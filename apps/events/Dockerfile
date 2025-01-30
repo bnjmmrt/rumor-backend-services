@@ -1,40 +1,15 @@
-# dev build
 FROM public.ecr.aws/docker/library/node:20 as development
 
-EXPOSE 50053
+EXPOSE 5051
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-COPY yarn.lock ./
 
-RUN apt-get install git
-
-RUN yarn --frozen-lockfile
+RUN npm install
 
 COPY . .
 
-RUN yarn build:events
+RUN npm run build
 
-# prod build
-FROM public.ecr.aws/docker/library/node:20 as production
-
-ARG NODE_ENV=production
-ENV NODE_ENV=${NODE_ENV}
-
-WORKDIR /usr/src/app
-
-COPY package*.json ./
-COPY yarn.lock ./
-
-RUN apt-get install git
-
-RUN yarn install --production --frozen-lockfile
-
-COPY . .
-
-COPY --from=development /usr/src/app/dist ./dist
-
-EXPOSE 50053
-
-CMD ["node", "dist/apps/events/main"]
+CMD ["node", "dist/index.ts"]

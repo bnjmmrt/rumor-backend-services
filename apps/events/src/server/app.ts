@@ -1,8 +1,9 @@
-import express, { Request, Response, NextFunction } from 'express';
-import bodyParser from 'body-parser';
+import * as express from 'express';
+import { Request, Response, NextFunction } from 'express';
+import * as bodyParser from 'body-parser';
 import helmet from 'helmet';
-import cors from 'cors';
-import router from '../routes/index';
+import * as cors from 'cors';
+// import router from '../routes/index';
 
 // import context from 'express-http-context';
 // import bookingRoutes from '../services/bookings/routes';
@@ -42,7 +43,7 @@ app.use(helmet());
 app.use(bodyParser.json());
 // app.use(context.middleware);
 
-app.use(router);
+// app.use(router);
 
 // app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundEndpointError(req.path)));
 

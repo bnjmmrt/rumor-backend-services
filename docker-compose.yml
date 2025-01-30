@@ -1,0 +1,13 @@
+version: '3'
+services:
+  users:
+    build: ./users
+    volumes:
+      - ./users:/app
+    # Add any other configuration for the "users" service here
+
+  events:
+    build: ./events
+    volumes:
+      - ./events:/app
+    # Add any other configuration for the "events" service here

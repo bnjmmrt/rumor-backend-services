@@ -7,7 +7,6 @@ const getSecret = async (secretName: string) =>
         .getSecretValue({ SecretId: secretName })
         .promise()
         .then((data: any) => {
-            console.log("🚀 ~ .then ~ data:", JSON.parse(data.SecretString))
             return JSON.parse(data.SecretString);
         })
         .catch((err: any) => {

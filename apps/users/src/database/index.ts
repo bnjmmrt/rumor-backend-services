@@ -16,9 +16,10 @@ export class ConnectionManager {
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
-          entities: [__dirname + "/entities/*.ts"],
+          entities: [ "../../../../rumor-utils"+"/entities/*.ts"],
           synchronize: false,
           logging: false,
+          ssl: { rejectUnauthorized: false }
         });
         this.connection = await appDataSource.initialize();
       }
