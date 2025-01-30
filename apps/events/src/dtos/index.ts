@@ -1,0 +1,9 @@
+export { CreateCollaboratorDto, UpdateCollaboratorDto } from './collaborator.dto';
+export { CreateAdmissionTypeRequestDto } from './create-admission-type.dto';
+export { CreateTalentRequestDto } from './create-talent.dto';
+export { CreateTicketTypeRequestDto } from './ticket-type.dto';
+export { RequestByIdDto } from './shared.dto';
+export { UpdateAdmissionTypeRequestDto } from './update-admission-type.dto';
+export { UpdateTalentRequestDto } from './update-talent.dto';
+export { UpdateTicketTypeRequestDto } from './ticket-type.dto';
+export { AddGuestsRequestDto, GuestsRequestDto, UpdateGuestsRequestDto } from './guest.dto';
