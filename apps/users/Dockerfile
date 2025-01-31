@@ -1,6 +1,6 @@
 FROM public.ecr.aws/docker/library/node:20 as development
 
-EXPOSE 5050
+EXPOSE 8000
 
 WORKDIR /usr/src/app
 

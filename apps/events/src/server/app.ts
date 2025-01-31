@@ -17,7 +17,8 @@ import * as cors from 'cors';
 
 const app = express();
 
-app.get('/health', (req: Request, res: Response) => {
+// app.use('/events/v1', router)
+app.get('/events/v1/health', (req: Request, res: Response) => {
     res.sendStatus(200);
 });
 

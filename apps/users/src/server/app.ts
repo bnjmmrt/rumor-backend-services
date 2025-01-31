@@ -19,7 +19,7 @@ import * as cors from 'cors';
 
 const app = express();
 
-app.get('/health', (req: Request, res: Response) => {
+app.get('/users/v1/health', (req: Request, res: Response) => {
     res.sendStatus(200);
 });
 
