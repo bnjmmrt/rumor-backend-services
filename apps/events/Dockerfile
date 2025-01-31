@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:20 as development
+FROM public.ecr.aws/docker/library/node:20
 
 EXPOSE 8001
 

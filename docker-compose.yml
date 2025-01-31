@@ -1,13 +1,15 @@
 version: '3'
 services:
-  users:
-    build: ./users
-    volumes:
-      - ./users:/app
-    # Add any other configuration for the "users" service here
+    users:
+        image: users
+        ports:
+            - 8000:8000
+        volumes:
+            - ./users:/app
 
-  events:
-    build: ./events
-    volumes:
-      - ./events:/app
-    # Add any other configuration for the "events" service here
+    events:
+        image: events
+        ports:
+            - 8001:8001
+        volumes:
+            - ./events:/app

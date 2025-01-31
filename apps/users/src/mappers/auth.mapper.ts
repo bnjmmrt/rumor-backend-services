@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import { User } from '../database/entities/user.entity';
+import { User } from 'rumor-utils/entities/users/entities/user.entity';
 import {
   Gender as GenderProto,
   CurrentMember,
@@ -17,7 +17,7 @@ import * as dayjs from 'dayjs';
 import { formatSinceDate, formatToUnits } from '../utils/auth.util';
 import { entityToProviderType } from './social.mapper';
 import { entityToUserSource, entityToUserStatus } from './shared.mapper';
-import { UserRole } from '../database/entities/roles/user-role.entity';
+import { UserRole } from 'rumor-utils/entities/users/entities/roles/user-role.entity';
 import { SocialProviderType, UserStatus } from '../interfaces/shared.interface';
 import { InterestData } from '../../../events/src/grpc/events/general.pb';
 import { calculateAge } from 'rumor-utils/utils/utils';

@@ -1,16 +1,15 @@
 import database from 'src/database';
 import { IdRequestDto } from '../dtos/shared.dto';
-import { User } from '../database/entities/user.entity';
-import { Repository } from 'typeorm';
+import { User } from 'rumor-utils/entities/users/entities/user.entity';
 import { GetPushNotificationTokensRequest, GetPushNotificationTokensResponse, ProfileNotificationSetting, UserSettingResponse } from '../grpc/auth/settings.pb';
-import { UserSettings } from '../database/entities/user-settings.entity';
+import { UserSettings } from 'rumor-utils/entities/users/entities/user-settings.entity';
 import { responses } from '../common/responses.common';
 import { isWithinTimeRange } from '../utils/auth.util';
 import { DeleteNotificationTokenRequestDto, UpdateNotificationSettingRequestDto } from '../dtos/settings.dto';
 import { UserDataSimple } from '../grpc/auth/auth.pb';
 import { SaveNotificationTokenRequestDto } from '../dtos/settings.dto';
 import { GenericResponse } from '../grpc/auth/shared.pb';
-import { PushNotificationToken } from '../database/entities/push-notification-token.entity';
+import { PushNotificationToken } from 'rumor-utils/entities/users/entities/push-notification-token.entity';
 
 
 export class SettingsService {

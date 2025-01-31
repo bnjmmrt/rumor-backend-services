@@ -55,10 +55,10 @@ import { entityToProviderType } from '../mappers/social.mapper';
 import { ProviderAuth, ProviderType } from '../grpc/auth/shared.pb';
 import * as querystring from 'querystring';
 import { generateCodeChallenge, generateCodeVerifier } from '../utils/auth.util';
-import { User } from '../database/entities/user.entity';
-import { XAuthSession } from '../database/entities/xauthsession.entity';
-import { SocialProvider } from '../database/entities/social-provider.entity';
-import { SocialStats } from '../database/entities/social-stats.entity';
+import { User } from 'rumor-utils/entities/users/entities/user.entity';
+import { XAuthSession } from 'rumor-utils/entities/users/entities/xauthsession.entity';
+import { SocialProvider } from 'rumor-utils/entities/users/entities/social-provider.entity';
+import { SocialStats } from 'rumor-utils/entities/users/entities/social-stats.entity';
 
 
 export class SocialService {

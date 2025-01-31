@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import { User } from '../database/entities/user.entity';
+import { User } from "rumor-utils/entities/users/entities/user.entity"
 import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile } from '../grpc/auth/auth.pb';
 import dayjs from 'dayjs';
 import { formatEventStatus } from '../../../events/src/mappers/events.mapper';
@@ -7,7 +7,7 @@ import { EventStatus } from '../../../events/src/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
 import { entityToUserStatus } from './shared.mapper';
-import { UserRole } from '../database/entities/roles/user-role.entity';
+import { UserRole } from 'rumor-utils/entities/users/entities/roles/user-role.entity';
 
 export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
   const upcomingEvents = user.hostedEvents

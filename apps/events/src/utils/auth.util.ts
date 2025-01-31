@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { HostSignUpRequestDto, MemberAddressDto, MemberSignUpRequestDto } from '../../../users/src/dtos/auth.dto';
-import { Address } from '../database/entities';
-import { User } from '../database/entities';
+import { Address } from 'rumor-utils/entities/users/entities/address.entity';
+import { User } from 'rumor-utils/entities/users/entities/user.entity';
 import { genderToEntity } from '../../../users/src/mappers/auth.mapper';
 import { UpdateHostProfileRequestDto } from '../../../users/src/dtos/admin.dto';
 import { getCityNameFromAddressComponents } from '../../../events/src/utils/event.utils';

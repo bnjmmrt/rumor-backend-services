@@ -1,6 +1,6 @@
 import database from '../database'
-import { Role } from '../database/entities/roles/role.entity';
-import { UserRole } from '../database/entities/roles/user-role.entity';
+import { Role } from 'rumor-utils/entities/users/entities/roles/role.entity';
+import { UserRole } from 'rumor-utils/entities/users/entities/roles/user-role.entity';
 import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from '../grpc/auth/role.pb';
 import { responses } from '../common/responses.common';
 import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from '../dtos/role.dto';
@@ -8,7 +8,7 @@ import { GenericResponse } from '../grpc/auth/shared.pb';
 import { IdRequestDto } from '../dtos/shared.dto';
 import { UserSource, UserStatus } from '../interfaces/shared.interface';
 import { userSourceToEntity, userStatusToEntity } from '../mappers/shared.mapper';
-import { User } from '../database/entities/user.entity';
+import { User } from 'rumor-utils/entities/users/entities/user.entity';
    
 export class RoleService {
   static dbConnection = database;
