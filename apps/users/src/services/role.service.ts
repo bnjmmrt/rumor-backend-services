@@ -1,14 +1,14 @@
 import database from '../database'
-import { Role } from 'rumor-utils/entities/users/entities/roles/role.entity';
-import { UserRole } from 'rumor-utils/entities/users/entities/roles/user-role.entity';
-import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from '../grpc/auth/role.pb';
+import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
+import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
+import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from 'rumor-utils/shared/users/grpc/auth/role.pb';
 import { responses } from '../common/responses.common';
-import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from '../dtos/role.dto';
-import { GenericResponse } from '../grpc/auth/shared.pb';
-import { IdRequestDto } from '../dtos/shared.dto';
-import { UserSource, UserStatus } from '../interfaces/shared.interface';
-import { userSourceToEntity, userStatusToEntity } from '../mappers/shared.mapper';
-import { User } from 'rumor-utils/entities/users/entities/user.entity';
+import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from 'rumor-utils/shared/users/dtos/role.dto';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { userSourceToEntity, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
    
 export class RoleService {
   static dbConnection = database;

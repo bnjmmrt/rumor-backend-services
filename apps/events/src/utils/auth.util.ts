@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
-import { HostSignUpRequestDto, MemberAddressDto, MemberSignUpRequestDto } from '../../../users/src/dtos/auth.dto';
-import { Address } from 'rumor-utils/entities/users/entities/address.entity';
-import { User } from 'rumor-utils/entities/users/entities/user.entity';
-import { genderToEntity } from '../../../users/src/mappers/auth.mapper';
-import { UpdateHostProfileRequestDto } from '../../../users/src/dtos/admin.dto';
+import { HostSignUpRequestDto, MemberAddressDto, MemberSignUpRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
+import { Address } from 'rumor-utils/shared/users/entities/address.entity';
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
+import { genderToEntity } from 'rumor-utils/shared/users/mappers/auth.mapper';
+import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { getCityNameFromAddressComponents } from '../../../events/src/utils/event.utils';
 
 export const newMember = (payload: MemberSignUpRequestDto, address: Address): User => {

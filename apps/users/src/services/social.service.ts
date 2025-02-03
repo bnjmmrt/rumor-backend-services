@@ -1,4 +1,4 @@
-import { IsNull, Repository } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { responses } from '../common/responses.common';
 import database from '../database';
 import config from '../config';
@@ -16,7 +16,7 @@ import {
   XAuthCallbackRequestDto,
   InstagramUserRequestDto,
   LinkedInUserIdAuthRequestDto,
-} from '../dtos/social.dto';
+} from 'rumor-utils/shared/users/dtos/social.dto';
 
 import {
   GetGoogleAuthUrlResponse,
@@ -39,7 +39,7 @@ import {
   SocialMediaStatsResponse,
   TiktokAuthCallbackResponse,
   XAuthCallbackResponse,
-} from '../grpc/auth/social.pb';
+} from 'rumor-utils/shared/users/grpc/auth/social.pb';
 
 import {
   FacebookTokenResponse,
@@ -47,18 +47,18 @@ import {
   InstagramTokenResponse,
   LinkedInTokenResponse,
   LinkedInUserInfoResponse,
-} from '../interfaces/social.interface';
+} from 'rumor-utils/shared/users/interfaces/social.interface';
 
-import { SocialProviderType } from '../interfaces/shared.interface';
+import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import axios, { AxiosError } from 'axios';
-import { entityToProviderType } from '../mappers/social.mapper';
-import { ProviderAuth, ProviderType } from '../grpc/auth/shared.pb';
+import { entityToProviderType } from 'rumor-utils/shared/users/mappers/social.mapper';
+import { ProviderAuth, ProviderType } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import * as querystring from 'querystring';
 import { generateCodeChallenge, generateCodeVerifier } from '../utils/auth.util';
-import { User } from 'rumor-utils/entities/users/entities/user.entity';
-import { XAuthSession } from 'rumor-utils/entities/users/entities/xauthsession.entity';
-import { SocialProvider } from 'rumor-utils/entities/users/entities/social-provider.entity';
-import { SocialStats } from 'rumor-utils/entities/users/entities/social-stats.entity';
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
+import { XAuthSession } from 'rumor-utils/shared/users/entities/xauthsession.entity';
+import { SocialProvider } from 'rumor-utils/shared/users/entities/social-provider.entity';
+import { SocialStats } from 'rumor-utils/shared/users/entities/social-stats.entity';
 
 
 export class SocialService {

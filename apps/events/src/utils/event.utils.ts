@@ -1,4 +1,4 @@
-import { EventStatus, GuestStatus } from '../grpc/events/general.pb';
+import { EventStatus, GuestStatus } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { parse } from 'qs';
 
 export enum Gender {

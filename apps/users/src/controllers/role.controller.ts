@@ -1,10 +1,10 @@
 // import { Controller, Inject } from '@nestjs/common';
 // import { GrpcMethod } from '@nestjs/microservices';
 import { RoleService } from '../services/role.service';
-import { CheckRoleResponse, ListRolesResponse, ROLE_SERVICE_NAME, RoleResponse, UserRoleResponse } from '../grpc/auth/role.pb';
-import { IdRequestDto } from '../dtos/shared.dto';
-import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from '../dtos/role.dto';
-import { GenericResponse } from '../grpc/auth/shared.pb';
+import { CheckRoleResponse, ListRolesResponse, ROLE_SERVICE_NAME, RoleResponse, UserRoleResponse } from 'rumor-utils/shared/users/grpc/auth/role.pb';
+import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from 'rumor-utils/shared/users/dtos/role.dto';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 
 export class RoleController {
   // @Inject(RoleService)

@@ -8,11 +8,11 @@ import {
   MemberProfileResponse,
   SignUpResponse,
   TokenResponse,
-} from '../grpc/auth/auth.pb';
-import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from '../dtos/shared.dto';
-import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from '../dtos/auth.dto';
-import { UpdateHostProfileRequestDto } from '../dtos/admin.dto';
-import { GenericResponse } from '../grpc/auth/shared.pb';
+} from 'rumor-utils/shared/users/grpc/auth/auth.pb'
+import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
+import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 
 export class AdminController {
 

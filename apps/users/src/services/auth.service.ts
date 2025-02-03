@@ -32,7 +32,7 @@ import {
   NonMemberSignUpRequestDto,
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
-} from '../dtos/auth.dto';
+} from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
   ForgotPasswordResponse,
@@ -56,14 +56,14 @@ import {
   SimpleUserResponse,
   GetUserWithRolesByEmailResponse,
   CreateUserResponse,
-} from '../grpc/auth/auth.pb';
+} from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
-import { Invitation } from 'rumor-utils/entities/users/entities/invitation.entity';
-import { TemporaryLoginCode } from 'rumor-utils/entities/users/entities/temporary-login-code.entity';
-import { HostCustomUsersLists } from 'rumor-utils/entities/users/entities/host-custom-users-lists.entity';
-import { HostFavorite } from 'rumor-utils/entities/users/entities/host-favorite.entity';
-import { Address } from 'rumor-utils/entities/users/entities/address.entity';
-import { TemporaryPasswordToken } from "rumor-utils/entities/users/entities/temporary-password-token.entity";
+import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity';
+import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
+import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
+import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
+import { Address } from 'rumor-utils/shared/users/entities/address.entity';
+import { TemporaryPasswordToken } from "rumor-utils/shared/users/entities/temporary-password-token.entity";
 
 import {
   LoginRequest,
@@ -82,28 +82,28 @@ import {
   toCurrentUser,
   toSimpleUser,
   toUserDataSimple,
-} from '../mappers/auth.mapper';
+} from 'rumor-utils/shared/users/mappers/auth.mapper';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
-import { hasPagination, TokenRequestDto } from '../dtos/shared.dto';
-import { ProviderAuth } from '../grpc/auth/shared.pb';
-import { AdditionalHostInformation, RoleType } from '../interfaces/auth.interface';
+import { hasPagination, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { AdditionalHostInformation, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
-import { UserSource, UserStatus } from '../interfaces/shared.interface';
-import { entityToProviderType, providerTypeToEntity } from '../mappers/social.mapper';
+import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { entityToProviderType, providerTypeToEntity } from 'rumor-utils/shared/users/mappers/social.mapper';
 import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library/build/src/auth/jwtclient';
-import { ListUsersInviteesDto } from '../dtos/guest.dto';
+import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
 import { ParsedQs } from 'qs';
 import GoogleAddressClient from '../utils/clients/googleAddress.client';
-import { getCityNameFromAddressComponents } from '../../../events/src/utils/event.utils';
+import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
 
 //-----------------Admin Imports
 
-import { User } from 'rumor-utils/entities/users/entities/user.entity';
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { Brackets, IsNull, Repository } from 'typeorm';
 
-import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from '../dtos/shared.dto';
+import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import {
   BasicHostProfileResponse,
   GetHostsResponse,
@@ -112,32 +112,32 @@ import {
   MemberProfileResponse,
   SignUpResponse,
   TokenResponse,
-} from '../grpc/auth/auth.pb';
+} from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { parse } from 'qs';
-import { toHost, toMember } from '../mappers/auth.mapper';
+import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { responses } from '../common/responses.common';
-import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from '../dtos/auth.dto';
-import { UserRole } from 'rumor-utils/entities/users/entities/roles/user-role.entity';
+import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
+import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
-import { RawHost } from '../interfaces/auth.interface';
-import { toBasicHostProfile, toHostProfile, toMemberProfile } from '../mappers/admin.mapper';
-import { UpdateHostProfileRequestDto } from '../dtos/admin.dto';
+import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { toBasicHostProfile, toHostProfile, toMemberProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
+import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from '../mappers/shared.mapper';
+import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
-import { SocialProviderType } from '../interfaces/shared.interface';
-import { GenericResponse, NewUserStatus } from '../grpc/auth/shared.pb';
+import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { GenericResponse, NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 // import { CommunicationClient } from 'rumor-utils/clients/communication.client';
-import { HostFollowing } from 'rumor-utils/entities/users/entities/host-following.entity';
-import { SocialProvider } from 'rumor-utils/entities/users/entities/social-provider.entity';
+import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
+import { SocialProvider } from 'rumor-utils/shared/users/entities/social-provider.entity';
 
 import * as dayjs from 'dayjs';
 import * as isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import * as utc from 'dayjs/plugin/utc';
 import * as tz from 'dayjs/plugin/timezone';
-import { TemporaryPassword } from 'rumor-utils/entities/users/entities/temporary-password.entity';
-import { Role } from 'rumor-utils/entities/users/entities/roles/role.entity';
-import { HostUserMapping } from 'rumor-utils/entities/users/entities/host-user-mapping.entity';
+import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
+import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
+import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
