@@ -1,15 +1,13 @@
-// import { Controller, Inject } from '@nestjs/common';
-import { IdRequestDto } from '../dtos/shared.dto';
+import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { SettingsService } from '../services/settings.service';
 import {
   DeleteNotificationTokenRequestDto,
   GetPushNotificationTokensRequestDto,
   UpdateNotificationSettingRequestDto,
   SaveNotificationTokenRequestDto,
-} from '../dtos/settings.dto';
-import { GetPushNotificationTokensResponse, SETTINGS_SERVICE_NAME, UserSettingResponse } from '../grpc/auth/settings.pb';
-// import { GrpcMethod } from '@nestjs/microservices';
-import { GenericResponse } from '../grpc/auth/shared.pb';
+} from 'rumor-utils/shared/users/dtos/settings.dto';
+import { GetPushNotificationTokensResponse, SETTINGS_SERVICE_NAME, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 
 // @Controller('settings')
 export class SettingsController {

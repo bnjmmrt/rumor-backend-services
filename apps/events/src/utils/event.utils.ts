@@ -1,13 +1,43 @@
-import { Gender } from '../../users/src/grpc/auth/auth.pb';
-import { EventStatus, GuestStatus } from '../grpc/events/general.pb';
+import { EventStatus, GuestStatus } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { parse } from 'qs';
-import { SocialProviderType } from '../../users/src/interfaces/shared.interface';
+
+export enum Gender {
+  MALE = 0,
+  FEMALE = 1,
+  NON_BINARY = 2,
+  NOT_APPLICABLE = 3,
+  UNRECOGNIZED = -1,
+}
+
+export enum SocialProviderType {
+  FACEBOOK = 'FACEBOOK',
+  INSTAGRAM = 'INSTAGRAM',
+  TIKTOK = 'TIKTOK',
+  GOOGLE = 'GOOGLE',
+  LINKEDIN = 'LINKEDIN',
+  SNAPCHAT = 'SNAPCHAT',
+  X = 'X',
+}
+
+
+export enum ProviderType {
+  FACEBOOK = 0,
+  INSTAGRAM = 1,
+  TIKTOK = 2,
+  GOOGLE = 3,
+  LINKEDIN = 4,
+  X = 5,
+  SNAPCHAT = 6,
+  UNRECOGNIZED = -1,
+}
 
 interface AddressComponent {
   long_name: string;
   short_name: string;
   types: string[];
 }
+
+
 
 export const getCityNameFromAddressComponents = (addressComponents: AddressComponent[]): string | undefined => {
   for (const component of addressComponents) {

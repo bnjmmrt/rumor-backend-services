@@ -22,7 +22,7 @@ import {
   XAuthCallbackResponse,
   InstagramUserResponse,
   SocialMediaStatsResponse,
-} from '../grpc/auth/social.pb';
+} from 'rumor-utils/shared/users/grpc/auth/social.pb';
 import {
   UserIdAuthRequestDto,
   GetMetaAuthUrlRequestDto,
@@ -35,9 +35,9 @@ import {
   TiktokAuthCallbackRequestDto,
   InstagramUserRequestDto,
   LinkedInUserIdAuthRequestDto,
-} from '../dtos/social.dto';
+} from 'rumor-utils/shared/users/dtos/social.dto';
 import { SocialService } from '../services/social.service';
-import { XAuthCallbackRequestDto } from '../dtos/social.dto';
+import { XAuthCallbackRequestDto } from 'rumor-utils/shared/users/dtos/social.dto';
 
 // @Controller('social')
 export class SocialController {

@@ -25,7 +25,7 @@ import {
   SimpleUserResponse,
   GetUserWithRolesByEmailResponse,
   CreateUserResponse,
-} from '../grpc/auth/auth.pb';
+} from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
   CheckAgeRequestDto,
@@ -58,10 +58,10 @@ import {
   NonMemberSignUpRequestDto,
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
-} from '../dtos/auth.dto';
-import { GenericResponse } from '../grpc/auth/shared.pb';
-import { ListUsersInviteesDto } from '../../../events/src/dtos/guest.dto';
-import { IdRequestDto, PaginatedRequestDto, TokenRequestDto } from '../dtos/shared.dto';
+} from 'rumor-utils/shared/users/dtos/auth.dto';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
+import { IdRequestDto, PaginatedRequestDto, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 
 export class AuthController {
   

@@ -1,5 +1,5 @@
 import { ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments, registerDecorator, ValidationOptions } from 'class-validator';
-import { CreateEventRequestDto } from '../dtos/events.dto';
+import { CreateEventRequestDto } from 'rumor-utils/shared/events/dtos/events.dto';
 
 @ValidatorConstraint({ async: false })
 export class IsPublishDateValidConstraint implements ValidatorConstraintInterface {

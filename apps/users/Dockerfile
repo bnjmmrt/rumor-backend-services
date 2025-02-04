@@ -1,15 +1,25 @@
-FROM public.ecr.aws/docker/library/node:20 as development
+# Use the latest Node.js image as the base
+FROM node:latest
+
+WORKDIR /app
+
+# Copy rumor-utils to the working directory
+COPY rumor-utils rumor-utils
+
+# Copy package.json and package-lock.json to the working directory
+COPY apps/users/package*.json .
+COPY apps/users/tsconfig.json .
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application code to the working directory
+COPY apps/users/src src
+
+# Build the application
+RUN npm run build
 
 EXPOSE 8000
 
-WORKDIR /usr/src/app
-
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
-RUN npm run build
-
-CMD ["node", "dist/index.ts"]
+# Start the service
+CMD ["node", "/app/dist/src/index.js"]
