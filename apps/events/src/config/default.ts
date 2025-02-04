@@ -7,7 +7,6 @@ const config = {
         adminAppBaseUrl: '',
         HostAppBaseUrl: '',
         MemberAppBaseUrl: '',
-        port: 8000,
         runMigrations: true,
         runSeeds: false,
         runTasks: false,
