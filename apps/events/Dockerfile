@@ -21,4 +21,4 @@ RUN npm run build
 EXPOSE 8001
 
 # Start the service
-CMD ["node", "dist/index.js"]
+CMD ["node", "/app/dist/src/index.js"]
