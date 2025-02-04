@@ -2,7 +2,7 @@ const config = {
     parameters: [],
     secrets: [
         {
-            remoteKey: 'dev-rumor'
+            remoteKey: '/local/dev'
         }
     ],
     values: {

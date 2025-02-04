@@ -84,7 +84,7 @@ class Config {
                     // throw new ProgrammerError(`No config for environment '${environment}'`);
             }
 
-            console.info(`[CONFIG] Successfully loaded config.`);
+            console.info(`[CONFIG] Successfully loaded config.`,this.values);
 
             // Validate config values after loading
             this.validateConfigValues(this.values);
