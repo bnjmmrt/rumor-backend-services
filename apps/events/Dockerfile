@@ -9,8 +9,10 @@ COPY rumor-utils rumor-utils
 COPY apps/events/package*.json .
 COPY apps/events/tsconfig.json .
 
+RUN rm -rf node_modules package-lock.json
+
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm install
 
 # Copy the rest of the application code to the working directory
 COPY apps/events/src src

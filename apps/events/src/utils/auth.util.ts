@@ -4,7 +4,7 @@ import { Address } from 'rumor-utils/shared/users/entities/address.entity';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { genderToEntity } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
-import { getCityNameFromAddressComponents } from '../../../events/src/utils/event.utils';
+import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
 
 export const newMember = (payload: MemberSignUpRequestDto, address: Address): User => {
   const user = new User();
