@@ -43,7 +43,7 @@ app.use(helmet());
 app.use(bodyParser.json());
 // app.use(context.middleware);
 
-app.use(router);
+app.use('/users/v1', router);
 
 // app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundEndpointError(req.path)));
 

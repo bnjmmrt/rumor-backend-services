@@ -4,8 +4,9 @@ import { AuthController } from '../controllers/auth.controller';
 
 const router: Router = express.Router();
 
-router.get('/admin/login',(req: Request, res: Response) => {
-  AuthController.login(req.body);
+router.post('/auth/admin/login', async (req: Request, res: Response) => {
+  let loginData = await AuthController.login(req.body);
+  res.json(loginData)
 })
 
 export default router;
