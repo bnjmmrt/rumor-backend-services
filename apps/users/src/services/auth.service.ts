@@ -161,7 +161,7 @@ export class AuthService {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: { email: payload.email, deletedAt: IsNull() },
       });
-
+      
       if (!user) {
         return responses.forbidden('Verify your password and email');
       }

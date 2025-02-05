@@ -16,7 +16,10 @@ export class ConnectionManager {
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
-          entities: [ "../../../../rumor-utils"+"/entities/*.ts"],
+          entities: [
+            "node_modules/rumor-utils/shared/users/entities/*.ts",
+            "node_modules/rumor-utils/shared/events/entities/*.ts"
+          ],
           synchronize: false,
           logging: false,
           ssl: { rejectUnauthorized: false }
