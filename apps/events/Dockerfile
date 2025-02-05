@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY apps/events/package*.json .
 COPY apps/events/tsconfig.json .
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application code to the working directory
 COPY apps/events/src src

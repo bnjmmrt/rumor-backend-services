@@ -1,6 +1,9 @@
 const config = {
     parameters: [],
     secrets: [
+        {
+            remoteKey: "/local/dev"
+        }
     ],
     values: {
         domain: '',

@@ -62,7 +62,7 @@ class Config {
             await this.loadEnvironmentConfig(defaultConfig);
 
             const { NODE_ENV } = process.env;
-            const environment = NODE_ENV  ? NODE_ENV : 'development';
+            const environment = NODE_ENV  ? NODE_ENV : 'default';
             this.set('env', environment);
 
             console.info(`[CONFIG] Loading config for ${environment} environment...`);
