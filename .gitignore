@@ -5,7 +5,6 @@ dist/
 communication_to_be_inside_notifications/
 platform_to_be_dissolved/
 scheduler_to_be_dissolved/
-notifications/
 
 # Ignore dependencies
 node_modules/

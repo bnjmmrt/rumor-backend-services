@@ -1,0 +1,19 @@
+export { User } from '../users/entities/user.entity'; 
+export { Address } from '../users/entities/address.entity';
+
+export { AdmissionType } from '../events/entities/admission-type.entity';
+export { Collaborator } from '../events/entities/collaborator.entity';
+export { Event } from '../events/entities/event.entity';
+export { EventTypes } from '../events/entities/event-types.entity';
+export { QuizQuestion } from '../events/entities/quiz-question.entity';
+export { Talent } from '../events/entities/talent.entity';
+export { TicketType } from '../events/entities/ticket-type.entity';
+export { EventLocation } from '../events/entities/event-location.entity';
+export { Guest } from '../events/entities/guest.entity';
+export { UserAttendeeStats } from '../events/entities/user-attendee-stats.entity';
+export { UserQuizAnswer } from '../events/entities/user-quiz-question-answer.entity';
+export { Ticket } from '../events/entities/ticket.entity';
+export { EventAgeLimit } from '../events/entities/event-age-limit.entity';
+export { DefaultRoleSettings } from '../events/entities/default-role-settings.entity';
+export { FeaturedEventSection } from '../events/entities/featured-event-section.entity'
+export { EventAnnouncement } from '../events/entities/event-announcement.entity';
