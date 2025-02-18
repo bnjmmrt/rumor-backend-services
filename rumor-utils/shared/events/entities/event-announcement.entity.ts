@@ -2,7 +2,7 @@ import { RumorBaseEntity } from '../../entities/rumor-base.entity';
 import { Entity, Column, ManyToOne, JoinColumn} from 'typeorm';
 import { Event } from './event.entity';
 import { TicketType } from './ticket-type.entity';
-import { User } from 'shared/entities';
+import { User } from '../../users/entities/user.entity';
 
 @Entity()
 export class EventAnnouncement extends RumorBaseEntity{

@@ -1,6 +1,5 @@
 export { User } from '../users/entities/user.entity'; 
 export { Address } from '../users/entities/address.entity';
-
 export { AdmissionType } from '../events/entities/admission-type.entity';
 export { Collaborator } from '../events/entities/collaborator.entity';
 export { Event } from '../events/entities/event.entity';
