@@ -62,255 +62,399 @@ import {
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { IdRequestDto, PaginatedRequestDto, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import asyncWrapper from 'src/server/helpers/asyncWrapper';
 
 export class AuthController {
   
   //@GrpcMethod(AUTH_SERVICE_NAME, 'ForgotPassword')
-  public static forgotPassword(payload: ForgotPasswordRequestDto): Promise<ForgotPasswordResponse> {
-    return AuthService.forgot(payload);
-  }
+  public static forgotPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ForgotPasswordRequestDto = req.body;
+      const response: ForgotPasswordResponse = await AuthService.forgot(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'SetPassword')
-  public static setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponse> {
-    return AuthService.setPassword(payload);
-  }
+  public static setPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SetHostPasswordRequestDto = req.body;
+      const response: TokenResponse = await AuthService.setPassword(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'Login')
-  public static login(payload: LoginRequestDto): Promise<LoginResponse> {
-    return AuthService.login(payload);
-  }
+  public static login = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: LoginRequestDto = req.body;
+      const response: LoginResponse = await AuthService.login(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'Validate')
-  public static validate(payload: ValidateRequestDto): Promise<ValidateResponse> {
-    return AuthService.validate(payload);
-  }
+  public static validate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ValidateRequestDto = req.body;
+      const response: ValidateResponse = await AuthService.validate(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'MemberSignUp')
-  public static memberSignUp(payload: MemberSignUpRequestDto): Promise<SignUpResponse> {
-    return AuthService.memberSignUp(payload);
-  }
+  public static memberSignUp = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: MemberSignUpRequestDto = req.body;
+      const response: SignUpResponse = await AuthService.memberSignUp(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'HostSignUp')
-  public static hostSignUp(payload: HostSignUpRequestDto): Promise<SignUpResponse> {
-    return AuthService.hostSignUp(payload);
-  }
+  public static hostSignUp = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: HostSignUpRequestDto = req.body;
+      const response: SignUpResponse = await AuthService.hostSignUp(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'Logout')
-  public static logout(payload: TokenRequestDto): Promise<GenericResponse> {
-    return AuthService.logout(payload);
-  }
+  public static logout = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: TokenRequestDto = req.body;
+      const response: GenericResponse = await AuthService.logout(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'ValidatePasswordToken')
-  public static validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<ValidityResponse> {
-    return AuthService.validatePasswordToken(payload);
-  }
+  public static validatePasswordToken = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ValidatePasswordTokenRequestDto = req.body;
+      const response: ValidityResponse = await AuthService.validatePasswordToken(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'SetHostPassword')
-  public static setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
-    return AuthService.setHostPassword(payload);
-  }
+  public static setHostPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SetHostPasswordRequestDto = req.body;
+      const response: GenericResponse = await AuthService.setHostPassword(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostPassword')
-  public static updateHostPassword(payload: UpdateHostPasswordRequestDto): Promise<GenericResponse> {
-    return AuthService.updateHostPassword(payload);
-  }
+  public static updateHostPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateHostPasswordRequestDto = req.body;
+      const response: GenericResponse = await AuthService.updateHostPassword(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'LoginSSO')
-  public static loginSSO(): Promise<LoginSSOResponse> {
-    return AuthService.loginSSO();
-  }
+  public static loginSSO = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: LoginSSOResponse = await AuthService.loginSSO();
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'OAuthRedirect')
-  public static oAuthRedirect(payload: OAuthRequestDto): Promise<OAuthRedirectResponse> {
-    return AuthService.oAuthRedirect(payload);
-  }
+  public static oAuthRedirect = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: OAuthRequestDto = req.body;
+      const response: OAuthRedirectResponse = await AuthService.oAuthRedirect(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CheckPhoneNumber')
-  public static checkPhoneNumber(payload: PhoneNumberRequestDto): Promise<ValidityResponse> {
-    return AuthService.checkPhoneNumber(payload);
-  }
+  public static checkPhoneNumber = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: PhoneNumberRequestDto = req.body;
+      const response: ValidityResponse = await AuthService.checkPhoneNumber(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CheckEmail')
-  public static checkEmail(payload: CheckEmailRequestDto): Promise<ValidityResponse> {
-    return AuthService.checkEmail(payload);
-  }
+  public static checkEmail = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CheckEmailRequestDto = req.body;
+      const response: ValidityResponse = await AuthService.checkEmail(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CheckAge')
-  public static checkAge(payload: CheckAgeRequestDto): Promise<ValidityResponse> {
-    return AuthService.checkAge(payload);
-  }
+  public static checkAge = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CheckAgeRequestDto = req.body;
+      const response: ValidityResponse = await AuthService.checkAge(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CheckMemberLogin')
-  public static checkMemberLogin(payload: LoginVerificationRequestDto): Promise<ValidityResponse> {
-    return AuthService.checkMemberLogin(payload);
-  }
+  public static checkMemberLogin = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: LoginVerificationRequestDto = req.body;
+      const response: ValidityResponse = await AuthService.checkMemberLogin(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'MemberLogin')
-  public static memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
-    return AuthService.memberLogin(payload);
-  }
+  public static memberLogin = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: MemberLoginRequestDto = req.body;
+      const response: TokenResponse = await AuthService.memberLogin(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'HostLogin')
-  public static hostLogin(payload: LoginRequestDto): Promise<TokenResponse> {
-    return AuthService.hostLogin(payload);
-  }
+  public static hostLogin = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: LoginRequestDto = req.body;
+      const response: TokenResponse = await AuthService.hostLogin(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetCurrentMember')
-  public static getCurrentMember(payload: IdRequestDto): Promise<MemberResponse> {
-    return AuthService.getCurrentMember(payload);
-  }
+  public static getCurrentMember = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: MemberResponse = await AuthService.getCurrentMember(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetUser')
-  public static getUser(payload: IdRequestDto): Promise<SimpleUserResponse> {
-    return AuthService.getUser(payload);
-  }
+  public static getUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: SimpleUserResponse = await AuthService.getUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetCurrentUser')
-  public static getCurrentUser(payload: IdRequestDto): Promise<CurrentUserResponse> {
-    return AuthService.getCurrentUser(payload);
-  }
+  public static getCurrentUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: CurrentUserResponse = await AuthService.getCurrentUser(payload);
+      res.json(response);
+    }
+  );
 
-  // Provider
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateProviderAuth')
-  public static saveOrUpdateProvider(payload: SaveOrUpdateProviderAuthRequestDto): Promise<SaveOrUpdateProviderAuthResponse> {
-    return AuthService.saveOrUpdateProvider(payload);
-  }
+  public static saveOrUpdateProvider = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SaveOrUpdateProviderAuthRequestDto = req.body;
+      const response: SaveOrUpdateProviderAuthResponse = await AuthService.saveOrUpdateProvider(payload);
+      res.json(response);
+    }
+  );
 
-  // Invitations
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'SendInvitations')
-  public static sendInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
-    return AuthService.sendInvitations(payload);
-  }
+  public static sendInvitations = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserInvitationsRequestDto = req.body;
+      const response: GenericResponse = await AuthService.sendInvitations(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'SaveInvitations')
-  public static saveInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
-    return AuthService.saveInvitations(payload);
-  }
+  public static saveInvitations = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserInvitationsRequestDto = req.body;
+      const response: GenericResponse = await AuthService.saveInvitations(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'InviteNewMember')
-  public static inviteNewMember(payload: InviteNewMemberRequestDto): Promise<GenericResponse> {
-    return AuthService.inviteNewMember(payload);
-  }
+  public static inviteNewMember = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InviteNewMemberRequestDto = req.body;
+      const response: GenericResponse = await AuthService.inviteNewMember(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'InviteNewHost')
-  public static inviteNewHost(payload: InviteNewHostRequestDto): Promise<GenericResponse> {
-    return AuthService.inviteNewHost(payload);
-  }
+  public static inviteNewHost = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InviteNewHostRequestDto = req.body;
+      const response: GenericResponse = await AuthService.inviteNewHost(payload);
+      res.json(response);
+    }
+  );
 
-  // User Profile
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateUserProfilePicture')
-  public static updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UpdateUserProfilePictureResponse> {
-    return AuthService.updateUserProfilePicture(payload);
-  }
+  public static updateUserProfilePicture = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateUserProfilePictureRequestDto = req.body;
+      const response: UpdateUserProfilePictureResponse = await AuthService.updateUserProfilePicture(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateUserProfile')
-  public static updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UpdateUserProfileResponse> {
-    return AuthService.updateUserProfile(payload);
-  }
+  public static updateUserProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateUserProfileRequestDto = req.body;
+      const response: UpdateUserProfileResponse = await AuthService.updateUserProfile(payload);
+      res.json(response);
+    }
+  );
 
-  // Bio
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetBioProfile')
-  public async getBioProfile(payload: IdRequestDto): Promise<BioProfileResponse> {
-    return AuthService.getBioProfile(payload);
-  }
+  public static getBioProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: BioProfileResponse = await AuthService.getBioProfile(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CreateBioProfile')
-  public async createBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
-    return AuthService.createBioProfile(payload);
-  }
+  public static createBioProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: BioProfileRequestDto = req.body;
+      const response: BioProfileResponse = await AuthService.createBioProfile(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateBioProfile')
-  public async updateBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
-    return AuthService.updateBioProfile(payload);
-  }
+  public static updateBioProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: BioProfileRequestDto = req.body;
+      const response: BioProfileResponse = await AuthService.updateBioProfile(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'ApproveMember')
-  public static approveMember(payload: IdRequestDto): Promise<GenericResponse> {
-    return AuthService.approveMember(payload);
-  }
+  public static approveMember = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: GenericResponse = await AuthService.approveMember(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'ListUsersByType')
-  public static listUsersByType(payload: ListUsersByTypeRequestDto): Promise<ListUsersByTypeResponse> {
-    return AuthService.listUsersByType(payload);
-  }
+  public static listUsersByType = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListUsersByTypeRequestDto = req.body;
+      const response: ListUsersByTypeResponse = await AuthService.listUsersByType(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CreateNonMemberUser')
-  public static createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<CreateNonMemberUserResponse> {
-    return AuthService.createNonMemberUser(payload);
-  }
+  public static createNonMemberUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CreateNonMemberUserRequestDto = req.body;
+      const response: CreateNonMemberUserResponse = await AuthService.createNonMemberUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetMembersOrNonMembers')
-  public static getMembersOrNonMembers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
-    return AuthService.getMembersOrNonMembers(payload);
-  }
+  public static getMembersOrNonMembers = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListUsersInviteesDto = req.body;
+      const response: GetMembersResponse = await AuthService.getMembersOrNonMembers(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'ManageFollowHost')
-  public static manageFollowHost(payload: ManageFollowHostRequestDto): Promise<GenericResponse> {
-    return AuthService.manageFollowHost(payload);
-  }
+  public static manageFollowHost = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageFollowHostRequestDto = req.body;
+      const response: GenericResponse = await AuthService.manageFollowHost(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetFollowedHosts')
-  public static getFollowedHosts(payload: PaginatedRequestDto): Promise<GetFollowedHostsResponse> {
-    return AuthService.getFollowedHosts(payload);
-  }
+  public static getFollowedHosts = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: PaginatedRequestDto = req.body;
+      const response: GetFollowedHostsResponse = await AuthService.getFollowedHosts(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetCustomUsersLists')
-  public static getCustomUsersLists(payload: IdRequestDto): Promise<CustomUsersListsResponse> {
-    return AuthService.getCustomUsersLists(payload);
-  }
+  public static getCustomUsersLists = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: CustomUsersListsResponse = await AuthService.getCustomUsersLists(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetCustomUsersList')
-  public static getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    return AuthService.getCustomUsersList(payload);
-  }
+  public static getCustomUsersList = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CustomUsersListRequestDto = req.body;
+      const response: CustomUsersListResponse = await AuthService.getCustomUsersList(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'DeleteCustomUsersList')
-  public static deleteCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    return AuthService.deleteCustomUsersList(payload);
-  }
+  public static deleteCustomUsersList = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CustomUsersListRequestDto = req.body;
+      const response: CustomUsersListResponse = await AuthService.deleteCustomUsersList(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CreateCustomUsersList')
-  public static createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    return AuthService.createCustomUsersList(payload);
-  }
+  public static createCustomUsersList = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageCustomUsersListRequestDto = req.body;
+      const response: CustomUsersListResponse = await AuthService.createCustomUsersList(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateCustomUsersList')
-  public static updateCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    return AuthService.updateCustomUsersList(payload);
-  }
+  public static updateCustomUsersList = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageCustomUsersListRequestDto = req.body;
+      const response: CustomUsersListResponse = await AuthService.updateCustomUsersList(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'ManageFavoriteUser')
-  public static manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<GenericResponse> {
-    return AuthService.manageFavoriteUser(payload);
-  }
+  public static manageFavoriteUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageFavoriteUserRequestDto = req.body;
+      const response: GenericResponse = await AuthService.manageFavoriteUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetFavoriteUsers')
-  public static getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
-    return AuthService.getFavoriteUsers(payload);
-  }
+  public static getFavoriteUsers = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: PaginatedRequestDto = req.body;
+      const response: GetMembersResponse = await AuthService.getFavoriteUsers(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetConfirmedMembers')
-  public static getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
-    return AuthService.getConfirmedMembers(payload);
-  }
+  public static getConfirmedMembers = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ContactsListRequestDto = req.body;
+      const response: ConfirmedMembersResponse = await AuthService.getConfirmedMembers(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetUserWithRolesByEmail')
-  public static getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<GetUserWithRolesByEmailResponse> {
-    return AuthService.getUserWithRolesByEmail(payload);
-  }
+  public static getUserWithRolesByEmail = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetUserWithRolesByEmailRequestDto = req.body;
+      const response: GetUserWithRolesByEmailResponse = await AuthService.getUserWithRolesByEmail(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'RegisterInvitesAsNonMember')
-  public static registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUserResponse> {
-    return AuthService.registerInvitesAsNonMember(payload);
-  }
+  public static registerInvitesAsNonMember = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: NonMemberSignUpRequestDto = req.body;
+      const response: SimpleUserResponse = await AuthService.registerInvitesAsNonMember(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'CreateUser')
-  public static createUser(payload: NonMemberSignUpRequestDto): Promise<CreateUserResponse> {
-    return AuthService.createUser(payload);
-  }
+  public static createUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: NonMemberSignUpRequestDto = req.body;
+      const response: CreateUserResponse = await AuthService.createUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(AUTH_SERVICE_NAME, 'GetAllUsers')
-  public static getAllUsers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
-    return AuthService.getAllusers(payload);
-  }
+  public static getAllUsers = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListUsersInviteesDto = req.body;
+      const response: GetMembersResponse = await AuthService.getAllusers(payload);
+      res.json(response);
+    }
+  );
 }
