@@ -1,5 +1,5 @@
 import * as express from 'express';
-import { Request, Response, NextFunction } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import * as bodyParser from 'body-parser';
 import helmet from 'helmet';
 import * as cors from 'cors';
@@ -15,7 +15,7 @@ import * as cors from 'cors';
 // import { NotFoundEndpointError } from '../utils/errors';
 // import bugsnag from '../utils/bugsnag';
 
-const app = express();
+const app:Express = express();
 
 // app.use('/events/v1', router)
 app.get('/events/v1/health', (req: Request, res: Response) => {
