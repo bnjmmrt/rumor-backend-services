@@ -8,6 +8,7 @@ import {
 } from 'rumor-utils/shared/users/dtos/settings.dto';
 import { GetPushNotificationTokensResponse, SETTINGS_SERVICE_NAME, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import asyncWrapper from 'src/server/helpers/asyncWrapper';
 
 // @Controller('settings')
 export class SettingsController {
@@ -16,27 +17,47 @@ export class SettingsController {
   // Profile Notifications Settings
 
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'GetUserSettings')
-  public async getNotificationSettings(payload: IdRequestDto): Promise<UserSettingResponse> {
-    return SettingsService.getNotificationSettings(payload);
-  }
+  public static getNotificationSettings = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: UserSettingResponse = await SettingsService.getNotificationSettings(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'UpdateNotificationSettings')
-  public async updateNotificationSettings(payload: UpdateNotificationSettingRequestDto): Promise<UserSettingResponse> {
-    return SettingsService.updateNotificationSettings(payload);
-  }
+  public static updateNotificationSettings = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateNotificationSettingRequestDto = req.body;
+      const response: UserSettingResponse = await SettingsService.updateNotificationSettings(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'GetPushNotificationTokens')
-  private getPushNotificationTokens(payload: GetPushNotificationTokensRequestDto): Promise<GetPushNotificationTokensResponse> {
-    return SettingsService.getPushNotificationTokens(payload);
-  }
+  public static getPushNotificationTokens = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetPushNotificationTokensRequestDto = req.body;
+      const response: GetPushNotificationTokensResponse = await SettingsService.getPushNotificationTokens(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'SavePushNotificationToken')
-  private savePushNotificationToken(payload: SaveNotificationTokenRequestDto): Promise<GenericResponse> {
-    return SettingsService.savePushNotificationToken(payload);
-  }
+  public static savePushNotificationToken = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SaveNotificationTokenRequestDto = req.body;
+      const response: GenericResponse = await SettingsService.savePushNotificationToken(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'DeletePushNotificationToken')
-  private deletePushNotificationToken(payload: DeleteNotificationTokenRequestDto): Promise<GenericResponse> {
-    return SettingsService.deletePushNotificationToken(payload);
-  }
+  public static deletePushNotificationToken = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: DeleteNotificationTokenRequestDto = req.body;
+      const response: GenericResponse = await SettingsService.deletePushNotificationToken(payload);
+      res.json(response);
+    }
+  );
 }
