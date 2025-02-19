@@ -5,53 +5,77 @@ import { CheckRoleResponse, ListRolesResponse, ROLE_SERVICE_NAME, RoleResponse, 
 import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from 'rumor-utils/shared/users/dtos/role.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import asyncWrapper from 'src/server/helpers/asyncWrapper';
 
 export class RoleController {
-  // @Inject(RoleService)
-  // private readonly service: RoleService;
+  public static listRoles = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: ListRolesResponse = await RoleService.listRoles();
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'ListRoles')
-  private listRoles(): Promise<ListRolesResponse> {
-    return RoleService.listRoles();
-  }
+  public static assignRoleToUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RoleRequestDto = req.body;
+      const response: GenericResponse = await RoleService.assignRoleToUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'AssignRoleToUser')
-  private assignRoleToUser(payload: RoleRequestDto): Promise<GenericResponse> {
-    return RoleService.assignRoleToUser(payload);
-  }
+  public static getUserRoleHierarchy = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: UserRoleResponse = await RoleService.getUserRoleHierarchy(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'GetUserRoleHierarchy')
-  private getUserRoleHierarchy(payload: IdRequestDto): Promise<UserRoleResponse> {
-    return RoleService.getUserRoleHierarchy(payload);
-  }
+  public static checkRole = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RoleRequestDto = req.body;
+      const response: CheckRoleResponse = await RoleService.checkRole(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'CheckRole')
-  private checkRole(payload: RoleRequestDto): Promise<CheckRoleResponse> {
-    return RoleService.checkRole(payload);
-  }
+  public static updateUserRole = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateUserRoleRequestDto = req.body;
+      const response: GenericResponse = await RoleService.updateUserRole(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'UpdateUserRole')
-  private updateUserRole(payload: UpdateUserRoleRequestDto): Promise<GenericResponse> {
-    return RoleService.updateUserRole(payload);
-  }
+  public static listUserRoles = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: ListRolesResponse = await RoleService.listUserRoles(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'ListUserRoles')
-  private listUserRoles(payload: IdRequestDto): Promise<ListRolesResponse> {
-    return RoleService.listUserRoles(payload);
-  }
+  public static revokeRoleFromUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RoleRequestDto = req.body;
+      const response: GenericResponse = await RoleService.revokeRoleFromUser(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'RevokeRoleFromUser')
-  private revokeRoleFromUser(payload: RoleRequestDto): Promise<GenericResponse> {
-    return RoleService.revokeRoleFromUser(payload);
-  }
+  public static getRoleByName = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RoleNameRequestDto = req.body;
+      const response: RoleResponse = await RoleService.getRoleByName(payload);
+      res.json(response);
+    }
+  );
 
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'GetRoleByName')
-  private getRoleByName(payload: RoleNameRequestDto): Promise<RoleResponse> {
-    return RoleService.getRoleByName(payload);
-  }
-
-  //@GrpcMethod(ROLE_SERVICE_NAME, 'MarkUserAsSpam')
-  private markUserAsSpam(payload: IdRequestDto): Promise<GenericResponse> {
-    return RoleService.markUserAsSpam(payload);
-  }
+  public static markUserAsSpam = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: GenericResponse = await RoleService.markUserAsSpam(payload);
+      res.json(response);
+    }
+  );
 }
