@@ -1,6 +1,6 @@
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses.common';
-import database from '../database';
+import { connectionManager }  from '../database';
 import config from '../config';
 
 import {
@@ -63,7 +63,7 @@ import { SocialStats } from 'rumor-utils/shared/users/entities/social-stats.enti
 
 export class SocialService {
 
-  static dbConnection = database;
+  static dbConnection = connectionManager;
 
   static async getFacebookAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
     try {

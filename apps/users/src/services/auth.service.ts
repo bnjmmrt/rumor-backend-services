@@ -1,5 +1,5 @@
 import { FindOptionsWhere, ILike, In } from 'typeorm';
-import database from '../database'
+import { connectionManager } from '../database'
 import config from '../config';
 
 import {
@@ -152,7 +152,7 @@ export class AuthService {
     AuthService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
   }
 
-  public static dbConnection = database;
+  public static dbConnection = connectionManager;
 
   public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));
 

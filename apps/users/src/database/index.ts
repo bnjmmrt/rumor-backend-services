@@ -121,16 +121,8 @@ export class ConnectionManager {
     }
   }
 
-  public async runMigrations(): Promise<void> {
-    const connection = await this.initializeDbConnection();
-    await connection.runMigrations();
-  }
-
-  public async runSeeders(): Promise<void> {}
 }
 
 const connectionManager = new ConnectionManager();
-export { connectionManager };
-
-export default connection;
+export { connectionManager } ;
 

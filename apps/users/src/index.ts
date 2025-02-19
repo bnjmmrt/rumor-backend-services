@@ -1,21 +1,15 @@
 /* eslint-disable global-require */
+require("dotenv").config();
 import config from './config'
 import server from './server';
-import {connectionManager, initializeDataSource} from './database';
+import { connectionManager, initializeDataSource } from './database';
 
 const start = async () => {
     console.info('[APP] - Starting application...');
     try {
         await config.load();
-        await initializeDataSource(); // Initialize the database connection
+        await initializeDataSource();
         await connectionManager.initializeDbConnection();
-        if (config.get('runMigrations')) {
-            await connectionManager.runMigrations();
-        }
-
-        if (config.get('runSeeds')) {
-            await connectionManager.runSeeders();
-        }
 
         await server.start();
         console.info('[APP] - Application started. 🚀');

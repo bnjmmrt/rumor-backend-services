@@ -1,5 +1,5 @@
 import { RumorBaseEntity } from '../../entities/rumor-base.entity';
-import { User } from '../../users/entities/user.entity';
+import { User } from './user.entity';
 import { Event } from '../../events/entities/event.entity';
 import { Entity, Column, Index, JoinColumn, ManyToOne } from 'typeorm';
 

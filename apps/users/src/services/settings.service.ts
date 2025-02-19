@@ -1,4 +1,4 @@
-import database from 'src/database';
+import { connectionManager } from 'src/database';
 import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { GetPushNotificationTokensRequest, GetPushNotificationTokensResponse, ProfileNotificationSetting, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
@@ -13,7 +13,7 @@ import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-no
 
 
 export class SettingsService {
-  static dbConnection = database;
+  static dbConnection = connectionManager;
   
   public static async getNotificationSettings(payload: IdRequestDto): Promise<UserSettingResponse> {
     try {

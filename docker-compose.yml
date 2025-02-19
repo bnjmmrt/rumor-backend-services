@@ -1,15 +1,53 @@
-version: '3'
-services:
-    users:
-        image: users
-        ports:
-            - 8000:8000
-        volumes:
-            - apps/users:/app
+version: '3.8'
 
-    events:
-        image: events
-        ports:
-            - 8001:8001
-        volumes:
-            - apps/events:/app
+services:
+  users:
+    container_name: rumour-users-service
+    build:
+      context: ./apps/users  
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/users/src/:/app/src/ 
+      - rumor-utils:/app/node_modules/rumor-utils
+    ports:
+      - "8000:8000"
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+
+  # events:
+  #   container_name: rumour-events-service
+  #   build:
+  #     context: ./apps/events
+  #   env_file:
+  #     - env/api.env
+  #   volumes:
+  #     - ./apps/events/src:/app/src 
+  #     - rumor-utils:/app/node_modules/rumor-utils
+  #   ports:
+  #     - "8001:8001"
+  #   depends_on:
+  #     rumor-db:
+  #       condition: service_healthy
+
+  rumor-db:
+    image: postgres:latest
+    container_name: rumor-backend-db
+    restart: always
+    environment:
+      POSTGRES_USER: rumor
+      POSTGRES_PASSWORD: rumor
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rumor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rumor-utils:
+  postgres_data:

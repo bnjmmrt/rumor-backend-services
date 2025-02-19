@@ -21,7 +21,6 @@ export class ConnectionManager {
           ],
           synchronize: false,
           logging: false,
-          ssl: { rejectUnauthorized: false }
         });
         this.connection = await appDataSource.initialize();
       }

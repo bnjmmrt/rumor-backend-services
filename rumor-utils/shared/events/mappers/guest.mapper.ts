@@ -1,4 +1,4 @@
-import { Guest as GuestEntity } from "../../events/entities/guest.entity";
+import { Guest as GuestEntity } from "../entities/guest.entity";
 import { User } from '../../users/entities/user.entity';
 import { Guest, GuestData, GuestDataSimple, GuestStatus as GuestStatusProto, QuizData, UserSource, VouchesData } from '../grpc/events/general.pb';
 import { GuestStatus, TicketStatusEnum } from '../interfaces/event.interface';
@@ -8,9 +8,9 @@ import { formatToUnits } from '../../users/utils/auth.util';
 import { Focus as FocusProto } from '../../users/grpc/auth/auth.pb';
 import { UserVouch } from '../grpc/platform/general.pb';
 import { SocialProviderType } from '../../users/interfaces/shared.interface';
-import { UserQuizAnswer } from '../../events/entities/user-quiz-question-answer.entity';
+import { UserQuizAnswer } from '../entities/user-quiz-question-answer.entity';
 import { ListEventUsedTicketsData, TicketStatus } from '../grpc/events/general.pb';
-import { Ticket } from '../../events/entities/ticket.entity';
+import { Ticket } from '../entities/ticket.entity';
 
 export const entityToGuestStatus: { [s in GuestStatus]: GuestStatusProto } = {
   [GuestStatus.NO_STATUS]: GuestStatusProto.NO_STATUS,
