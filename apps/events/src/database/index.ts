@@ -9,7 +9,7 @@ export class ConnectionManager {
     try {
       if (!this.connection) {
         const appDataSource = new DataSource({
-          type: config.get("POSTGRES_DATABASE"),
+          type: 'postgres',
           host: config.get("POSTGRES_HOST"),
           port: config.get("POSTGRES_PORT"),
           username: config.get("POSTGRES_USERNAME"),

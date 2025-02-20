@@ -1,148 +1,135 @@
-// import { Injectable, Logger } from '@nestjs/common';
-// import { CreateTicketTypeRequestDto, RequestByIdDto, UpdateTicketTypeRequestDto } from '../dtos';
-// import { TicketTypesResponse, TicketTypeResponse } from '../grpc/events/events.pb';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { TicketType } from '../entities/ticket-type.entity';
-// import { IsNull, Repository } from 'typeorm';
-// import { responses } from '../common/responses';
-// import { normalizeCatalogName } from '../common/helpers';
-// import { Event } from '../entities';
+import { CreateTicketTypeRequestDto, RequestByIdDto, UpdateTicketTypeRequestDto } from 'rumor-utils/shared/events/dtos';
+import { TicketTypesResponse, TicketTypeResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import { TicketType } from 'rumor-utils/shared/events/entities/ticket-type.entity';
+import { IsNull } from 'typeorm';
+import { responses } from '../common/responses';
+import { normalizeCatalogName } from '../common/helpers';
+import { Event } from 'rumor-utils/shared/events/entities';
+import database from '../database';
 
-// @Injectable()
-// export class TicketTypeService {
-//   private readonly logger = new Logger(TicketTypeService.name);
+export class TicketTypeService {
+  public static dbConnection = database;
 
-//   @InjectRepository(TicketType)
-//   private readonly ticketTypeRepository: Repository<TicketType>;
+  public static async createTicketType(payload: CreateTicketTypeRequestDto): Promise<TicketTypeResponse> {
+    try {
+      const name = normalizeCatalogName(payload.name);
+      const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
+        where: {
+          name,
+          deletedAt: IsNull(),
+          event: { id: payload.eventId },
+        },
+      });
+      if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
+      const ticketType = new TicketType();
+      ticketType.name = name;
+      ticketType.description = payload.description;
+      ticketType.capacity = payload.capacity;
 
-//   @InjectRepository(Event)
-//   private readonly eventRepository: Repository<Event>;
+      if (payload.eventId) {
+        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+        if (event) ticketType.event = event;
+      }
 
-//   public async createTicketType(payload: CreateTicketTypeRequestDto): Promise<TicketTypeResponse> {
-//     try {
-//       const name = normalizeCatalogName(payload.name);
-//       const existingTicketType = await this.ticketTypeRepository.findOne({
-//         where: {
-//           name,
-//           deletedAt: IsNull(),
-//           event: { id: payload.eventId },
-//         },
-//       });
-//       if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
-//       const ticketType = new TicketType();
-//       ticketType.name = name;
-//       ticketType.description = payload.description;
-//       ticketType.capacity = payload.capacity;
+      const created = await this.dbConnection.getRepository(TicketType).save(ticketType);
 
-//       if (payload.eventId) {
-//         const event = await this.eventRepository.findOne({ where: { id: payload.eventId } });
-//         if (event) ticketType.event = event;
-//       }
+      return responses.data(created);
+    } catch (err) {
+      return responses.badRequest('Error creating a new ticket type');
+    }
+  }
 
-//       const created = await this.ticketTypeRepository.save(ticketType);
+  public static async getTicketType(payload: RequestByIdDto): Promise<TicketTypeResponse> {
+    try {
+      const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
+        where: {
+          id: payload.id,
+          deletedAt: IsNull(),
+        },
+      });
 
-//       return responses.data(created);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error creating a new ticket type');
-//     }
-//   }
+      if (!ticketType) {
+        return responses.notFound('Ticket type not found');
+      }
+      return responses.data(ticketType);
+    } catch (err) {
+      return responses.badRequest('Error getting ticket type');
+    }
+  }
 
-//   public async getTicketType(payload: RequestByIdDto): Promise<TicketTypeResponse> {
-//     try {
-//       const ticketType = await this.ticketTypeRepository.findOne({
-//         where: {
-//           id: payload.id,
-//           deletedAt: IsNull(),
-//         },
-//       });
+  public static async getTicketTypes(payload: RequestByIdDto): Promise<TicketTypesResponse> {
+    const eventId = payload?.id;
+    if (!eventId) return responses.badRequest('eventId param is a required value');
+    try {
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
 
-//       if (!ticketType) {
-//         return responses.notFound('Ticket type not found');
-//       }
-//       return responses.data(ticketType);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error getting ticket type');
-//     }
-//   }
+      if (!event) return responses.badRequest('Event with given Id was not found');
 
-//   public async getTicketTypes(payload: RequestByIdDto): Promise<TicketTypesResponse> {
-//     const eventId = payload?.id;
-//     if (!eventId) return responses.badRequest('eventId param is a required value');
-//     try {
-//       const event = await this.eventRepository.findOne({ where: { id: eventId } });
+      const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
+        where: {
+          event: {
+            id: event.id,
+          },
+        },
+      });
 
-//       if (!event) return responses.badRequest('Event with given Id was not found');
+      return responses.data(ticketTypes);
+    } catch (err) {
+      return responses.badRequest('Error getting ticket types');
+    }
+  }
 
-//       const ticketTypes = await this.ticketTypeRepository.find({
-//         where: {
-//           event: {
-//             id: event.id,
-//           },
-//         },
-//       });
+  public static async updateTicketType(payload: UpdateTicketTypeRequestDto): Promise<TicketTypeResponse> {
+    try {
+      if (payload.name) payload.name = normalizeCatalogName(payload.name);
+      const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
+        where: {
+          name: payload.name,
+          deletedAt: IsNull(),
+        },
+      });
+      if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
+      const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
+        where: {
+          id: payload.id,
+          deletedAt: IsNull(),
+        },
+      });
 
-//       return responses.data(ticketTypes);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error getting ticket types');
-//     }
-//   }
+      if (!ticketType) return responses.badRequest('Ticket type not found');
 
-//   public async updateTicketType(payload: UpdateTicketTypeRequestDto): Promise<TicketTypeResponse> {
-//     try {
-//       if (payload.name) payload.name = normalizeCatalogName(payload.name);
-//       const existingTicketType = await this.ticketTypeRepository.findOne({
-//         where: {
-//           name: payload.name,
-//           deletedAt: IsNull(),
-//         },
-//       });
-//       if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
-//       const ticketType = await this.ticketTypeRepository.findOne({
-//         where: {
-//           id: payload.id,
-//           deletedAt: IsNull(),
-//         },
-//       });
+      delete payload.id;
+      const updatedTicketType = this.dbConnection.getRepository(TicketType).merge(ticketType, payload);
 
-//       if (!ticketType) return responses.badRequest('Ticket type not found');
+      if (payload.eventId) {
+        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+        if (event) updatedTicketType.event = event;
+      }
 
-//       delete payload.id;
-//       const updatedTicketType = this.ticketTypeRepository.merge(ticketType, payload);
+      await updatedTicketType.save();
 
-//       if (payload.eventId) {
-//         const event = await this.eventRepository.findOne({ where: { id: payload.eventId } });
-//         if (event) updatedTicketType.event = event;
-//       }
+      return responses.data(updatedTicketType);
+    } catch (err) {
+      return responses.badRequest('Error updating ticket type');
+    }
+  }
 
-//       await updatedTicketType.save();
+  public static async deleteTicketType(payload: RequestByIdDto): Promise<TicketTypeResponse> {
+    try {
+      const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
+        where: {
+          id: payload.id,
+          deletedAt: IsNull(),
+        },
+      });
 
-//       return responses.data(updatedTicketType);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error updating ticket type');
-//     }
-//   }
+      if (!ticketType) return responses.badRequest('Ticket type not found');
 
-//   public async deleteTicketType(payload: RequestByIdDto): Promise<TicketTypeResponse> {
-//     try {
-//       const ticketType = await this.ticketTypeRepository.findOne({
-//         where: {
-//           id: payload.id,
-//           deletedAt: IsNull(),
-//         },
-//       });
+      await ticketType.softRemove();
 
-//       if (!ticketType) return responses.badRequest('Ticket type not found');
-
-//       await ticketType.softRemove();
-
-//       return responses.data(ticketType);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error updating ticket type');
-//     }
-//   }
-// }
+      return responses.data(ticketType);
+    } catch (err) {
+      return responses.badRequest('Error updating ticket type');
+    }
+  }
+}

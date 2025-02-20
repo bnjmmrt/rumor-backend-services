@@ -8,7 +8,7 @@ import {
 } from 'rumor-utils/shared/users/dtos/settings.dto';
 import { GetPushNotificationTokensResponse, SETTINGS_SERVICE_NAME, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 // @Controller('settings')
 export class SettingsController {

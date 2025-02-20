@@ -5,7 +5,7 @@ import { CheckRoleResponse, ListRolesResponse, ROLE_SERVICE_NAME, RoleResponse, 
 import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from 'rumor-utils/shared/users/dtos/role.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 export class RoleController {
   public static listRoles = asyncWrapper(

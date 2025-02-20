@@ -12,6 +12,6 @@ export { UserQuizAnswer } from './user-quiz-question-answer.entity';
 export { Ticket } from './ticket.entity';
 export { EventAgeLimit } from './event-age-limit.entity';
 export { DefaultRoleSettings } from './default-role-settings.entity';
-// export { FeaturedEventSection } from '../../../../platform_to_be_dissolved/src/entities/featured-event-section.entity'
-// export { User } from '../../../users/src/database/entities/user.entity'; 
-// export { Address } from '../../../users/src/database/entities/address.entity';
+export { FeaturedEventSection } from './featured-event-section.entity';
+export { User } from '../../users/entities/user.entity'; 
+export { Address } from '../../users/entities/address.entity';

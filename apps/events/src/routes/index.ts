@@ -3,7 +3,7 @@ import { EventAnnouncementController } from 'src/controllers/event-announcement.
 
 const router: Router = express.Router();
 
-router.get('/event-announcement/:eventId/guest-list', EventAnnouncementController.getGuestListForAnnoucement)
+//router.get('/event-announcement/:eventId/guest-list', EventAnnouncementController.getGuestListForAnnoucement)
 router.post('/event-announcement',EventAnnouncementController.postAnnoucement);
 router.patch('/event-announcement',EventAnnouncementController.updateAnnouncement);
 

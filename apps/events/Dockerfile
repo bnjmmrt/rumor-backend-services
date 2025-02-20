@@ -6,10 +6,11 @@ WORKDIR /app
 # Copy rumor-utils to the working directory
 COPY rumor-utils /app/rumor-utils
 
-
 # Copy package.json and package-lock.json to the working directory
-COPY /apps/events/package*.json .
+COPY /apps/events/package.json .
 COPY /apps/events/tsconfig.json .
+
+RUN rm -rf node_modules package-lock.json
 
 # Install dependencies
 RUN npm install

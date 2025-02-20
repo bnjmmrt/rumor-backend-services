@@ -1,10 +1,10 @@
 import * as express from 'express';
 import { Router, Request, Response } from 'express';
 import { AuthController } from '../controllers/auth.controller';
-import { AdminController } from 'src/controllers/admin.controller';
-import { RoleController } from 'src/controllers/role.controller';
-import { SettingsController } from 'src/controllers/settings.controller';
-import { SocialController } from 'src/controllers/social.controller';
+import { AdminController } from '../controllers/admin.controller';
+import { RoleController } from '../controllers/role.controller';
+import { SettingsController } from '../controllers/settings.controller';
+import { SocialController } from '../controllers/social.controller';
 
 const router: Router = express.Router();
 

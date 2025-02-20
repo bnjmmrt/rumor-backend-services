@@ -62,7 +62,7 @@ import {
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { IdRequestDto, PaginatedRequestDto, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 export class AuthController {
   

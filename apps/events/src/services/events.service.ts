@@ -36,8 +36,7 @@ import {
   ListEventStatusResponse,
   ListEventUsedTicketsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-// import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { parse } from 'qs';
 import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
@@ -48,12 +47,11 @@ import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/ev
 import { getCityNameFromAddressComponents, isValidEventStatus } from '../utils/event.utils';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { haversineDistance } from 'rumor-utils/utils/utils';
+import * as serviceMesh from 'rumor-utils/service-mesh';
 
-// import { AuthClient } from 'rumor-utils/clients/auth.client';
-// import { CommunicationClient } from 'rumor-utils/clients/communication.client';
-// import { PlatformClient } from 'rumor-utils/clients/platform.client';
 // import { JwtService } from '@nestjs/jwt';
 
+import {generateToken, verifyToken} from 'rumor-utils/jwt';
 import { EventStatus, FeaturedEvent } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import database from '../database'
@@ -94,7 +92,6 @@ const responses = {
 
 export class EventsService {
   public static dbConnection = database;
-  // public static authClient = new AuthClient()
   public static googleAddressClient = new GoogleAddressClient() 
 
   public static googleAuthClient = new GoogleAuthJWT();
@@ -103,9 +100,6 @@ export class EventsService {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
   }
-  //private readonly jwtService: JwtService;
-
-  private readonly eventRepository: Repository<Event>;
 
   public static filterLocationsByDistance(currentLat: number, currentLng: number, locations: EventLocationInterface[]): EventLocationInterface[] {
     const maxDistance = 50; //50 miles
@@ -253,7 +247,7 @@ export class EventsService {
       event.publishDate = payload.publishDate && new Date(payload.publishDate);
       event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       if (payload.ownerId) {
-        const owner = false//await this.authClient.getUser(payload.ownerId, this.logger);
+        const owner = serviceMesh.getUser(config.get('API_BASE_URL') ,payload.ownerId);
         if (!owner) return responses.badRequest(`The ID ${payload.ownerId} is not a valid user or the user does not exist!`);
         event.owner = { id: payload.ownerId } as User;
       }
@@ -689,29 +683,22 @@ export class EventsService {
       if (payload.status === EventStatusEnum.CANCELLED_STATUS) {
         // TODO: Add functionality to send notification to all guests for cancelled event
       } else if (payload.status === EventStatusEnum.DECLINED_STATUS && event.owner) {
-
-        //Micro-service call
-
-        // const success = await this.communicationClient.sendEmailFromTemplate(
-        //   [
-        //     {
-        //       key: 'event_name',
-        //       value: event.name,
-        //     },
-        //     {
-        //       key: 'host_name',
-        //       value: event.owner.firstName,
-        //     },
-        //   ],
-        //   'Event Submission Rejected',
-        //   [event.owner.email],
-        //   null,
-        //   this.logger,
-        // );
-
-        // if (!success) {
-        //   this.logger.warn('failed to send the email for event rejection');
-        // }
+        await serviceMesh.sendEmailFromTemplate(
+          config.get('API_BASE_URL'),
+          [
+            {
+              key: 'event_name',
+              value: event.name,
+            },
+            {
+              key: 'host_name',
+              value: event.owner.firstName,
+            },
+          ],
+          'Event Submission Rejected',
+          [event.owner.email],
+          null
+        );
       }
 
       if (payload.publishDate) {
@@ -747,7 +734,7 @@ export class EventsService {
       }
 
       if (payload.ownerId) {
-        const owner = {id:""}//await this.authClient.getCurrentMember(payload.ownerId, this.logger);
+        const owner = serviceMesh.getCurrentMember(config.get('API_BASE_URL'), payload.ownerId);
         if (owner) event.owner = { id: owner.id } as User;
       }
       if (payload.eventTypeId) {
@@ -1266,7 +1253,7 @@ export class EventsService {
           ticket: hasTicket.id,
         };
 
-        const token = ""//await this.jwtService.sign(tokenPayload);
+        const token = generateToken(tokenPayload)//this.jwtService.sign(tokenPayload);
         const qrCode = await QRCode.toDataURL(token);
 
         return responses.data({
@@ -1291,7 +1278,7 @@ export class EventsService {
 
   public static async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<GenericResponse> {
     try {
-      const decodedToken = {toke:'',ticket:''}//await this.jwtService.verify(payload.ticketToken);
+      const decodedToken = await verifyToken(payload.ticketToken);
       if (!decodedToken) {
         return responses.badRequest('Invalid ticket token');
       }
@@ -1364,10 +1351,10 @@ export class EventsService {
         event.featuredEventSection = null;
         await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = false//await this.platformClient.getFeaturedEventSection(payload.featuredSectionId, this.logger);
+        const featuredEventSection = await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
         if (!featuredEventSection) return responses.notFound('Featured event section was not found');
 
-        //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
+        event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
         await this.dbConnection.getRepository(Event).save(event);
       }
 

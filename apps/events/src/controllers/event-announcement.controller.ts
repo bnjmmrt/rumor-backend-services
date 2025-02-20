@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+
 import {
   AUTH_SERVICE_NAME,
   BasicHostProfileResponse,
@@ -9,6 +10,7 @@ import {
   SignUpResponse,
   TokenResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb'
+
 import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
@@ -17,7 +19,7 @@ import { EventAnnouncementService } from '../services/event-announcement.service
 
 export class EventAnnouncementController {
 
-static async getGuestListForAnnoucement(payload: PaginatedRequestDto,res: Response){
+  public static async getGuestListForAnnoucement(payload: PaginatedRequestDto,res: Response){
     const announcementGuestList = await EventAnnouncementService.getAnnouncementGuestList(payload)
     res.json(announcementGuestList).status(200);
   }                
