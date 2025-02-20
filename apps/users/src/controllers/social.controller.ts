@@ -38,7 +38,7 @@ import {
 } from 'rumor-utils/shared/users/dtos/social.dto';
 import { SocialService } from '../services/social.service';
 import { XAuthCallbackRequestDto } from 'rumor-utils/shared/users/dtos/social.dto';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
+import asyncWrapper from '../../src/server/helpers/asyncWrapper';
 
 // @Controller('social')
 export class SocialController {

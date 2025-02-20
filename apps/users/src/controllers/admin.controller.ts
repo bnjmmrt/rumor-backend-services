@@ -21,7 +21,8 @@ import {
 } from "rumor-utils/shared/users/dtos/auth.dto";
 import { UpdateHostProfileRequestDto } from "rumor-utils/shared/users/dtos/admin.dto";
 import { GenericResponse } from "rumor-utils/shared/users/grpc/auth/shared.pb";
-import asyncWrapper from "src/server/helpers/asyncWrapper";
+import asyncWrapper from '../../src/server/helpers/asyncWrapper';
+
 
 export class AdminController {
   public static getMembers = asyncWrapper(
