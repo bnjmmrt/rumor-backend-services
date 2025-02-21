@@ -13,6 +13,7 @@ import { RumorBaseEntity } from '../../entities/rumor-base.entity';
 import { EventStatusEnum } from '../interfaces/event.interface';
 import { Ticket } from './ticket.entity';
 import { FeaturedEventSection } from './featured-event-section.entity';
+import { EventSignupForms } from './event-signup-forms.entity';
 
 @Entity()
 export class Event extends RumorBaseEntity {
@@ -110,4 +111,7 @@ export class Event extends RumorBaseEntity {
     onDelete: 'SET NULL',
   })
   featuredEventSection: FeaturedEventSection;
+
+  @OneToMany(() => EventSignupForms, (esf) => esf.event)
+  signupForms: EventSignupForms[];
 }
