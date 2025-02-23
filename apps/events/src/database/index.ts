@@ -19,8 +19,8 @@ export class ConnectionManager {
             "node_modules/rumor-utils/shared/users/entities/*.ts",
             "node_modules/rumor-utils/shared/events/entities/*.ts"
           ],
-          synchronize: false,
-          logging: false,
+          synchronize: true,
+          logging: true,
         });
         this.connection = await appDataSource.initialize();
       }
