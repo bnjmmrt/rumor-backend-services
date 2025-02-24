@@ -1,6 +1,6 @@
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses.common';
-import { connectionManager }  from '../database';
+import database  from '../database';
 import config from '../config';
 
 import {

@@ -13,6 +13,7 @@ services:
       - rumor-utils:/app/node_modules/rumor-utils
     ports:
       - "8000:8000"
+    command: npm run dev  
     depends_on:
       rumor-db:
         condition: service_healthy
@@ -29,6 +30,7 @@ services:
       - rumor-utils:/app/node_modules/rumor-utils
     ports:
       - "8001:8001"
+    command: npm run dev
     depends_on:
       rumor-db:
         condition: service_healthy

@@ -1,14 +1,13 @@
 /* eslint-disable global-require */
 import config from './config'
 import server from './server';
-import { connectionManager, initializeDataSource } from './database';
+import database from './database';
 
 const start = async () => {
     console.info('[APP] - Starting application...');
     try {
         await config.load();
-        await initializeDataSource();
-        await connectionManager.initializeDbConnection();
+        await database.initializeDbConnection();
 
         await server.start();
         console.info('[APP] - Application started. 🚀');

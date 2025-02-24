@@ -1,5 +1,5 @@
 import { FindOptionsWhere, ILike, In } from 'typeorm';
-import { connectionManager } from '../database'
+import database from '../database'
 import config from '../config';
 
 import {
@@ -58,8 +58,8 @@ import {
   CreateUserResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
-import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity';
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
+import { Invitation } from 'rumor-utils/shared/users/entities';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
@@ -152,7 +152,7 @@ export class AuthService {
     AuthService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
   }
 
-  public static dbConnection = connectionManager;
+  public static dbConnection = database;
 
   public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));
 

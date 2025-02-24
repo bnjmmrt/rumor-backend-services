@@ -1,4 +1,4 @@
-import { connectionManager } from '../database'
+import database from '../database'
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from 'rumor-utils/shared/users/grpc/auth/role.pb';

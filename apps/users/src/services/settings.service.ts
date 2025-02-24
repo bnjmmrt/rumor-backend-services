@@ -1,4 +1,4 @@
-import { connectionManager } from '../database';
+import database from '../database';
 import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { GetPushNotificationTokensRequest, GetPushNotificationTokensResponse, ProfileNotificationSetting, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';

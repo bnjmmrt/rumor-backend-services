@@ -4,7 +4,8 @@
   "description": "",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "docker compose up"
+    "start": "docker compose up",
+    "build":"node tools/build.js"
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",
