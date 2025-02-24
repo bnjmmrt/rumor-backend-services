@@ -21,7 +21,7 @@ COPY /apps/events/src src
 # Build the application
 RUN npm run build
 
-EXPOSE 8000
+EXPOSE 8001
 
 # Start the service
 CMD ["node", "/app/dist/src/index.js"]
