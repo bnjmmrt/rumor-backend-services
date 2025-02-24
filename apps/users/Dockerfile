@@ -1,5 +1,4 @@
-# Use the latest Node.js image as the base
-FROM node:latest
+FROM public.ecr.aws/lambda/nodejs:22.2025.01.24.10
 
 WORKDIR /app
 

@@ -1,4 +1,3 @@
-import config from "../../../../apps/events/src/config";
 import { Event } from "../entities";
 import { EventSignupForms } from "../entities/event-signup-forms.entity";
 import { SignupFormsResponse } from "../grpc/events/general.pb";
@@ -24,7 +23,7 @@ export const buildSignupFormsResponse = (
     submissionCount: submissions,
     isActive: esf.isActive,
     description: esf.description,
-    url: `${config.get("")}/${event.owner}/${event.name}/${esf.urlCode}`,
+    url: `/${event.owner}/${event.name}/${esf.urlCode}`,
     questions: esf.questions,
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
   };
@@ -42,7 +41,7 @@ export const buildSignupFormList = (
     name: event.name,
     submissionCount: submissions,
     isActive: esf.isActive,
-    url: `${config.get("")}/${event.owner}/${event.name}/${esf.urlCode}`,
+    url: `/${event.owner}/${event.name}/${esf.urlCode}`,
     userId: esf.createdBy.id,
     userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,
     userProfile: esf.createdBy.profilePicture,
