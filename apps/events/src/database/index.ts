@@ -1,6 +1,5 @@
 import "reflect-metadata";
 import config from "../config";
-
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 
 export class ConnectionManager {
@@ -10,16 +9,18 @@ export class ConnectionManager {
     try {
       if (!this.connection) {
         const appDataSource = new DataSource({
-          type: config.get("POSTGRES_DATABASE"),
+          type: 'postgres',
           host: config.get("POSTGRES_HOST"),
           port: config.get("POSTGRES_PORT"),
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
-          entities: ["../../../../rumor-utils" + "/entities/*.ts"],
+          entities: [
+            "node_modules/rumor-utils/shared/users/entities/*.ts",
+            "node_modules/rumor-utils/shared/events/entities/*.ts"
+          ],
           synchronize: false,
           logging: false,
-          ssl: { rejectUnauthorized: false }
         });
         this.connection = await appDataSource.initialize();
       }

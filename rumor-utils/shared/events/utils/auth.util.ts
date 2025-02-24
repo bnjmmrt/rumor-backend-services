@@ -4,7 +4,7 @@ import { Address } from '../../users/entities/address.entity';
 import { User } from '../../users/entities/user.entity';
 import { genderToEntity } from '../../users/mappers/auth.mapper';
 import { UpdateHostProfileRequestDto } from '../../users/dtos/admin.dto';
-import { getCityNameFromAddressComponents } from '../../events/utils/event.utils';
+import { getCityNameFromAddressComponents } from './event.utils';
 
 export const newMember = (payload: MemberSignUpRequestDto, address: Address): User => {
   const user = new User();

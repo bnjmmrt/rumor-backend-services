@@ -1,13 +1,14 @@
-FROM node:18-alpine
+# Use the latest Node.js image as the base
+FROM node:latest
 
 WORKDIR /app
 
 # Copy rumor-utils to the working directory
-COPY rumor-utils rumor-utils
+COPY rumor-utils /app/rumor-utils
 
 # Copy package.json and package-lock.json to the working directory
-COPY apps/events/package*.json .
-COPY apps/events/tsconfig.json .
+COPY /apps/events/package.json .
+COPY /apps/events/tsconfig.json .
 
 RUN rm -rf node_modules package-lock.json
 
@@ -15,12 +16,12 @@ RUN rm -rf node_modules package-lock.json
 RUN npm install
 
 # Copy the rest of the application code to the working directory
-COPY apps/events/src src
+COPY /apps/events/src src
 
 # Build the application
 RUN npm run build
 
-EXPOSE 8001
+EXPOSE 8000
 
 # Start the service
 CMD ["node", "/app/dist/src/index.js"]

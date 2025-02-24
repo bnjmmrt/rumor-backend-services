@@ -38,6 +38,7 @@ import {
 } from 'rumor-utils/shared/users/dtos/social.dto';
 import { SocialService } from '../services/social.service';
 import { XAuthCallbackRequestDto } from 'rumor-utils/shared/users/dtos/social.dto';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 // @Controller('social')
 export class SocialController {
@@ -46,144 +47,253 @@ export class SocialController {
 
   // Facebook
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetFacebookAuthUrl')
-  private getFacebookAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
-    return SocialService.getFacebookAuthUrl(payload);
-  }
+  public static getFacebookAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetMetaAuthUrlRequestDto = req.body;
+      const response: GetMetaAuthUrlResponse = await SocialService.getFacebookAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'FacebookAuthCallback')
-  private facebookAuthCallback(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
-    return SocialService.facebookAuthCallback(payload);
-  }
+  public static facebookAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: MetaAuthCallbackRequestDto = req.body;
+      const response: MetaAuthCallbackResponse = await SocialService.facebookAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'SetFacebookAuthToken')
-  private setFacebookAuthToken(payload: SetMetaAuthTokenRequestDto): Promise<SetMetaAuthTokenResponse> {
-    return SocialService.setFacebookAuthToken(payload);
-  }
+  public static setFacebookAuthToken = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SetMetaAuthTokenRequestDto = req.body;
+      const response: SetMetaAuthTokenResponse = await SocialService.setFacebookAuthToken(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetFacebookAuthData')
-  private getFacebookAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
-    return SocialService.getFacebookAuthData(payload);
-  }
+  public static getFacebookAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetMetaAuthDataResponse = await SocialService.getFacebookAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // Instagram
-
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'SetInstagramUser')
-  private setInstagramUser(payload: InstagramUserRequestDto): Promise<InstagramUserResponse> {
-    return SocialService.setInstagramUser(payload);
-  }
+  public static setInstagramUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InstagramUserRequestDto = req.body;
+      const response: InstagramUserResponse = await SocialService.setInstagramUser(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetInstagramUser')
-  private getInstagramUser(payload: InstagramUserRequestDto): Promise<InstagramUserResponse> {
-    return SocialService.getInstagramUser(payload);
-  }
+  public static getInstagramUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InstagramUserRequestDto = req.body;
+      const response: InstagramUserResponse = await SocialService.getInstagramUser(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetInstagramAuthUrl')
-  private getInstagramAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
-    return SocialService.getInstagramAuthUrl(payload);
-  }
+  public static getInstagramAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetMetaAuthUrlRequestDto = req.body;
+      const response: GetMetaAuthUrlResponse = await SocialService.getInstagramAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'InstagramAuthCallback')
-  private instagramAuthCallback(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
-    return SocialService.instagramAuthCallback(payload);
-  }
+  public static instagramAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: MetaAuthCallbackRequestDto = req.body;
+      const response: MetaAuthCallbackResponse = await SocialService.instagramAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'InstagramRedirect')
-  private instagramRedirect(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
-    return SocialService.instagramRedirect(payload);
-  }
+  public static instagramRedirect = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: MetaAuthCallbackRequestDto = req.body;
+      const response: MetaAuthCallbackResponse = await SocialService.instagramRedirect(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'SetInstagramAuthToken')
-  private setMetaAuthToken(payload: SetMetaAuthTokenRequestDto): Promise<SetMetaAuthTokenResponse> {
-    return SocialService.setInstagramAuthToken(payload);
-  }
+  public static setMetaAuthToken = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SetMetaAuthTokenRequestDto = req.body;
+      const response: SetMetaAuthTokenResponse = await SocialService.setInstagramAuthToken(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetInstagramAuthData')
-  private getInstagramAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
-    return SocialService.getInstagramAuthData(payload);
-  }
+  public static getInstagramAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetMetaAuthDataResponse = await SocialService.getInstagramAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // Google
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetGoogleAuthUrl')
-  private getGoogleAuthUrl(payload: UserIdAuthRequestDto): Promise<GetGoogleAuthUrlResponse> {
-    return SocialService.getGoogleAuthUrl(payload);
-  }
+  public static getGoogleAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetGoogleAuthUrlResponse = await SocialService.getGoogleAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GoogleAuthCallback')
-  private googleAuthCallback(payload: GoogleAuthCallbackRequestDto): Promise<GoogleAuthCallbackResponse> {
-    return SocialService.googleAuthCallback(payload);
-  }
+  public static googleAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GoogleAuthCallbackRequestDto = req.body;
+      const response: GoogleAuthCallbackResponse = await SocialService.googleAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetGoogleAuthData')
-  private getGoogleAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
-    return SocialService.getGoogleAuthData(payload);
-  }
+  public static getGoogleAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetMetaAuthDataResponse = await SocialService.getGoogleAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // LinkedIn
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetLinkedInAuthUrl')
-  public async getLinkedInAuthUrl(payload: LinkedInUserIdAuthRequestDto): Promise<GetLinkedInAuthUrlResponse> {
-    return SocialService.getLinkedInAuthUrl(payload);
-  }
+  public static getLinkedInAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: LinkedInUserIdAuthRequestDto = req.body;
+      const response: GetLinkedInAuthUrlResponse = await SocialService.getLinkedInAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'LinkedInAuthCallback')
-  public async linkedInAuthCallback(payload: LinkedInAuthCallbackRequestDto): Promise<LinkedInAuthCallbackResponse> {
-    return SocialService.linkedInAuthCallback(payload);
-  }
+  public static linkedInAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: LinkedInAuthCallbackRequestDto = req.body;
+      const response: LinkedInAuthCallbackResponse = await SocialService.linkedInAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetLinkedInAuthData')
-  public async getLinkedInAuthData(payload: UserIdAuthRequestDto): Promise<GetLinkedInAuthDataResponse> {
-    return SocialService.getLinkedInAuthData(payload);
-  }
+  public static getLinkedInAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetLinkedInAuthDataResponse = await SocialService.getLinkedInAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // TikTok
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetTiktokAuthUrl')
-  private getTiktokAuthUrl(payload: UserIdAuthRequestDto): Promise<GetTiktokAuthUrlResponse> {
-    return SocialService.getTiktokAuthUrl(payload);
-  }
+  public static getTiktokAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetTiktokAuthUrlResponse = await SocialService.getTiktokAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'TiktokAuthCallback')
-  private tiktokAuthCallback(payload: TiktokAuthCallbackRequestDto): Promise<TiktokAuthCallbackResponse> {
-    return SocialService.tiktokAuthCallback(payload);
-  }
+  public static tiktokAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: TiktokAuthCallbackRequestDto = req.body;
+      const response: TiktokAuthCallbackResponse = await SocialService.tiktokAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetTiktokAuthData')
-  private getTiktokAuthData(payload: UserIdAuthRequestDto): Promise<GetTiktokAuthDataResponse> {
-    return SocialService.getTiktokAuthData(payload);
-  }
+  public static getTiktokAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetTiktokAuthDataResponse = await SocialService.getTiktokAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // Snapchat
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetSnapchatAuthUrl')
-  public async getSnapchatAuthUrl(payload: UserIdAuthRequestDto): Promise<GetSnapchatAuthUrlResponse> {
-    return SocialService.getSnapchatAuthUrl(payload);
-  }
+  public static getSnapchatAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetSnapchatAuthUrlResponse = await SocialService.getSnapchatAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'SnapchatAuthCallback')
-  public async snapchatAuthCallback(payload: SnapchatAuthCallbackRequestDto): Promise<SnapchatAuthCallbackResponse> {
-    return SocialService.snapchatAuthCallback(payload);
-  }
+  public static snapchatAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SnapchatAuthCallbackRequestDto = req.body;
+      const response: SnapchatAuthCallbackResponse = await SocialService.snapchatAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetSnapchatAuthData')
-  public async getSnapchatAuthData(payload: GetSnapchatAuthDataRequestDto): Promise<GetSnapchatAuthDataResponse> {
-    return SocialService.getSnapchatAuthData(payload);
-  }
+  public static getSnapchatAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetSnapchatAuthDataRequestDto = req.body;
+      const response: GetSnapchatAuthDataResponse = await SocialService.getSnapchatAuthData(payload);
+      res.json(response);
+    }
+  );
 
   // X
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetXAuthUrl')
-  private getXAuthUrl(payload: UserIdAuthRequestDto): Promise<GetXAuthUrlResponse> {
-    return SocialService.getXAuthUrl(payload);
-  }
+  public static getXAuthUrl = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetXAuthUrlResponse = await SocialService.getXAuthUrl(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'XAuthCallback')
-  private xAuthCallback(payload: XAuthCallbackRequestDto): Promise<XAuthCallbackResponse> {
-    return SocialService.xAuthCallback(payload);
-  }
+  public static xAuthCallback = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: XAuthCallbackRequestDto = req.body;
+      const response: XAuthCallbackResponse = await SocialService.xAuthCallback(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'GetXAuthData')
-  private getXAuthData(payload: UserIdAuthRequestDto): Promise<GetXAuthDataResponse> {
-    return SocialService.getXAuthData(payload);
-  }
+  public static getXAuthData = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: GetXAuthDataResponse = await SocialService.getXAuthData(payload);
+      res.json(response);
+    }
+  );
 
   //@GrpcMethod(SOCIAL_SERVICE_NAME, 'SyncSocialStats')
-  private syncSocialStats(payload: UserIdAuthRequestDto): Promise<SocialMediaStatsResponse> {
-    return SocialService.syncSocialStats(payload);
-  }
+  public static syncSocialStats = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserIdAuthRequestDto = req.body;
+      const response: SocialMediaStatsResponse = await SocialService.syncSocialStats(payload);
+      res.json(response);
+    }
+  );
 }
+
+

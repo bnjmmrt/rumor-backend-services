@@ -1,4 +1,3 @@
-// const { getSecret } = require('../utils/aws/secretsManager');
 import getSecret from '../utils/aws/secretsManager';
 import defaultConfig from './default';
 import developmentConfig from './development';

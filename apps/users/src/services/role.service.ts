@@ -11,7 +11,7 @@ import { userSourceToEntity, userStatusToEntity } from 'rumor-utils/shared/users
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
    
 export class RoleService {
-  static dbConnection = database;
+  static dbConnection = connectionManager;
 
   static async listRoles(): Promise<ListRolesResponse> {
     return responses.data([]);

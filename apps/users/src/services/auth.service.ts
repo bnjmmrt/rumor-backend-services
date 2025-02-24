@@ -58,8 +58,8 @@ import {
   CreateUserResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
-import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity';
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
+import { Invitation } from 'rumor-utils/shared/users/entities';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
@@ -161,7 +161,7 @@ export class AuthService {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: { email: payload.email, deletedAt: IsNull() },
       });
-
+      
       if (!user) {
         return responses.forbidden('Verify your password and email');
       }

@@ -10,16 +10,21 @@ export class ConnectionManager {
     try {
       if (!this.connection) {
         const appDataSource = new DataSource({
-          type: config.get("POSTGRES_DATABASE"),
+          type: 'postgres',
           host: config.get("POSTGRES_HOST"),
           port: config.get("POSTGRES_PORT"),
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
-          entities: [ "../../../../rumor-utils"+"/entities/*.ts"],
-          synchronize: false,
-          logging: false,
-          ssl: { rejectUnauthorized: false }
+          entities: [
+            "node_modules/rumor-utils/shared/users/entities/*.ts",
+            "node_modules/rumor-utils/shared/events/entities/*.ts",
+          ],
+          synchronize: true,
+          logging: true,
+          migrationsTableName: "users-migrations",
+          migrations: ["src/database/migrations/*.ts"],
+          migrationsRun: true,
         });
         this.connection = await appDataSource.initialize();
       }

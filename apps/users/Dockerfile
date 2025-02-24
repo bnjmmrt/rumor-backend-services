@@ -4,17 +4,19 @@ FROM node:latest
 WORKDIR /app
 
 # Copy rumor-utils to the working directory
-COPY rumor-utils rumor-utils
+COPY rumor-utils /app/rumor-utils
 
 # Copy package.json and package-lock.json to the working directory
-COPY apps/users/package*.json .
-COPY apps/users/tsconfig.json .
+COPY /apps/users/package.json .
+COPY /apps/users/tsconfig.json .
+
+RUN rm -rf node_modules package-lock.json
 
 # Install dependencies
 RUN npm install
 
 # Copy the rest of the application code to the working directory
-COPY apps/users/src src
+COPY /apps/users/src src
 
 # Build the application
 RUN npm run build
