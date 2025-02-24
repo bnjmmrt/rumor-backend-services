@@ -551,4 +551,34 @@ export interface ListEventUsedTicketsData {
   status: TicketStatus;
 }
 
+export interface SignupFormsResponse {
+  id: string;
+  styling: string;
+  name: string;
+  submissionCount: number;
+  isActive: boolean;
+  url: string;
+  userId: string;
+  userName: string;
+  userProfile: string;
+  description: string;
+  hasAccessForAdditionalGuests: boolean;
+  startDate: string;
+  talents: Talent[];
+  collaborators: CollaboratorsEvent[];
+  questions: SignupFormQuestions[];
+  address?: EventLocation;
+  type?: string;
+  ageLimit?: EventAgeLimit;
+}
+
+
+export interface SignupFormQuestions {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  ordering: number;
+  isDefault: boolean;
+}
+
 export const EVENTS_PACKAGE_NAME = "events";

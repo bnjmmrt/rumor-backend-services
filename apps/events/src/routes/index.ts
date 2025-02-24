@@ -1,6 +1,7 @@
-import express, { Router, Request, Response } from "express";
-import { EventAnnouncementController } from "src/controllers/event-announcement.controller";
-import { SignupFormsController } from "src/controllers/signup-forms.controller";
+import { Router, Request, Response } from "express";
+import * as express from "express";
+import { EventAnnouncementController } from "../controllers/event-announcement.controller";
+import { SignupFormsController } from "../controllers/signup-forms.controller";
 
 const router: Router = express.Router();
 
@@ -10,6 +11,10 @@ router.patch(
   "/event-announcement",
   EventAnnouncementController.updateAnnouncement
 );
+
+/**
+ * Event Signup Forms------------------------------------------
+ */
 router.get("/events/:id/signup-forms", (req: Request, res: Response) => {});
 
 router.post("/events/:id/signup-forms", (req: Request, res: Response) => {});
@@ -36,7 +41,6 @@ router.get(
   (req: Request, res: Response) => {}
 );
 
-router.get("/signup-forms/questions", (req: Request, res: Response) => {
-  SignupFormsController.getStaticQuestions(req);
-});
+router.get("/signup-forms/questions", SignupFormsController.getStaticQuestions);
+
 export default router;

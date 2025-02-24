@@ -38,6 +38,7 @@ import { VouchRequest } from "./vouch-request.entity";
 import { PushNotificationToken } from "./push-notification-token.entity";
 import { HostUserMapping } from "./host-user-mapping.entity";
 import { SignupFormSubmissions } from "../../events/entities/signup-form-submissions.entity";
+import { EventSignupForms } from "../../events/entities/event-signup-forms.entity";
 
 @Entity()
 export class User extends RumorBaseEntity {
@@ -198,4 +199,7 @@ export class User extends RumorBaseEntity {
 
   @OneToMany(() => SignupFormSubmissions, (sfs) => sfs.attendees)
   signupFormSubmissions: SignupFormSubmissions[];
+
+  @OneToMany(() => EventSignupForms, (esf) => esf.event)
+  signupForms: EventSignupForms[];
 }

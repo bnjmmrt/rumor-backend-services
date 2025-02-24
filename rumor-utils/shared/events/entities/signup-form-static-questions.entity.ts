@@ -12,7 +12,7 @@ export class SignupFormStaticQuestions extends RumorBaseEntity {
     enum: QuestionValueType,
     name: "type",
     default: QuestionValueType.STRING,
-    nullable: false
+    nullable: false,
   })
   type: QuestionValueType;
 
@@ -21,4 +21,7 @@ export class SignupFormStaticQuestions extends RumorBaseEntity {
 
   @Column({ type: "boolean", default: true, name: "is_active" })
   isActive: boolean;
+
+  @Column({ type: "boolean", default: true, name: "is_required" })
+  isRequired: boolean;
 }
