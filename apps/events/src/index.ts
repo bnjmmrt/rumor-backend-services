@@ -1,5 +1,4 @@
 /* eslint-disable global-require */
-require('dotenv').config();
 import config from './config'
 import server from './server';
 import connectionManager from './database';
