@@ -11,7 +11,7 @@ import router from '../routes/index';
 // import schoolRoutes from '../services/schools/routes';
 // import userRoutes from '../services/users/routes';
 // import sharedRoutes from '../services/shared/routes';
-// import errorHandler from './middleware/errorHandler';
+import { globalErrorHandler } from '../../../../rumor-utils/middlewares/global-error-handler.middleware';
 // import { NotFoundEndpointError } from '../utils/errors';
 // import bugsnag from '../utils/bugsnag';
 
@@ -47,6 +47,6 @@ app.use('/users/v1', router);
 
 // app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundEndpointError(req.path)));
 
-// app.use(errorHandler);
+app.use(globalErrorHandler);
 
 export default app;
