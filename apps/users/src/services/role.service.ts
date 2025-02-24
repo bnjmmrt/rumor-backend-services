@@ -1,4 +1,4 @@
-import database from '../database'
+import connectionManager from '../database'
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from 'rumor-utils/shared/users/grpc/auth/role.pb';
@@ -11,7 +11,7 @@ import { userSourceToEntity, userStatusToEntity } from 'rumor-utils/shared/users
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
    
 export class RoleService {
-  static dbConnection = connectionManager;
+  public static dbConnection = connectionManager;
 
   static async listRoles(): Promise<ListRolesResponse> {
     return responses.data([]);

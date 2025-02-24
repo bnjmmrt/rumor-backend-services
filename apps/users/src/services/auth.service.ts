@@ -59,7 +59,7 @@ import {
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
-import { Invitation } from 'rumor-utils/shared/users/entities';
+// import { Invitation } from 'rumor-utils/shared/users/entities';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
@@ -333,7 +333,7 @@ export class AuthService {
       // Micro-service call - need to shift the focus from platfrom to users
       //await this.platformClient.saveFocusesForUser(newUser.id, payload.focusIds, this.logger);
       
-      await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
+      // await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
       
       // Micro-service call - need to shift this call to notifications services, right now at commununication service
 
@@ -675,22 +675,22 @@ export class AuthService {
       const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
       if (!user) return responses.notFound('User not found!');
 
-      const invitations = await Promise.all(
-        payload.phoneNumbers.map(async (phoneNumber) => {
-          try {
-            const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
-            if (existingInvitation) return existingInvitation;
+      // const invitations = await Promise.all(
+      //   payload.phoneNumbers.map(async (phoneNumber) => {
+      //     try {
+      //       const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+      //       if (existingInvitation) return existingInvitation;
 
-            const invitation = new Invitation();
-            invitation.phoneNumber = phoneNumber;
-            invitation.inviteeUser = user;
-            return await this.dbConnection.getRepository(Invitation).save(invitation);
-          } catch (err) {
-            return null;
-          }
-        }),
-      );
-      const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
+      //       const invitation = new Invitation();
+      //       invitation.phoneNumber = phoneNumber;
+      //       invitation.inviteeUser = user;
+      //       return await this.dbConnection.getRepository(Invitation).save(invitation);
+      //     } catch (err) {
+      //       return null;
+      //     }
+      //   }),
+      // );
+      //const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
       
       //Micro-service call
       // const success = await this.communicationClient.sendInvitationMessages(successfulInvitations, user.firstName);      
@@ -707,21 +707,21 @@ export class AuthService {
       const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
       if (!user) return responses.notFound('User not found!');
 
-      await Promise.all(
-        payload.phoneNumbers.map(async (phoneNumber) => {
-          try {
-            const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
-            if (existingInvitation) return existingInvitation;
+      // await Promise.all(
+      //   payload.phoneNumbers.map(async (phoneNumber) => {
+      //     try {
+      //       const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+      //       if (existingInvitation) return existingInvitation;
 
-            const invitation = new Invitation();
-            invitation.phoneNumber = phoneNumber;
-            invitation.inviteeUser = user;
-            return await this.dbConnection.getRepository(Invitation).save(invitation);
-          } catch (err) {
-            return null;
-          }
-        }),
-      );
+      //       const invitation = new Invitation();
+      //       invitation.phoneNumber = phoneNumber;
+      //       invitation.inviteeUser = user;
+      //       return await this.dbConnection.getRepository(Invitation).save(invitation);
+      //     } catch (err) {
+      //       return null;
+      //     }
+      //   }),
+      // );
       return responses.ok;
     } catch (err) {
       return responses.badRequest('An error occured while saving invitations, please try again.');
@@ -747,13 +747,13 @@ export class AuthService {
         }
       }
 
-      const invitation = new Invitation();
-      invitation.phoneNumber = payload.phoneNumber;
-      invitation.email = payload.email;
-      invitation.referralCode = payload.referralCode;
-      invitation.inviteeUser = invitee;
+      // const invitation = new Invitation();
+      // invitation.phoneNumber = payload.phoneNumber;
+      // invitation.email = payload.email;
+      // invitation.referralCode = payload.referralCode;
+      // invitation.inviteeUser = invitee;
 
-      await this.dbConnection.getRepository(Invitation).save(invitation);
+      // await this.dbConnection.getRepository(Invitation).save(invitation);
 
       if (payload.phoneNumber) {
         const message =
@@ -819,12 +819,12 @@ export class AuthService {
         }
       }
 
-      const invitation = new Invitation();
-      invitation.phoneNumber = payload.phoneNumber;
-      invitation.email = payload.email;
-      invitation.inviteeUser = invitee;
+      // const invitation = new Invitation();
+      // invitation.phoneNumber = payload.phoneNumber;
+      // invitation.email = payload.email;
+      // invitation.inviteeUser = invitee;
 
-      await this.dbConnection.getRepository(Invitation).save(invitation);
+      // await this.dbConnection.getRepository(Invitation).save(invitation);
 
       const params = [
         {
@@ -1020,11 +1020,11 @@ export class AuthService {
         }
 
         // Check for invitation and set flags
-        const invitation = await this.dbConnection.getRepository(Invitation).findOne({
-          where: { phoneNumber: payload.phoneNumber, email: payload.email },
-        });
-        const isSignUpCompleted = invitation?.signUpComplete || false;
-        const isInvited = !!invitation;
+        // const invitation = await this.dbConnection.getRepository(Invitation).findOne({
+        //   where: { phoneNumber: payload.phoneNumber, email: payload.email },
+        // });
+        const isSignUpCompleted = false //invitation?.signUpComplete || false;
+        const isInvited = false //!!invitation;
 
         const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
