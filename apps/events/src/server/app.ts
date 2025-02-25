@@ -19,7 +19,7 @@ import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler
 const app: Express = express();
 
 app.get("/events/v1/health", (req: Request, res: Response) => {
-  res.sendStatus(200);
+  res.json({ status: "UP" , timestamp:new Date()}).status(200);
 });
 
 app.use("/events/v1", router);
