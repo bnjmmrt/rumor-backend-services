@@ -2,13 +2,11 @@
 build/
 dist/
 
-communication_to_be_inside_notifications/
-platform_to_be_dissolved/
-scheduler_to_be_dissolved/
-
 # Ignore dependencies
 node_modules/
-vendor/
+
+# Ignore Packages
+apps/*/packages
 
 # Ignore environment-specific files
 .env
@@ -21,15 +19,9 @@ api.*.env
 # Ignore logs
 *.log
 
-# Ignore compiled binaries
-*.exe
-*.dll
-*.so
-*.dylib
 
 # Ignore package lock files
 package-lock.json
-yarn.lock
 
 # Ignore IDE and editor files
 .vscode/
@@ -40,10 +32,3 @@ yarn.lock
 # Ignore system files
 .DS_Store
 Thumbs.db
-
-# Ignore backup files
-*~
-*.bak
-
-packages
-packages/*

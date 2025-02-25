@@ -1,22 +1,34 @@
 # Use the latest Node.js image as the base
-FROM public.ecr.aws/lambda/nodejs:22.2025.01.24.10
+FROM public.ecr.aws/docker/library/node:22-alpine3.20
 
 WORKDIR /app
 
-# Copy rumor-utils to the working directory
-COPY rumor-utils /app/rumor-utils
+# Copy and build rumor-utils before installing dependencies
+COPY packages/rumor-utils packages/rumor-utils
 
-# Copy package.json and package-lock.json to the working directory
-COPY /apps/users/package.json .
-COPY /apps/users/tsconfig.json .
+WORKDIR /app/packages/rumor-utils
 
-RUN rm -rf node_modules package-lock.json
+RUN npm install && npm run build
+
+# Remove everything except dist, then move dist contents to the root of rumor-utils
+RUN find . -mindepth 1 -maxdepth 1 ! -name 'dist' -exec rm -rf {} + && \
+    mv dist/* . && \
+    rm -rf dist
+
+WORKDIR /app
+
+# Copy necessary files for apps/users
+COPY apps/users/package.json  ./
+COPY apps/users/tsconfig.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
-# Copy the rest of the application code to the working directory
-COPY /apps/users/src src
+# Copy the application source code
+COPY apps/users/src src
+
+# Remove previous build artifacts
+RUN rm -rf dist
 
 # Build the application
 RUN npm run build
@@ -24,4 +36,4 @@ RUN npm run build
 EXPOSE 8000
 
 # Start the service
-CMD ["node", "/app/dist/src/index.js"]
+CMD ["npm", "start"]

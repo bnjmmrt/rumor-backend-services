@@ -20,11 +20,11 @@ export class ConnectionManager {
             "node_modules/rumor-utils/shared/users/entities/*.ts",
             "node_modules/rumor-utils/shared/events/entities/*.ts",
           ],
-          synchronize: true,
-          logging: true,
+          synchronize: false,
+          logging: false,
           migrationsTableName: "users-migrations",
           migrations: ["src/database/migrations/*.ts"],
-          migrationsRun: true,
+          migrationsRun: false,
         });
         this.connection = await appDataSource.initialize();
       }
