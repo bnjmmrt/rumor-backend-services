@@ -1,5 +1,5 @@
 # Use the latest Node.js image as the base
-FROM node:latest
+FROM public.ecr.aws/lambda/nodejs:22.2025.01.24.10
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY /apps/events/src src
 # Build the application
 RUN npm run build
 
-EXPOSE 8000
+EXPOSE 8001
 
 # Start the service
 CMD ["node", "/app/dist/src/index.js"]
