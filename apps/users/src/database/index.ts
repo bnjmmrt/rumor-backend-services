@@ -17,8 +17,8 @@ export class ConnectionManager {
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
           entities: [
-            "node_modules/rumor-utils/shared/users/entities/*.ts",
-            "node_modules/rumor-utils/shared/events/entities/*.ts",
+            "packages/rumor-utils/shared/users/entities/*.js",
+            "packages/rumor-utils/shared/events/entities/*.js"
           ],
           synchronize: false,
           logging: false,
