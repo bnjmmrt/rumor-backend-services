@@ -18,10 +18,11 @@ import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler
 
 const app: Express = express();
 
-app.use("/events/v1", router);
-app.get("/health", (req: Request, res: Response) => {
-  res.sendStatus(200);
+app.get("/events/v1/health", (req: Request, res: Response) => {
+  res.json({ status: "UP" , timestamp:new Date()}).status(200);
 });
+
+app.use("/events/v1", router);
 
 // const bugsnagMiddleware = bugsnag.getPlugin('express');
 // app.use(bugsnagMiddleware.requestHandler);

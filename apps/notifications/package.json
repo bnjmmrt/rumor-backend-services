@@ -45,7 +45,7 @@
     "rxjs": "^7.2.0",
     "twilio": "^5.0.4",
     "typeorm": "^0.3.20",
-    "rumor-utils": "file:../../rumor-utils"
+    "rumor-utils": "file:./packages/rumor-utils"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

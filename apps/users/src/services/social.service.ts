@@ -63,7 +63,7 @@ import { SocialStats } from 'rumor-utils/shared/users/entities/social-stats.enti
 
 export class SocialService {
 
-  static dbConnection = connectionManager;
+  public static dbConnection = database;
 
   static async getFacebookAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
     try {

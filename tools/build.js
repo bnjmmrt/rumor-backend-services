@@ -20,7 +20,7 @@ const packages = [
     {
         name: utils,
         builder: 'rumor_utils_builder',
-        path: `${root}/rumor-utils`
+        path: `${root}/packages/rumor-utils`
     }
 ];
 
@@ -45,18 +45,42 @@ const apps = [
     }
 ];
 
-const buildPackage = ({ path }) => {
-    cd(path);
-    exec(`npm install`);
+const copyDependencies = (dependencies, destinationName, destinationPath) => {
+    console.log(`Copying packages over to ${destinationName}...`);
+    rm('-rf', destinationPath);
+    mkdir(destinationPath);
+
+    dependencies.forEach(packageName => {
+        const { path } = packages.find(({ name }) => name === packageName);
+        cp('-r', `${path}/dist/`, `${destinationPath}/${packageName}`);
+    });
 };
 
-const distributePackages = ({ appDirectory }) => {
+const buildPackage = ({ name, path }) => {
+    console.log(`Building ${name} package...`);
+    cd(path);
+    rm('-rf', 'dist');
+    exec('npm install');
+    exec('npm run build');
+    cd(root);
+};
+
+const distributePackages = ({ name: appName, appDirectory, packagesDirectory, dependencies }) => {
+    copyDependencies(dependencies, appName, packagesDirectory);
     cd(appDirectory);
     exec('npm install');
     cd(root);
 };
 
-packages.filter(({ name }) => packagesToBuild.includes(name)).map(buildPackage);
-apps.filter(({ name }) => appsToBuild.includes(name)).map(distributePackages);
+packages.filter(({ name }) => packagesToBuild.includes(name)).forEach(buildPackage);
+apps.filter(({ name }) => appsToBuild.includes(name)).forEach(distributePackages);
+
+// const containersString = appsToBuild.join(' ');
+
+// console.log('Rebuilding dependent images...');
+// exec(`docker-compose build ${containersString}`);
+
+// console.log('Restarting dependent containers...');
+// exec(`docker-compose up -d --no-deps ${containersString}`);
 
 console.log('Done 🌟');

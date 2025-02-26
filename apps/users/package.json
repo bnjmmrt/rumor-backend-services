@@ -48,7 +48,7 @@
     "qs": "^6.12.1",
     "querystring": "^0.2.1",
     "reflect-metadata": "^0.2.2",
-    "rumor-utils": "file:../../rumor-utils",
+    "rumor-utils": "file:./packages/rumor-utils",
     "rxjs": "^7.2.0",
     "twilio": "^5.0.4",
     "typeorm": "^0.3.20"

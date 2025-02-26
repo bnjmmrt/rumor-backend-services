@@ -4,6 +4,7 @@ import * as bodyParser from 'body-parser';
 import helmet from 'helmet';
 import * as cors from 'cors';
 import router from '../routes/index';
+import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler.middleware";
 
 // import context from 'express-http-context';
 // import bookingRoutes from '../services/bookings/routes';
@@ -11,7 +12,6 @@ import router from '../routes/index';
 // import schoolRoutes from '../services/schools/routes';
 // import userRoutes from '../services/users/routes';
 // import sharedRoutes from '../services/shared/routes';
-import { globalErrorHandler } from '../../../../rumor-utils/middlewares/global-error-handler.middleware';
 // import { NotFoundEndpointError } from '../utils/errors';
 // import bugsnag from '../utils/bugsnag';
 
