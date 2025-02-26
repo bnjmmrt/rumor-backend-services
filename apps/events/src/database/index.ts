@@ -24,8 +24,8 @@ export class ConnectionManager {
           ...(ConnectionManager.isSSLRequired && { 
             ssl: { rejectUnauthorized: false } 
           }),
-          synchronize: true,
-          logging: true,
+          synchronize: false,
+          logging: false,
         });
         this.connection = await appDataSource.initialize();
       }
