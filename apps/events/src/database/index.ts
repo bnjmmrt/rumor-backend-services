@@ -5,6 +5,8 @@ import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 export class ConnectionManager {
   connection: DataSource;
 
+  public static isSSLRequired = ["development", "staging", "production"].includes(config.get("NODE_ENV"));
+
   public async initializeDbConnection(): Promise<DataSource> {
     try {
       if (!this.connection) {
@@ -15,13 +17,13 @@ export class ConnectionManager {
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
-          ssl: {
-            rejectUnauthorized: false, // Set to `true` if using a valid CA
-          },
           entities: [
-            "node_modules/rumor-utils/shared/users/entities/*.ts",
-            "node_modules/rumor-utils/shared/events/entities/*.ts"
+            "packages/rumor-utils/shared/users/entities/*.js",
+            "packages/rumor-utils/shared/events/entities/*.js"
           ],
+          ...(ConnectionManager.isSSLRequired && { 
+            ssl: { rejectUnauthorized: false } 
+          }),
           synchronize: false,
           logging: false,
         });
