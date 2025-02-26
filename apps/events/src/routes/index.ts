@@ -15,7 +15,9 @@ router.patch(
 /**
  * Event Signup Forms------------------------------------------
  */
-router.get("/events/:id/signup-forms", (req: Request, res: Response) => {});
+router.get("/events/:id/signup-forms", (req: Request, res: Response) => {
+  return 
+});
 
 router.post("/events/:id/signup-forms", (req: Request, res: Response) => {});
 
