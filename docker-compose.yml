@@ -10,7 +10,7 @@ services:
       - env/api.env
     volumes:
       - ./apps/users/src/:/app/src/ 
-      - rumor-utils:/app/node_modules/rumor-utils
+      - rumor-utils:/app/node_modules/rumor-utils:cached
     ports:
       - "8000:8000"
     command: npm run dev  
@@ -27,7 +27,7 @@ services:
       - env/api.env
     volumes:
       - ./apps/events/src:/app/src/ 
-      - rumor-utils:/app/node_modules/rumor-utils
+      - rumor-utils:/app/node_modules/rumor-utils:cached
     ports:
       - "8001:8001"
     command: npm run dev
@@ -51,6 +51,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  
+  nginx:
+    container_name: load-balancer
+    image: nginx:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./tools/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - users
+      - events
 
 volumes:
   rumor-utils:
