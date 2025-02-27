@@ -4,7 +4,10 @@ import { SignupFormStaticQuestions } from "rumor-utils/shared/entities";
 import { SignupFormsResponse } from "rumor-utils/shared/events/grpc/events/general.pb";
 import { GetResponse } from "rumor-utils/success";
 import asyncWrapper from "../server/helpers/asyncWrapper";
-import { CreateSignupFormDto, SignupFormAnswersDto } from "rumor-utils/shared/events/dtos/signup-forms.dto";
+import {
+  CreateSignupFormDto,
+  SignupFormAnswersDto,
+} from "rumor-utils/shared/events/dtos/signup-forms.dto";
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -71,9 +74,10 @@ export class SignupFormsController {
   );
   public static submitAnswers = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const eventId = req.params.id;
+      const eventId = req.params.eventId;
+      const id = req.params.id;
       const payload = req.body as SignupFormAnswersDto[];
-      await SignupFormsServices.answers(eventId, payload);
+      await SignupFormsServices.answers(id, eventId, payload);
       res.json(new GetResponse({}));
     }
   );

@@ -7,9 +7,10 @@ import {
   SignupFormQuestions,
   SignupFormSubmissions,
   User,
+  UserRole,
+  Role,
 } from "rumor-utils/shared/entities";
 import { ForbiddenError, NotFoundError } from "rumor-utils/errors";
-import { Role } from "rumor-utils/shared/users/entities/roles/role.entity";
 import database from "../database";
 import {
   CreateSignupFormDto,
@@ -70,7 +71,7 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
       if (!event) {
-        throw "Event not found";
+        throw new NotFoundError("Event not found");
       }
       const signupForms = await EventSignupForms.find({
         where: { event: { id: eventId } },
@@ -113,7 +114,7 @@ export class SignupFormsServices {
         });
 
       if (!eventSignupForm) {
-        throw "SignupForm does not exists";
+        throw new ForbiddenError("SignupForm does not exists");
       }
 
       const data = buildSignupFormsResponse(
@@ -137,7 +138,7 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
       if (!event) {
-        throw new ForbiddenError("");
+        throw new NotFoundError("Event");
       }
       if (!event.isPublished) {
         throw new ForbiddenError("This event is not published.");
@@ -239,8 +240,19 @@ export class SignupFormsServices {
     return response;
   }
 
-  public static async answers(id: string, payload: SignupFormAnswersDto[]) {
+  public static async answers(
+    id: string,
+    eventId: string,
+    payload: SignupFormAnswersDto[]
+  ) {
     try {
+      const signupForm: EventSignupForms | undefined =
+        await EventSignupForms.findOne({
+          where: { id: id, event: { id: eventId } },
+        });
+      if (!signupForm) {
+        throw new ForbiddenError("Signup Forms");
+      }
       const userPayload = new User();
       const answerList: SignupFormAnswersDto[] = [];
       payload.forEach((ans: SignupFormAnswersDto) => {
@@ -267,10 +279,20 @@ export class SignupFormsServices {
         }
       });
 
-      const savedUser = await userPayload.save();
-      const role: Role[] = await this.dbConnection
+      /**
+       * 1. Create User with Role Non_member.
+       * 2. Create this User as Guest in applied Event.
+       * 3. Create Submissions for this User.
+       */
+      await userPayload.save();
+      const nonMemberRole: Role[] = await this.dbConnection
         .getRepository(Role)
         .find({ where: { name: "non_member" } });
+
+      await UserRole.create({
+        role: { id: nonMemberRole[0].id },
+        user: { id: userPayload.id },
+      }).save();
 
       const submissions = new SignupFormSubmissions();
       submissions.signupForm = { id: id } as EventSignupForms;

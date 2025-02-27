@@ -564,6 +564,7 @@ export interface SignupFormsResponse {
   name: string;
   submissionCount: number;
   isActive: boolean;
+  isPublished: boolean
   url: string;
   userId: string;
   userName: string;
