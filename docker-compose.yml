@@ -10,8 +10,7 @@ services:
       - env/api.env
     volumes:
       - ./apps/users/src:/app/src
-      - ./packages/rumor-utils/dist:/app/packages/rumor-utils
-      - ./apps/events/packages/rumor-utils:/app/node_modules/rumor-utils
+      - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8000:8000"
     command: npm run dev  
@@ -28,8 +27,7 @@ services:
       - env/api.env
     volumes:
       - ./apps/events/src:/app/src 
-      - ./packages/rumor-utils/dist:/app/packages/rumor-utils
-      - ./apps/events/packages/rumor-utils:/app/node_modules/rumor-utils
+      - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8001:8001"
     command: npm run dev
