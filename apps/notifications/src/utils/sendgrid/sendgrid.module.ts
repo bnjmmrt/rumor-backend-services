@@ -67,3 +67,46 @@
 //     };
 //   }
 // }
+
+import sgMail, { MailService } from '@sendgrid/mail';
+import dotenv from 'dotenv';
+import { SendGridModuleOptions } from './sendgrid.interfaces';
+dotenv.config();
+
+export class SendGridModule {
+  private static options: SendGridModuleOptions;
+  private static mailService: MailService = sgMail;
+
+  /**
+   * Initialize SendGridModule with options (Sync).
+   */
+  public static forRoot(options: SendGridModuleOptions): void {
+    if (!options?.apikey) {
+      throw new Error('SendGrid API Key is not defined');
+    }
+    this.options = options;
+    this.mailService.setApiKey(options.apikey);
+
+    if (options.substitutionWrappers) {
+      this.mailService.setSubstitutionWrappers(options.substitutionWrappers.left, options.substitutionWrappers.right);
+    }
+  }
+
+  /**
+   * Initialize SendGridModule asynchronously.
+   */
+  public static async forRootAsync(factory: () => Promise<SendGridModuleOptions>): Promise<void> {
+    const options = await factory();
+    this.forRoot(options);
+  }
+
+  /**
+   * Get the configured MailService instance.
+   */
+  public static getMailService(): MailService {
+    if (!this.options) {
+      throw new Error('SendGridModule has not been initialized. Call forRoot() first.');
+    }
+    return this.mailService;
+  }
+}

@@ -19,3 +19,20 @@
 //     };
 //   }
 // }
+
+import { createTwilioClient } from "./common";
+import { TwilioModuleOptions, TwilioModuleAsyncOptions } from "./interfaces";
+
+export class TwilioModule {
+  static forRoot(options: TwilioModuleOptions) {
+    return createTwilioClient(options); // Return Twilio client instance
+  }
+
+  static async forRootAsync(options: TwilioModuleAsyncOptions) {
+    if (options.useFactory) {
+      const resolvedOptions = await options.useFactory(...(options.inject || []));
+      return createTwilioClient(resolvedOptions);
+    }
+    throw new Error("TwilioModuleAsyncOptions must include a useFactory function");
+  }
+}
