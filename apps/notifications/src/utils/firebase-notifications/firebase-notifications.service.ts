@@ -50,17 +50,15 @@
 import * as firebase from "firebase-admin";
 import dotenv from "dotenv";
 import { PushNotificationPayload } from './firebase-notifications.interface';
-
-dotenv.config(); // Load environment variables from .env file
-
+import config from '../../config'
 
 class FirebaseNotificationsService {
   constructor() {
     firebase.initializeApp({
       credential: firebase.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        projectId: config.get('FIREBASE_PROJECT_ID'),
+        clientEmail: config.get('FIREBASE_CLIENT_EMAIL'),
+        privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, "\n"),
       }),
     });
   }

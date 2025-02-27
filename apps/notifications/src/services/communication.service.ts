@@ -1,4 +1,3 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   DeleteEmailTemplateRequestDto,
   EmailTemplateDto,
@@ -9,137 +8,47 @@ import {
   SendTextMessageRequestDto,
   SendVerificationCodeRequestDto,
   VerifyCodeRequestDto,
-} from '../dtos/communication.dto';
+} from 'rumor-utils/shared/notifications/dtos/communication.dto';
 import { EmailTemplatesResponse, GenericResponse, ListEmailTemplatesResponse, VerifyResponse } from '../grpc/communication/communication.pb';
-import { ConfigService } from '@nestjs/config';
-import { TWILIO_CONFIG_TOKEN, TwilioClient } from '@rumor/shared/twilio';
-import { InjectRepository } from '@nestjs/typeorm';
+// import { TWILIO_CONFIG_TOKEN, TwilioClient } from '@rumor/shared/twilio';
 import { Repository } from 'typeorm';
-import { EmailTemplate } from '../entities/email-templates.entity';
+// import { EmailTemplate } from '../entities/email-templates.entity';
 
 import * as sgMail from '@sendgrid/mail';
-import { FirebaseNotificationsService } from '@rumor/shared/firebase-notifications/firebase-notifications.service';
+// import { FirebaseNotificationsService } from '@rumor/shared/firebase-notifications/firebase-notifications.service';
 
-const responses = {
-  conflict: (message: string) => ({
-    status: HttpStatus.CONFLICT,
-    error: {
-      type: 'conflict',
-      message: message,
-    },
-  }),
-  notFound: (message: string | null) => ({
-    status: HttpStatus.NOT_FOUND,
-    error: {
-      type: 'user_not_found',
-      message: message ?? 'Specified user not found',
-    },
-  }),
-  badRequest: (message?: string) => ({
-    status: HttpStatus.BAD_REQUEST,
-    error: {
-      type: 'bad_request',
-      message: message ?? 'Bad Request',
-    },
-    data: null,
-  }),
-  forbidden: (message: string) => ({
-    status: HttpStatus.FORBIDDEN,
-    error: {
-      type: 'forbidden',
-      message: message ?? 'Bad Request',
-    },
-  }),
-  ok: {
-    status: HttpStatus.OK,
-    error: null,
-  },
-  data: <T>(data: T) => ({
-    status: HttpStatus.OK,
-    error: null,
-    data: data,
-  }),
-  verification: (verified: boolean) => ({
-    status: HttpStatus.OK,
-    error: undefined,
-    data: {
-      verified,
-    },
-  }),
-};
-
-@Injectable()
 export class CommunicationService {
-  private readonly logger = new Logger(CommunicationService.name);
 
-  @InjectRepository(EmailTemplate)
-  private readonly emailTemplateRepository: Repository<EmailTemplate>;
+  // @InjectRepository(EmailTemplate)
+  // private readonly emailTemplateRepository: Repository<EmailTemplate>;
 
-  constructor(
-    private readonly configService: ConfigService,
-    @Inject(TWILIO_CONFIG_TOKEN)
-    private readonly twilioClient: TwilioClient,
-    private readonly firebaseNotifications: FirebaseNotificationsService,
-  ) {
-    sgMail.setApiKey(this.configService.get<string>('SENDGRID_API_KEY'));
-  }
+  // constructor(
+  //   private readonly configService: ConfigService,
+  //   @Inject(TWILIO_CONFIG_TOKEN)
+  //   private readonly twilioClient: TwilioClient,
+  //   private readonly firebaseNotifications: FirebaseNotificationsService,
+  // ) {
+  //   sgMail.setApiKey(this.configService.get<string>('SENDGRID_API_KEY'));
+  // }
 
-  async sendVerificationCode(payload: SendVerificationCodeRequestDto): Promise<GenericResponse> {
-    try {
-      const sid = this.configService.get<string>('TWILIO_VERIFY_SID');
-      await this.twilioClient.verify.v2.services(sid).verifications.create({
-        to: payload.phoneNumber,
-        channel: 'sms',
-      });
-      return responses.ok;
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('Unknown error occured, please try again');
-    }
+  async sendVerificationCode(req:Request,res:Response) {
+    
+    //call to utils
+    //return the response to client or interservice.
+
+    payload: SendVerificationCodeRequestDto
   }
 
   async verifyCode(payload: VerifyCodeRequestDto): Promise<VerifyResponse> {
-    try {
-      const sid = this.configService.get<string>('TWILIO_VERIFY_SID');
-      const verificationCheck = await this.twilioClient.verify.v2.services(sid).verificationChecks.create({
-        to: payload.phoneNumber,
-        code: payload.verificationCode,
-      });
-      return responses.verification(verificationCheck.status === 'approved' && verificationCheck.valid);
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('Unknown error occured, please try again');
-    }
+    
   }
 
   async sendTextMessage(payload: SendTextMessageRequestDto): Promise<boolean> {
-    try {
-      await this.twilioClient.messages.create({
-        to: payload.phoneNumber,
-        from: this.configService.get<string>('TWILIO_MESSAGING_SERVICE_SID'),
-        body: payload.message,
-      });
-      return true;
-    } catch (err) {
-      this.logger.error(err);
-      return false;
-    }
+    
   }
 
   async sendInvitationMessages(payload: SendInvitationMessagesRequestDto): Promise<void> {
-    try {
-      await Promise.all(
-        payload.phoneNumbers.map(async (phoneNumber) => {
-          await this.twilioClient.messages.create({
-            to: phoneNumber,
-            from: this.configService.get<string>('TWILIO_MESSAGING_SERVICE_SID'),
-            body: `Hi, I want to invite you to join Rumor - a new app that connects a private community of people and experience organizers that shape culture. Check it out and download here: [link]`,
-          });
-        }),
-      );
-    } catch (err) {
-      this.logger.error(err);
-    }
+    
   }
 
   async sendEmailFromTemplate(payload: SendEmailFromTemplateRequestDto): Promise<GenericResponse> {
@@ -162,6 +71,7 @@ export class CommunicationService {
         }
       }
 
+      // Similar to twilio this will move to sendgrid utils folder - kaustubh
       await sgMail.send({
         to: payload.to,
         from: {
@@ -232,6 +142,8 @@ export class CommunicationService {
   }
 
   async sendPushNotificationRequest(payload: SendPushNotificationRequestDto): Promise<GenericResponse> {
+    // Send this to firebase utils
+
     try {
       const success = this.firebaseNotifications.sendPushNotification(payload);
       if (!success) {

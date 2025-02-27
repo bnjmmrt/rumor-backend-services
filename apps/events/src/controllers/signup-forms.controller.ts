@@ -13,7 +13,7 @@ export class SignupFormsController {
     async (req: Request, res: Response): Promise<void> => {
       const data: SignupFormStaticQuestions[] =
         await SignupFormsServices.getStaticQuestions();
-      res.json(new GetResponse(data));
+        res.json(new GetResponse(data));
     }
   );
 
