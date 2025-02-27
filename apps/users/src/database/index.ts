@@ -20,7 +20,7 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/users/entities/*.js",
             "packages/rumor-utils/shared/events/entities/*.js"
           ],
-          ssl: { rejectUnauthorized: false } ,
+          // ssl: { rejectUnauthorized: false } ,
           synchronize: false,
           logging: false,
           migrationsTableName: "users-migrations",

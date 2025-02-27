@@ -17,7 +17,7 @@ import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { EventAnnouncementService } from '../services/event-announcement.service';
 import asyncWrapper from "../server/helpers/asyncWrapper";
-import { GetResponse, CreateResponse } from "rumor-utils/success";
+import { GetResponse, CreateResponse, UpdateResponse } from "rumor-utils/success";
 
 export class EventAnnouncementController {
 
@@ -32,7 +32,7 @@ export class EventAnnouncementController {
     res.json(new GetResponse(announcementGuestList));
   })        
   
-  public static postAnnoucement = asyncWrapper(async (req:Request, res: Response) => {
+  public static postAnnoucement = asyncWrapper(async (req:Request, res:Response) => {
     const payload: any = {
       eventId: req.params.eventId,
       ticketType: req.body.ticketType,
@@ -45,7 +45,15 @@ export class EventAnnouncementController {
     res.json(new CreateResponse(announcement));
   })
 
-  static async updateAnnouncement(){
-    //return AuthService.getMembers(payload);
-  }
+  public static updateAnnouncement = asyncWrapper(async(req:Request, res:Response)=> {
+    const payload: any = {
+      id: req.body.announcementId,
+      eventId: req.params.eventId,
+      announcement: req.body.announcement,
+      attachments: req.body.attachments,
+    }
+
+    const updatedAnnouncement = await EventAnnouncementService.updateAnnouncement(payload)
+    res.json(new UpdateResponse(""));
+  })
 }

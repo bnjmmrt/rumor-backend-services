@@ -6,8 +6,8 @@ import { SignupFormsController } from "../controllers/signup-forms.controller";
 const router: Router = express.Router();
 
 router.get("/event/:eventId/event-announcement-guest", EventAnnouncementController.getGuestListForAnnoucement);
-router.post("/event-announcement", EventAnnouncementController.postAnnoucement);
-router.patch("/event-announcement",EventAnnouncementController.updateAnnouncement);
+router.post("/event/:eventId/event-announcement", EventAnnouncementController.postAnnoucement);
+router.patch("/event/:eventId/event-announcement/:annoucementId", EventAnnouncementController.updateAnnouncement);
 
 /**
  * Event Signup Forms------------------------------------------

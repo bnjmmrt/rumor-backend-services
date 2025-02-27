@@ -1,6 +1,30 @@
 import "reflect-metadata";
 import config from "../config";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import {
+  AdmissionType,
+  Collaborator,
+  Event,
+  EventTypes,
+  QuizQuestion,
+  Talent,
+  TicketType,
+  EventLocation,
+  Guest,
+  UserAttendeeStats,
+  UserQuizAnswer,
+  Ticket,
+  EventAgeLimit,
+  DefaultRoleSettings,
+  FeaturedEventSection,
+  User,
+  SignupFormQuestions,
+  SignupFormStaticQuestions,
+  SignupFormSubmissions,
+  EventAnnouncement,
+  EventSignupForms,
+  Role
+} from "rumor-utils/shared/events/entities";
 
 export class ConnectionManager {
   connection: DataSource;
@@ -9,19 +33,21 @@ export class ConnectionManager {
     try {
       if (!this.connection) {
         const appDataSource = new DataSource({
-          type: 'postgres',
+          type: "postgres",
           host: config.get("POSTGRES_HOST"),
           port: config.get("POSTGRES_PORT"),
           username: config.get("POSTGRES_USERNAME"),
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
           entities: [
+            "packages/rumor-utils/shared/users/entities/*.ts",
+            "packages/rumor-utils/shared/events/entities/*.ts",
             "packages/rumor-utils/shared/users/entities/*.js",
             "packages/rumor-utils/shared/events/entities/*.js"
           ],
-          ssl: { rejectUnauthorized: false },
+          //ssl: { rejectUnauthorized: false },
           synchronize: false,
-          logging: false,
+          logging: true,
         });
         this.connection = await appDataSource.initialize();
       }
