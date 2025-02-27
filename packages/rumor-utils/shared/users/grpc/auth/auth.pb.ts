@@ -779,8 +779,10 @@ export interface SocialMediaStats {
 }
 
 export interface CustomUsersList {
-  customName: string;
-  users: UserDataSimple[];
+  name: string;
+  users: UsersList[];
+  count?: number | undefined;
+  id: string;
 }
 
 export interface CustomUsersListResponse {
@@ -798,12 +800,18 @@ export interface ManageCustomUsersListRequest {
 export interface CustomUsersListRequest {
   userId: string;
   query: string;
+  id?: string | undefined;
 }
 
 export interface CustomUsersListsResponse {
   status: number;
   error?: Error | undefined;
-  data: CustomUsersList[];
+  data: CustomUsersListsData | undefined;
+}
+
+export interface CustomUsersListsData {
+  count: number;
+  list: CustomUsersList[];
 }
 
 export interface GetUserWithRolesByEmailRequest {
@@ -839,6 +847,41 @@ export interface CreateUserResponse {
   status: number;
   error?: Error | undefined;
   data?: UserResponseData | undefined;
+}
+
+export interface UsersList {
+  id: string;
+  name: string;
+  gender: Gender;
+  city: string;
+  followerCount: string;
+  categories: string[];
+  interests: string[];
+  type: string;
+  profilePicture?: string | undefined;
+  age?: number | undefined;
+  isFavourite?: boolean | undefined;
+  listMappingId?: string | undefined;
+  isInCustomList?: boolean | undefined;
+}
+
+export interface GetUsersResponse {
+  status: number;
+  error?: Error | undefined;
+  data: UsersData | undefined;
+}
+
+export interface UsersData {
+  users: UsersList[];
+  totalCount: number;
+}
+
+export interface UpdateCustomUsersListRequest {
+  hostId: string;
+  name: string;
+  userIds: string[];
+  customListId: string;
+  mappingIds: string[];
 }
 
 export const AUTH_PACKAGE_NAME = "auth";

@@ -1,11 +1,11 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne, OneToMany } from 'typeorm';
 import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Event } from './event.entity';
 import { User } from '../../users/entities/user.entity';
 import { GuestStatus } from '../interfaces/event.interface';
 import { TicketType } from './ticket-type.entity';
 import { UserSource } from '../interfaces/event.interface';
 import { Ticket } from './ticket.entity';
-
+import { RestrictedInvites } from './restricted-invites.entity';
 @Entity()
 export class Guest extends RumorBaseEntity {
   @Column({ type: 'enum', enum: GuestStatus, name: 'status', default: GuestStatus.NO_STATUS })
@@ -19,6 +19,9 @@ export class Guest extends RumorBaseEntity {
 
   @Column({ type: 'integer', name: 'additional_requested_guests', default: 0 })
   additionalRequestedGuests: number;
+
+  @Column({ type: 'boolean', name: 'check_in', default: false })
+  checkIn: boolean;
 
   @Column({ type: 'varchar', name: 'private_guest_note', nullable: true })
   privateGuestNote: string;
@@ -34,6 +37,7 @@ export class Guest extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.guests, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })
@@ -65,4 +69,7 @@ export class Guest extends RumorBaseEntity {
 
   @OneToOne(() => Ticket, (ticket) => ticket.guest)
   ticket: Ticket;
+
+  @OneToMany(() => RestrictedInvites, (ri) => ri.guest, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  restrictedGuest: RestrictedInvites;
 }

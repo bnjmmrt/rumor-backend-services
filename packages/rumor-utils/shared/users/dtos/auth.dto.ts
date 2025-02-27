@@ -35,6 +35,7 @@ import {
   GetUserWithRolesByEmailRequest,
   InviteNewHostRequest,
   LoginVerificationRequest,
+  UpdateCustomUsersListRequest,
 } from '../grpc/auth/auth.pb';
 import { Type } from 'class-transformer';
 import { NewUserStatus, ProviderType } from '../grpc/auth/shared.pb';
@@ -397,6 +398,10 @@ export class CustomUsersListRequestDto implements CustomUsersListRequest {
   userId: string;
 
   @IsString()
+  @IsOptional()
+  id: string;
+
+  @IsString()
   @IsNotEmpty()
   query: string;
 }
@@ -428,6 +433,30 @@ export class ManageFavoriteUserRequestDto implements ManageFavoriteUserRequest {
   @IsBoolean()
   @IsNotEmpty()
   favorite: boolean;
+}
+
+export class UpdateCustomUsersListRequestDto implements UpdateCustomUsersListRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  hostId: string;
+
+  @IsUUID()
+  @IsOptional()
+  customListId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  userIds: string[];
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  mappingIds: string[];
 }
 
 export class UpdateUserStatusRequestDto implements UpdateUserStatusRequest {

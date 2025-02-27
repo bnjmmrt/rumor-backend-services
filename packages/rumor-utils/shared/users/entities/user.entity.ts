@@ -34,57 +34,57 @@ import { TemporaryPassword } from "./temporary-password.entity";
 import { TemporaryPasswordToken } from "./temporary-password-token.entity";
 import { UserAttendeeStats } from "../../events/entities/user-attendee-stats.entity";
 import { Collaborator } from "../../events/entities";
+import { CsvUploadRecords } from "../../events/entities";
 import { VouchRequest } from "./vouch-request.entity";
 import { PushNotificationToken } from "./push-notification-token.entity";
 import { HostUserMapping } from "./host-user-mapping.entity";
 import { SignupFormSubmissions } from "../../events/entities/signup-form-submissions.entity";
 import { EventSignupForms } from "../../events/entities/event-signup-forms.entity";
+import { HostFeedback } from "./host-feedback.entity";
+import { HostUserSettings } from "./host-user-settings.entity";
+import { RestrictedInvites } from "../../events/entities";
+import { Focus } from "./focus.entity";
+import { Report } from "./report.entity";
 
 @Entity()
 export class User extends RumorBaseEntity {
-  @Column({ type: "varchar", name: "first_name" })
+  @Column({ type: 'varchar', name: 'first_name' })
   firstName: string;
 
-  @Column({ type: "varchar", name: "last_name" })
+  @Column({ type: 'varchar', name: 'last_name' })
   lastName: string;
 
-  @Column({ type: "varchar", nullable: true, name: "date_of_birth" })
+  @Column({ type: 'varchar', nullable: true, name: 'date_of_birth' })
   dateOfBirth: string | null;
 
   @Index()
-  @Column({ type: "varchar", name: "email" })
+  @Column({ type: 'varchar', name: 'email' })
   email: string;
 
-  @Column({ type: "varchar", nullable: true, name: "username", unique: true })
+  @Column({ type: 'varchar', nullable: true, name: 'username', unique: true })
   username: string;
 
   @Index()
-  @Column({ type: "varchar", name: "phone_number", nullable: true })
+  @Column({ type: 'varchar', name: 'phone_number', nullable: true })
   phoneNumber: string;
 
-  @Column({ type: "enum", enum: Gender, nullable: true, name: "gender" })
+  @Column({ type: 'enum', enum: Gender, nullable: true, name: 'gender' })
   gender: Gender;
 
-  @Column({
-    type: "jsonb",
-    nullable: true,
-    name: "additional_member_information",
-    default: null,
-  })
+  @Column({ type: 'jsonb', nullable: true, name: 'additional_member_information', default: null })
   additionalMemberInformation: AdditionalMemberInformation | null;
 
-  @Column({
-    type: "jsonb",
-    nullable: true,
-    name: "additional_host_information",
-  })
+  @Column({ type: 'jsonb', nullable: true, name: 'additional_host_information' })
   additionalHostInformation: AdditionalHostInformation | null;
 
-  @Column({ type: "varchar", name: "profile_picture", nullable: true })
+  @Column({ type: 'varchar', name: 'profile_picture', nullable: true })
   profilePicture?: string;
 
-  @Column({ type: "varchar", name: "instagram_user_name", nullable: true })
+  @Column({ type: 'varchar', name: 'instagram_user_name', nullable: true })
   instagramUserName?: string;
+
+  @Column({ type: 'boolean', name: 'is_first_time_logged_in', default: false })
+  isFirstTimeLoggedIn: boolean;
 
   @OneToMany(() => SocialProvider, (socialProvider) => socialProvider.user)
   socialProviders: Relation<SocialProvider[]>;
@@ -93,7 +93,7 @@ export class User extends RumorBaseEntity {
   socialStats: Relation<SocialStats>;
 
   @OneToOne(() => Address, { nullable: true, cascade: true })
-  @JoinColumn({ name: "address_id", referencedColumnName: "id" })
+  @JoinColumn({ name: 'address_id', referencedColumnName: 'id' })
   address: Address | null;
 
   @OneToMany(() => Invitation, (invitation) => invitation.inviteeUser)
@@ -114,6 +114,13 @@ export class User extends RumorBaseEntity {
   @ManyToMany(() => Interest, { cascade: false })
   @JoinTable()
   interests: Interest[];
+
+  @ManyToMany(() => Focus, { cascade: false })
+  @JoinTable()
+  focuses: Focus[];
+
+  @OneToMany(() => RestrictedInvites, (ri) => ri.restrictedBy, { onDelete: 'CASCADE' })
+  restrictedByInvitee: RestrictedInvites;
 
   @OneToMany(() => Guest, (guest) => guest.user)
   eventInvitations: Guest[];
@@ -139,10 +146,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => HostUserMapping, (hostCreated) => hostCreated.host)
   createdByHost: HostUserMapping[];
 
-  @OneToMany(
-    () => HostCustomUsersLists,
-    (hostCustomUsersLists) => hostCustomUsersLists.host
-  )
+  @OneToMany(() => HostCustomUsersLists, (hostCustomUsersLists) => hostCustomUsersLists.host)
   customLists: HostCustomUsersLists[];
 
   @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.host)
@@ -151,35 +155,24 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.member)
   favoritedByHosts: HostFavorite[];
 
-  @OneToOne(
-    () => TemporaryPassword,
-    (temporaryPassword) => temporaryPassword.user,
-    {
-      nullable: true,
-      cascade: true,
-      eager: true,
-    }
-  )
-  @JoinColumn({ name: "temporary_password_id", referencedColumnName: "id" })
+  @OneToOne(() => TemporaryPassword, (temporaryPassword) => temporaryPassword.user, {
+    nullable: true,
+    cascade: true,
+    eager: true,
+  })
+  @JoinColumn({ name: 'temporary_password_id', referencedColumnName: 'id' })
   temporaryPassword: TemporaryPassword | null;
 
-  @OneToOne(
-    () => TemporaryPasswordToken,
-    (temporaryPasswordToken) => temporaryPasswordToken.user,
-    {
-      nullable: true,
-      cascade: true,
-      eager: true,
-    }
-  )
-  @JoinColumn({
-    name: "temporary_password_token_id",
-    referencedColumnName: "id",
+  @OneToOne(() => TemporaryPasswordToken, (temporaryPasswordToken) => temporaryPasswordToken.user, {
+    nullable: true,
+    cascade: true,
+    eager: true,
   })
+  @JoinColumn({ name: 'temporary_password_token_id', referencedColumnName: 'id' })
   temporaryPasswordToken: TemporaryPasswordToken | null;
 
   @OneToOne(() => UserAttendeeStats, (attendeeStats) => attendeeStats.user)
-  @JoinColumn({ name: "attendee_stats_id" })
+  @JoinColumn({ name: 'attendee_stats_id' })
   attendeeStats: UserAttendeeStats;
 
   @OneToMany(() => Collaborator, (collaborator) => collaborator.user)
@@ -191,10 +184,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => VouchRequest, (vouchRequest) => vouchRequest.requester)
   requestedVouches: VouchRequest[];
 
-  @OneToMany(
-    () => PushNotificationToken,
-    (pushNotificationToken) => pushNotificationToken.user
-  )
+  @OneToMany(() => PushNotificationToken, (pushNotificationToken) => pushNotificationToken.user)
   pushNotificationToken: PushNotificationToken[];
 
   @OneToMany(() => SignupFormSubmissions, (sfs) => sfs.attendees)
@@ -202,4 +192,27 @@ export class User extends RumorBaseEntity {
 
   @OneToMany(() => EventSignupForms, (esf) => esf.event)
   signupForms: EventSignupForms[];
+
+  @OneToMany(() => HostFeedback, (hostFeedback) => hostFeedback.user)
+  hostFeedbacks: Relation<HostFeedback[]>;
+
+  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.user)
+  managedByHosts: Relation<HostUserSettings[]>;
+
+  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.host)
+  managingUsers: Relation<HostUserSettings[]>;
+
+  @OneToMany(() => Report, (report) => report.reportedBy)
+  reportsMade: Relation<Report[]>;
+
+  @OneToMany(() => Report, (report) => report.reportedTo)
+  reportsReceived: Relation<Report[]>;
+
+  @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.host)
+  csvUploads: CsvUploadRecords[];
+
+  // New Relation: Tracks which CSV upload created this user
+  @ManyToOne(() => CsvUploadRecords, (csvUpload) => csvUpload.uploadedUsers, { nullable: true })
+  @JoinColumn({ name: 'csv_upload_id' })
+  uploadedViaCsv: CsvUploadRecords | null;
 }

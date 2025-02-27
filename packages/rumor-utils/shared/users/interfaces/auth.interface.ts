@@ -68,3 +68,10 @@ export enum RoleType {
   Member = 'member',
   NonMember = 'non_member',
 }
+
+export enum Tag {
+  General = 'general',
+  Bug = 'bug',
+  NewFeatureSuggestion = 'new_feature_suggestion',
+}
+

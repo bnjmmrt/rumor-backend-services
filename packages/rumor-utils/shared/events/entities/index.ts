@@ -15,3 +15,5 @@ export { DefaultRoleSettings } from './default-role-settings.entity';
 export { FeaturedEventSection } from './featured-event-section.entity';
 export { User } from '../../users/entities/user.entity'; 
 export { Address } from '../../users/entities/address.entity';
+export { CsvUploadRecords } from './csv-upload-records.entity'
+export { RestrictedInvites } from './restricted-invites.entity'

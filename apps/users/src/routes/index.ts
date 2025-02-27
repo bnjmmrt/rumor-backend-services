@@ -5,7 +5,7 @@ import { AdminController } from '../controllers/admin.controller';
 import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
-
+// import AuthMiddleware from '../utils/fusion-auth/index'
 const router: Router = express.Router();
 
 // Admin routes

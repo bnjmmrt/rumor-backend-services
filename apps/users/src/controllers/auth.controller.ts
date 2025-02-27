@@ -25,6 +25,8 @@ import {
   SimpleUserResponse,
   GetUserWithRolesByEmailResponse,
   CreateUserResponse,
+  GetUsersResponse,
+  UserResponseData,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -58,11 +60,13 @@ import {
   NonMemberSignUpRequestDto,
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
+  UpdateCustomUsersListRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
-import { IdRequestDto, PaginatedRequestDto, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { IdRequestDto, PaginatedRequestDto, TokenRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
+import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
 
 export class AuthController {
   
@@ -366,9 +370,9 @@ export class AuthController {
 
   public static getCustomUsersLists = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
+      const payload: CustomUsersListRequestDto = req.body;
       const response: CustomUsersListsResponse = await AuthService.getCustomUsersLists(payload);
-      res.json(response);
+      res.json(new GetResponse(response))
     }
   );
 
@@ -383,8 +387,9 @@ export class AuthController {
   public static deleteCustomUsersList = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: CustomUsersListRequestDto = req.body;
-      const response: CustomUsersListResponse = await AuthService.deleteCustomUsersList(payload);
-      res.json(response);
+      await AuthService.deleteCustomUsersList(payload);
+      const message = "Custom list deleted successfully"
+      res.json(new DeleteResponse(message));    
     }
   );
 
@@ -392,15 +397,15 @@ export class AuthController {
     async (req, res): Promise<void> => {
       const payload: ManageCustomUsersListRequestDto = req.body;
       const response: CustomUsersListResponse = await AuthService.createCustomUsersList(payload);
-      res.json(response);
+      res.json(new CreateResponse(response));
     }
   );
 
-  public static updateCustomUsersList = asyncWrapper(
+ public static updateCustomUsersList = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: ManageCustomUsersListRequestDto = req.body;
+      const payload: UpdateCustomUsersListRequestDto = req.body;
       const response: CustomUsersListResponse = await AuthService.updateCustomUsersList(payload);
-      res.json(response);
+      res.json(new CreateResponse(response));    
     }
   );
 
@@ -447,16 +452,16 @@ export class AuthController {
   public static createUser = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: NonMemberSignUpRequestDto = req.body;
-      const response: CreateUserResponse = await AuthService.createUser(payload);
-      res.json(response);
+      const response: UserResponseData = await AuthService.createUser(payload);
+      res.json(new CreateResponse(response));
     }
   );
 
   public static getAllUsers = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: ListUsersInviteesDto = req.body;
-      const response: GetMembersResponse = await AuthService.getAllusers(payload);
-      res.json(response);
+      const response: GetUsersResponse = await AuthService.getAllusers(payload);
+      res.json(new GetResponse(response));
     }
   );
 }

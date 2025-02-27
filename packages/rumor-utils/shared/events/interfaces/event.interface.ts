@@ -21,6 +21,11 @@ export enum TicketStatusEnum {
   TICKET_EXPIRED = "TICKET_EXPIRED",
 }
 
+export enum UploadType {
+  EVENT_UPLOAD = 'EVENT_UPLOAD', // CSV uploaded for an event
+  USER_UPLOAD = 'USER_UPLOAD', // CSV uploaded to add users to the system
+}
+
 export enum GuestStatus {
   NO_STATUS = "NO_STATUS", // Default when no status is selected
   DRAFT = "DRAFT", // Host has created draft but has not yet sent the invitation

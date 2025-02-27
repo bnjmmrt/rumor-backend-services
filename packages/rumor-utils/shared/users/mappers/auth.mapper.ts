@@ -11,6 +11,7 @@ import {
   CurrentUser,
   ConfirmedMember,
   SimpleUser,
+  UsersList,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -258,5 +259,44 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+  };
+};
+
+
+export const toUser = (
+  user: User,
+  focuses: FocusProto[] = [],
+  interests: InterestData[] = [],
+  role: UserRole,
+  socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
+): UsersList => {
+  let totalFollowerCount = 0;
+
+  if (user.socialStats) {
+    if (Object.keys(socialNetworkObject).length > 0) {
+      totalFollowerCount = Object.keys(socialNetworkObject).reduce((acc, key) => {
+        const statKey = `${key.toLowerCase()}FollowersCount`;
+        return acc + (user.socialStats[statKey] || 0);
+      }, 0);
+    } else {
+      totalFollowerCount = Object.values(user.socialStats).reduce((acc, val) => {
+        return typeof val === 'number' ? acc + val : acc;
+      }, 0);
+    }
+  }
+
+  const followerCount = formatToUnits(totalFollowerCount) || 'N/A';
+
+  return {
+    id: user.id,
+    name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
+    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    categories: focuses.map((focus) => focus.name),
+    interests: interests.map((interest) => interest.name),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    followerCount,
+    profilePicture: user.profilePicture,
+    type: role.role.name,
+    age: calculateAge(user.dateOfBirth),
   };
 };
