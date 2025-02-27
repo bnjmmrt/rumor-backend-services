@@ -17,6 +17,7 @@ import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler
 // import bugsnag from '../utils/bugsnag';
 
 const app: Express = express();
+app.use(bodyParser.json());
 
 app.get("/events/v1/health", (req: Request, res: Response) => {
   res.json({ status: "UP" , timestamp:new Date()}).status(200);
@@ -49,7 +50,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(helmet());
-app.use(bodyParser.json());
 // app.use(context.middleware);
 
 // app.use(router);

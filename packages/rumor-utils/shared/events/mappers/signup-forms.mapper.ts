@@ -1,5 +1,6 @@
 import { Event } from "../entities";
 import { EventSignupForms } from "../entities/event-signup-forms.entity";
+import { SignupFormQuestions } from "../entities/signup-form-questions.entity";
 import { SignupFormsResponse } from "../grpc/events/general.pb";
 
 export const buildSignupFormsResponse = (
@@ -23,11 +24,21 @@ export const buildSignupFormsResponse = (
     submissionCount: submissions,
     isActive: esf.isActive,
     description: esf.description,
-    url: `/${event.owner}/${event.name}/${esf.urlCode}`,
-    questions: esf.questions,
+    url: `/${event.owner.firstName}/${event.name}/${esf.urlCode}`,
+    questions: esf.questions && esf.questions.map((q) => buildQuestion(q)) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
   };
   return result;
+};
+
+const buildQuestion = (q: SignupFormQuestions) => {
+  return {
+    id: q.id,
+    isRequired: q.isRequired,
+    isDefault: q.isDefault,
+    name: q.name,
+    ordering: q.ordering,
+  };
 };
 
 export const buildSignupFormList = (
