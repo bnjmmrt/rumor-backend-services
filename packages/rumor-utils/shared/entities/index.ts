@@ -1,4 +1,6 @@
 export { User } from "../users/entities/user.entity";
+export { UserRole } from "../users/entities/roles/user-role.entity";
+export { Role } from "../users/entities/roles/role.entity";
 export { Address } from "../users/entities/address.entity";
 export { AdmissionType } from "../events/entities/admission-type.entity";
 export { Collaborator } from "../events/entities/collaborator.entity";

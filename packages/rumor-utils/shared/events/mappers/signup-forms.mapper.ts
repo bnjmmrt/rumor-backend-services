@@ -23,6 +23,7 @@ export const buildSignupFormsResponse = (
     userProfile: esf.createdBy.profilePicture,
     submissionCount: submissions,
     isActive: esf.isActive,
+    isPublished: esf.isPublished,
     description: esf.description,
     url: `/${event.owner.firstName}/${event.name}/${esf.urlCode}`,
     questions: esf.questions && esf.questions.map((q) => buildQuestion(q)) || [],
@@ -39,29 +40,4 @@ const buildQuestion = (q: SignupFormQuestions) => {
     name: q.name,
     ordering: q.ordering,
   };
-};
-
-export const buildSignupFormList = (
-  event: Event,
-  esf: EventSignupForms,
-  submissions: number
-): SignupFormsResponse => {
-  const result: SignupFormsResponse = {
-    id: esf.id,
-    styling: esf.styling,
-    name: event.name,
-    submissionCount: submissions,
-    isActive: esf.isActive,
-    url: `/${event.owner}/${event.name}/${esf.urlCode}`,
-    userId: esf.createdBy.id,
-    userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,
-    userProfile: esf.createdBy.profilePicture,
-    description: esf.description,
-    hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
-    startDate: event.startDate.toString() || new Date().toString(),
-    talents: [],
-    collaborators: [],
-    questions: [],
-  };
-  return result;
 };
