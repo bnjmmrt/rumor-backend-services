@@ -15,34 +15,25 @@ router.patch(
 /**
  * Event Signup Forms------------------------------------------
  */
-router.get("/events/:id/signup-forms", (req: Request, res: Response) => {
-  return 
-});
-
-router.post("/events/:id/signup-forms", (req: Request, res: Response) => {});
-
-router.put(
-  "/events/:eventId/signup-forms/:id",
-  (req: Request, res: Response) => {}
-);
-
-router.post(
-  "/events/:eventId/signup-forms/:id/publish",
-  (req: Request, res: Response) => {}
-);
-
-router.post(
-  "/events/:eventId/signup-forms/:id/answers",
-  (req: Request, res: Response) => {}
-);
-
-router.get("/signup-forms", (req: Request, res: Response) => {});
-
-router.get(
-  "/signup-forms/:id/submissions",
-  (req: Request, res: Response) => {}
-);
 
 router.get("/signup-forms/questions", SignupFormsController.getStaticQuestions);
+router.get("/events/:id/signup-forms", SignupFormsController.getByEventId);
+router.get("/events/:eventId/signup-forms/:id", SignupFormsController.get);
+router.get("/signup-forms", SignupFormsController.getByUrl);
+
+router.post("/events/:id/signup-forms", SignupFormsController.create);
+router.put("/events/:eventId/signup-forms/:id", SignupFormsController.update);
+router.post(
+  "/events/:eventId/signup-forms/:id/answers",
+  SignupFormsController.submitAnswers
+);
+router.patch("/signup-forms/:id/deactivate", SignupFormsController.deactivate);
+
+// router.get("/signup-forms/:id/submissions");
+
+// router.post(
+//   "/events/:eventId/signup-forms/:id/publish",
+//   (req: Request, res: Response) => {}
+// );
 
 export default router;

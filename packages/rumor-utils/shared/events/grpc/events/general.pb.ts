@@ -551,6 +551,13 @@ export interface ListEventUsedTicketsData {
   status: TicketStatus;
 }
 
+export interface CreateSignupFormRequest {
+  styling: string;
+  description: string;
+  hasAccessForAdditionalGuests: boolean;
+  questions: ISignupFormQuestionsRequest[];
+}
+
 export interface SignupFormsResponse {
   id: string;
   styling: string;
@@ -566,19 +573,18 @@ export interface SignupFormsResponse {
   startDate: string;
   talents: Talent[];
   collaborators: CollaboratorsEvent[];
-  questions: SignupFormQuestions[];
+  questions: ISignupFormQuestionsRequest[];
   address?: EventLocation;
   type?: string;
   ageLimit?: EventAgeLimit;
 }
 
-
-export interface SignupFormQuestions {
+export interface ISignupFormQuestionsRequest {
   id: string;
   name: string;
+  type?: string;
   isRequired: boolean;
-  ordering: number;
-  isDefault: boolean;
+  answers?: string;
 }
 
 export const EVENTS_PACKAGE_NAME = "events";

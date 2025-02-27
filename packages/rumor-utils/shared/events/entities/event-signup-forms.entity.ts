@@ -33,7 +33,7 @@ export class EventSignupForms extends RumorBaseEntity {
   additionalGuestsCount: boolean;
 
   @Column({ type: "jsonb", nullable: false, name: "question_ids" })
-  questionIds: number[];
+  questionIds: string[];
 
   @ManyToOne(() => User, (user) => user.signupForms, {
     onDelete: "RESTRICT",
