@@ -15,17 +15,18 @@ export class EventAnnouncement extends RumorBaseEntity{
     @Column({type: 'jsonb', name: 'recipients', nullable: true, comment:'Array of GuestId'})
     recipients: any[];
 
-    @Column({type: 'jsonb', name: 'addedBy', nullable: true, comment:'Array of collaborators'})
+    @Column({type: 'jsonb', name: 'added_by', nullable: true, comment:'Array of collaborators'})
     addedBy: any[];
 
-    @ManyToOne(() => Event)
-    event?: Event;
-
-    @ManyToOne(() => TicketType)
+    @Column({type: 'jsonb', name: 'ticket_type_id', nullable: true, comment:'Array of collaborators'})
     ticketType: TicketType
 
+    @ManyToOne(() => Event)
+    @JoinColumn({ name: "event_id" })
+    event?: Event;
+
     @ManyToOne(()=> User)
-    @JoinColumn({ name: 'createdBy', referencedColumnName: 'id' })
+    @JoinColumn({ name: 'created_by', referencedColumnName: 'id' })
     user:User
 
 }
