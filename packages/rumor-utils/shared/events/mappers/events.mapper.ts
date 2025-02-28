@@ -1,46 +1,66 @@
-import { EventData, EventStatus, GuestEventData, GuestStatus as GuesStatusGRPC } from '../grpc/events/general.pb';
+import { EventData, EventStatus, GuestEventData, GuestStatus as GuesStatusGRPC, CollaboratorsEvent } from '../grpc/events/general.pb';
 import { Event } from '../entities/event.entity';
-import { Guest } from '../entities/guest.entity';
 import * as dayjs from 'dayjs';
-import { EventStatusEnum } from '../interfaces/event.interface';
+import { EventStatusEnum, HostsFollowedByGuestInterface } from '../interfaces/event.interface';
+import { Collaborator, Guest } from '../entities';
 import { entityToGuestStatus } from './guest.mapper';
+// import { formatDateFromDB } from '../utils/event.utils';
+// import {formatDateFromDB} from '../utils/event.utils'
 
-export const toEvent = (event: Event, qrCodeUtilization: number | null | undefined, guestCount?: number, guest?: Guest): EventData => {
+export const toEvent = (
+  event: Event,
+  totalCheckedInGuests?: number | null | undefined,
+  guestCount?: number,
+  guest?: Guest,
+  totalConfirmedGuests?: number | null | undefined,
+  hostsFollowedByGuest?: HostsFollowedByGuestInterface[],
+): EventData => {
   const currentGuestStatus = guest?.status;
-
+  const invitationDeclinedBy = guest?.declinedBy?.id || '';
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest);
+  const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+  const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
+  const location = event.location ? { ...event.location, placeId: event.location.googlePlaceId } : undefined;
+  const ownerDetails = {
+    ...event.owner,
+    companyLogo: event?.owner?.additionalHostInformation?.companyLogo,
+    companyName: event?.owner?.additionalHostInformation?.companyName,
+    isFollowedByCurrentGuest: hostsFollowedByGuest?.some((follow) => follow.hostId === event.owner?.id && follow.followerId === guest?.user?.id),
+  };
   return {
     admissionType: event.admissionType || undefined,
-    collaborators: event.collaborators || [],
+    collaborators: collaborators,
     description: event.description || '',
     enabled: event.enabled || false,
-    endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
+    // endDate: formatDateFromDB(event.endDate),
     eventType: event.eventType || undefined,
     furtherInstructions: event.furtherInstructions || '',
     imageCover: event.imageCover || '',
     imageFlyer: event.imageFlyer || '',
     limitOnePlus: event.limitOnePlus || 0,
-    location: event.location || undefined,
-    owner: event.owner || undefined,
+    location: location,
+    owner: ownerDetails,
     quizQuestions: event.quizQuestions || [],
-    rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('MM/DD/YYYY HH:mm') : '',
+    rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || '' : '',
     showLocation: event.showLocation || false,
-    startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
-    status: formatEventStatus(event),
+    // startDate: formatDateFromDB(event.startDate),
+    status: eventStatus,
     talents: event.talents || [],
     ticketTypes: event.ticketTypes || [],
     useQr: event.useQr || false,
     id: event.id,
     name: event.name || '',
     ageLimit: event.ageLimit || undefined,
-    publishDate: event.publishDate ? dayjs(event.publishDate).format('MM/DD/YYYY HH:mm') : '',
+    // publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
     capacity: event.capacity || 0,
-    qrCodeUtilization: qrCodeUtilization,
     guestsCount: guestCount || 0,
     currentGuestStatus: currentGuestStatus ? entityToGuestStatus[currentGuestStatus] : GuesStatusGRPC.NO_STATUS,
     guestId: guest?.id,
     userId: guest?.user?.id,
+    timeZone: event?.timeZone,
+    invitationDeclinedBy: invitationDeclinedBy,
     featuredEventSection: event.featuredEventSection
       ? {
           id: event.featuredEventSection?.id,
@@ -48,39 +68,95 @@ export const toEvent = (event: Event, qrCodeUtilization: number | null | undefin
           index: event.featuredEventSection?.index,
         }
       : null,
+    isPublished: event.isPublished || false,
+    totalCheckedInGuests: totalCheckedInGuests || 0,
+    totalConfirmedGuests: totalConfirmedGuests || 0,
   };
 };
 
-export const toEventGuest = (event: Event, currentGuest: Guest): GuestEventData => {
+export const groupCollaborators = (collaborators: Collaborator[], hostsFollowedByGuest?: HostsFollowedByGuestInterface[], guest?: Guest): CollaboratorsEvent[] => {
+  try {
+    if (!Array.isArray(collaborators)) {
+      return [];
+    }
+    const grouped = {};
+    collaborators.forEach((collab) => {
+      if (!collab?.user?.id) {
+        return;
+      }
+      const { user, role, limitInvitationsNumber, ticketType, ...collaboratorDetails } = collab;
+      if (!grouped[user.id]) {
+        let isFollowedByCurrentGuest = false;
+        if (guest && hostsFollowedByGuest.length) {
+          isFollowedByCurrentGuest = hostsFollowedByGuest.some((follow) => follow.hostId === user.id && follow.followerId === guest?.user?.id);
+        }
+        grouped[user.id] = {
+          ...collaboratorDetails,
+          id: user.id,
+          name: [user.firstName, user.lastName].filter(Boolean).join(' '), // Avoids "null undefined"
+          email: user.email || '',
+          companyLogo: user.additionalHostInformation?.companyLogo || '',
+          companyName: user.additionalHostInformation?.companyName || '',
+          role: role,
+          tickets: [],
+          isFollowedByCurrentGuest,
+          //TODO:add the status if collaboartor is approved or accepted the invite
+        };
+      }
+      if (ticketType?.id && ticketType?.name) {
+        grouped[user.id].tickets.push({
+          limitInvitationsNumber: limitInvitationsNumber,
+          name: ticketType.name,
+          id: ticketType.id,
+        });
+      }
+    });
+    return Object.values(grouped);
+  } catch (e) {
+    throw new Error('Error grouping the collaborators.');
+  }
+};
+
+export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentUserId?: string): GuestEventData => {
   return {
     description: event.description || '',
     enabled: event.enabled || false,
-    endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
+    // endDate: formatDateFromDB(event.endDate),
     eventType: event.eventType || undefined,
     imageCover: event.imageCover || '',
     imageFlyer: event.imageFlyer || '',
     location: event.location || undefined,
     owner: event.owner || undefined,
-    rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('MM/DD/YYYY HH:mm') : '',
+    // rsvpDeadline: event.rsvpDeadline ? formatDateFromDB(event.rsvpDeadline) : '',
     showLocation: event.showLocation || false,
-    startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
+    // startDate: formatDateFromDB(event.startDate),
     status: formatEventStatus(event),
     id: event.id,
     name: event.name || '',
     ageLimit: event.ageLimit || undefined,
-    publishDate: event.publishDate ? dayjs(event.publishDate).format('MM/DD/YYYY HH:mm') : '',
+    // publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
-    guest: {
-      guestId: currentGuest.id,
-      userId: currentGuest?.user?.id,
-      guestStatus: currentGuest.status,
-      numFollowers: currentGuest.numFollowers,
-      privateGuestNote: currentGuest.privateGuestNote,
-      maxAdditionalGuests: currentGuest.maxAdditionalGuests,
-      profilePicture: currentGuest?.user?.profilePicture || '',
-      name: `${currentGuest?.user?.firstName || ''} ${currentGuest?.user?.lastName || ''}`,
-    },
+    guest: currentGuest
+      ? {
+          guestId: currentGuest.id,
+          userId: currentGuest?.user?.id,
+          guestStatus: currentGuest.status,
+          numFollowers: currentGuest.numFollowers,
+          privateGuestNote: currentGuest.privateGuestNote,
+          maxAdditionalGuests: currentGuest.maxAdditionalGuests,
+          profilePicture: currentGuest?.user?.profilePicture || '',
+          name: `${currentGuest?.user?.firstName || ''} ${currentGuest?.user?.lastName || ''}`,
+        }
+      : undefined,
+    featuredEventSection: event.featuredEventSection
+      ? {
+          id: event.featuredEventSection?.id,
+          name: event.featuredEventSection?.name,
+          index: event.featuredEventSection?.index,
+        }
+      : null,
+    isCurrentUserIsGuest: currentGuest?.user?.id === currentUserId ? true : false,
   };
 };
 

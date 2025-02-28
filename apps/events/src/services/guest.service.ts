@@ -57,84 +57,84 @@ export class GuestService {
     });
   }
 
-  public static async addGuests(payload: AddGuestsRequestDto): Promise<GuestsResponse> {
-    try {
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-      if (!event) return responses.badRequest('Event not found');
+  public static async addGuests(payload: AddGuestsRequestDto): Promise<void> {
+    // try {
+    //   const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    //   if (!event) return responses.badRequest('Event not found');
 
-      const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'),payload.hostId);
-      if (!host) return responses.badRequest('Host not found');
+    //   const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'),payload.hostId);
+    //   if (!host) return responses.badRequest('Host not found');
 
-      let ticketType = undefined;
-      if (payload.ticketTypeId) {
-        ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+    //   let ticketType = undefined;
+    //   if (payload.ticketTypeId) {
+    //     ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
 
-        if (!ticketType) return responses.badRequest('Ticket type not found');
-      }
+    //     if (!ticketType) return responses.badRequest('Ticket type not found');
+    //   }
 
-      const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+    //   const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
 
-      if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
-        return responses.badRequest('Invalid guest status');
-      }
+    //   if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
+    //     return responses.badRequest('Invalid guest status');
+    //   }
 
-      if (GuestStatus[guestStatus] === GuestStatus.CONFIRMED && event.status !== EventStatusEnum.APPROVED_STATUS) {
-        return responses.badRequest('Confirmed users can only be added to Approved events.');
-      }
+    //   if (GuestStatus[guestStatus] === GuestStatus.CONFIRMED && event.status !== EventStatusEnum.APPROVED_STATUS) {
+    //     return responses.badRequest('Confirmed users can only be added to Approved events.');
+    //   }
 
-      let guests = await Promise.all(
-        payload.users.map(async (userId) => {
-          try {
-            const user = await serviceMesh.getCurrentUser(config.get('API_BASE_URL'),userId);
-            if (!user) return null;
+    //   let guests = await Promise.all(
+    //     payload.users.map(async (userId) => {
+    //       try {
+    //         const user = await serviceMesh.getCurrentUser(config.get('API_BASE_URL'),userId);
+    //         if (!user) return null;
 
-            const alreadyUser = await this.dbConnection.getRepository(Guest).findOne({
-              where: {
-                event: { id: event.id },
-                user: { id: userId },
-              },
-              relations: ['user', 'addedBy', 'declinedBy'],
-            });
+    //         const alreadyUser = await this.dbConnection.getRepository(Guest).findOne({
+    //           where: {
+    //             event: { id: event.id },
+    //             user: { id: userId },
+    //           },
+    //           relations: ['user', 'addedBy', 'declinedBy'],
+    //         });
 
-            if (!alreadyUser) {
-              const guest = new Guest();
-              guest.status = guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS;
-              guest.event = event;
-              guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
-              guest.user = { id: userId } as User;
-              guest.addedBy = { id: host.id } as User;
-              guest.privateGuestNote = payload.privateGuestNote;
-              guest.invitationSource = UserSource.INVITED_BY_HOST;
+    //         if (!alreadyUser) {
+    //           const guest = new Guest();
+    //           guest.status = guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS;
+    //           guest.event = event;
+    //           guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
+    //           guest.user = { id: userId } as User;
+    //           guest.addedBy = { id: host.id } as User;
+    //           guest.privateGuestNote = payload.privateGuestNote;
+    //           guest.invitationSource = UserSource.INVITED_BY_HOST;
 
-              if (ticketType) {
-                guest.ticketType = { id: ticketType.id } as TicketType;
-              }
-              return await this.dbConnection.getRepository(Guest).save(guest);
-            } else {
-              return alreadyUser;
-            }
-          } catch (err) {
-            return null;
-          }
-        }),
-      );
+    //           if (ticketType) {
+    //             guest.ticketType = { id: ticketType.id } as TicketType;
+    //           }
+    //           return await this.dbConnection.getRepository(Guest).save(guest);
+    //         } else {
+    //           return alreadyUser;
+    //         }
+    //       } catch (err) {
+    //         return null;
+    //       }
+    //     }),
+    //   );
 
-      guests = guests.filter((guest) => guest !== null);
+    //   guests = guests.filter((guest) => guest !== null);
 
-      if (guestStatus === 'INVITED' && payload.sendInvite) {
-        //sendInvites(guests, payload.inviteMessage)
-      }
+    //   if (guestStatus === 'INVITED' && payload.sendInvite) {
+    //     //sendInvites(guests, payload.inviteMessage)
+    //   }
 
-      const guestsTransform = await Promise.all(
-        guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'),guest.user.id);
-          return toGuest(guest, focuses);
-        }),
-      );
-      return responses.data(guestsTransform);
-    } catch (err) {
-      return responses.badRequest('Error adding guests');
-    }
+    //   const guestsTransform = await Promise.all(
+    //     guests.map(async (guest) => {
+    //       const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'),guest.user.id);
+    //       return toGuest(guest, focuses);
+    //     }),
+    //   );
+    //   return responses.data(guestsTransform);
+    // } catch (err) {
+    //   return responses.badRequest('Error adding guests');
+    // }
   }
 
   public static async withdrawInvites(payload: GuestsRequestDto): Promise<GenericResponse> {
@@ -222,97 +222,97 @@ export class GuestService {
     }
   }
 
-  public static async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-      const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-      const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
-      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-      const { error: validationError, response: validation } = validateFilters(payload.query);
-      if (validationError) return responses.badRequest(validation);
-      const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
+  public static async getGuests(payload: GuestsQueryRequestDto): Promise<void> {
+    // try {
+    //   const parsedQuery = parse(payload.query);
+    //   const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    //   const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    //   const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
+    //   const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
+    //   const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+    //   const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    //   const { error: validationError, response: validation } = validateFilters(payload.query);
+    //   if (validationError) return responses.badRequest(validation);
+    //   const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
 
-      let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
-      if (typeof socialNetworkNames === 'string') {
-        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-        socialNetworkObject = socialNetworkArray.reduce(
-          (acc, name) => {
-            acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
-            return acc;
-          },
-          {} as { [key in keyof typeof SocialProviderType]?: string },
-        );
-      }
+    //   let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
+    //   if (typeof socialNetworkNames === 'string') {
+    //     const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+    //     socialNetworkObject = socialNetworkArray.reduce(
+    //       (acc, name) => {
+    //         acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
+    //         return acc;
+    //       },
+    //       {} as { [key in keyof typeof SocialProviderType]?: string },
+    //     );
+    //   }
 
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-      if (!event) return responses.badRequest('Event not found');
+    //   const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    //   if (!event) return responses.badRequest('Event not found');
 
-      const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+    //   const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
 
-      queryBuilder
-        .leftJoinAndSelect('guest.user', 'user')
-        .leftJoinAndSelect('user.roles', 'roles')
-        .leftJoinAndSelect('user.socialStats', 'socialStats')
-        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-        .leftJoinAndSelect('user.address', 'address')
-        .leftJoinAndSelect('roles.role', 'role')
-        .leftJoinAndSelect('guest.addedBy', 'addedBy')
-        .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-        .leftJoinAndSelect('guest.ticketType', 'ticketType')
-        .where({ event: { id: event.id } })
-        .offset(skip)
-        .limit(take);
+    //   queryBuilder
+    //     .leftJoinAndSelect('guest.user', 'user')
+    //     .leftJoinAndSelect('user.roles', 'roles')
+    //     .leftJoinAndSelect('user.socialStats', 'socialStats')
+    //     .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+    //     .leftJoinAndSelect('user.address', 'address')
+    //     .leftJoinAndSelect('roles.role', 'role')
+    //     .leftJoinAndSelect('guest.addedBy', 'addedBy')
+    //     .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+    //     .leftJoinAndSelect('guest.ticketType', 'ticketType')
+    //     .where({ event: { id: event.id } })
+    //     .offset(skip)
+    //     .limit(take);
 
-      if (guestStatus) {
-        queryBuilder.andWhere({ status: GuestStatus[guestStatus] });
-      }
+    //   if (guestStatus) {
+    //     queryBuilder.andWhere({ status: GuestStatus[guestStatus] });
+    //   }
 
-      if (searchValue) {
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
-          }),
-        );
-      }
+    //   if (searchValue) {
+    //     queryBuilder.andWhere(
+    //       new Brackets((qb) => {
+    //         qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+    //           .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
+    //       }),
+    //     );
+    //   }
 
-      if (Object.keys(socialNetworkObject).length > 0) {
-        const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
-          const columnName = `${networkKey.toLowerCase()}FollowersCount`;
-          return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
-        });
+    //   if (Object.keys(socialNetworkObject).length > 0) {
+    //     const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+    //       const columnName = `${networkKey.toLowerCase()}FollowersCount`;
+    //       return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+    //     });
 
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where(socialConditions.join(' OR '), {
-              followerCountFrom: followerCountFrom || 0,
-              followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
-            });
-          }),
-        );
-      }
+    //     queryBuilder.andWhere(
+    //       new Brackets((qb) => {
+    //         qb.where(socialConditions.join(' OR '), {
+    //           followerCountFrom: followerCountFrom || 0,
+    //           followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+    //         });
+    //       }),
+    //     );
+    //   }
 
-      const guests = await queryBuilder.getMany();
-      const buildGuests = await Promise.all(
-        guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-          const guestData = toGuest(guest, focuses, socialNetworkObject);
-          return { ...guestData, category: focuses.map((focus) => focus.name) };
-        }),
-      );
-      return responses.data(buildGuests);
-    } catch (err) {
-      return responses.badRequest('Error getting guests');
-    }
+    //   const guests = await queryBuilder.getMany();
+    //   const buildGuests = await Promise.all(
+    //     guests.map(async (guest) => {
+    //       const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+    //       const guestData = toGuest(guest, focuses, socialNetworkObject);
+    //       return { ...guestData, category: focuses.map((focus) => focus.name) };
+    //     }),
+    //   );
+    //   return responses.data(buildGuests);
+    // } catch (err) {
+    //   return responses.badRequest('Error getting guests');
+    // }
   }
 
   public static async deleteGuests(payload: GuestsRequestDto): Promise<GenericResponse> {
@@ -564,47 +564,47 @@ export class GuestService {
     }
   }
 
-  public static async getGuestProfile(payload: RequestByIdDto): Promise<GetGuestProfileResponse> {
-    try {
-      const guest = (
-        await this.dbConnection.getRepository(Guest).find({
-          where: {
-            id: payload.id,
-            user: {
-              deletedAt: IsNull(),
-              roles: {
-                role: {
-                  name: In(['member', 'non_member']),
-                },
-              },
-            },
-          },
-          take: 1,
-          relations: {
-            user: {
-              address: true,
-              hostedEvents: true,
-              socialStats: true,
-              interests: true,
-              roles: {
-                role: true,
-              },
-            },
-            addedBy: true,
-            declinedBy: true,
-          },
-        })
-      )[0];
+  public static async getGuestProfile(payload: RequestByIdDto): Promise<void> {
+    // try {
+    //   const guest = (
+    //     await this.dbConnection.getRepository(Guest).find({
+    //       where: {
+    //         id: payload.id,
+    //         user: {
+    //           deletedAt: IsNull(),
+    //           roles: {
+    //             role: {
+    //               name: In(['member', 'non_member']),
+    //             },
+    //           },
+    //         },
+    //       },
+    //       take: 1,
+    //       relations: {
+    //         user: {
+    //           address: true,
+    //           hostedEvents: true,
+    //           socialStats: true,
+    //           interests: true,
+    //           roles: {
+    //             role: true,
+    //           },
+    //         },
+    //         addedBy: true,
+    //         declinedBy: true,
+    //       },
+    //     })
+    //   )[0];
 
-      if (!guest) {
-        return responses.notFound('Guest not found');
-      }
+    //   if (!guest) {
+    //     return responses.notFound('Guest not found');
+    //   }
 
-      const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-      return responses.data(toGuestData(guest.user, guest, focuses));
-    } catch (err) {
-      return responses.badRequest('Error at get user list.');
-    }
+    //   const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+    //   return responses.data(toGuestData(guest.user, guest, focuses));
+    // } catch (err) {
+    //   return responses.badRequest('Error at get user list.');
+    // }
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
@@ -694,7 +694,7 @@ export class GuestService {
     );
   }
 
-  public static async listEventGuests(payload: ListEventGuestsDto): Promise<ListEventGuestsResponse> {
+  public static async listEventGuests(payload: ListEventGuestsDto): Promise<any> {
     try {
       const currentGuest = await this.dbConnection.getRepository(Guest).findOne({ where: { user: { id: payload.userId } } });
       if (!currentGuest) return { ...responses.notFound('User guest not found'), data: [] };
@@ -1335,7 +1335,7 @@ export class GuestService {
     }
   }
 
-  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<any> {
     try {
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
@@ -1538,50 +1538,50 @@ export class GuestService {
     }
   }
 
-  public static async getGuestDetails(payload: RequestByIdDto): Promise<GuestDetailsResponse> {
-    try {
-      if (!payload.id) return responses.badRequest('Invalid guest ID provided');
-      const guestProfileResponse = await this.getGuestProfile(payload);
-      const { error, data: guestProfile } = guestProfileResponse;
-      if (error) {
-        return responses.badRequest(error.message);
-      }
-      const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
-        where: { id: payload.id },
-        relations: { ticketType: true, user: true, event: true },
-      });
-      if (!guestDetail) {
-        return responses.badRequest('Guest not found');
-      }
+  public static async getGuestDetails(payload: RequestByIdDto): Promise<void> {
+    // try {
+    //   if (!payload.id) return responses.badRequest('Invalid guest ID provided');
+    //   const guestProfileResponse = await this.getGuestProfile(payload);
+    //   const { error, data: guestProfile } = guestProfileResponse;
+    //   if (error) {
+    //     return responses.badRequest(error.message);
+    //   }
+    //   const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
+    //     where: { id: payload.id },
+    //     relations: { ticketType: true, user: true, event: true },
+    //   });
+    //   if (!guestDetail) {
+    //     return responses.badRequest('Guest not found');
+    //   }
 
-      const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
+    //   const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
 
-      const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
-      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id);
+    //   const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
+    //   const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id);
 
-      const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: {
-          user: { id: guestDetail.user.id },
-          event: { id: guestDetail.event.id },
-        },
-      });
+    //   const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+    //     where: {
+    //       user: { id: guestDetail.user.id },
+    //       event: { id: guestDetail.event.id },
+    //     },
+    //   });
 
-      return responses.data({
-        guestDetail: {
-          guestId,
-          userId: user?.id || null,
-          ticketType: ticketType?.name || null,
-          maxAdditionalGuests,
-          privateGuestNote,
-          guestStatus,
-        },
-        guestProfile,
-        quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
-        vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
-      });
-    } catch (err) {
-      return responses.badRequest('Error at get guest details');
-    }
+    //   return responses.data({
+    //     guestDetail: {
+    //       guestId,
+    //       userId: user?.id || null,
+    //       ticketType: ticketType?.name || null,
+    //       maxAdditionalGuests,
+    //       privateGuestNote,
+    //       guestStatus,
+    //     },
+    //     guestProfile,
+    //     quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
+    //     vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
+    //   });
+    // } catch (err) {
+    //   return responses.badRequest('Error at get guest details');
+    // }
   }
 
   public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {

@@ -76,6 +76,18 @@ export interface SignUpResponse {
   data?: string | undefined;
 }
 
+export interface UserIdWithRolesAndToken {
+  id: string;
+  roles: RolesInLogin[];
+  token: string;
+}
+
+export interface MemberSignUpResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: UserIdWithRolesAndToken | undefined;
+}
+
 /** MemberSignUp */
 export interface MemberAddress {
   placeId: string;
@@ -97,6 +109,8 @@ export interface MemberSignUpRequest {
   facebookAccessToken?: string | undefined;
   linkedInAccessToken?: string | undefined;
   instagramUserName?: string | undefined;
+  interestsIds: string[];
+  profilePicture?: string | undefined;
 }
 
 /** HostSignUp */
@@ -139,6 +153,7 @@ export interface MemberLoginRequest {
   code: string;
   email?: string | undefined;
   isExist: boolean;
+  isGuest: boolean;
 }
 
 export interface TokenResponseAndRoles {
@@ -147,6 +162,9 @@ export interface TokenResponseAndRoles {
   hostDetails?: AdditionalHostInformation | undefined;
   isInvited?: boolean | undefined;
   isSignUpCompleted?: boolean | undefined;
+  id?: string | undefined;
+  user?: CompleteUser | undefined;
+  isGuest?: boolean | undefined;
 }
 
 export interface RolesInLogin {
@@ -201,6 +219,7 @@ export interface OAuthRedirectResponse {
 /** Validity Response */
 export interface Validity {
   isValid: boolean;
+  isGuest?: boolean | undefined;
 }
 
 export interface ValidityResponse {
@@ -492,6 +511,23 @@ export interface MemberProfile {
   requestedEvents: MemberEvent[];
   status: UserStatus;
   instagramUsername?: string | undefined;
+  role?: string | undefined;
+  interest?: string | undefined;
+  isFavourite?: boolean | undefined;
+  imageUrl?: string | undefined;
+  age?: number | undefined;
+  isSpam?: boolean | undefined;
+  note?: string | undefined;
+  isFollow?: boolean | undefined;
+  hostUserMappingId?: string | undefined;
+  customLists: customListData[];
+  focuses: FocusProto[];
+  roleId?: string | undefined;
+}
+
+export interface FocusProto {
+  id: string;
+  name: string;
 }
 
 export interface MemberProfileResponse {
@@ -535,6 +571,11 @@ export interface UpdateHostProfileRequest {
   socialMedia?: HostSocialMedia | undefined;
 }
 
+export interface UpdateUsersStatusRequest {
+  ids: string[];
+  status: UserStatus;
+}
+
 /** Update host status */
 export interface UpdateUserStatusRequest {
   id: string;
@@ -556,7 +597,6 @@ export interface SetHostPasswordRequest {
 /** Update Host Password */
 export interface UpdateHostPasswordRequest {
   id: string;
-  currentPassword: string;
   newPassword: string;
 }
 
@@ -639,6 +679,7 @@ export interface UpdateUserProfileRequest {
   mobilePhone?: string | undefined;
   gender?: Gender | undefined;
   address?: MemberAddressUpdate | undefined;
+  focusIds: string[];
   id: string;
 }
 
@@ -740,7 +781,21 @@ export interface CreateNonMemberUserRequest {
   id?: string | undefined;
 }
 
+export interface CreateHostCollaboratorRequest {
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
+  role?: string | undefined;
+}
+
 export interface CreateNonMemberUserResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: UserIdData | undefined;
+}
+
+export interface CreateHostCollaboratorResponse {
   status: number;
   error?: Error | undefined;
   data?: UserIdData | undefined;
@@ -785,6 +840,11 @@ export interface CustomUsersList {
   id: string;
 }
 
+export interface CustomUsersListsData {
+  count: number;
+  list: CustomUsersList[];
+}
+
 export interface CustomUsersListResponse {
   status: number;
   error?: Error | undefined;
@@ -795,6 +855,14 @@ export interface ManageCustomUsersListRequest {
   userId: string;
   customName: string;
   userIds: string[];
+}
+
+export interface UpdateCustomUsersListRequest {
+  hostId: string;
+  name: string;
+  userIds: string[];
+  customListId: string;
+  mappingIds: string[];
 }
 
 export interface CustomUsersListRequest {
@@ -809,18 +877,18 @@ export interface CustomUsersListsResponse {
   data: CustomUsersListsData | undefined;
 }
 
-export interface CustomUsersListsData {
-  count: number;
-  list: CustomUsersList[];
-}
-
 export interface GetUserWithRolesByEmailRequest {
   email: string;
+}
+
+export interface GetUserWithRolesByPhoneRequest {
+  phoneNumber: string;
 }
 
 export interface RolesData {
   name: string;
   id: string;
+  status: string;
 }
 
 export interface UserWithRoles {
@@ -828,9 +896,18 @@ export interface UserWithRoles {
   email: string;
   id: string;
   roles: RolesData[];
+  isFirstTimeLoggedIn?: boolean | undefined;
+  phoneNumber?: string | undefined;
+  profilePicture?: string | undefined;
 }
 
 export interface GetUserWithRolesByEmailResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: UserWithRoles | undefined;
+}
+
+export interface GetUserWithRolesByIdResponse {
   status: number;
   error?: Error | undefined;
   data?: UserWithRoles | undefined;
@@ -849,6 +926,45 @@ export interface CreateUserResponse {
   data?: UserResponseData | undefined;
 }
 
+export interface UserFilterOptionsResponse {
+  status: number;
+  error?: Error | undefined;
+  data: Filter[];
+}
+
+export interface Filter {
+  id: string;
+  label: string;
+  options: Option[];
+  isSearchable?: boolean | undefined;
+  type: string;
+}
+
+export interface Option {
+  id: string;
+  name: string;
+  options: Option[];
+}
+
+export interface HostFeedbackRequest {
+  userId: string;
+  description: string;
+  tag: string;
+}
+
+export interface HostFeedbackResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: HostFeedbackData | undefined;
+}
+
+export interface HostFeedbackData {
+  description: string;
+  tag: string;
+  feedbackId: string;
+}
+
+/** GetUsersList */
 export interface UsersList {
   id: string;
   name: string;
@@ -865,23 +981,208 @@ export interface UsersList {
   isInCustomList?: boolean | undefined;
 }
 
+export interface UsersData {
+  users: UsersList[];
+  totalCount: number;
+}
+
 export interface GetUsersResponse {
   status: number;
   error?: Error | undefined;
   data: UsersData | undefined;
 }
 
-export interface UsersData {
-  users: UsersList[];
-  totalCount: number;
+export interface BulkCreateUsersRequest {
+  id: string;
+  filename: string;
+  type: string;
+  size: number;
+  contentType: string;
+  file: Uint8Array;
 }
 
-export interface UpdateCustomUsersListRequest {
+export interface BulkCreateUsersResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: BulkUserResponse | undefined;
+}
+
+export interface BulkUserResponse {
+  message: string;
+  userCount: number;
+  failedGuestCount: number;
+  failedGuestUploads: string;
+}
+
+export interface CsvRecord {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  reason?: string | undefined;
+}
+
+export interface VerificationStatus {
+  verified: boolean;
+}
+
+export interface VerifyResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: VerificationStatus | undefined;
+}
+
+export interface SendVerificationCodeByEmailRequest {
+  email: string;
+}
+
+export interface VerifyCodeByEmailRequest {
+  email: string;
+  verificationCode: string;
+}
+
+export interface AddHostUserSettingsRequest {
+  userId: string;
+  id: string;
+  note?: string | undefined;
+  isSpam?: boolean | undefined;
+  isFavorite?: boolean | undefined;
+}
+
+export interface AddUserNote {
+  hostUserSettingsId: string;
+  note: string;
+}
+
+export interface AddUserNoteResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: AddUserNote | undefined;
+}
+
+export interface ReportRequest {
+  reportedById: string;
+  reportedToId: string;
+  reportMessage: string;
+  reportedByRoleId: string;
+  reportedToRoleId: string;
+}
+
+export interface Report {
+  reportId: string;
+  blockId?: string | undefined;
+  reportMessage: string;
+}
+
+export interface ReportResponse {
+  status: number;
+  error?: Error | undefined;
+  data?: Report | undefined;
+}
+
+/** Block Host Request */
+export interface BlockHostRequest {
+  blockedById: string;
+  blockedToId: string;
+  blockedByRoleId: string;
+  blockedToRoleId: string;
+}
+
+export interface customListData {
+  id: string;
+  totalCount: number;
+  customName: string;
+}
+
+export interface duplicateCustomListRequest {
+  customListId?: string | undefined;
+  customName: string;
   hostId: string;
-  name: string;
-  userIds: string[];
-  customListId: string;
-  mappingIds: string[];
+  listType: string;
+}
+
+export interface SupportEmailRequest {
+  id: string;
+  subject: string;
+  message: string;
+}
+
+export interface switchProfileRequest {
+  userId: string;
+  targetRole: string;
+}
+
+export interface ReportsAndFeedbacksRequst {
+  query: string;
+}
+
+/** Report Response */
+export interface ReportsResponse {
+  status: number;
+  error?: Error | undefined;
+  reports: ReportDetails[];
+}
+
+/** Feedback Response */
+export interface FeedbacksResponse {
+  status: number;
+  error?: Error | undefined;
+  feedbacks: Feedback[];
+}
+
+/** Report Message */
+export interface ReportDetails {
+  id?: string | undefined;
+  reportMessage?: string | undefined;
+  reportedBy?: CompleteUser | undefined;
+  reportedTo?: CompleteUser | undefined;
+  reportedByRole?: string | undefined;
+  reportedToRole?: string | undefined;
+}
+
+/** Feedback Message */
+export interface Feedback {
+  id?: string | undefined;
+  tag?: string | undefined;
+  description?: string | undefined;
+  user?: CompleteUser | undefined;
+}
+
+/** User Information */
+export interface CompleteUser {
+  id?: string | undefined;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
+  dateOfBirth?: string | undefined;
+  email?: string | undefined;
+  username?: string | undefined;
+  phoneNumber?: string | undefined;
+  gender?: string | undefined;
+  additionalHostInformation?: AdditionalHostInfo | undefined;
+  profilePicture?: string | undefined;
+  instagramUserName?: string | undefined;
+  isFirstTimeLoggedIn?: boolean | undefined;
+}
+
+/** Additional Host Information */
+export interface AdditionalHostInfo {
+  bio?: string | undefined;
+  website?: string | undefined;
+  referredBy?: string | undefined;
+  companyLogo?: string | undefined;
+  companyName?: string | undefined;
+  socialMedia?: SocialMedia | undefined;
+  eventsPerYear?: number | undefined;
+}
+
+/** Social Media Links */
+export interface SocialMedia {
+  x?: string | undefined;
+  tiktok?: string | undefined;
+  youtube?: string | undefined;
+  facebook?: string | undefined;
+  linkedin?: string | undefined;
+  instagram?: string | undefined;
 }
 
 export const AUTH_PACKAGE_NAME = "auth";
@@ -889,7 +1190,7 @@ export const AUTH_PACKAGE_NAME = "auth";
 export interface AuthServiceClient {
   /** Authentication */
 
-  memberSignUp(request: MemberSignUpRequest): Observable<SignUpResponse>;
+  memberSignUp(request: MemberSignUpRequest): Observable<MemberSignUpResponse>;
 
   hostSignUp(request: HostSignUpRequest): Observable<SignUpResponse>;
 
@@ -913,6 +1214,10 @@ export interface AuthServiceClient {
 
   listUsersByType(request: ListUsersByTypeRequest): Observable<ListUsersByTypeResponse>;
 
+  sendVerificationCodeByEmail(request: SendVerificationCodeByEmailRequest): Observable<GenericResponse>;
+
+  verifyCodeByEmail(request: VerifyCodeByEmailRequest): Observable<VerifyResponse>;
+
   /** Members */
 
   checkMemberLogin(request: LoginVerificationRequest): Observable<ValidityResponse>;
@@ -925,11 +1230,23 @@ export interface AuthServiceClient {
 
   getUserWithRolesByEmail(request: GetUserWithRolesByEmailRequest): Observable<GetUserWithRolesByEmailResponse>;
 
+  getUserWithRolesById(request: IdRequest): Observable<GetUserWithRolesByIdResponse>;
+
+  getUserWithRolesByPhone(request: GetUserWithRolesByPhoneRequest): Observable<GetUserWithRolesByEmailResponse>;
+
   getCurrentUser(request: IdRequest): Observable<CurrentUserResponse>;
 
   approveMember(request: IdRequest): Observable<GenericResponse>;
 
   getConfirmedMembers(request: ContactsListRequest): Observable<ConfirmedMembersResponse>;
+
+  setLoginStatus(request: IdRequest): Observable<GenericResponse>;
+
+  deleteHostUserMapping(request: UserAndIdRequest): Observable<GenericResponse>;
+
+  sendSupportEmail(request: SupportEmailRequest): Observable<GenericResponse>;
+
+  switchProfile(request: switchProfileRequest): Observable<TokenResponse>;
 
   /** Validation */
 
@@ -967,6 +1284,8 @@ export interface AuthServiceClient {
 
   updateMemberStatus(request: UpdateUserStatusRequest): Observable<GenericResponse>;
 
+  updateUsersStatus(request: UpdateUsersStatusRequest): Observable<GenericResponse>;
+
   /** Host */
 
   getHostProfile(request: UserAndIdRequest): Observable<HostProfileResponse>;
@@ -983,9 +1302,25 @@ export interface AuthServiceClient {
 
   hostLogin(request: LoginRequest): Observable<TokenResponse>;
 
+  hostFeedback(request: HostFeedbackRequest): Observable<HostFeedbackResponse>;
+
   /** Hosts and Members */
 
   completeProfileSetup(request: IdRequest): Observable<GenericResponse>;
+
+  manageUserSpam(request: AddHostUserSettingsRequest): Observable<GenericResponse>;
+
+  addUserNote(request: AddHostUserSettingsRequest): Observable<AddUserNoteResponse>;
+
+  manageUserFavorite(request: AddHostUserSettingsRequest): Observable<GenericResponse>;
+
+  reportUser(request: ReportRequest): Observable<ReportResponse>;
+
+  blockHost(request: BlockHostRequest): Observable<ReportResponse>;
+
+  unblockHost(request: BlockHostRequest): Observable<GenericResponse>;
+
+  reportAndBlockHost(request: ReportRequest): Observable<ReportResponse>;
 
   /** Update user profile */
 
@@ -1009,39 +1344,59 @@ export interface AuthServiceClient {
 
   createUser(request: CreateNonMemberUserRequest): Observable<CreateUserResponse>;
 
+  bulkUploadUser(request: BulkCreateUsersRequest): Observable<BulkCreateUsersResponse>;
+
+  createHostCollaborator(request: CreateHostCollaboratorRequest): Observable<CreateHostCollaboratorResponse>;
+
   /** Get Followed Hosts */
 
   getFollowedHosts(request: PaginatedRequest): Observable<GetFollowedHostsResponse>;
 
   manageFollowHost(request: ManageFollowHostRequest): Observable<GenericResponse>;
 
+  getFollowedUsers(request: PaginatedRequest): Observable<GetUsersResponse>;
+
   /** Get favorite users */
 
-  getFavoriteUsers(request: PaginatedRequest): Observable<GetMembersResponse>;
+  getFavoriteUsers(request: PaginatedRequest): Observable<GetUsersResponse>;
 
   manageFavoriteUser(request: ManageFavoriteUserRequest): Observable<GenericResponse>;
 
   getMembersOrNonMembers(request: PaginatedRequest): Observable<GetMembersResponse>;
 
-  getAllUsers(request: PaginatedRequest): Observable<GetMembersResponse>;
+  getAllUsers(request: PaginatedRequest): Observable<GetUsersResponse>;
+
+  getUserFiltersOptions(request: PaginatedRequest): Observable<UserFilterOptionsResponse>;
+
+  getUserProfile(request: UserAndIdRequest): Observable<MemberProfileResponse>;
 
   /** Custom list of users */
 
   getCustomUsersList(request: CustomUsersListRequest): Observable<CustomUsersListResponse>;
 
-  getCustomUsersLists(request: IdRequest): Observable<CustomUsersListsResponse>;
+  getCustomUsersLists(request: CustomUsersListRequest): Observable<CustomUsersListsResponse>;
 
   createCustomUsersList(request: ManageCustomUsersListRequest): Observable<CustomUsersListResponse>;
 
-  updateCustomUsersList(request: ManageCustomUsersListRequest): Observable<CustomUsersListResponse>;
+  updateCustomUsersList(request: UpdateCustomUsersListRequest): Observable<CustomUsersListResponse>;
 
-  deleteCustomUsersList(request: CustomUsersListRequest): Observable<CustomUsersListResponse>;
+  deleteCustomUsersList(request: UserAndIdRequest): Observable<CustomUsersListResponse>;
+
+  duplicateCustomList(request: duplicateCustomListRequest): Observable<CustomUsersListResponse>;
+
+  /** reports and feedbacks */
+
+  getAllReports(request: ReportsAndFeedbacksRequst): Observable<ReportsResponse>;
+
+  getAllFeedbacks(request: ReportsAndFeedbacksRequst): Observable<FeedbacksResponse>;
 }
 
 export interface AuthServiceController {
   /** Authentication */
 
-  memberSignUp(request: MemberSignUpRequest): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
+  memberSignUp(
+    request: MemberSignUpRequest,
+  ): Promise<MemberSignUpResponse> | Observable<MemberSignUpResponse> | MemberSignUpResponse;
 
   hostSignUp(request: HostSignUpRequest): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
 
@@ -1073,6 +1428,14 @@ export interface AuthServiceController {
     request: ListUsersByTypeRequest,
   ): Promise<ListUsersByTypeResponse> | Observable<ListUsersByTypeResponse> | ListUsersByTypeResponse;
 
+  sendVerificationCodeByEmail(
+    request: SendVerificationCodeByEmailRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  verifyCodeByEmail(
+    request: VerifyCodeByEmailRequest,
+  ): Promise<VerifyResponse> | Observable<VerifyResponse> | VerifyResponse;
+
   /** Members */
 
   checkMemberLogin(
@@ -1092,6 +1455,17 @@ export interface AuthServiceController {
     | Observable<GetUserWithRolesByEmailResponse>
     | GetUserWithRolesByEmailResponse;
 
+  getUserWithRolesById(
+    request: IdRequest,
+  ): Promise<GetUserWithRolesByIdResponse> | Observable<GetUserWithRolesByIdResponse> | GetUserWithRolesByIdResponse;
+
+  getUserWithRolesByPhone(
+    request: GetUserWithRolesByPhoneRequest,
+  ):
+    | Promise<GetUserWithRolesByEmailResponse>
+    | Observable<GetUserWithRolesByEmailResponse>
+    | GetUserWithRolesByEmailResponse;
+
   getCurrentUser(
     request: IdRequest,
   ): Promise<CurrentUserResponse> | Observable<CurrentUserResponse> | CurrentUserResponse;
@@ -1101,6 +1475,18 @@ export interface AuthServiceController {
   getConfirmedMembers(
     request: ContactsListRequest,
   ): Promise<ConfirmedMembersResponse> | Observable<ConfirmedMembersResponse> | ConfirmedMembersResponse;
+
+  setLoginStatus(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  deleteHostUserMapping(
+    request: UserAndIdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  sendSupportEmail(
+    request: SupportEmailRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  switchProfile(request: switchProfileRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
   /** Validation */
 
@@ -1159,6 +1545,10 @@ export interface AuthServiceController {
     request: UpdateUserStatusRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
+  updateUsersStatus(
+    request: UpdateUsersStatusRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
   /** Host */
 
   getHostProfile(
@@ -1187,9 +1577,33 @@ export interface AuthServiceController {
 
   hostLogin(request: LoginRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
+  hostFeedback(
+    request: HostFeedbackRequest,
+  ): Promise<HostFeedbackResponse> | Observable<HostFeedbackResponse> | HostFeedbackResponse;
+
   /** Hosts and Members */
 
   completeProfileSetup(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  manageUserSpam(
+    request: AddHostUserSettingsRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  addUserNote(
+    request: AddHostUserSettingsRequest,
+  ): Promise<AddUserNoteResponse> | Observable<AddUserNoteResponse> | AddUserNoteResponse;
+
+  manageUserFavorite(
+    request: AddHostUserSettingsRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  reportUser(request: ReportRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
+
+  blockHost(request: BlockHostRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
+
+  unblockHost(request: BlockHostRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+
+  reportAndBlockHost(request: ReportRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
 
   /** Update user profile */
 
@@ -1230,6 +1644,17 @@ export interface AuthServiceController {
     request: CreateNonMemberUserRequest,
   ): Promise<CreateUserResponse> | Observable<CreateUserResponse> | CreateUserResponse;
 
+  bulkUploadUser(
+    request: BulkCreateUsersRequest,
+  ): Promise<BulkCreateUsersResponse> | Observable<BulkCreateUsersResponse> | BulkCreateUsersResponse;
+
+  createHostCollaborator(
+    request: CreateHostCollaboratorRequest,
+  ):
+    | Promise<CreateHostCollaboratorResponse>
+    | Observable<CreateHostCollaboratorResponse>
+    | CreateHostCollaboratorResponse;
+
   /** Get Followed Hosts */
 
   getFollowedHosts(
@@ -1240,11 +1665,15 @@ export interface AuthServiceController {
     request: ManageFollowHostRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
+  getFollowedUsers(
+    request: PaginatedRequest,
+  ): Promise<GetUsersResponse> | Observable<GetUsersResponse> | GetUsersResponse;
+
   /** Get favorite users */
 
   getFavoriteUsers(
     request: PaginatedRequest,
-  ): Promise<GetMembersResponse> | Observable<GetMembersResponse> | GetMembersResponse;
+  ): Promise<GetUsersResponse> | Observable<GetUsersResponse> | GetUsersResponse;
 
   manageFavoriteUser(
     request: ManageFavoriteUserRequest,
@@ -1254,9 +1683,15 @@ export interface AuthServiceController {
     request: PaginatedRequest,
   ): Promise<GetMembersResponse> | Observable<GetMembersResponse> | GetMembersResponse;
 
-  getAllUsers(
+  getAllUsers(request: PaginatedRequest): Promise<GetUsersResponse> | Observable<GetUsersResponse> | GetUsersResponse;
+
+  getUserFiltersOptions(
     request: PaginatedRequest,
-  ): Promise<GetMembersResponse> | Observable<GetMembersResponse> | GetMembersResponse;
+  ): Promise<UserFilterOptionsResponse> | Observable<UserFilterOptionsResponse> | UserFilterOptionsResponse;
+
+  getUserProfile(
+    request: UserAndIdRequest,
+  ): Promise<MemberProfileResponse> | Observable<MemberProfileResponse> | MemberProfileResponse;
 
   /** Custom list of users */
 
@@ -1265,7 +1700,7 @@ export interface AuthServiceController {
   ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
 
   getCustomUsersLists(
-    request: IdRequest,
+    request: CustomUsersListRequest,
   ): Promise<CustomUsersListsResponse> | Observable<CustomUsersListsResponse> | CustomUsersListsResponse;
 
   createCustomUsersList(
@@ -1273,12 +1708,26 @@ export interface AuthServiceController {
   ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
 
   updateCustomUsersList(
-    request: ManageCustomUsersListRequest,
+    request: UpdateCustomUsersListRequest,
   ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
 
   deleteCustomUsersList(
-    request: CustomUsersListRequest,
+    request: UserAndIdRequest,
   ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+
+  duplicateCustomList(
+    request: duplicateCustomListRequest,
+  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+
+  /** reports and feedbacks */
+
+  getAllReports(
+    request: ReportsAndFeedbacksRequst,
+  ): Promise<ReportsResponse> | Observable<ReportsResponse> | ReportsResponse;
+
+  getAllFeedbacks(
+    request: ReportsAndFeedbacksRequst,
+  ): Promise<FeedbacksResponse> | Observable<FeedbacksResponse> | FeedbacksResponse;
 }
 
 // export function AuthServiceControllerMethods() {

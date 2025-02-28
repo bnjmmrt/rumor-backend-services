@@ -3,9 +3,9 @@ import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Even
 import { User } from '../../users/entities/user.entity';
 import { GuestStatus } from '../interfaces/event.interface';
 import { TicketType } from './ticket-type.entity';
-import { UserSource } from '../interfaces/event.interface';
 import { Ticket } from './ticket.entity';
 import { RestrictedInvites } from './restricted-invites.entity';
+import { UserSource } from '../grpc/events/general.pb';
 @Entity()
 export class Guest extends RumorBaseEntity {
   @Column({ type: 'enum', enum: GuestStatus, name: 'status', default: GuestStatus.NO_STATUS })
@@ -73,3 +73,4 @@ export class Guest extends RumorBaseEntity {
   @OneToMany(() => RestrictedInvites, (ri) => ri.guest, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
   restrictedGuest: RestrictedInvites;
 }
+

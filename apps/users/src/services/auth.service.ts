@@ -527,7 +527,6 @@ export class AuthService {
       const request: ChangePasswordRequest = {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
         loginId: user.email,
-        currentPassword: payload.currentPassword,
         password: payload.newPassword,
       };
 
@@ -2140,9 +2139,11 @@ export class AuthService {
         name: user.firstName + ' ' + user.lastName,
         email: user.email,
         id: user.id,
+        profilePicture: user.profilePicture,
         roles: user.roles.map((item) => {
           return {
             name: item.role.name,
+            status: item.status,
             id: item.role.id,
           };
         }),

@@ -12,7 +12,7 @@ import { UserRole } from '../entities/roles/user-role.entity';
 export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
   const upcomingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -24,7 +24,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     });
   const pastEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PAST_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -36,7 +36,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     });
   const pendingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PENDING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -121,5 +121,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     requestedEvents: [],
     status: entityToUserStatus[role.status],
     instagramUsername: instagramUsername,
+    customLists: [],
+    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
   };
 };

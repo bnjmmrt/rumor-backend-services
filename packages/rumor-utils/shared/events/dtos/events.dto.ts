@@ -1,7 +1,8 @@
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsObject } from 'class-validator';
 import {
   AddEventToFeaturedSectionRequest,
   AddressValidationRequest,
+  CancelEventAndNotifyRequest,
   CreateEventRequest,
   CreateEventTypeRequest,
   UpdateEventAgeLimitRequest,
@@ -10,10 +11,38 @@ import {
   UpdateEventTypeRequest,
   UpdateTicketRequest,
   ValidateTicketForGuestRequest,
+  ToggleGuestCheckStatusRequest,
 } from '../grpc/events/events.pb';
 import { IsPublishDateValid } from '../validators/pupublish-date-valid.constraint';
 import { EventStatusEnum } from '../interfaces/event.interface';
 import { EventAgeLimit, EventLocation, EventStatus, QueryRequest, TicketStatus } from '../grpc/events/general.pb';
+import { Type } from 'class-transformer';
+import { CreateTicketTypeRequestDto, UpdateTicketTypeRequestDto } from './ticket-type.dto';
+import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from './quiz-question.dto';
+import { CreateTalentRequestDto } from './create-talent.dto';
+import { CreateCollaboratorDto, UpdateCollaboratorDto } from './collaborator.dto';
+import { UpdateTalentRequestDto } from './update-talent.dto';
+
+export class EventLocationDto implements EventLocation {
+  @IsString()
+  @IsOptional()
+  placeId?: string;
+  @IsString()
+  @IsOptional()
+  location?: string;
+  @IsString()
+  @IsOptional()
+  regionCode?: string;
+  @IsString()
+  @IsOptional()
+  city?: string;
+  @IsString()
+  @IsOptional()
+  latitude?: number;
+  @IsString()
+  @IsOptional()
+  longitude?: number;
+}
 
 export class CreateEventTypeRequestDto implements CreateEventTypeRequest {
   @IsString()
@@ -58,23 +87,26 @@ export class CreateEventRequestDto implements CreateEventRequest {
   name: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   description?: string;
   @IsBoolean()
   @IsOptional()
   enabled?: boolean;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
   startDate?: string;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
   endDate?: string;
   @IsInt()
   @IsOptional()
+  @IsNotEmpty()
   limitOnePlus?: number;
   @IsUUID()
   @IsOptional()
+  @IsNotEmpty()
   ageLimitId?: string;
   @IsString()
   @IsOptional()
@@ -84,16 +116,18 @@ export class CreateEventRequestDto implements CreateEventRequest {
   useQr?: boolean;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   imageFlyer?: string;
   @IsString()
   @IsOptional()
   imageCover?: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   eventTypeId?: string;
-  @IsString()
+  @IsObject()
   @IsOptional()
-  locationId?: string;
+  eventLocation?: EventLocationDto;
   @IsString()
   @IsOptional()
   furtherInstructions?: string;
@@ -109,7 +143,7 @@ export class CreateEventRequestDto implements CreateEventRequest {
   ownerId?: string;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'publishDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'publishDate must be in the format MM/DD/YYYY HH:mm' })
   @IsPublishDateValid({ message: 'Publish date cannot be after the start date.' })
   publishDate?: string;
 
@@ -120,10 +154,38 @@ export class CreateEventRequestDto implements CreateEventRequest {
 
   @IsBoolean()
   @IsOptional()
+  @IsNotEmpty()
   isPrivate?: boolean;
   @IsNumber()
   @IsOptional()
   capacity?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTicketTypeRequestDto)
+  ticketTypes: CreateTicketTypeRequestDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTalentRequestDto)
+  @IsOptional()
+  talents: CreateTalentRequestDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateCollaboratorDto)
+  @IsOptional()
+  collaborators: CreateCollaboratorDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuizQuestionRequestDto)
+  @IsOptional()
+  quizQuestions: CreateQuizQuestionRequestDto[];
+
+  @IsOptional()
+  @IsString()
+  timeZone?: string;
 }
 
 export class UpdateEventRequestDto implements UpdateEventRequest {
@@ -141,11 +203,11 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   enabled?: boolean;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
   startDate?: string;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
   endDate?: string;
   @IsInt()
   @IsOptional()
@@ -168,9 +230,9 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   @IsString()
   @IsOptional()
   eventTypeId?: string;
-  @IsString()
+  @IsObject()
   @IsOptional()
-  locationId?: string;
+  eventLocation?: EventLocationDto;
   @IsString()
   @IsOptional()
   furtherInstructions?: string;
@@ -191,7 +253,7 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   ownerId?: string;
   @IsString()
   @IsOptional()
-  @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'publishDate must be in the format MM/DD/YYYY HH:mm' })
+  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'publishDate must be in the format MM/DD/YYYY HH:mm' })
   @IsPublishDateValid({ message: 'Publish date cannot be after the start date.' })
   publishDate?: string;
 
@@ -201,23 +263,42 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   @IsNumber()
   @IsOptional()
   capacity?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateTicketTypeRequestDto)
+  ticketTypes: UpdateTicketTypeRequestDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateTalentRequestDto)
+  @IsOptional()
+  talents: UpdateTalentRequestDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateCollaboratorDto)
+  @IsOptional()
+  collaborators: UpdateCollaboratorDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateQuizQuestionRequestDto)
+  @IsOptional()
+  quizQuestions: UpdateQuizQuestionRequestDto[];
+
+  @IsOptional()
+  @IsString()
+  timeZone?: string;
+
+  @IsOptional()
+  @IsString()
+  actiion?: string;
 }
 
 export class AddressValidationDto implements AddressValidationRequest {
   @IsString()
   address: string;
-}
-
-export class EventLocationDto implements EventLocation {
-  @IsString()
-  @IsOptional()
-  placeId?: string;
-  @IsString()
-  @IsOptional()
-  location?: string;
-  @IsString()
-  @IsOptional()
-  regionCode?: string;
 }
 
 export class UpdateEventLocationRequestDto implements UpdateEventLocationRequest {
@@ -290,6 +371,16 @@ export class ValidateTicketForGuestRequestDto implements ValidateTicketForGuestR
   ticketToken: string;
 }
 
+export class ToggleGuestCheckStatusRequestDto implements ToggleGuestCheckStatusRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsBoolean()
+  @IsNotEmpty()
+  checkIn: boolean;
+}
+
 export class UpdateTicketRequestDto implements UpdateTicketRequest {
   @IsUUID()
   @IsNotEmpty()
@@ -307,4 +398,28 @@ export class AddEventToFeaturedSectionDto implements AddEventToFeaturedSectionRe
   @IsUUID()
   @IsOptional()
   featuredSectionId?: string;
+}
+
+export class ListHostEventsDto {
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsOptional()
+  query: string;
+}
+
+export class CancelEventAndNotifyRequestDto implements CancelEventAndNotifyRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  ownerId: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  eventId: string;
+
+  @IsString()
+  @IsOptional()
+  customMessage: string;
 }
