@@ -31,7 +31,7 @@ import { AddGuestsRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/d
 
 export class GuestController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'AddGuests')
-  public async addGuests(payload: AddGuestsRequestDto): Promise<GuestsResponse> {
+  public async addGuests(payload: AddGuestsRequestDto): Promise<void> {
     return GuestService.addGuests(payload);
   }
 
@@ -41,7 +41,7 @@ export class GuestController {
   }
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuests')
-  public async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public async getGuests(payload: GuestsQueryRequestDto): Promise<void> {
     return GuestService.getGuests(payload);
   }
 
@@ -66,7 +66,7 @@ export class GuestController {
   }
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuestProfile')
-  private async getGuestProfile(payload: RequestByIdDto): Promise<GetGuestProfileResponse> {
+  private async getGuestProfile(payload: RequestByIdDto): Promise<void> {
     return GuestService.getGuestProfile(payload);
   }
 
@@ -128,7 +128,7 @@ export class GuestController {
   }
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuestDetails')
-  private getGuestDetails(payload: RequestByIdDto): Promise<GuestDetailsResponse> {
+  private getGuestDetails(payload: RequestByIdDto): Promise<void> {
     return GuestService.getGuestDetails(payload);
   }
 

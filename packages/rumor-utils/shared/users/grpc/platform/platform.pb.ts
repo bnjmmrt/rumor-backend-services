@@ -180,6 +180,11 @@ export interface GetUserVouchesResponse {
   data: UserVouch[];
 }
 
+export interface GetUserVouchRequest {
+  requesterId: string;
+  eventId: string;
+}
+
 /** Save Referred User */
 export interface ReferredUserRequest {
   userId: string;

@@ -33,6 +33,11 @@ export class PaginatedRequestDto implements PaginatedRequest {
   query: string;
 }
 
+export class ReportAndFeedbackRequestDto {
+  @IsString()
+  query: string;
+}
+
 export type PaginationQuery = {
   take: string;
   skip: string;

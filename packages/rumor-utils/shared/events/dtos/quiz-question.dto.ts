@@ -6,12 +6,12 @@ import {
   UpdateQuizQuestionRequest,
   UpdateUserQuizAnswerRequest,
 } from '../grpc/events/events.pb';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateQuizQuestionRequestDto implements CreateQuizQuestionRequest {
   @IsUUID()
-  @IsNotEmpty()
-  eventId: string;
+  @IsOptional()
+  eventId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -27,9 +27,10 @@ export class CreateQuizQuestionRequestDto implements CreateQuizQuestionRequest {
 }
 
 export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value)) // Convert empty string to undefined
   @IsUUID()
-  @IsNotEmpty()
-  id: string;
+  id?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -46,6 +47,10 @@ export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
   @IsNumber()
   @IsOptional()
   order?: number;
+
+  @IsString()
+  @IsOptional()
+  action?: string;
 }
 
 class QuizAnswerDto {
