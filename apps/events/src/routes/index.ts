@@ -1,13 +1,20 @@
-import { Router, Request, Response } from "express";
 import * as express from "express";
+import { Router } from "express";
 import { EventAnnouncementController } from "../controllers/event-announcement.controller";
 import { SignupFormsController } from "../controllers/signup-forms.controller";
 
 const router: Router = express.Router();
 
+/**
+ * Event Announcements------------------------------------------
+ */
+
 router.get("/event/:eventId/event-announcement-guest", EventAnnouncementController.getGuestListForAnnoucement);
-router.post("/event/:eventId/event-announcement", EventAnnouncementController.postAnnoucement);
-router.patch("/event/:eventId/event-announcement/:annoucementId", EventAnnouncementController.updateAnnouncement);
+router.get("/event/:eventId/event-announcement-guest/:announcementId", EventAnnouncementController.getRecipientListForAnnoucement);
+router.post("/event/:eventId/event-announcement", EventAnnouncementController.postAnnouncement);
+router.patch("/event/:eventId/event-announcement/:announcementId", EventAnnouncementController.updateAnnouncement);
+router.get("/event/:eventId/event-announcements", EventAnnouncementController.getAnnouncements);
+router.delete("/event/:eventId/event-announcement/:announcementId", EventAnnouncementController.deleteAnnouncement);
 
 /**
  * Event Signup Forms------------------------------------------
