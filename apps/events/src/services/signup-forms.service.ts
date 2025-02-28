@@ -66,7 +66,11 @@ export class SignupFormsServices {
       relations: { createdBy: true, questions: true },
     });
 
-    const data = buildSignupFormsResponse(event, signupForm, "https://dev.therumor.com");
+    const data = buildSignupFormsResponse(
+      event,
+      signupForm,
+      "https://dev.therumor.com"
+    );
     return data;
   }
 
@@ -90,7 +94,12 @@ export class SignupFormsServices {
 
       signupForms.forEach((sf) =>
         resultList.push(
-          buildSignupFormsResponse(event, sf, "https://dev.therumor.com", sf.submissions.length)
+          buildSignupFormsResponse(
+            event,
+            sf,
+            "https://dev.therumor.com",
+            sf.submissions.length
+          )
         )
       );
       return resultList;
@@ -188,7 +197,12 @@ export class SignupFormsServices {
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map((q) => q.id);
       await signupForm.save();
-      const response = buildSignupFormsResponse(event, signupForm, "https://dev.therumor.com", 0);
+      const response = buildSignupFormsResponse(
+        event,
+        signupForm,
+        "https://dev.therumor.com",
+        0
+      );
       return response;
     } catch (error) {
       throw error;
@@ -458,14 +472,14 @@ export class SignupFormsServices {
         .innerJoin("sfs.attendees", "atd")
         .innerJoin("sfs.guest", "gst")
         .select([])
-        .addSelect('sfs.id', 'id')
+        .addSelect("sfs.id", "id")
         .addSelect("atd.firstName", "firstName")
         .addSelect("atd.lastName", "lastName")
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id })
-        .orderBy("sfs.id", 'DESC')
+        .orderBy("sfs.id", "DESC")
         .skip(skip)
         .take(take);
 
@@ -484,7 +498,8 @@ export class SignupFormsServices {
 
       const count = await SignupFormSubmissions.count();
       const submissionList = await submissionsQuery.getRawMany();
-      return submissionList;
+      const result = { count, result: submissionList };
+      return result;
     } catch (err) {
       throw err;
     }
