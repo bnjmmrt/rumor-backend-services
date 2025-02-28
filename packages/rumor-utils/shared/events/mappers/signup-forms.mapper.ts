@@ -6,8 +6,16 @@ import { SignupFormsResponse } from "../grpc/events/general.pb";
 export const buildSignupFormsResponse = (
   event: Event,
   esf: EventSignupForms,
+  baseUrl: string,
   submissions: number = 0
 ): SignupFormsResponse => {
+  const companyName = (
+    event.owner?.additionalHostInformation?.companyName || ""
+  )
+    .split(" ")
+    .join("");
+  const eventName = event.name.split(" ").join("");
+
   const result: SignupFormsResponse = {
     id: esf.id,
     name: event.name,
@@ -25,8 +33,9 @@ export const buildSignupFormsResponse = (
     isActive: esf.isActive,
     isPublished: esf.isPublished,
     description: esf.description,
-    url: `/${event.owner.firstName}/${event.name}/${esf.urlCode}`,
-    questions: esf.questions && esf.questions.map((q) => buildQuestion(q)) || [],
+    url: `${baseUrl}/${companyName}/${eventName}/${esf.urlCode}`,
+    questions:
+      (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
   };
   return result;
