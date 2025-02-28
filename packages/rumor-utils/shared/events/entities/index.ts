@@ -1,5 +1,6 @@
 export { AdmissionType } from './admission-type.entity';
 export { Collaborator } from './collaborator.entity';
+export { Role } from '../../users/entities/roles/role.entity';
 export { Event } from './event.entity';
 export { EventTypes } from './event-types.entity';
 export { QuizQuestion } from './quiz-question.entity';
@@ -15,3 +16,8 @@ export { DefaultRoleSettings } from './default-role-settings.entity';
 export { FeaturedEventSection } from './featured-event-section.entity';
 export { User } from '../../users/entities/user.entity'; 
 export { Address } from '../../users/entities/address.entity';
+export { EventAnnouncement } from './event-announcement.entity'; 
+export { EventSignupForms } from './event-signup-forms.entity';
+export { SignupFormQuestions } from './signup-form-questions.entity';
+export { SignupFormStaticQuestions } from './signup-form-static-questions.entity';
+export { SignupFormSubmissions } from './signup-form-submissions.entity';

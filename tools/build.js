@@ -52,6 +52,7 @@ const copyDependencies = (dependencies, destinationName, destinationPath) => {
 
     dependencies.forEach(packageName => {
         const { path } = packages.find(({ name }) => name === packageName);
+        rm('-rf', `${destinationPath}/${packageName}`);
         cp('-r', `${path}/dist/`, `${destinationPath}/${packageName}`);
     });
 };
