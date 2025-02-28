@@ -31,7 +31,9 @@ export class EventAnnouncementService {
     let { eventId, ticketType, addedBy } = payload;
 
     ticketType = isArray(ticketType) ? ticketType : [ticketType];
+    console.log("🚀 ~ EventAnnouncementService ~ getAnnouncementGuestList ~ ticketType:", ticketType)
     addedBy = isArray(addedBy) ? addedBy : [addedBy];
+    console.log("🚀 ~ EventAnnouncementService ~ getAnnouncementGuestList ~ addedBy:", addedBy)
 
     let event = await database.getRepository(Event).findOne({
       where: {
@@ -41,23 +43,32 @@ export class EventAnnouncementService {
         deletedAt: IsNull(),
       }
     });
+    
+    console.log("🚀 ~ EventAnnouncementService ~ event ~ event:", event)
 
     if (!event) {
       throw new NotFoundError("Event not found");
     }
 
+    let guestQueryParams:any = {
+      event: { id: eventId },
+      deletedAt: IsNull()
+    }
+
+    if(ticketType && ticketType.legth > 0) {
+      guestQueryParams.ticketType = {
+        id: In(ticketType),
+      }
+    }
+    if(addedBy && addedBy.legth > 0) {
+      guestQueryParams.addedBy = {
+        id: In(addedBy),
+      }
+    }
+
     let guestList = await database.getRepository(Guest).find({
-      where: {
-        event: {
-          id: eventId,
-          deletedAt: IsNull(),
-        },
-        deletedAt: IsNull(),
-        addedBy: In(addedBy),
-        status: GuestStatus.CONFIRMED,
-        ticketType: In(ticketType)
-      },
-      relations: { user: true, ticketType: true },
+      where: guestQueryParams,
+      relations: { user: true, ticketType: true, addedBy: true, event: true },
     });
 
     return guestList;
