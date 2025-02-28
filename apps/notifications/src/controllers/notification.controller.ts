@@ -1,8 +1,6 @@
 import { NotificationService } from '../services/notification.service';
 
 import asyncWrapper from '../../../users/src/server/helpers/asyncWrapper';
-
-import { getRepository } from 'typeorm';
 import { Notification } from '../../../../packages/rumor-utils/shared/notifications/entities/notification.entity';
 
 import * as serviceMesh from 'rumor-utils/packages/rumor-utils/service-mesh'
@@ -10,6 +8,7 @@ const authClient = serviceMesh.authClient;
 const communicationClient = serviceMesh.communicationClient;
 
 export class NotificationController {
+
   public static createNotification = asyncWrapper(
     async (req, res): Promise<void> => {
       const response = await notificationService.createNotification(req, res);

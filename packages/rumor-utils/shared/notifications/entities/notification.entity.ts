@@ -1,6 +1,6 @@
 import { RumorBaseEntity } from '../../../shared/entities/rumor-base.entity';
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { NotificationSource, NotificationStatus, NotificationType, RecipientsType } from '../../../../../apps/notifications/src/interfaces/notification.interface';
+import { NotificationSource, NotificationStatus, NotificationType, RecipientsType } from '../interfaces/notification.interface';
 import { EmailTemplate } from './email-templates.entity';
 
 @Entity()
