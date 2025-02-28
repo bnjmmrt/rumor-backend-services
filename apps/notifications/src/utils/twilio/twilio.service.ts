@@ -1,5 +1,7 @@
+import config from '../../config'
+
 function sendVerificationCode(){
-    const sid = this.configService.get<string>('TWILIO_VERIFY_SID');
+    const sid = config.get('TWILIO_VERIFY_SID');
       await this.twilioClient.verify.v2.services(sid).verifications.create({
         to: payload.phoneNumber,
         channel: 'sms',
@@ -9,7 +11,7 @@ function sendVerificationCode(){
 
 
 function verifyCode(){
-    const sid = this.configService.get<string>('TWILIO_VERIFY_SID');
+    const sid = config.get('TWILIO_VERIFY_SID');
     const verificationCheck = await this.twilioClient.verify.v2.services(sid).verificationChecks.create({
         to: payload.phoneNumber,
         code: payload.verificationCode,

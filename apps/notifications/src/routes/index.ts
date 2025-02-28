@@ -6,6 +6,15 @@ import CommunicationService from "../services/communication.service";
 
 const router: Router = express.Router();
 
-router.get("/send-verification-code", CommunicationService.sendVerificationCode);
+
+router.post('/send-verification-code', sendVerificationCode);
+router.post('/verify-code', verifyCode);
+router.post('/send-invitation-messages', sendInvitationMessages);
+router.post('/send-text-message', sendTextMessage);
+router.post('/send-email-from-template', sendEmailFromTemplate);
+router.post('/create-email-template', createEmailTemplate);
+router.get('/list-email-templates', listEmailTemplates);
+router.post('/delete-email-template', deleteEmailTemplate);
+router.post('/get-email-template', getEmailTemplate);
 
 export default router;
