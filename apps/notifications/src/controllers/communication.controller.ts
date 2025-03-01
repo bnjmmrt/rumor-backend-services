@@ -18,12 +18,12 @@ import {
   DeleteEmailTemplateRequestDto,
   RequestByIdDto,
 } from "rumor-utils/shared/notifications/dtos/communication.dto";
-import twilioServiceInstance from "src/utils/twilio/twilio.service";
+import twilioServiceInstance from "../utils/twilio/twilio.service";
 import {
   CreateResponse,
   DeleteResponse,
   GetResponse,
-} from "packages/rumor-utils/success";
+} from "rumor-utils/success";
 
 export class CommunicationController {
   // SendVerificationCode

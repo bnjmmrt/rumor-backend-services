@@ -1,13 +1,13 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import * as express from "express";
-import { CommunicationController } from "src/controllers/communication.controller";
+import { CommunicationController } from "../controllers/communication.controller";
 const router: Router = express.Router();
 
 
 router.post('/send-verification-code', CommunicationController.sendVerificationCode);
 router.post('/verify-code', CommunicationController.verifyCode);
-// router.post('/send-invitation-messages', CommunicationController.sendInvitationMessages);
-// router.post('/send-text-message', CommunicationController.sendTextMessage);
+router.post('/send-invitation-messages', CommunicationController.sendInvitationMessages);
+router.post('/send-text-message', CommunicationController.sendTextMessage);
 router.post('/template-email/send', CommunicationController.sendEmailFromTemplate);
 router.post('/template-email', CommunicationController.createEmailTemplate);
 router.get('/template-emails', CommunicationController.listEmailTemplates);

@@ -21,11 +21,11 @@ app.use(
   })
 );
 
-app.get("/events/v1/health", (req: Request, res: Response) => {
+app.get("/notifications/v1/health", (req: Request, res: Response) => {
   res.json({ status: "UP" , timestamp:new Date()}).status(200);
 });
 
-app.use("/events/v1", router);
+app.use("/notifications/v1", router);
 app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundError(req.path)));
 app.use(globalErrorHandler);
 

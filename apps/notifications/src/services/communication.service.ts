@@ -13,10 +13,10 @@ import {
 // import { TWILIO_CONFIG_TOKEN, TwilioClient } from '@rumor/shared/twilio';
 // import { EmailTemplate } from '../entities/email-templates.entity';
 import * as sgMail from "@sendgrid/mail";
-import { FirebaseNotificationsService } from "@rumor/shared/firebase-notifications/firebase-notifications.service";
+//import { FirebaseNotificationsService } from "@rumor/shared/firebase-notifications/firebase-notifications.service";
 import database from "../database";
-import { EmailTemplate } from "packages/rumor-utils/shared/notifications/entities/email-templates.entity";
-import { BadRequestError, NotFoundError } from "packages/rumor-utils/errors";
+import { EmailTemplate } from "rumor-utils/shared/notifications/entities/email-templates.entity";
+import { BadRequestError, NotFoundError } from "rumor-utils/errors";
 import config from "../config";
 export class CommunicationService {
   public static dbConnection = database;
@@ -145,18 +145,18 @@ export class CommunicationService {
     };
   }
 
-  public static async sendPushNotificationRequest(
-    payload: SendPushNotificationRequestDto
-  ): Promise<GenericResponse> {
-    // Send this to firebase utils
+  // public static async sendPushNotificationRequest(
+  //   payload: SendPushNotificationRequestDto
+  // ): Promise<GenericResponse> {
+  //   // Send this to firebase utils
 
-    const success = FirebaseNotificationsService.sendPushNotification(payload);
-    if (!success) {
-      // return responses.badRequest('error occurred while trying to send push notifications');
-      throw new BadRequestError(
-        "error occurred while trying to send push notifications"
-      );
-    }
-    return;
-  }
+  //   const success = FirebaseNotificationsService.sendPushNotification(payload);
+  //   if (!success) {
+  //     // return responses.badRequest('error occurred while trying to send push notifications');
+  //     throw new BadRequestError(
+  //       "error occurred while trying to send push notifications"
+  //     );
+  //   }
+  //   return;
+  // }
 }
