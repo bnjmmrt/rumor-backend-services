@@ -15,6 +15,8 @@ import * as UserSettings from './user-settings.entity';
 import * as XAuthSession from './xauthsession.entity'
 import * as Role from './roles/role.entity';
 import * as UserRole from './roles/user-role.entity';
+import * as Focus from './focus.entity';
+
 
 export {
     Address,
@@ -33,5 +35,6 @@ export {
     UserSettings,
     XAuthSession,
     Role,
-    UserRole
+    UserRole,
+    Focus
 }

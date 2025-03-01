@@ -1,6 +1,6 @@
 import apiService from './apiService';
 
-export const sendVerificationCode = (baseURL:string, phoneNumber: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumber });
+export const sendVerificationCode = (baseURL:string, phoneNumber: string) => apiService.getApi().post(`${baseURL}/send-verification-code`, { phoneNumber });
 
 export const verifyPhoneNumber = (baseURL:string, phoneNumber: string, code: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumber, code });
 

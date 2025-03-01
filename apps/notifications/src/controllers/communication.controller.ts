@@ -1,79 +1,130 @@
-import { Controller, Inject } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
-import { CommunicationService } from '../services/communication.service';
+import asyncWrapper from "../server/helpers/asyncWrapper"; // Assuming you have this utility
 
+import { CommunicationService } from "../services/communication.service";
 import {
-  COMMUNICATION_SERVICE_NAME,
-  EmailTemplatesResponse,
   GenericResponse,
-  ListEmailTemplatesResponse,
-  StatusResponse,
   VerifyResponse,
-} from '../grpc/communication/communication.pb';
+  StatusResponse,
+  ListEmailTemplatesResponse,
+  EmailTemplatesResponse,
+} from "rumor-utils/shared/notifications/grpc/communication/communication.pb";
 import {
-  DeleteEmailTemplateRequestDto,
-  EmailTemplateDto,
-  RequestByIdDto,
-  SendEmailFromTemplateRequestDto,
-  SendInvitationMessagesRequestDto,
-  SendTextMessageRequestDto,
   SendVerificationCodeRequestDto,
   VerifyCodeRequestDto,
-} from '../dtos/communication.dto';
+  SendInvitationMessagesRequestDto,
+  SendTextMessageRequestDto,
+  SendEmailFromTemplateRequestDto,
+  EmailTemplateDto,
+  DeleteEmailTemplateRequestDto,
+  RequestByIdDto,
+} from "rumor-utils/shared/notifications/dtos/communication.dto";
+import twilioServiceInstance from "../utils/twilio/twilio.service";
+import {
+  CreateResponse,
+  DeleteResponse,
+  GetResponse,
+} from "rumor-utils/success";
 
-@Controller('communication')
 export class CommunicationController {
-  @Inject(CommunicationService)
-  private readonly service: CommunicationService;
+  // SendVerificationCode
+  public static sendVerificationCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SendVerificationCodeRequestDto = req.body;
+      const response: any = await twilioServiceInstance.sendVerificationCode(
+        payload
+      );
+      const successResponse = new CreateResponse(
+        response,
+        "Code Sent Successfully"
+      );
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'SendVerificationCode')
-  private async sendVerificationCode(payload: SendVerificationCodeRequestDto): Promise<GenericResponse> {
-    return this.service.sendVerificationCode(payload);
-  }
-
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'VerifyCode')
-  private async verifyCode(payload: VerifyCodeRequestDto): Promise<VerifyResponse> {
-    return this.service.verifyCode(payload);
-  }
-
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'SendInvitationMessages')
-  private async sendInvitationMessages(payload: SendInvitationMessagesRequestDto): Promise<StatusResponse> {
-    this.service.sendInvitationMessages(payload);
-    return {
-      success: true,
+  public static verifyCode = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: VerifyCodeRequestDto = req.body;
+    const result = await twilioServiceInstance.verifyCode(payload);
+    const response: VerifyResponse = {
+      status: result.verified ? 200 : 400,
+      data: result,
     };
-  }
+    const successResponse = new GetResponse(response, "Code Verified");
+    res.json(successResponse).status(successResponse.statusCode);
+  });
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'SendTextMessage')
-  private async sendTextMessage(payload: SendTextMessageRequestDto): Promise<StatusResponse> {
-    this.service.sendTextMessage(payload);
-    return {
-      success: true,
-    };
-  }
+  public static sendInvitationMessages = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SendInvitationMessagesRequestDto = req.body;
+      twilioServiceInstance.sendInvitationMessages(payload);
+      const response: StatusResponse = {
+        success: true,
+      };
+      const successResponse = new GetResponse(response, "ok");
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'SendEmailFromTemplate')
-  private async sendEmailFromTemplate(payload: SendEmailFromTemplateRequestDto): Promise<GenericResponse> {
-    return this.service.sendEmailFromTemplate(payload);
-  }
+  public static sendTextMessage = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SendTextMessageRequestDto = req.body;
+      twilioServiceInstance.sendTextMessage(payload);
+      const response: StatusResponse = {
+        success: true,
+      };
+      const successResponse = new GetResponse(response, "ok");
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'CreateEmailTemplate')
-  private async createEmailTemplate(payload: EmailTemplateDto): Promise<GenericResponse> {
-    return this.service.createEmailTemplate(payload);
-  }
+  public static sendEmailFromTemplate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: SendEmailFromTemplateRequestDto = req.body;
+      const response: GenericResponse =
+        await CommunicationService.sendEmailFromTemplate(payload);
+      const successResponse = new GetResponse(response, "ok");
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'ListEmailTemplates')
-  private async listEmailTemplates(): Promise<ListEmailTemplatesResponse> {
-    return this.service.listEmailTemplates();
-  }
+  public static createEmailTemplate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: EmailTemplateDto = req.body;
+      const response: GenericResponse =
+        await CommunicationService.createEmailTemplate(payload);
+      const successResponse = new CreateResponse(
+        response,
+        "Template created successfully"
+      );
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'DeleteEmailTemplate')
-  private async deleteEmailTemplate(payload: DeleteEmailTemplateRequestDto): Promise<GenericResponse> {
-    return this.service.deleteEmailTemplate(payload);
-  }
+  public static listEmailTemplates = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: ListEmailTemplatesResponse =
+        await CommunicationService.listEmailTemplates();
+      const successResponse = new GetResponse(response, "Ok");
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 
-  @GrpcMethod(COMMUNICATION_SERVICE_NAME, 'GetEmailTemplate')
-  private async getEmailTemplate(payload: RequestByIdDto): Promise<EmailTemplatesResponse> {
-    return this.service.getEmailTemplate(payload);
-  }
+  public static deleteEmailTemplate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: DeleteEmailTemplateRequestDto = req.body;
+      const response: GenericResponse =
+        await CommunicationService.deleteEmailTemplate(payload);
+      const deleteResponse = new DeleteResponse("Template deleted");
+      res.json(deleteResponse).status(deleteResponse.statusCode);
+    }
+  );
+
+  public static getEmailTemplate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RequestByIdDto = req.body;
+      const response: EmailTemplatesResponse =
+        await CommunicationService.getEmailTemplate(payload);
+      const successResponse = new GetResponse(response, "Ok");
+      res.json(successResponse).status(successResponse.statusCode);
+    }
+  );
 }
