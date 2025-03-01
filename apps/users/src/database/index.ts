@@ -17,10 +17,12 @@ export class ConnectionManager {
           password: config.get("POSTGRES_PASSWORD"),
           database: config.get("POSTGRES_DATABASE"),
           entities: [
+            "packages/rumor-utils/shared/users/entities/*.ts",
+            "packages/rumor-utils/shared/events/entities/*.ts",
             "packages/rumor-utils/shared/users/entities/*.js",
             "packages/rumor-utils/shared/events/entities/*.js"
           ],
-          ssl: { rejectUnauthorized: false } ,
+          //ssl: { rejectUnauthorized: false } ,
           synchronize: false,
           logging: false,
           migrationsTableName: "users-migrations",

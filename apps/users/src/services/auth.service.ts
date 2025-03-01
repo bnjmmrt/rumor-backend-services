@@ -95,7 +95,7 @@ import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library/build/src/auth/jwtclient';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
 import { ParsedQs } from 'qs';
-import GoogleAddressClient from '../utils/clients/googleAddress.client';
+import { GoogleAddressClient } from '../utils/google';
 import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
 
 //-----------------Admin Imports
