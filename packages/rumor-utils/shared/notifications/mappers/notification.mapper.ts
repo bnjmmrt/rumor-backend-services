@@ -1,5 +1,5 @@
-import { Notification } from '../../../../packages/rumor-utils/shared/notifications/entities/notification.entity';
-import { NotificationData, NotificationType, RecipientsType, NotificationStatus, NotificationSource } from '../../../../packages/rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { Notification } from '../entities/notification.entity';
+import { NotificationData, NotificationType, RecipientsType, NotificationStatus, NotificationSource } from '../grpc/notification/notification.pb';
 import {
   NotificationType as NotificationTypeInterface,
   RecipientsType as RecipientsTypeInterface,
