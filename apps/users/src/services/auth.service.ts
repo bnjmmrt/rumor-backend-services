@@ -59,7 +59,7 @@ import {
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
-// import { Invitation } from 'rumor-utils/shared/users/entities';
+import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
@@ -95,7 +95,7 @@ import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library/build/src/auth/jwtclient';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
 import { ParsedQs } from 'qs';
-import GoogleAddressClient from '../utils/clients/googleAddress.client';
+import { GoogleAddressClient } from '../utils/google';
 import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
 
 //-----------------Admin Imports

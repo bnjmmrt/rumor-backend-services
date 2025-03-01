@@ -35,6 +35,23 @@ services:
       rumor-db:
         condition: service_healthy
 
+  notifications:
+    container_name: rumour-notifications-service
+    build:
+      context: .  
+      dockerfile: apps/notifications/Dockerfile  
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/notifications/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+    ports:
+      - "8002:8002"
+    command: npm run dev  
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+
   rumor-db:
     image: postgres:latest
     container_name: rumor-backend-db

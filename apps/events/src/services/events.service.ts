@@ -42,7 +42,7 @@ import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { normalizeCatalogName } from '../common/helpers';
 import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, FeaturedEventSection } from 'rumor-utils/shared/entities';
-import GoogleAddressClient  from 'src/utils/clients/googleAddress.client';
+import { GoogleAddressClient }  from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { getCityNameFromAddressComponents, isValidEventStatus } from '../utils/event.utils';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
