@@ -1,25 +1,24 @@
 import { Request, Response } from "express";
-import { Repository, Brackets } from "typeorm";
-import { Notification } from "../../../../packages/rumor-utils/shared/notifications/entities/notification.entity";
+import { Brackets } from "typeorm";
+import { Notification } from "rumor-utils/shared/notifications/entities/notification.entity";
 import {
   NotificationSource,
   NotificationStatus,
   NotificationType,
   RecipientsType,
-} from "../interfaces/notification.interface";
+} from "rumor-utils/shared/notifications/interfaces/notification.interface";
 import {
   notificationSourceToEntity,
   notificationStatusToEntity,
   notificationTypeToEntity,
   recipientsTypeToEntity,
   toNotificationData,
-} from "../mappers/notification.mapper";
+} from "rumor-utils/shared/notifications/mappers/notification.mapper";
 import { parse } from "qs";
 import { hasPagination } from "../../../../packages/rumor-utils/shared/users/dtos/shared.dto";
 // import { AuthClient } from '../../../../packages/rumor-utils/client/auth.client';
 // import { CommunicationClient } from '../../../../packages/rumor-utils/client/communication.client';
 // import { responses } from "../../../users/src/common/responses";
-import * as serviceMesh from 'rumor-utils/service-mesh'
 
 import {
   CreateNotificationRequestDto,
@@ -29,10 +28,15 @@ import {
   SendPushNotificationRequestDto,
 } from "../../../../packages/rumor-utils/shared/notifications/dtos/notification.dto";
 import { EmailTemplate } from "@fusionauth/typescript-client";
+import database from "../database";
+import { NotFoundError, BadRequestError } from 'rumor-utils/errors'
+import * as serviceMesh from 'rumor-utils/service-mesh'
 
 export class NotificationService {
+
+  public static dbConnection = database;
+  
   public static async createNotification(req: Request, res: Response) {
-    try {
       const payload: CreateNotificationRequestDto = req.body;
       const notification = new Notification();
       notification.title = payload.title;
@@ -56,36 +60,29 @@ export class NotificationService {
       notification.userIds = payload.userIds;
       notification.source = notificationSourceToEntity[payload.source];
 
+      // Changes below is needed for the following snippet
       if (payload.templateId) {
-        const template = await this.communicationClient.getTemplateById(
+        const template = await serviceMesh.getTemplateById("",
           payload.templateId
         );
         if (template) notification.relatedTemplate = template;
       }
 
-      await this.notificationRepository.save(notification);
-      return res.json(responses.ok);
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error creating notification."));
-    }
+      return this.dbConnection.getRepository(Notification).save(notification);
   }
 
-  async updateNotification(req: Request, res: Response) {
-    try {
+
+  public static async updateNotification(req: Request, res: Response) {
       const payload: UpdateNotificationRequestDto = req.body;
-      const notification = await this.notificationRepository.findOne({
+      const notification = await this.dbConnection.getRepository(Notification).findOne({
         where: { id: payload.id },
       });
       if (!notification)
-        return res
-          .status(404)
-          .json(responses.notFound("Notification not found"));
+        throw new NotFoundError("Notification not found");
+
       if (notification.status === NotificationStatus.SENT)
-        return res
-          .status(400)
-          .json(responses.badRequest("Cannot modify a sent notification"));
+        throw new BadRequestError("Cannot modify a sent notification");
+
       notification.title = payload.title || notification.title;
       notification.message = payload.message || notification.message;
       notification.date = payload.date || notification.date;
@@ -113,46 +110,32 @@ export class NotificationService {
 
       if (payload.templateId) {
         const template: Partial<EmailTemplate> =
-          await this.communicationClient.getTemplateById(payload.id);
+          await serviceMesh.getTemplateById("",payload.id); // This line is changed
         if (template) notification.relatedTemplate = template;
       }
 
-      await this.notificationRepository.save(notification);
-      return responses.ok;
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error updating notification."));
-    }
+      await this.dbConnection.getRepository(Notification).save(notification);
+      return 
   }
 
-  async getNotification(req: Request, res: Response) {
-    try {
+  public static async getNotification(req: Request, res: Response) {
       const { id } = req.params;
-      const notification = await this.notificationRepository.findOne({
+      const notification = await this.dbConnection.getRepository(Notification).findOne({
         where: { id },
         relations: ["relatedTemplate"],
       });
       if (!notification)
-        return res
-          .status(404)
-          .json(responses.notFound("Notification not found"));
-      return res.json(responses.data(toNotificationData(notification)));
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error fetching notification."));
-    }
+        throw new Error("Notification not found");
+      return toNotificationData(notification);
   }
 
-  async listNotifications(req: Request, res: Response) {
-    try {
+  public static async listNotifications(req: Request, res: Response) {
       const parsedQuery = parse(req.query as unknown as string);
       const pagination = hasPagination(parsedQuery)
         ? { take: parseInt(parsedQuery.take), skip: parseInt(parsedQuery.skip) }
         : {};
       const queryBuilder =
-        this.notificationRepository.createQueryBuilder("notification");
+        this.dbConnection.getRepository(Notification).createQueryBuilder("notification");
 
       if (parsedQuery.recipients) {
         const recipients = String(parsedQuery.recipients)
@@ -220,57 +203,42 @@ export class NotificationService {
       queryBuilder.relation("relatedTemplate");
 
       const notifications = await queryBuilder.getMany();
-      return res.json(responses.data(notifications.map(toNotificationData)));
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error listing notifications."));
-    }
+      return notifications.map(toNotificationData);
   }
 
-  async deleteNotification(req: Request, res: Response) {
-    try {
+  public static async deleteNotification(req: Request, res: Response) {
       const { id } = req.params;
-      await this.notificationRepository.delete({ id });
-      return res.json(responses.ok);
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error deleting notification."));
-    }
+      await this.dbConnection.getRepository(Notification).delete({ id });
+      return ;
   }
 
-  async sendPushNotification(req: Request, res: Response) {
-    try {
+  public static async sendPushNotification(req: Request, res: Response) {
       const payload: SendPushNotificationRequestDto = req.body;
       const userSettings = await serviceMesh.getUserSettings(
-        payload.userId
+        "",payload.userId
       );
-      if (!userSettings) return responses.notFound("user settings not found");
+      
+      if (!userSettings) throw new NotFoundError("user settings not found");
 
       const notificationSettings = userSettings.notificationsSettings;
-      if (!notificationSettings.allowPushNotifications) return responses.ok;
-      if (!notificationSettings.enableAppNotifications) return responses.ok;
+      if (!notificationSettings.allowPushNotifications) return //responses.ok;
+      if (!notificationSettings.enableAppNotifications) return //responses.ok;
 
-      if (notificationSettings.muteNotifications) return responses.ok;
+      if (notificationSettings.muteNotifications) return //responses.ok;
 
       const pushNotificationTokens =
-        await this.authClient.getPushNotificationTokens(payload.userId);
+        await serviceMesh.getPushNotificationTokens("",payload.userId);
       const notificationTokens = pushNotificationTokens.map(
         (p) => p.notificationToken
       );
-      if (notificationTokens.length === 0) return responses.ok;
+      if (notificationTokens.length === 0) return //responses.ok;
 
-      await this.communicationClient.sendPushNotification(
-        notificationTokens,
-        payload.title,
-        payload.body
-      );
-      return res.json(responses.ok);
-    } catch (err) {
-      return res
-        .status(400)
-        .json(responses.badRequest("Error sending push notification."));
-    }
+      // await serviceMesh.sendPushNotification(
+      //   "",
+      //   notificationTokens,
+      //   payload.title,
+      //   payload.body
+      // );
+      return //res.json(responses.ok);
   }
 }
