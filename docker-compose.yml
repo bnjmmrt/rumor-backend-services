@@ -46,7 +46,7 @@ services:
       - ./apps/notifications/src:/app/src
       - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
-      - "8003:8003"
+      - "8002:8002"
     command: npm run dev  
     depends_on:
       rumor-db:

@@ -17,9 +17,11 @@ export class ConnectionManager {
           database: config.get("POSTGRES_DATABASE"),
           entities: [
             "packages/rumor-utils/shared/users/entities/*.js",
-            "packages/rumor-utils/shared/events/entities/*.js"
+            "packages/rumor-utils/shared/events/entities/*.js",
+            "packages/rumor-utils/shared/users/entities/*.ts",
+            "packages/rumor-utils/shared/events/entities/*.ts"
           ],
-          // ssl: { rejectUnauthorized: false },
+          ...(["development", "staging", "production", "uat"].includes(config.get('NODE_ENV')) && { ssl: { rejectUnauthorized: false } }),
           synchronize: false,
           logging: false,
         });
