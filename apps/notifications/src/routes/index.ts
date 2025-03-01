@@ -1,20 +1,17 @@
 import { Router, Request, Response } from "express";
 import * as express from "express";
-import { EventAnnouncementController } from "../controllers/event-announcement.controller";
-import { SignupFormsController } from "../controllers/signup-forms.controller";
-import CommunicationService from "../services/communication.service";
-
+import { CommunicationController } from "src/controllers/communication.controller";
 const router: Router = express.Router();
 
 
-router.post('/send-verification-code', sendVerificationCode);
-router.post('/verify-code', verifyCode);
-router.post('/send-invitation-messages', sendInvitationMessages);
-router.post('/send-text-message', sendTextMessage);
-router.post('/send-email-from-template', sendEmailFromTemplate);
-router.post('/create-email-template', createEmailTemplate);
-router.get('/list-email-templates', listEmailTemplates);
-router.post('/delete-email-template', deleteEmailTemplate);
-router.post('/get-email-template', getEmailTemplate);
+router.post('/send-verification-code', CommunicationController.sendVerificationCode);
+router.post('/verify-code', CommunicationController.verifyCode);
+// router.post('/send-invitation-messages', CommunicationController.sendInvitationMessages);
+// router.post('/send-text-message', CommunicationController.sendTextMessage);
+router.post('/template-email/send', CommunicationController.sendEmailFromTemplate);
+router.post('/template-email', CommunicationController.createEmailTemplate);
+router.get('/template-emails', CommunicationController.listEmailTemplates);
+router.delete('/template-email', CommunicationController.deleteEmailTemplate);
+router.post('/get-email-template', CommunicationController.getEmailTemplate);
 
 export default router;
