@@ -3,7 +3,7 @@ const config = {
     secrets: [
     ],
     values: {
-        PORT: 8003
+        PORT: 8002
     }
 };
 

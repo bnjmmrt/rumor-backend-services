@@ -4,7 +4,7 @@ const config = {
         
     ],
     values: {
-        PORT: 8003,
+        PORT: 8002,
     }
 };
 
