@@ -51,6 +51,7 @@ import { Type } from 'class-transformer';
 import { NewUserStatus, PaginatedRequest, ProviderType } from '../grpc/auth/shared.pb';
 import { IsPasswordMatch, IsStrongPassword } from '../../../decorators';
 import { Tag } from '../interfaces/auth.interface';
+import { UserStatus } from '../interfaces/shared.interface';
 
 export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsString()
@@ -753,4 +754,14 @@ export class sendSupportEmailRequestDto {
 
   @IsString()
   message: string;
+}
+
+export class UpdateUsersStatusDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsNotEmpty()
+  ids: string[];
+
+  @IsNotEmpty()
+  status: UserStatus;
 }

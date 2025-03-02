@@ -523,6 +523,7 @@ export interface MemberProfile {
   customLists: customListData[];
   focuses: FocusProto[];
   roleId?: string | undefined;
+  placeId?: string | undefined;
 }
 
 export interface FocusProto {

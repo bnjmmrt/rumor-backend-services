@@ -1,6 +1,7 @@
 import { ParsedQs } from 'qs';
 import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest } from '../grpc/auth/shared.pb';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import { UserStatus } from '../interfaces/shared.interface';
 
 export class TokenRequestDto implements TokenRequest {
   @IsString()
@@ -42,6 +43,16 @@ export type PaginationQuery = {
   take: string;
   skip: string;
 };
+
+export class UpdateUsersStatusDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsNotEmpty()
+  ids: string[];
+
+  @IsNotEmpty()
+  status: UserStatus;
+}
 
 export const hasPagination = (query: ParsedQs | null): query is PaginationQuery => {
   if (!query) return false;

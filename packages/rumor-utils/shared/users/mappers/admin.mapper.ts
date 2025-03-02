@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import dayjs from 'dayjs';
 import { User } from "../entities/user.entity"
-import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile } from '../grpc/auth/auth.pb';
+import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
@@ -100,6 +100,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     lastName: user.lastName,
     category: focuses.map((focus) => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
+    placeId: user.address?.googlePlaceId,
     dateOfBirth: user.dateOfBirth,
     phoneNumber: user.phoneNumber,
     email: user.email,

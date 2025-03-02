@@ -302,7 +302,7 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[]): MemberProfile => {
+export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string): MemberProfile => {
   return {
     id: user.id,
     firstName: user.firstName,
@@ -327,6 +327,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interest
     interest: interests.map((interest) => interest.name).join(', '),
     age: calculateAge(user.dateOfBirth),
     imageUrl: user.profilePicture || '',
+    instagramUsername: instagramUsername,
     customLists: customLists,
     focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
   };

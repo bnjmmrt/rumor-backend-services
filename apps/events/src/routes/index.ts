@@ -33,7 +33,10 @@ router.post(
 );
 router.patch("/signup-forms/:id/deactivate", SignupFormsController.deactivate);
 
-// router.get("/signup-forms/:id/submissions");
+router.get(
+  "/signup-forms/:id/submissions",
+  SignupFormsController.listSubmissions
+);
 
 // router.post(
 //   "/events/:eventId/signup-forms/:id/publish",

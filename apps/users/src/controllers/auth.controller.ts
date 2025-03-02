@@ -27,6 +27,8 @@ import {
   CreateUserResponse,
   GetUsersResponse,
   UserResponseData,
+  UserFilterOptionsResponse,
+  MemberProfileResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -61,10 +63,13 @@ import {
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
   UpdateCustomUsersListRequestDto,
+  FilterRequestDto,
+  DuplicateCustomListRequestDto,
+  ManageUserRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
-import { IdRequestDto, PaginatedRequestDto, TokenRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { IdRequestDto, PaginatedRequestDto, TokenRequestDto, UpdateUsersStatusDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
 
@@ -208,9 +213,7 @@ export class AuthController {
 
   public static hostLogin = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: LoginRequestDto = req.body;
-      console.log('hostLogin', payload);
-      
+      const payload: LoginRequestDto = req.body;      
       const response: TokenResponse = await AuthService.hostLogin(payload);
       res.json(response);
     }
@@ -336,6 +339,14 @@ export class AuthController {
     }
   );
 
+  public static updateUsersStatus = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateUsersStatusDto = req.body;
+      const response: GenericResponse = await AuthService.updateUsersStatus(payload);
+      res.json(response);
+    }
+  );
+
   public static createNonMemberUser = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: CreateNonMemberUserRequestDto = req.body;
@@ -420,8 +431,8 @@ export class AuthController {
   public static getFavoriteUsers = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: PaginatedRequestDto = req.body;
-      const response: GetMembersResponse = await AuthService.getFavoriteUsers(payload);
-      res.json(response);
+      const response: GetUsersResponse = await AuthService.getFavoriteUsers(payload);
+      res.json(new GetResponse(response));
     }
   );
 
@@ -451,7 +462,13 @@ export class AuthController {
 
   public static createUser = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: NonMemberSignUpRequestDto = req.body;
+      const id = (req as any).userId;
+      console.log("userId", id)
+      const payload: NonMemberSignUpRequestDto = {
+        ...req.body, // Spread the existing payload
+        id, // Add the userId to the payload
+      }; 
+      console.log("####", payload)
       const response: UserResponseData = await AuthService.createUser(payload);
       res.json(new CreateResponse(response));
     }
@@ -462,6 +479,55 @@ export class AuthController {
       const payload: ListUsersInviteesDto = req.body;
       const response: GetUsersResponse = await AuthService.getAllusers(payload);
       res.json(new GetResponse(response));
+    }
+  );
+
+  public static getUserFiltersOptions = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: FilterRequestDto = req.body;
+      const response: UserFilterOptionsResponse = await AuthService.getUserFiltersOptions(payload);
+      res.json(new GetResponse(response));
+    }
+  );
+
+  public static duplicateCustomList = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: DuplicateCustomListRequestDto = req.body;
+      const response: CustomUsersListResponse = await AuthService.duplicateCustomList(payload);
+      res.json(new CreateResponse(response));
+    }
+  );
+
+  public static deleteHostUserMapping = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: GenericResponse = await AuthService.deleteHostUserMapping(payload);
+      const message = "User removed successfully"
+      res.json(new DeleteResponse(message));
+    }
+  );
+
+  public static getUserProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserAndIdRequestDto = req.body;
+      const response: MemberProfileResponse = await AuthService.getUserProfile(payload);
+      res.json(new GetResponse(response));
+    }
+  );
+
+  public static getFollowedUsers = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: PaginatedRequestDto = req.body;
+      const response: GetUsersResponse = await AuthService.getFollowedUsers(payload);
+      res.json(new GetResponse(response));
+    }
+  );
+
+  public static manageUserSpam = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageUserRequestDto = req.body;
+      const response: GenericResponse = await AuthService.manageUserSpam(payload);
+      res.json(new CreateResponse(response));
     }
   );
 }

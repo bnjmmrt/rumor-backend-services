@@ -5,7 +5,8 @@ import { AdminController } from '../controllers/admin.controller';
 import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
-// import AuthMiddleware from '../utils/fusion-auth/index'
+// import AuthMiddleware from 'src/utils/fusion-auth';
+import AuthMiddleware from '../utils/fusion-auth/index'
 const router: Router = express.Router();
 
 // Admin routes
@@ -73,7 +74,7 @@ router.get('/auth/hosts/favorites', AuthController.getFavoriteUsers);
 router.post('/auth/get-confirmed-members', AuthController.getConfirmedMembers);
 router.post('/auth/get-user-with-roles-by-email', AuthController.getUserWithRolesByEmail);
 // router.post('/auth/admin/reactivate-account', AuthController.registerInvitesAsNonMember);
-router.post('/auth/create-user', AuthController.createUser);
+router.post('/auth/create-user',AuthMiddleware.fusionAuthRequired, AuthController.createUser);
 router.get('/auth/users-list', AuthController.getAllUsers);
 
 //Role routes
