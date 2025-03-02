@@ -6,7 +6,7 @@ const config = {
         }
     ],
     values: {    
-        port: 8001,
+        PORT: 8001,
         POSTGRES_USERNAME: process.env.POSTGRES_USERNAME,
         POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
         POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
