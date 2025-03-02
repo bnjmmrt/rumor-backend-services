@@ -33,7 +33,7 @@ RUN rm -rf dist
 # Build the application
 RUN npm run build
 
-EXPOSE 8003
+EXPOSE 8002
 
 # Start the service
 CMD ["npm", "start"]
