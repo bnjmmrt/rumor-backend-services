@@ -21,7 +21,7 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/events/entities/*.js"
           ],
           ...(["development", "staging", "production", "uat"].includes(config.get('NODE_ENV')) && { ssl: { rejectUnauthorized: false } }),
-          logging: true,
+          logging: false,
         });
         this.connection = await appDataSource.initialize();
       }

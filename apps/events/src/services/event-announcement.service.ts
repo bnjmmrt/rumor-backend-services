@@ -87,7 +87,7 @@ export class EventAnnouncementService {
   }
 
   public static async getAnnouncement(payload) {
-    const { id,eventId } = payload;
+    const { id, eventId } = payload;
     const event = await database.getRepository(Event).findOne({
       where: { id: eventId, status: EventStatusEnum.APPROVED_STATUS, isPublished: true, deletedAt: IsNull() },
     });
