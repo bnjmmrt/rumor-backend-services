@@ -1,5 +1,4 @@
-import asyncWrapper from "../server/helpers/asyncWrapper"; // Assuming you have this utility
-
+import asyncWrapper from "../server/helpers/asyncWrapper";
 import { CommunicationService } from "../services/communication.service";
 import {
   GenericResponse,
@@ -18,7 +17,7 @@ import {
   DeleteEmailTemplateRequestDto,
   RequestByIdDto,
 } from "rumor-utils/shared/notifications/dtos/communication.dto";
-import twilioServiceInstance from "../utils/twilio/twilio.service";
+import { TwilioService } from '../utils/twilio'
 import {
   CreateResponse,
   DeleteResponse,
@@ -30,7 +29,7 @@ export class CommunicationController {
   public static sendVerificationCode = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendVerificationCodeRequestDto = req.body;
-      const response: any = await twilioServiceInstance.sendVerificationCode(
+      const response: any = await TwilioService.sendVerificationCode(
         payload
       );
       const successResponse = new CreateResponse(
@@ -43,7 +42,7 @@ export class CommunicationController {
 
   public static verifyCode = asyncWrapper(async (req, res): Promise<void> => {
     const payload: VerifyCodeRequestDto = req.body;
-    const result = await twilioServiceInstance.verifyCode(payload);
+    const result = await TwilioService.verifyCode(payload);
     const response: VerifyResponse = {
       status: result.verified ? 200 : 400,
       data: result,
@@ -55,7 +54,7 @@ export class CommunicationController {
   public static sendInvitationMessages = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendInvitationMessagesRequestDto = req.body;
-      twilioServiceInstance.sendInvitationMessages(payload);
+      TwilioService.sendInvitationMessages(payload);
       const response: StatusResponse = {
         success: true,
       };
@@ -67,7 +66,7 @@ export class CommunicationController {
   public static sendTextMessage = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendTextMessageRequestDto = req.body;
-      twilioServiceInstance.sendTextMessage(payload);
+      TwilioService.sendTextMessage(payload);
       const response: StatusResponse = {
         success: true,
       };
