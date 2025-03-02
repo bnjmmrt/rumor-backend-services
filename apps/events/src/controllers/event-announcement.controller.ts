@@ -51,7 +51,7 @@ export class EventAnnouncementController {
   public static getAnnouncement = asyncWrapper(async(req:Request, res:Response) => {
     const payload: any = {
       eventId: req.params.eventId,
-      announcementId :req.params.announcementId
+      id :req.params.announcementId
     }
     const announcement = await EventAnnouncementService.getAnnouncement(payload)
     res.json(new GetResponse(announcement));
