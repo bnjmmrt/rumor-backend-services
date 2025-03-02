@@ -21,7 +21,7 @@ import {
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource } from "typeorm";
+import { Brackets, DataSource, In } from "typeorm";
 import { isUUID } from "class-validator";
 import { EventStatusEnum } from "rumor-utils/shared/events/interfaces/event.interface";
 
@@ -217,47 +217,65 @@ export class SignupFormsServices {
     const signupForm: EventSignupForms | undefined =
       await EventSignupForms.findOne({
         where: { id: id, event: { id: eventId } },
-        relations: { event: true },
+        relations: { event: true, createdBy: true },
       });
     if (!signupForm) {
       throw new ForbiddenError("Signup Forms does not exists.");
     }
 
+    const oldQuestionids = [];
+    body.questions.forEach((q) => q.id && oldQuestionids.push(q.id));
+
+    const questonList = await SignupFormQuestions.find({
+      where: { id: In(oldQuestionids) },
+    });
+    const questionsMap = new Map<string, boolean>();
+    questonList.forEach((q) => questionsMap.set(q.id.toString(), q.isDefault));
+
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
     signupForm.styling = body.styling;
 
+    const ids = [];
     const questionPromises: any[] = [];
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
       index++;
       const question = new SignupFormQuestions();
-      question.name = q.name;
-      question.isDefault = false;
-      question.isRequired = q.isRequired;
-      question.ordering = index;
-      question.signupForms = { id: id } as EventSignupForms;
-
-      switch (q.type.toLowerCase()) {
-        case "create":
-          questionList.push(question);
-          break;
-        case "update":
-          const updatesQuestion = SignupFormQuestions.update(q.id, question);
-          questionPromises.push(updatesQuestion);
-          break;
-        case "delete":
-          const deleteQuestions = SignupFormQuestions.delete(q.id);
-          questionPromises.push(deleteQuestions);
-          break;
+      const isStatic = questionsMap.get(q.id) || false;
+      if (!isStatic) {
+        question.name = q.name;
+        question.isRequired = q.isRequired;
+        switch (q.action.toLowerCase()) {
+          case "create":
+            question.ordering = index;
+            question.signupForms = { id: id } as EventSignupForms;
+            questionList.push(question);
+            break;
+          case "update":
+            ids.push(q.id);
+            question.ordering = index;
+            const updatesQuestion = SignupFormQuestions.update(q.id, question);
+            questionPromises.push(updatesQuestion);
+            break;
+          case "delete":
+            const deleteQuestions = SignupFormQuestions.delete(q.id);
+            questionPromises.push(deleteQuestions);
+            break;
+        }
+      } else {
+        ids.push(q.id);
+        question.ordering = index;
+        const updatesQuestion = SignupFormQuestions.update(q.id, question);
+        questionPromises.push(updatesQuestion);
       }
     }
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
     await SignupFormQuestions.insert(newQuestions);
-    const newQuestionIds = newQuestions.map((q) => q.id);
-    signupForm.questionIds.push(...newQuestionIds);
+    ids.push(...newQuestions.map((q) => q.id));
+    signupForm.questionIds = ids;
     await signupForm.save();
     const response = buildSignupFormsResponse(
       signupForm.event,
@@ -413,9 +431,22 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * 1. When an event is cancelled, need to deactivate Signup Forms.
+   * @param id
+   */
   public static async deactivate(id: string) {
-    await EventSignupForms.update(id, { isPublished: false });
+    await EventSignupForms.update(id, { isPublished: false, isActive: false });
   }
+
+  /**
+   * Situation 1: Event is Active and SF is created -> PUBLISHED and ACTIVE
+   * Situation 2: Event is passed and SF was Update -> RSVP CLOSED
+   * Timezone not coming up get signup forms.
+   * Collaborators data is not showing up email, role, name and profile.
+   * Only approved Collaborator which is Host will be shown.
+   * Host profile pictures.
+   */
 
   // private static generateSubmissionQuery(skip: number, take: number, ) {
   //   const submissionsQuery = SignupFormSubmissions.createQueryBuilder("sfs")

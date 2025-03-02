@@ -699,7 +699,7 @@ export interface SignupFormsResponse {
 export interface ISignupFormQuestionsRequest {
   id: string;
   name: string;
-  type?: string;
+  action?: string;
   isRequired: boolean;
   answers?: string;
 }
