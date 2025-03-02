@@ -21,6 +21,7 @@ export const buildSignupFormsResponse = (
     name: event.name,
     startDate: event.startDate.toString() || new Date().toString(),
     address: event.location,
+    timeZone: "", //event.timezone,
     type: event.eventType?.name,
     ageLimit: event.ageLimit,
     talents: event.talents,
