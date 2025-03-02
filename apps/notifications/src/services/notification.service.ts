@@ -15,7 +15,7 @@ import {
   toNotificationData,
 } from "rumor-utils/shared/notifications/mappers/notification.mapper";
 import { parse } from "qs";
-import { hasPagination } from "../../../../packages/rumor-utils/shared/users/dtos/shared.dto";
+import { hasPagination } from "rumor-utils/shared/users/dtos/shared.dto";
 // import { AuthClient } from '../../../../packages/rumor-utils/client/auth.client';
 // import { CommunicationClient } from '../../../../packages/rumor-utils/client/communication.client';
 // import { responses } from "../../../users/src/common/responses";
@@ -26,7 +26,7 @@ import {
   ListNotificationsRequestDto,
   RequestByIdDto,
   SendPushNotificationRequestDto,
-} from "../../../../packages/rumor-utils/shared/notifications/dtos/notification.dto";
+} from "rumor-utils/shared/notifications/dtos/notification.dto";
 import { EmailTemplate } from "@fusionauth/typescript-client";
 import database from "../database";
 import { NotFoundError, BadRequestError } from 'rumor-utils/errors'

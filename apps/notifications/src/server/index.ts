@@ -2,7 +2,7 @@ import app from './app';
 import config from '../config';
 
 const start = async () => {
-    const port = config.get('port');
+    const port = config.get('PORT');
     console.info('[SERVER] Starting server...');
     return new Promise((resolve, reject) => {
         const server = app
