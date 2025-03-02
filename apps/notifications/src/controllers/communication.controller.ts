@@ -35,7 +35,7 @@ export class CommunicationController {
       );
       const successResponse = new CreateResponse(
         response,
-        "Code Sent Successfully"
+        "Verification code sent successfully"
       );
       res.json(successResponse).status(successResponse.statusCode);
     }
@@ -48,7 +48,7 @@ export class CommunicationController {
       status: result.verified ? 200 : 400,
       data: result,
     };
-    const successResponse = new GetResponse(response, "Code Verified");
+    const successResponse = new GetResponse(response, "Code verified");
     res.json(successResponse).status(successResponse.statusCode);
   });
 
