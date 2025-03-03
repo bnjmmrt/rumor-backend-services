@@ -1,4 +1,8 @@
-import { BadRequestError } from "rumor-utils/errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  ValidationError,
+} from "rumor-utils/errors";
 import config from "../../config";
 import { Twilio } from "twilio";
 
@@ -9,7 +13,6 @@ class TwilioService {
     if (!this.twilioClient) {
       const accountSid = config.get("TWILIO_ACCOUNT_SID");
       const authToken = config.get("TWILIO_AUTH_TOKEN");
-
 
       if (!accountSid || !authToken) {
         throw new BadRequestError("Twilio credentials are missing or invalid");
@@ -29,12 +32,22 @@ class TwilioService {
       throw new BadRequestError("TWILIO_VERIFY_SID is missing or invalid");
     }
 
-    await client.verify.v2.services(sid).verifications.create({
-      to: payload.phoneNumber,
-      channel: "sms",
-    });
+    try {
+      const response = await client.verify.v2
+        .services(sid)
+        .verifications.create({
+          to: payload.phoneNumber,
+          channel: "sms",
+        });
 
-    return { status: "ok" };
+      if (!response || response.status !== "pending") {
+        throw new BadRequestError("Failed to send verification code");
+      }
+
+      return { status: "ok" };
+    } catch (error) {
+      throw new InternalServerError(error);
+    }
   }
 
   async verifyCode(payload: { phoneNumber: string; verificationCode: string }) {
@@ -45,17 +58,26 @@ class TwilioService {
       throw new BadRequestError("TWILIO_VERIFY_SID is missing or invalid");
     }
 
-    const verificationCheck = await client.verify.v2
-      .services(sid)
-      .verificationChecks.create({
-        to: payload.phoneNumber,
-        code: payload.verificationCode,
-      });
+    try {
+      const verificationCheck = await client.verify.v2
+        .services(sid)
+        .verificationChecks.create({
+          to: payload.phoneNumber,
+          code: payload.verificationCode,
+        });
 
-    return {
-      verified:
-        verificationCheck.status === "approved" && verificationCheck.valid,
-    };
+      if (
+        !verificationCheck ||
+        verificationCheck.status !== "approved" ||
+        !verificationCheck.valid
+      ) {
+        throw new ValidationError("Invalid verification code");
+      }
+
+      return { verified: true };
+    } catch (error) {
+      throw new InternalServerError(error);
+    }
   }
 
   async sendTextMessage(payload: { phoneNumber: string; message: string }) {
@@ -68,13 +90,21 @@ class TwilioService {
       );
     }
 
-    await client.messages.create({
-      to: payload.phoneNumber,
-      from: messagingServiceSid,
-      body: payload.message,
-    });
+    try {
+      const response = await client.messages.create({
+        to: payload.phoneNumber,
+        from: messagingServiceSid,
+        body: payload.message,
+      });
 
-    return true;
+      if (!response || !response.sid) {
+        throw new BadRequestError("Failed to send text message");
+      }
+
+      return true;
+    } catch (error) {
+      throw new InternalServerError(error);
+    }
   }
 
   async sendInvitationMessages(payload: { phoneNumbers: string[] }) {
@@ -86,15 +116,23 @@ class TwilioService {
         "TWILIO_MESSAGING_SERVICE_SID is missing or invalid"
       );
     }
-    await Promise.all(
-      payload.phoneNumbers.map(async (phoneNumber) => {
-        await client.messages.create({
-          to: phoneNumber,
-          from: messagingServiceSid,
-          body: `Hi, I want to invite you to join Rumor - a new app that connects a private community of people and experience organizers that shape culture. Check it out and download here: [link]`,
-        });
-      }),
-    );
+
+    try {
+      await Promise.all(
+        payload.phoneNumbers.map(async (phoneNumber) => {
+          return await client.messages.create({
+            to: phoneNumber,
+            from: messagingServiceSid,
+            body: `Hi, I want to invite you to join Rumor - a new app that connects a private community of people and experience organizers that shape culture. Check it out and download here: [link]`,
+          });
+        })
+      );
+
+      return { success: true };
+    } catch (error) {
+      throw new InternalServerError(error);
+    }
   }
 }
+
 export default new TwilioService();
