@@ -7,6 +7,7 @@ const config = {
     ],
     values: {
         PORT: 8001,
+        NODE_ENV:'development'
     }
 };
 
