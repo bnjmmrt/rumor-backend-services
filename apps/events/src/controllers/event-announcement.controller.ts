@@ -9,7 +9,10 @@ export class EventAnnouncementController {
     const payload: any = {
       eventId: req.params.eventId,
       ticketType: req.query.ticketType,
-      addedBy: req.query.addedBy
+      addedBy: req.query.addedBy,
+      take: req.query.take,
+      skip: req.query.skip,
+      findByName: req.query.findByName
     }
     const announcementGuestList = await EventAnnouncementService.getAnnouncementGuestList(payload)
     res.json(new GetResponse(announcementGuestList));
@@ -71,6 +74,9 @@ export class EventAnnouncementController {
     const payload: any = {
       eventId: req.params.eventId,
       announcementId: req.params.announcementId,
+      take: req.query.take,
+      skip: req.query.skip,
+      findByName: req.query.findByName
     }
 
     const recipientList = await EventAnnouncementService.getRecipientList(payload)
