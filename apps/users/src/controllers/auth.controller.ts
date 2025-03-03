@@ -72,6 +72,7 @@ import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { IdRequestDto, PaginatedRequestDto, TokenRequestDto, UpdateUsersStatusDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
+import AuthMiddleware from "../utils/fusion-auth";
 
 export class AuthController {
   
@@ -100,14 +101,6 @@ export class AuthController {
     }
   );
 
-  public static validate = asyncWrapper(
-    async (req, res): Promise<void> => {
-      const payload: ValidateRequestDto = req.body;
-      const response: ValidateResponse = await AuthService.validate(payload);
-      res.json(response);
-    }
-  );
-
   public static memberSignUp = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: MemberSignUpRequestDto = req.body;
@@ -129,6 +122,14 @@ export class AuthController {
       const payload: TokenRequestDto = req.body;
       const response: GenericResponse = await AuthService.logout(payload);
       res.json(response);
+    }
+  );
+
+  public static validate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ValidateRequestDto = req.body;
+      const response: any = AuthMiddleware.validate(payload);
+      res.json(new CreateResponse(response));
     }
   );
 

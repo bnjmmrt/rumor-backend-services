@@ -1,14 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-// import { validate } from "../../";
 import config from '../../config'
 import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
 import {ValidateResponse} from 'rumor-utils/shared/users/grpc/auth/auth.pb'
 import { ValidateRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
 import { responses } from "../../common/responses.common";
-// import { responses } from '../common/responses.common';
-
-
-
 
 class AuthMiddleware {
     public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));    

@@ -20,14 +20,14 @@ const createApiService = () => {
             baseURL
         });
 
-        // api.interceptors.request.use(
-        //     config => {
-        //         const customConfig = config;
-        //         customConfig.headers.Authorization = `Bearer ${token}`;
-        //         return customConfig;
-        //     },
-        //     error => Promise.reject(error)
-        // );
+        api.interceptors.request.use(
+            config => {
+                const customConfig = config;
+                customConfig.headers.Authorization = `Bearer ${token}`;
+                return customConfig;
+            },
+            error => Promise.reject(error)
+        );
 
         api.interceptors.response.use(handleSuccessResponse, handleErrorResponse);
     };
