@@ -1,7 +1,6 @@
-import { In, IsNull, Brackets } from "typeorm";
+import { In, IsNull } from "typeorm";
 import database from "../database";
 import { NotFoundError } from "rumor-utils/errors";
-import { isArray, result } from "lodash";
 import {
   Event,
   User,
