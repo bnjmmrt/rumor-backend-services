@@ -14,16 +14,23 @@ import {
   Role,
   Guest,
 } from "rumor-utils/shared/entities";
-import { ForbiddenError, NotFoundError } from "rumor-utils/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "rumor-utils/errors";
 import database from "../database";
 import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource, In } from "typeorm";
+import { Brackets, DataSource, In, QueryRunner } from "typeorm";
 import { isUUID } from "class-validator";
-import { EventStatusEnum } from "rumor-utils/shared/events/interfaces/event.interface";
+import {
+  EventStatusEnum,
+  GuestStatus,
+} from "rumor-utils/shared/events/interfaces/event.interface";
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -132,6 +139,10 @@ export class SignupFormsServices {
 
       if (!eventSignupForm) {
         throw new ForbiddenError("SignupForm does not exists");
+      }
+
+      if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
+        throw new NotFoundError("Event does not exists");
       }
 
       const data = buildSignupFormsResponse(
@@ -321,6 +332,56 @@ export class SignupFormsServices {
     });
   }
 
+  private static async registerUserAsNonMember(
+    payload: User,
+    queryRunner: QueryRunner
+  ) {
+    await queryRunner.manager.save(payload);
+
+    const nonMemberRole: Role[] = await this.dbConnection
+      .getRepository(Role)
+      .find({ where: { name: "non_member" } });
+
+    const userRole = UserRole.create({
+      role: { id: nonMemberRole[0].id },
+      user: { id: payload.id },
+    });
+
+    await queryRunner.manager.save(userRole);
+  }
+
+  private static async validateUserAsGuest(eventId: string, userPayload: User) {
+    let user = null;
+    if (userPayload.email) {
+      user = await User.findOne({
+        where: { email: userPayload.email },
+      });
+    } else if (userPayload.phoneNumber) {
+      user = await User.findOne({
+        where: { email: userPayload.phoneNumber },
+      });
+    } else {
+      throw new BadRequestError(
+        "User information missing to apply for an event."
+      );
+    }
+    if (!user) {
+      return userPayload;
+    }
+
+    if (user.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userPayload.id }, event: { id: eventId } },
+      });
+      if (guest) {
+        throw new ForbiddenError(
+          "You are already part of this event. Please log into application and check your event status."
+        );
+      }
+    }
+    return user;
+  }
+
   public static async answers(
     id: string,
     eventId: string,
@@ -342,40 +403,11 @@ export class SignupFormsServices {
 
       // Step 5: Ensure invites can only be sent for approved events
       if (signupForm.event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new ForbiddenError(
-          "You cannot send invites until the event has been approved by the Rumor admin"
-        );
+        throw new ForbiddenError("You can apply only for approved event.");
       }
-      const userPayload = new User();
+      let userPayload = new User();
       const answerList: SignupFormAnswersDto[] = [];
       let requestedGuests: number = 0;
-      // payload.forEach((ans: SignupFormAnswersDto) => {
-      //   const answer = new SignupFormAnswersDto();
-      //   answer.answers = ans.answers || "";
-      //   answer.id = ans.id;
-      //   answer.isRequired = ans.isRequired;
-      //   answer.name = ans.name;
-      //   if (ans.isRequired) {
-      //     switch (answer.name.toLowerCase()) {
-      //       case "first name":
-      //         userPayload.firstName = ans.answers;
-      //         break;
-      //       case "last name":
-      //         userPayload.lastName = ans.answers;
-      //         break;
-      //       case "email":
-      //         userPayload.email = ans.answers;
-      //         break;
-      //       case "phone":
-      //         userPayload.phoneNumber = ans.answers;
-      //         break;
-      //       case "request access for additional guests":
-      //         requestedGuests = ans.answers;
-      //         break;
-      //     }
-      //   }
-      //   answerList.push(answer);
-      // });
 
       this.extractUserPayloadAndAnswers(
         payload,
@@ -384,36 +416,21 @@ export class SignupFormsServices {
         requestedGuests
       );
 
-      const queryRunner = database.connection.createQueryRunner();
+      userPayload = await this.validateUserAsGuest(eventId, userPayload);
+      const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
-      await queryRunner.manager.save(userPayload);
-      //await userPayload.save();
-
-      const nonMemberRole: Role[] = await this.dbConnection
-        .getRepository(Role)
-        .find({ where: { name: "non_member" } });
-
-      // const userRole = await UserRole.create({
-      //   role: { id: nonMemberRole[0].id },
-      //   user: { id: userPayload.id },
-      // }).save();
-
-      const userRole = UserRole.create({
-        role: { id: nonMemberRole[0].id },
-        user: { id: userPayload.id },
-      });
-      await queryRunner.manager.save(userRole);
-
+      if (!userPayload.id) {
+        await this.registerUserAsNonMember(userPayload, queryRunner);
+      }
       const inviteGuestPayload = new Guest();
       inviteGuestPayload.event = signupForm.event;
       inviteGuestPayload.maxAdditionalGuests = requestedGuests;
       inviteGuestPayload.user = { id: userPayload.id } as User;
       inviteGuestPayload.invitationSource = UserSource.INVITED_BY_HOST;
       inviteGuestPayload.ticketType = undefined;
-      // inviteGuestPayload.status = GuestStatus.APPLIED;
-      // await inviteGuestPayload.save();
+      inviteGuestPayload.status = GuestStatus.APPLIED;
       await queryRunner.manager.save(inviteGuestPayload);
 
       const submissions = new SignupFormSubmissions();
@@ -422,7 +439,6 @@ export class SignupFormsServices {
       submissions.guest = { id: inviteGuestPayload.id } as Guest;
       submissions.attendees = { id: userPayload.id } as User;
 
-      // await submissions.save();
       await queryRunner.manager.save(submissions);
       await queryRunner.commitTransaction();
       return submissions;
@@ -448,48 +464,16 @@ export class SignupFormsServices {
    * Host profile pictures.
    */
 
-  // private static generateSubmissionQuery(skip: number, take: number, ) {
-  //   const submissionsQuery = SignupFormSubmissions.createQueryBuilder("sfs")
-  //     .innerJoinAndSelect("sfs.attendees", "atd")
-  //     .innerJoinAndSelect("sfs.guest", "gst")
-  //     .orderBy("sfs.id", "DESC")
-  //     .addSelect("sfs.id", "id")
-  //     .addSelect("atd.firstName", "firstName")
-  //     .addSelect("atd.lastName", "lastName")
-  //     .addSelect("atd.email", "email")
-  //     .addSelect("atd.phone", "phone")
-  //     .addSelect("gst.status", "status")
-  //     .where("sfs.signup_form_id = :id", { signupFormId: id })
-  //     .skip(skip)
-  //     .take(take);
-
-  //   if (parsedQuery.lastIndex && isUUID(parsedQuery.lastIndex)) {
-  //     submissionsQuery.andWhere("sfs.id > :id", { id: parsedQuery.lastIndex });
-  //   }
-
-  //   if (searchValue) {
-  //     const searchWords = searchValue.trim().split(/\s+/);
-  //     submissionsQuery.andWhere(
-  //       new Brackets((qb) => {
-  //         searchWords.forEach((word) => {
-  //           qb.orWhere("atd.firstName ILIKE :word", {
-  //             word: `%${word}%`,
-  //           }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
-  //         });
-  //       })
-  //     );
-  //   }
-  // }
-
   public static async listSubmissions(id: string, payload: any) {
     try {
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take
         ? parseInt(parsedQuery.take as string)
         : undefined;
-      const skip = parsedQuery?.skip
-        ? parseInt(parsedQuery.skip as string)
-        : undefined;
+      const lastIndex =
+        parsedQuery?.lastIndex && isUUID(parsedQuery.lastIndex)
+          ? parsedQuery.lastIndex
+          : undefined;
 
       const searchValue =
         parsedQuery.findByName && typeof parsedQuery.findByName === "string"
@@ -509,10 +493,14 @@ export class SignupFormsServices {
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
-        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id })
-        .orderBy("sfs.id", "DESC")
-        .skip(skip)
-        .take(take);
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+
+      if (lastIndex && isUUID(lastIndex)) {
+        submissionsQuery.andWhere("sfs.id < :id", {
+          id: lastIndex,
+        });
+      }
+      submissionsQuery.orderBy("sfs.id", "DESC").limit(take);
 
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);

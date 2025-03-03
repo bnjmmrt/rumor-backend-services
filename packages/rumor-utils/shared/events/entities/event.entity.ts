@@ -35,6 +35,10 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'timestamp', nullable: true, name: 'end_date' })
   endDate?: Date;
 
+
+  @Column({ type: "varchar", nullable: true, name: "timezone" })
+  timeZone?: string;
+
   @Column({ type: 'integer', nullable: true, name: 'limit_one_plus' })
   limitOnePlus?: number;
 
