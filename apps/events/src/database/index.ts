@@ -18,10 +18,13 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/users/entities/*.ts",
             "packages/rumor-utils/shared/events/entities/*.ts",
             "packages/rumor-utils/shared/users/entities/*.js",
-            "packages/rumor-utils/shared/events/entities/*.js"
+            "packages/rumor-utils/shared/events/entities/*.js",
           ],
-          ...(["development", "staging", "production", "uat"].includes(config.get('NODE_ENV')) && { ssl: { rejectUnauthorized: false } }),
-          logging: false,
+          ...(["development", "staging", "production", "uat"].includes(
+            config.get("NODE_ENV")
+          ) && { ssl: { rejectUnauthorized: false } }),
+          logging: true,
+          synchronize: true,
         });
         this.connection = await appDataSource.initialize();
       }
