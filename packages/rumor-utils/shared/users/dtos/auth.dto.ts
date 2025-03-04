@@ -765,3 +765,13 @@ export class UpdateUsersStatusDto {
   @IsNotEmpty()
   status: UserStatus;
 }
+
+export class SwitchProfileDto {
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  targetRole: string;
+}

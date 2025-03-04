@@ -64,10 +64,10 @@ export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): 
   host.additionalHostInformation = {
     companyName: payload.companyName || host.additionalHostInformation?.companyName || '',
     companyLogo: payload.companyLogo || host.additionalHostInformation?.companyLogo || '',
-    website: payload.website || host.additionalHostInformation?.website || '',
+    website: payload.website !== undefined ? payload.website : host.additionalHostInformation?.website || '',
     referredBy: payload.referredBy || host.additionalHostInformation?.referredBy,
     eventsPerYear: payload.eventsPerYear || host.additionalHostInformation?.eventsPerYear,
-    bio: payload.bio || host.additionalHostInformation?.bio,
+    bio: payload.bio !== undefined ? payload.bio : host.additionalHostInformation?.bio,
     socialMedia: {
       instagram: payload.socialMedia.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram,
       tiktok: payload.socialMedia.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok,
