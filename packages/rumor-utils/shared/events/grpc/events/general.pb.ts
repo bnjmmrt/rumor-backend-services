@@ -680,7 +680,7 @@ export interface SignupFormsResponse {
   name: string;
   submissionCount: number;
   isActive: boolean;
-  isPublished: boolean
+  isPublished: boolean;
   url: string;
   userId: string;
   userName: string;
@@ -694,6 +694,7 @@ export interface SignupFormsResponse {
   address?: EventLocation;
   type?: string;
   ageLimit?: EventAgeLimit;
+  timeZone: string;
 }
 
 export interface ISignupFormQuestionsRequest {

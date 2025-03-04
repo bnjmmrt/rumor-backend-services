@@ -1354,10 +1354,10 @@ export class EventsService {
         event.featuredEventSection = null;
         await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-        if (!featuredEventSection) return responses.notFound('Featured event section was not found');
+        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
+        //if (!featuredEventSection) return responses.notFound('Featured event section was not found');
 
-        event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
+        //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
         await this.dbConnection.getRepository(Event).save(event);
       }
 

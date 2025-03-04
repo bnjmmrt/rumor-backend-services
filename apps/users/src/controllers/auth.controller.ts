@@ -85,6 +85,7 @@ import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { IdRequestDto, PaginatedRequestDto, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
+import AuthMiddleware from "../utils/fusion-auth";
 
 export class AuthController {
 
@@ -116,15 +117,6 @@ export class AuthController {
     }
   );
 
-  public static validate = asyncWrapper(
-    async (req, res): Promise<void> => {
-      const payload: ValidateRequestDto = req.body;
-      const response: ValidateResponse = await AuthService.validate(payload);
-      const createResponse = new CreateResponse(response, 'Ok');
-      res.json(createResponse).status(createResponse.statusCode);
-    }
-  );
-
   public static memberSignUp = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: MemberSignUpRequestDto = req.body;
@@ -149,6 +141,20 @@ export class AuthController {
       const response: GenericResponse = await AuthService.logout(payload);
       const createResponse = new CreateResponse(response, 'Ok');
       res.json(createResponse).status(createResponse.statusCode);
+    }
+  ); 
+
+  public static validate = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { userId }:any = req.user;
+      res.json(new CreateResponse(userId));
+    }
+  );
+
+  public static checkService = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: any = await AuthService.checkService();
+      res.json(response);
     }
   );
 

@@ -1,12 +1,12 @@
 import * as express from 'express';
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { AdminController } from '../controllers/admin.controller';
 import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
-// import AuthMiddleware from 'src/utils/fusion-auth';
-import AuthMiddleware from '../utils/fusion-auth/index'
+import AuthMiddleware from '../server/middleware/auth';
+
 const router: Router = express.Router();
 
 // Admin routes
@@ -28,7 +28,13 @@ router.get('/auth/admin/member/{id}', AdminController.getMemberProfile);
 router.post('/auth/forgot-password', AuthController.forgotPassword);
 router.post('/auth/set-password', AuthController.setPassword);
 router.post('/auth/login', AuthController.login);
-router.post('/auth/validate', AuthController.validate);
+
+// Auth Validator - For Inter Service Call
+router.post('/auth/validate', AuthMiddleware.fusionAuthRequired, AuthController.validate);
+
+//Testing the interservice COmmunication
+router.get('/check-service-call', AuthController.checkService);
+
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthController.logout);
