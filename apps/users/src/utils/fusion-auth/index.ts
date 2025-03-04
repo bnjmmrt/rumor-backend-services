@@ -1,10 +1,12 @@
-import { Request, Response, NextFunction } from "express";
-import { validate } from "rumor-utils/service-mesh";
+import { Request, Response, NextFunction, response } from "express";
 import config from '../../config'
-
+import FusionAuthClient from '@fusionauth/typescript-client';
+import { ValidateRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
+import { ForbiddenError , AuthorizationError } from 'rumor-utils/errors';
 
 class AuthMiddleware {
-    static fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
         const authorization = req.header("Authorization");
         if (!authorization) {
             res.status(401).send("Unauthorized");
@@ -14,23 +16,53 @@ class AuthMiddleware {
         if (tokenParts.length < 2) {
             res.status(401).send("Unauthorized");
         }
-        const baseURL = config.get('API_BASE_URL');
         const token = tokenParts[1];
 
-        const response = await validate(baseURL, token);
+        const response = await this.validate({ token });
 
-        if (!response || response.status !== 200 || !response.data.userId) {
+        if (!response || !response.userId) {
             res.status(401).send("Unauthorized");
         }
 
-        // Simulating token validation
-        const userId = response.data.userId;
-        (req as any).userId = userId;
+        (req as any).user = response;
+        (req as any).token = token;
 
         next();
+      } catch (error) {
+        res.send(new AuthorizationError(`Authorization Error : ${error} `)).status(error);
+      }
     };
 
-    static checkPermission = (permission: string) => {
+    async validate({ token }: ValidateRequestDto): Promise<any> {
+        try {
+          const fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'),config.get('FUSIONAUTH_BASE_URL')); 
+          const findUser = await fusionAuthClient.retrieveUserUsingJWT(token);
+          
+          if (!findUser?.response?.user?.active) {
+            throw new ForbiddenError('User is not active')
+          }
+
+          return {
+            userId: findUser.response.user.id,
+            user: {
+              username: findUser?.response?.user?.username || '',
+              email: findUser?.response?.user?.email || '',
+              firstName: findUser?.response?.user?.firstName || '',
+              lastName: findUser?.response?.user?.lastName || '',
+              active: !!findUser?.response?.user?.active,
+              birthDate: findUser?.response?.user?.birthDate || '',
+              mobilePhone: findUser?.response?.user?.mobilePhone || '',
+              verified: !!findUser?.response?.user?.verified,
+              roles: [],
+            },
+          };
+        } 
+        catch (err) {
+          throw new Error(err.statusCode)
+        }
+      }
+
+    checkPermission = (permission: string) => {
         return (req: Request, res: Response, next: NextFunction) => {
             const userId = res.getHeader("userId") as string;
 
@@ -56,4 +88,5 @@ class AuthMiddleware {
     };
 }
 
-export default AuthMiddleware;
+const authMiddleware = new AuthMiddleware()
+export default authMiddleware;

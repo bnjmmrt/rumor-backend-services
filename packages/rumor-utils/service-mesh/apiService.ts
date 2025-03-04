@@ -1,44 +1,49 @@
-import axios from 'axios';
-
+import axios, { AxiosInstance } from 'axios';
 import { handleErrorResponse, handleSuccessResponse } from './responseHandlers';
 import { InternalServerError } from '../errors';
 
-const createApiService = () => {
-    let api = null;
-    let token = null;
+class ApiService {
+    private api: AxiosInstance | null = null;
+    private token: string | null = null;
 
-    const setToken = newToken => {
-        token = newToken;
-    };
-
-    const configure = ({ baseUrl: baseURL }) => {
-        if (!baseURL) {
+    public initialize( baseUrl: string, token?: string ): void {
+        if (!baseUrl) {
             throw new InternalServerError(new Error('Cannot create axios instance without baseUrl'));
         }
 
-        api = axios.create({
-            baseURL
-        });
+        this.api = axios.create({ baseURL: baseUrl });
 
-        // api.interceptors.request.use(
-        //     config => {
-        //         const customConfig = config;
-        //         customConfig.headers.Authorization = `Bearer ${token}`;
-        //         return customConfig;
-        //     },
-        //     error => Promise.reject(error)
-        // );
+        if(token){
+            this.setToken(token);
+            this.api.interceptors.request.use(
+                config => {
+                    if (this.token) {
+                        config.headers.Authorization = `Bearer ${this.token}`;
+                    }
+                    return config;
+                },
+                error => Promise.reject(error)
+            );
+        }
+        
+        this.api.interceptors.response.use(handleSuccessResponse, handleErrorResponse);
+    }
 
-        api.interceptors.response.use(handleSuccessResponse, handleErrorResponse);
-    };
+    public getApi(): AxiosInstance {
+        if (!this.api) {
+            throw new InternalServerError(new Error('API not configured. Call initialize() before using getApi().'));
+        }
+        return this.api;
+    }
 
-    const getApi = () => api;
+    public setToken(token: string): void {
+        this.token = token;
+        if (this.api) {
+            this.api.defaults.headers.Authorization = `Bearer ${token}`;
+        }
+    }
+}
 
-    return {
-        configure,
-        setToken,
-        getApi
-    };
-};
-
-export default createApiService();
+// Export a singleton instance
+const apiService = new ApiService();
+export default apiService;

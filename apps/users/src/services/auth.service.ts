@@ -33,6 +33,9 @@ import {
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
   UpdateCustomUsersListRequestDto,
+  FilterRequestDto,
+  DuplicateCustomListRequestDto,
+  ManageUserRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -59,6 +62,9 @@ import {
   CreateUserResponse,
   GetUsersResponse,
   UserResponseData,
+  UserFilterOptionsResponse,
+  customListData,
+  FocusProto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -75,7 +81,7 @@ import {
   ChangePasswordRequest,
 } from '@fusionauth/typescript-client';
 
-import { newAddress, newHost, newMember } from '../utils/auth.util';
+import { formatDateToMMDDYYYYHHmm, newAddress, newHost, newMember, prepareQueryString } from '../utils/auth.util';
 import {
   entityToGender,
   genderToEntity,
@@ -85,13 +91,14 @@ import {
   toCurrentUser,
   toSimpleUser,
   toUserDataSimple,
-  toUser
+  toUser,
+  toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
-import { hasPagination, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { hasPagination, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import { AdditionalHostInformation, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { entityToProviderType, providerTypeToEntity } from 'rumor-utils/shared/users/mappers/social.mapper';
@@ -124,10 +131,10 @@ import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } fr
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
 import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
-import { toBasicHostProfile, toHostProfile, toMemberProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
+import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { GenericResponse, NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -144,7 +151,9 @@ import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
-import * as serviceMesh from 'rumor-utils/service-mesh';
+import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
+
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -455,6 +464,14 @@ export class AuthService {
       return responses.badRequest('Unknown error occurred, please try again later.');
     }
   }
+
+  public static async checkService(){
+    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
+    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
+    let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
+    return response
+  }
+
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
     try {
@@ -1490,6 +1507,79 @@ export class AuthService {
     }
   }
 
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<GenericResponse> {
+      const payloadStatus = userStatusToEntity[payload.status];
+      const users = await this.dbConnection.getRepository(User).find({
+        where: { id: In(payload.ids), deletedAt: null },
+        relations: { roles: { role: true } },
+      });
+
+      if (users.length === 0) return responses.notFound('Users not found!');
+
+      const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+      if (!memberRole) {
+        return responses.badRequest('Error updating user status.');
+      }
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: In(payload.ids) } },
+        relations: ['user', 'role'],
+      });
+
+      if (userRoles.length === 0) {
+        return responses.badRequest('Error updating user status.');
+      }
+
+      const failedUsers: string[] = [];
+      const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
+
+      for (const userRole of userRoles) {
+        if (payloadStatus === UserStatus.WAITLISTED && userRole.status === UserStatus.ACTIVE) {
+          failedUsers.push(userRole.user.id);
+          continue;
+        }
+        if (payloadStatus === UserStatus.ACTIVE) {
+          const user = users.find((u) => u.id === userRole.user.id);
+          if (user && user.roles.some((role) => role.role.name === 'non_member')) {
+            usersToUpdate.push({ userRole, newStatus: payloadStatus, newRole: memberRole });
+            continue;
+          }
+        }
+        usersToUpdate.push({ userRole, newStatus: payloadStatus });
+      }
+
+      // Perform bulk updates only for valid users
+      for (const update of usersToUpdate) {
+        update.userRole.status = update.newStatus;
+        if (update.newRole) {
+          update.userRole.role = update.newRole;
+        }
+        await this.dbConnection.getRepository(UserRole).save(update.userRole);
+
+        // Send email only to users who are now "ACTIVE" and got the "member" role
+        if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
+          const user = users.find((u) => u.id === update.userRole.user.id);
+          // if (user) {
+          //   await this.communicationClient.sendEmailFromTemplate(
+          //     [
+          //       {
+          //         key: 'link_to_application',
+          //         value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+          //       },
+          //     ],
+          //     'Member Approved into Rumor',
+          //     [user.email], // Send email to the approved member
+          //     null,
+          //     this.logger,
+          //   );
+          // }
+        }
+      }
+
+      return responses.ok;
+   
+  }
+
   public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<CreateNonMemberUserResponse> {
     try {
       const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
@@ -1836,8 +1926,8 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses = [] // await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = [] // await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2030,59 +2120,72 @@ export class AuthService {
     }
   }
 
-  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
-    try {
+  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+   
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const name = parsedQuery?.name ? parsedQuery.name : undefined;
+      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+      const type = parsedQuery?.type;
+      const gender = parsedQuery?.gender;
+      const focuses = parsedQuery.category;
+      const baseCity = parsedQuery.basecity;
+      const interest = parsedQuery.interest;
       const user = await this.dbConnection.getRepository(User).findOne({
         where: { id: payload.userId },
         relations: { favoritedMembers: { member: true } },
       });
       if (!user) return responses.badRequest('User not found!');
-      const favoriteIds = user.favoritedMembers.map((favorite) => favorite.member.id);
-      const whereCondition: any = { id: In(favoriteIds) };
-      if (name) {
-        whereCondition.firstName = ILike(`%${name}%`);
-      }
-      const favoriteUsers = await this.dbConnection.getRepository(User).find({
-        where: [whereCondition, { lastName: ILike(`%${name}%`) }],
-        relations: {
-          address: true,
-          roles: { role: true },
-          socialProviders: true,
-          hostedEvents: true,
-          socialStats: true,
-        },
-        take,
-        skip,
-      });
-      const members = await Promise.all(
-        favoriteUsers.map(async (user) => {
+      const queryBuilder = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.address', 'address')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
+        .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+        .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+        .leftJoinAndSelect('user.socialStats', 'socialStats')
+        .innerJoin('user.favoritedByHosts', 'hf')
+        .addSelect(['hf.createdAt'])
+        .where('hf.host.id = :hostId', { hostId: payload.userId })
+        .take(take)
+        .skip(skip);
 
-          //Micro-service call
-          // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-          // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
+      let userTypes: string[] = [];
+      if (type && typeof type === 'string') {
+        userTypes = type.split(',').map((name) => name.trim());
+      }
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      } else {
+        queryBuilder.orderBy('hf.createdAt', 'DESC');
+      }
+      await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+      const [favoriteUsers, totalCount] = await queryBuilder.getManyAndCount();
+      const users = await Promise.all(
+        favoriteUsers.map(async (user) => {
+          const focuses = [];
+          const interests = [];
 
           const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
             where: {
               user: {
                 id: user.id,
               },
-              type: SocialProviderType.FACEBOOK,
+              type: SocialProviderType.INSTAGRAM,
             },
             relations: ['user'],
           });
 
-          return toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-          //return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+          const socialProviderUsername = socialProvider?.username || null;
+
+          return toUser(user, focuses, interests, user.roles[0], {
+            INSTAGRAM: socialProviderUsername,
+          });
         }),
       );
-      return responses.data(members);
-    } catch (err) {
-      return responses.badRequest('Error at get favorite users.');
-    }
+      return responses.data({ users, totalCount });
+    
   }
 
   public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
@@ -2523,8 +2626,8 @@ export class AuthService {
 
     const users = await Promise.all(
       allUsers.map(async (user) => {
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses = []//await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = []//await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {
@@ -2552,7 +2655,7 @@ export class AuthService {
 
   // ADMIN Sevice Code
 
-  public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //GetMembersResponse
+  public static async getMembers(payload: PaginatedRequestDto): Promise<any> { //GetMembersResponse
     try {
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
@@ -3192,7 +3295,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-      return responses.data(toMemberProfile(user, focuses, userRole, socialProvider?.username));
+      return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username));
     } catch (err) {
       return responses.badRequest(`Unable to get host profile: ${err}`);
     }
@@ -3281,5 +3384,499 @@ export class AuthService {
       queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
     }
     return queryBuilder;
+  }
+
+  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<UserFilterOptionsResponse> {
+    const { userId } = payload;
+    const parsedQuery = parse(payload.query) as ParsedQs;
+    const eventId = parsedQuery?.eventId as string;
+    const filterOptionsSequence = [
+      'list',
+      'pastEvents',
+      'category',
+      'baseCity',
+      'gender',
+      'age',
+      'interest',
+      'type',
+      'ticketType',
+      'partySize',
+      'checkedIn',
+      'spammed',
+      'userSource',
+      'declinedBy',
+      'vouch',
+    ];
+    const focuses = [];
+
+    const categoryObj = {
+      id: 'category',
+      label: 'Category',
+      options: focuses,
+      isSearchable: true,
+      type: FilterTypeValues.category,
+    };
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId },
+      relations: {
+        customLists: {
+          usersLists: {
+            user: {
+              address: true,
+              roles: { role: true },
+              socialProviders: true,
+              hostedEvents: true,
+            },
+          },
+        },
+      },
+    });
+    const customLists = user?.customLists?.map((list) => ({
+      name: list.listName,
+      id: list.listName,
+    }));
+    const hostDefaultList = [
+      { id: 'myFavourites-systemDefault', name: 'My Favorites' },
+      { id: 'myFollowers-systemDefault', name: 'My Followers' },
+    ];
+    const hostCustomLists = [...hostDefaultList, ...customLists];
+    const listObj = {
+      id: 'list',
+      label: 'My Lists',
+      options: hostCustomLists,
+      type: FilterTypeValues.list,
+    };
+    const baseCityObj = {
+      id: 'basecity',
+      label: 'Base City',
+      options: [],
+      type: FilterTypeValues.baseCity,
+    };
+    const genderObj = {
+      id: 'gender',
+      label: 'Gender',
+      options: [
+        { id: Gender.MALE, name: 'Male' },
+        { id: Gender.FEMALE, name: 'Female' },
+        { id: Gender.NON_BINARY, name: 'Non-Binary' },
+      ],
+      type: FilterTypeValues.gender,
+    };
+    const ageObj = {
+      id: 'age',
+      label: 'Age',
+      options: [],
+      type: FilterTypeValues.age,
+    };
+    const interests = [];
+    const mappedInterests = interests?.map((interest) => ({
+      name: interest.name,
+      id: interest.id,
+    }));
+    const interestObj = {
+      id: 'interest',
+      label: 'Interests',
+      options: mappedInterests,
+      type: FilterTypeValues.interest,
+    };
+    const typeObj = {
+      id: 'type',
+      label: 'Type',
+      options: [
+        { id: RoleType.Member, name: 'Member' },
+        { id: RoleType.NonMember, name: 'Non-Member' },
+      ],
+      type: FilterTypeValues.type,
+    };
+    const now = new Date();
+    //TODO: check if this logic affects on date format changes
+    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    const queryParams = {
+      ownerId: userId,
+      statusName: 'PAST_STATUS',
+      maxEndDate: formattedDate,
+      isPublished: true,
+    };
+    const queryString = prepareQueryString(queryParams);
+    const listEvents = [];
+    const mappedEvents = listEvents?.map((event) => ({
+      name: event.name,
+      id: event.id,
+    }));
+    const pastEventsObj = {
+      id: 'pastEvents',
+      label: 'Past Events',
+      options: mappedEvents,
+      type: FilterTypeValues.pastEvents,
+    };
+
+    const ticketTypes = [];
+    const mappedticketTypes = ticketTypes?.map((ticketType) => ({
+      name: ticketType.name,
+      id: ticketType.id,
+    }));
+    const ticketTypeObj = {
+      id: 'ticketType',
+      label: 'Ticket Type',
+      options: mappedticketTypes,
+      type: FilterTypeValues.ticketType,
+    };
+
+    const partySizeObj = {
+      id: 'partySize',
+      label: 'Party Size',
+      options: [],
+      type: FilterTypeValues.partySize,
+    };
+
+    const checkedInObj = {
+      id: 'checkedIn',
+      label: 'Check-in Status',
+      options: [
+        { id: 'checkedIn', name: 'Checked-in' },
+        { id: 'notCheckedIn', name: 'Not Checked-in' },
+      ],
+      type: FilterTypeValues.checkedIn,
+    };
+
+    const spammedObj = {
+      id: 'spammed',
+      label: 'Spam',
+      options: [
+        { id: 'isSpammed', name: 'Marked as Spam' },
+        { id: 'isNotSpammed', name: 'Not marked as Spam' },
+      ],
+      type: FilterTypeValues.spammed,
+    };
+
+    const userSourceObj = {
+      id: 'userSource',
+      label: 'Request Source',
+      options: [
+        // { id: UserSource.INVITED_BY_HOST, name: 'Invited by Host' },
+        // { id: UserSource.INVITED_BY_ADMIN, name: 'Invited by Admin' },
+        // { id: UserSource.INVITED_BY_COLLABORATOR, name: 'Invited by Collaborator' },
+        { id: UserSource.SIGN_UP_FORM, name: 'Sign Up Form' },
+        { id: UserSource.REQUEST_IN_APP, name: 'In App' },
+      ],
+      type: FilterTypeValues.userSource,
+    };
+
+    const declinedByObj = {
+      id: 'declinedBy',
+      label: 'Declined By',
+      options: [
+        { id: 'declinedByUser', name: 'Declined By User' },
+        // { id: 'declinedByCollaborator', name: 'Declined By Event Collaborator' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const vouchObj = {
+      id: 'vouch',
+      label: 'Vouch',
+      options: [
+        { id: 'hasVouches', name: 'Has Vouches' },
+        { id: 'hasNoVouches', name: 'Does Not Have Vouches' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const followersObj = {
+      id: 'followers',
+      label: 'Followers',
+      options: [
+        {
+          id: 'instagram',
+          name: 'Instagram',
+        },
+      ],
+      type: FilterTypeValues.followers,
+    };
+
+    const objectsMap = {
+      baseCity: baseCityObj,
+      gender: genderObj,
+      age: ageObj,
+      interest: interestObj,
+      category: categoryObj,
+      type: typeObj,
+      list: listObj,
+      pastEvents: pastEventsObj,
+      ticketType: ticketTypeObj,
+      partySize: partySizeObj,
+      checkedIn: checkedInObj,
+      spammed: spammedObj,
+      userSource: userSourceObj,
+      declinedBy: declinedByObj,
+      vouch: vouchObj,
+      followersObj,
+    };
+    // Arrange objects in the desired sequence
+    const orderedObjects = filterOptionsSequence.map((id) => objectsMap[id]).filter((node) => node);
+    //ends here
+    return responses.data(orderedObjects);
+  }
+
+  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersListResponse> {
+    const { customListId, customName, hostId, listType } = payload;
+
+
+    if (!customName) {
+      throw new BadRequestError("customName");
+    }
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+
+    if (!host) {
+      throw new NotFoundError("host");
+
+    }
+
+    if (host.customLists.some((list) => list.listName === customName)) {
+      throw new BadRequestError("customName exists");
+    }
+
+    let existingList;
+
+    switch (true) {
+      case !customListId: {
+        switch (listType) {
+          case 'followed':
+
+            existingList = await this.dbConnection.getRepository(HostFollowing).find({
+              where: { host: { id: hostId } },
+              relations: { follower: true },
+            });
+            break;
+          case 'favorite':
+            existingList = await this.dbConnection.getRepository(HostFavorite).find({
+              where: { host: { id: hostId } },
+              relations: { member: true },
+            });
+            break;
+          default:
+            return responses.badRequest('Invalid list type provided.');
+        }
+
+        if (!existingList || existingList.length === 0) {
+          throw new NotFoundError("listType");
+        }
+        break;
+      }
+
+      default: {
+        existingList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
+          where: { id: customListId, host: { id: hostId } },
+          relations: ['usersLists', 'usersLists.user'],
+        });
+
+        if (!existingList) {
+          throw new NotFoundError("existingList");
+        }
+      }
+    }
+
+    const newCustomList = new HostCustomUsersLists();
+    newCustomList.listName = customName;
+    newCustomList.host = host;
+    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(newCustomList);
+
+    const userListEntries = (customListId ? existingList.usersLists : existingList).map((listUser) => {
+      const newListUser = new HostCustomUsersListsUsers();
+      newListUser.user = customListId ? listUser.user : listType === 'followed' ? listUser.follower : listUser.member;
+      newListUser.list = savedCustomList;
+      return newListUser;
+    });
+
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+    const customListSaved = await this.getCustomUsersList({
+      userId: hostId,
+      id: savedCustomList.id,
+      query: 'take=10&skip=0',
+    });
+    return responses.data(customListSaved.data);
+  }
+
+  public static async deleteHostUserMapping(payload: IdRequestDto): Promise<GenericResponse> {
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!hostUserMapping) {
+      return responses.notFound('Host is not associated with user!');
+    }
+
+    await this.dbConnection.getRepository(HostUserMapping).remove(hostUserMapping);
+    return responses.ok;
+  }
+
+  public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfileResponse> {
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: {
+        roles: {
+          role: true,
+        },
+        address: true,
+        socialStats: true,
+      },
+    });
+    if (!user) return responses.notFound('User not found!');
+    const [focuses, interests] = await Promise.all([
+      [],
+      [],
+    ]);
+    const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
+      this.dbConnection.getRepository(HostUserSettings).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
+
+      this.dbConnection.getRepository(HostFavorite).findOne({
+        where: { host: { id: payload.id }, member: { id: user.id } },
+      }),
+
+      this.dbConnection.getRepository(HostFollowing).findOne({
+        where: { follower: { id: user.id }, host: { id: payload.id } },
+      }),
+
+      this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
+    ]);
+    const formattedLists = await this.getUserCustomLists(payload.id, user.id);
+    const userRole = user.roles.find((r) => ['member', 'non_member'].includes(r.role.name));
+
+    const isFollow = !!hostFollowing;
+    const isFavorite = !!hostUserFavorite;
+    const isSpam = hostUserSettings?.isSpam ?? false;
+    const note = hostUserSettings?.note ?? '';
+    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    userData.isFavourite = isFavorite;
+    userData.isFollow = isFollow;
+    userData.isSpam = isSpam;
+    userData.note = note;
+    userData.hostUserMappingId = hostUserMapping?.id ?? '';
+    return responses.data(userData);
+  }
+
+  public static async getUserCustomLists(hostId: string, userId: string): Promise<customListData[]> {
+
+    const result = await this.dbConnection.getRepository(HostCustomUsersListsUsers)
+      .createQueryBuilder('listUserMapping')
+      .leftJoin('listUserMapping.list', 'list')
+      .leftJoin('listUserMapping.user', 'listUser')
+      .where('list.host.id = :hostId', { hostId })
+      .andWhere(':userId IN (SELECT user_id FROM host_custom_users_lists_users WHERE list_id = list.id)', { userId })
+      .select('list.id', 'id')
+      .addSelect('list.listName', 'customName')
+      .addSelect('COUNT(listUser.id)', 'userCount')
+      .groupBy('list.id')
+      .getRawMany();
+
+    return result.map((list) => ({
+      id: list.id,
+      customName: list.customName,
+      totalCount: list.userCount,
+    }));
+  }
+
+  public static async getFollowedUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: { followers: { follower: true } },
+    });
+    if (!user) return responses.badRequest('User not found!');
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .innerJoin('user.following', 'hf')
+      .addSelect(['hf.createdAt'])
+      .where('hf.host.id = :hostId', { hostId: payload.userId })
+      .take(take)
+      .skip(skip);
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('hf.createdAt', 'DESC');
+    }
+
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
+
+    const users = await Promise.all(
+      followedUsers.map(async (user) => {
+        const focuses = [];
+        const interests = [];
+
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
+
+        const socialProviderUsername = socialProvider?.username || null;
+
+        return toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+      }),
+    );
+    return responses.data({ users, totalCount });
+
+  }
+
+  public static async manageUserSpam(payload: ManageUserRequestDto): Promise<GenericResponse> {
+
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+
+    if (!user || !host) {
+      return responses.notFound(`User or Host not found`);
+    }
+    let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+      where: {
+        user: { id: payload.userId },
+        host: { id: payload.id },
+      },
+    });
+
+    if (!hostUserSettings) {
+      hostUserSettings = new HostUserSettings();
+      hostUserSettings.user = user;
+      hostUserSettings.host = host;
+      hostUserSettings.isSpam = payload.isSpam;
+    } else {
+      hostUserSettings.isSpam = payload.isSpam;
+    }
+    await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    return responses.ok;
   }
 }

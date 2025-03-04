@@ -15,12 +15,12 @@ import * as UserSettings from './user-settings.entity';
 import * as XAuthSession from './xauthsession.entity'
 import * as Role from './roles/role.entity';
 import * as UserRole from './roles/user-role.entity';
+import * as Focus from './focus.entity';
 import * as Block from './block.entity'
 import * as HostCustomUsersListsUsers from './host-custom-users-lists-users.entity'
 import * as Report from './report.entity'
 import * as HostFeedback from './host-feedback.entity'
 import * as HostUserSettings from './host-user-settings.entity'
-import * as Focus from './focus.entity';
 
 
 export {
@@ -41,10 +41,10 @@ export {
     XAuthSession,
     Role,
     UserRole,
+    Focus,
     Block,
     HostCustomUsersListsUsers,
     Report,
     HostFeedback,
-    HostUserSettings,
-    Focus
+    HostUserSettings
 }

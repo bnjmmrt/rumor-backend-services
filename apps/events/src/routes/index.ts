@@ -3,6 +3,7 @@ import { Router } from "express";
 import { EventAnnouncementController } from "../controllers/event-announcement.controller";
 import { SignupFormsController } from "../controllers/signup-forms.controller";
 import { GuestController } from "../controllers/guest.controller";
+import AuthMiddleware from '../server/middleware/auth';
 
 const router: Router = express.Router();
 
@@ -12,9 +13,14 @@ const router: Router = express.Router();
 
 router.get("/event/:eventId/event-announcement-guest", EventAnnouncementController.getGuestListForAnnoucement);
 router.get("/event/:eventId/event-announcement-guest/:announcementId", EventAnnouncementController.getRecipientListForAnnoucement);
-router.post("/event/:eventId/event-announcement", EventAnnouncementController.postAnnouncement);
-router.patch("/event/:eventId/event-announcement/:announcementId", EventAnnouncementController.updateAnnouncement);
+
+//example route with auth implemented
+router.post("/event/:eventId/event-announcement", AuthMiddleware.fusionAuthRequired, EventAnnouncementController.postAnnouncement);
+router.patch("/event/:eventId/event-announcement/:announcementId", AuthMiddleware.fusionAuthRequired, EventAnnouncementController.updateAnnouncement);
+
+// Exposed API for interserivce communication
 router.get("/event/:eventId/event-announcement/:announcementId", EventAnnouncementController.getAnnouncement);
+
 router.get("/event/:eventId/event-announcements", EventAnnouncementController.getAnnouncements);
 router.delete("/event/:eventId/event-announcement/:announcementId", EventAnnouncementController.deleteAnnouncement);
 

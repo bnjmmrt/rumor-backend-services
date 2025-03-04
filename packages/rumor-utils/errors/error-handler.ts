@@ -13,7 +13,7 @@ export const errorHandler = (
   console.error('Error:', {
     name: error.name,
     message: error.message,
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    stack: error.stack
   });
 
   // If it's already one of our custom errors, return it directly
