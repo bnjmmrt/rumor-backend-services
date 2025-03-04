@@ -1,48 +1,47 @@
-import { Controller, Inject } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
 import { NotificationService } from '../services/notification.service';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
-import { NOTIFICATION_SERVICE_NAME, GetNotificationResponse, ListNotificationsResponse, GenericResponse } from '../grpc/notification/notification.pb';
-import {
-  CreateNotificationRequestDto,
-  ListNotificationsRequestDto,
-  RequestByIdDto,
-  SendPushNotificationRequestDto,
-  UpdateNotificationRequestDto,
-} from '../dtos/notification.dto';
-
-@Controller('notification')
 export class NotificationController {
-  @Inject(NotificationService)
-  private readonly service: NotificationService;
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'CreateNotification')
-  private async createNotification(payload: CreateNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.createNotification(payload);
-  }
+  public static createNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.createNotification(req, res);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'UpdateNotification')
-  private async updateNotification(payload: UpdateNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.updateNotification(payload);
-  }
+  public static updateNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.updateNotification(req, res);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'GetNotification')
-  private async getNotification(payload: RequestByIdDto): Promise<GetNotificationResponse> {
-    return this.service.getNotification(payload);
-  }
+  public static getNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.getNotification(req, res);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'ListNotifications')
-  private async listNotifications(payload: ListNotificationsRequestDto): Promise<ListNotificationsResponse> {
-    return this.service.listNotifications(payload);
-  }
+  public static listNotifications = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.listNotifications(req, res);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'DeleteNotification')
-  private async deleteNotification(payload: RequestByIdDto): Promise<GenericResponse> {
-    return this.service.deleteNotification(payload);
-  }
+  public static deleteNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.deleteNotification(req, res);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'SendPushNotification')
-  private async sendPushNotification(payload: SendPushNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.sendPushNotification(payload);
-  }
+  public static sendPushNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response = await NotificationService.sendPushNotification(req, res);
+      res.json(response);
+    }
+  );
 }

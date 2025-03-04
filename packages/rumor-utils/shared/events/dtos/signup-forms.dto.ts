@@ -47,7 +47,7 @@ export class QuestionsDto implements ISignupFormQuestionsRequest {
 
   @IsNotEmpty()
   @IsString()
-  type: string;
+  action: string;
 
   @IsBoolean()
   isRequired: boolean;
@@ -64,7 +64,7 @@ export class SignupFormAnswersDto implements ISignupFormQuestionsRequest {
 
   @IsNotEmpty()
   @IsString()
-  type: string;
+  action: string;
 
   @IsNotEmpty()
   @IsString()

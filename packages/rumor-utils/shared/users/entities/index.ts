@@ -20,6 +20,7 @@ import * as HostCustomUsersListsUsers from './host-custom-users-lists-users.enti
 import * as Report from './report.entity'
 import * as HostFeedback from './host-feedback.entity'
 import * as HostUserSettings from './host-user-settings.entity'
+import * as Focus from './focus.entity';
 
 
 export {
@@ -44,5 +45,6 @@ export {
     HostCustomUsersListsUsers,
     Report,
     HostFeedback,
-    HostUserSettings
+    HostUserSettings,
+    Focus
 }

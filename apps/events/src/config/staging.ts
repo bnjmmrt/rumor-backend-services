@@ -3,7 +3,8 @@ const config = {
     secrets: [
     ],
     values: {
-        PORT: 8001
+        PORT: 8001,
+        NODE_ENV:'staging'
     }
 };
 

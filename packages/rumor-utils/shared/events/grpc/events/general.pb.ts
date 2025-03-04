@@ -680,7 +680,7 @@ export interface SignupFormsResponse {
   name: string;
   submissionCount: number;
   isActive: boolean;
-  isPublished: boolean
+  isPublished: boolean;
   url: string;
   userId: string;
   userName: string;
@@ -688,20 +688,23 @@ export interface SignupFormsResponse {
   description: string;
   hasAccessForAdditionalGuests: boolean;
   startDate: string;
+  endDate: string;
   talents: Talent[];
   collaborators: CollaboratorsEvent[];
   questions: ISignupFormQuestionsRequest[];
   address?: EventLocation;
   type?: string;
   ageLimit?: EventAgeLimit;
+  timeZone: string;
 }
 
 export interface ISignupFormQuestionsRequest {
   id: string;
   name: string;
-  type?: string;
+  action?: string;
   isRequired: boolean;
   answers?: string;
+  ordering?: number;
 }
 
 export const EVENTS_PACKAGE_NAME = "events";

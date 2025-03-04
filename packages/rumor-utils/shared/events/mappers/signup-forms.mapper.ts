@@ -6,13 +6,23 @@ import { SignupFormsResponse } from "../grpc/events/general.pb";
 export const buildSignupFormsResponse = (
   event: Event,
   esf: EventSignupForms,
+  baseUrl: string,
   submissions: number = 0
 ): SignupFormsResponse => {
+  const companyName = (
+    event.owner?.additionalHostInformation?.companyName || ""
+  )
+    .split(" ")
+    .join("");
+  const eventName = event.name.split(" ").join("");
+
   const result: SignupFormsResponse = {
     id: esf.id,
     name: event.name,
     startDate: event.startDate.toString() || new Date().toString(),
+    endDate: event.endDate.toString() || new Date().toString(),
     address: event.location,
+    timeZone: event.timeZone,
     type: event.eventType?.name,
     ageLimit: event.ageLimit,
     talents: event.talents,
@@ -25,10 +35,15 @@ export const buildSignupFormsResponse = (
     isActive: esf.isActive,
     isPublished: esf.isPublished,
     description: esf.description,
-    url: `/${event.owner.firstName}/${event.name}/${esf.urlCode}`,
-    questions: esf.questions && esf.questions.map((q) => buildQuestion(q)) || [],
+    url: `${baseUrl}/${companyName}/${eventName}/${esf.urlCode}`,
+    questions:
+      (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
   };
+  result.questions &&
+    result.questions.sort((a, b) => {
+      return a.ordering > b.ordering ? 1 : a.ordering == b.ordering ? 0 : -1;
+    });
   return result;
 };
 
