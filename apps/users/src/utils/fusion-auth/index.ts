@@ -1,13 +1,12 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction, response } from "express";
 import config from '../../config'
-import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
-import {ValidateResponse} from 'rumor-utils/shared/users/grpc/auth/auth.pb'
+import FusionAuthClient from '@fusionauth/typescript-client';
 import { ValidateRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
-import { responses } from "../../common/responses.common";
+import { ForbiddenError , AuthorizationError } from 'rumor-utils/errors';
 
 class AuthMiddleware {
-    public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));    
-    static fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
         const authorization = req.header("Authorization");
         if (!authorization) {
             res.status(401).send("Unauthorized");
@@ -21,24 +20,29 @@ class AuthMiddleware {
 
         const response = await this.validate({ token });
 
-        if (!response || response.status !== 200 || !response.data.userId) {
+        if (!response || !response.userId) {
             res.status(401).send("Unauthorized");
         }
 
-        // Simulating token validation
-        const userId = response.data.userId;
-        (req as any).userId = userId;
+        (req as any).user = response;
+        (req as any).token = token;
 
         next();
+      } catch (error) {
+        res.send(new AuthorizationError(`Authorization Error : ${error} `)).status(error);
+      }
     };
 
-    public static async validate({ token }: ValidateRequestDto): Promise<ValidateResponse> {
+    async validate({ token }: ValidateRequestDto): Promise<any> {
         try {
-          const findUser = await this.fusionAuthClient.retrieveUserUsingJWT(token);
+          const fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'),config.get('FUSIONAUTH_BASE_URL')); 
+          const findUser = await fusionAuthClient.retrieveUserUsingJWT(token);
+          
           if (!findUser?.response?.user?.active) {
-            return responses.forbidden('User is not active');
+            throw new ForbiddenError('User is not active')
           }
-          return responses.data({
+
+          return {
             userId: findUser.response.user.id,
             user: {
               username: findUser?.response?.user?.username || '',
@@ -51,19 +55,14 @@ class AuthMiddleware {
               verified: !!findUser?.response?.user?.verified,
               roles: [],
             },
-          });
-        } catch (err) {
-          if (err?.statusCode == 423) {
-            return responses.forbidden('User is locked.');
-          }
-          if (err.statusCode == 404) {
-            return responses.forbidden('Verify your password and email.');
-          }
-          return responses.badRequest('Unable to validate user.');
+          };
+        } 
+        catch (err) {
+          throw new Error(err.statusCode)
         }
       }
 
-    static checkPermission = (permission: string) => {
+    checkPermission = (permission: string) => {
         return (req: Request, res: Response, next: NextFunction) => {
             const userId = res.getHeader("userId") as string;
 
@@ -89,4 +88,5 @@ class AuthMiddleware {
     };
 }
 
-export default AuthMiddleware;
+const authMiddleware = new AuthMiddleware()
+export default authMiddleware;

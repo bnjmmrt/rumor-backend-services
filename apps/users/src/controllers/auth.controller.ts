@@ -127,9 +127,15 @@ export class AuthController {
 
   public static validate = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: ValidateRequestDto = req.body;
-      const response: any = AuthMiddleware.validate(payload);
-      res.json(new CreateResponse(response));
+      const { userId }:any = req.user;
+      res.json(new CreateResponse(userId));
+    }
+  );
+
+  public static checkService = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: any = await AuthService.checkService();
+      res.json(response);
     }
   );
 

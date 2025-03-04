@@ -23,8 +23,10 @@ export class EventAnnouncementController {
       recipients: req.body.recipients,
       announcement: req.body.announcement,
       attachments: req.body.attachments,
-      createdBy:"e1c43ea3-1343-43a4-99fc-e02b7f8c4046"
+      createdBy: (req as any).user
     }
+    console.log("🚀 ~ EventAnnouncementController ~ postAnnouncement=asyncWrapper ~ payload:", payload)
+    
     const announcement = await EventAnnouncementService.postAnnouncement(payload)
     res.json(new CreateResponse(announcement));
   })

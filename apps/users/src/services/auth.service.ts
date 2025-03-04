@@ -64,6 +64,7 @@ import {
   UserResponseData,
   UserFilterOptionsResponse,
   customListData,
+  FocusProto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -150,8 +151,9 @@ import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
-import * as serviceMesh from 'rumor-utils/service-mesh';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
+
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -462,6 +464,14 @@ export class AuthService {
       return responses.badRequest('Unknown error occurred, please try again later.');
     }
   }
+
+  public static async checkService(){
+    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
+    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
+    let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
+    return response
+  }
+
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
     try {
@@ -1916,8 +1926,8 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses = [] // await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = [] // await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2616,8 +2626,8 @@ export class AuthService {
 
     const users = await Promise.all(
       allUsers.map(async (user) => {
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses = []//await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = []//await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {

@@ -6,6 +6,7 @@ import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
 import AuthMiddleware from '../server/middleware/auth';
+
 const router: Router = express.Router();
 
 // Admin routes
@@ -29,7 +30,11 @@ router.post('/auth/set-password', AuthController.setPassword);
 router.post('/auth/login', AuthController.login);
 
 // Auth Validator - For Inter Service Call
-router.post('/auth/validate', AuthController.validate);
+router.post('/auth/validate', AuthMiddleware.fusionAuthRequired, AuthController.validate);
+
+//Testing the interservice COmmunication
+router.get('/check-service-call', AuthController.checkService);
+
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthController.logout);

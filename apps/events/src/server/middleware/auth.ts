@@ -1,7 +1,8 @@
 import * as serviceMesh from 'rumor-utils/service-mesh';
 import { Request, Response, NextFunction } from 'express';
 import config from '../../config';
-
+import apiService from 'rumor-utils/service-mesh';
+import { AuthorizationError } from 'rumor-utils/errors';
 class AuthMiddleware {
     static fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
        
@@ -15,18 +16,18 @@ class AuthMiddleware {
             res.status(401).send("Unauthorized");
         }
         const token = tokenParts[1];
-        
-        const response = await serviceMesh.validate(config.get('USERS_SERVICE_BASE_URL'), token)
-        console.log("🚀 ~ AuthMiddleware ~ fusionAuthRequired= ~ response:", response)
 
-        if (!response || response.status !== 200 || !response.data.userId) {
-            res.status(401).send("Unauthorized");
+        apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+        
+        const response = await serviceMesh.validate();
+
+        if (!response || !response.data) {
+            throw new AuthorizationError('Authorization Error')
         }
 
-        // Simulating token validation
-        const userId = response.data.userId;
-        (req as any).userId = userId;
-
+        const userId = response.data;
+        (req as any).user = userId;
+        
         next();
     };
 }

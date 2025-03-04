@@ -10,6 +10,6 @@ export const sendTextMessage = (baseURL:string, phoneNumber: string, message: st
 
 export const sendEmailFromTemplate = (baseURL:string, dynamicData, template: string, to: string[], from?: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { dynamicData, template, to, from });
 
-export const getTemplateById = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/auth/validate`, { id });
+export const getTemplateById = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/auth/validate`);
 
 export const sendPushNotification = (baseURL:string, tokens: string[], title: string, body: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { tokens, title, body });
