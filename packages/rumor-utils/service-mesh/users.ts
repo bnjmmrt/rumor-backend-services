@@ -16,6 +16,8 @@ export const getRoleByName = (baseURL:string, name: string) => apiService.getApi
 
 export const getUserWithRolesByEmail = (baseURL:string, email: string) => apiService.getApi().get(`${baseURL}/users/${email}`);
 
+export const getUserWithRolesByPhone = (baseURL:string, phoneNumber: string) => apiService.getApi().get(`${baseURL}/users/${phoneNumber}`);
+
 export const createNonMemberUser = (baseURL:string, email?: string, phoneNumber?: string, firstName?: string, lastName?: string) => apiService.getApi().post(`${baseURL}/users`, { email, phoneNumber, firstName, lastName });
 
 export const assignRoleToUser = (baseURL:string, userId: string, roleName?: string, roleId?: string) => apiService.getApi().post(`${baseURL}/users/${userId}/roles`, { roleName, roleId });

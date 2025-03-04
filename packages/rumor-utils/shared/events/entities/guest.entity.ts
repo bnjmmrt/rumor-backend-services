@@ -67,7 +67,10 @@ export class Guest extends RumorBaseEntity {
   @JoinColumn({ name: 'ticket_type_id' })
   ticketType: TicketType;
 
-  @OneToOne(() => Ticket, (ticket) => ticket.guest)
+  @OneToOne(() => Ticket, (ticket) => ticket.guest, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   ticket: Ticket;
 
   @OneToMany(() => RestrictedInvites, (ri) => ri.guest, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })

@@ -83,6 +83,11 @@ export interface PaginatedRequest {
   query: string;
 }
 
+export interface RequestByUserAndEventRequest {
+  userId: string;
+  eventId: string;
+}
+
 /** Social Provider */
 export interface ProviderAuth {
   userId: string;
