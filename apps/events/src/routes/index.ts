@@ -4,6 +4,7 @@ import { EventAnnouncementController } from "../controllers/event-announcement.c
 import { SignupFormsController } from "../controllers/signup-forms.controller";
 import { GuestController } from "../controllers/guest.controller";
 import AuthMiddleware from '../server/middleware/auth';
+import { VouchRequestController } from "../controllers/vouch-request.controller";
 
 const router: Router = express.Router();
 
@@ -90,5 +91,12 @@ router.get("/events/:count/bulk-user", AuthMiddleware.fusionAuthRequired, GuestC
 router.get("/events/users/:id/events", GuestController.listGuestEvents)
 router.post("/events/request/bulk/guest", AuthMiddleware.fusionAuthRequired, GuestController.manageBulkGuests)
 router.get("/events/users-events-invitees/:id", GuestController.getUsersEventInvitees)
+
+//Vouches
+router.get('/events/vouch-requests', VouchRequestController.createVouchRequest);
+router.get('/events/vouch-requests', VouchRequestController.getAllVouchRequests);
+router.get('/events/vouch-requests/:id', VouchRequestController.updateVouchRequest);
+router.post('/events/user/:id/vouches', VouchRequestController.getUserVouches);
+router.post('/events/event/:id', VouchRequestController.getUserVouchesByEvent);
 
 export default router;

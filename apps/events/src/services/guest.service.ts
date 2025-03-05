@@ -40,11 +40,12 @@ import {
   InviteNewUserRequestDto,
   AcceptEventInvitationRequestDto,
 } from 'rumor-utils/shared/events/dtos/guest.dto';
-import { guestStatusToEntity, toGuest, toGuestData, toGuestDataSimple, toQuizData, toVouchesData } from 'rumor-utils/shared/events/mappers/guest.mapper';
+import { guestStatusToEntity, toAdditionalGuestData, toGuest, toGuestData, toGuestDataSimple, toQuizData, toVouchesData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import { parse, ParsedQs } from 'qs';
 import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { RequestByIdDto } from 'rumor-utils/shared/events/dtos';
 import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
+import {  Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils/event.utils';
@@ -54,10 +55,11 @@ import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.i
 import { GuestDataSimple, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
-import * as serviceMesh from 'rumor-utils/service-mesh';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { toSimpleUser } from 'rumor-utils/shared/users/mappers/auth.mapper';
+import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/shared/users/entities';
 
 export class GuestService {
   public static dbConnection = database;
@@ -89,7 +91,7 @@ export class GuestService {
     if (!event) return responses.badRequest('Event not found');
 
     // Fetch the host profile
-    const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.hostId);
+    const host = await serviceMesh.userService('token').getBasicHostProfile(payload.hostId)
     if (!host) return responses.badRequest('Host not found');
 
     // Normalize and validate guest status (convert to uppercase and check if it exists in GuestStatus)
@@ -223,10 +225,10 @@ export class GuestService {
         // Extract main guest IDs
         const fetchData = { userId: hostId, query: payload.query };
         // TO DO: ServiceMesh Changes
-        // const usersData = await serviceMesh.getAllUsers(config.get('API_BASE_URL'), userId);
-        // if (usersData.users.length === 0 || usersData.totalCount === 0) {
-        //   return responses.badRequest('Users data not found');
-        // }
+        const usersData = await (await serviceMesh.userService('token').getAllusers(payload.hostId)).data
+        if (usersData.users.length === 0 || usersData.totalCount === 0) {
+          return responses.badRequest('Users data not found');
+        }
         let userIds: string[]
         // = usersData.users.map((user) => user.id);
         if (exclusiveIds.length > 0) {
@@ -308,7 +310,7 @@ export class GuestService {
     if (!event) return responses.badRequest('Event not found');
 
     // Fetch host profile using the provided host ID
-    const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.hostId);
+    const host = await serviceMesh.userService().getBasicHostProfile(payload.hostId);
     if (!host) return responses.badRequest('Host not found');
 
     let ticketType = undefined;
@@ -337,7 +339,7 @@ export class GuestService {
       payload.users.map(async (userId) => {
         try {
           // Fetch user details using the auth client
-          const user = await serviceMesh.getCurrentUser(config.get('API_BASE_URL'), userId);
+          const user = (await serviceMesh.userService('token').getCurrentUser()).data;
           if (!user) return null;
 
           // Extract user data and email
@@ -361,7 +363,7 @@ export class GuestService {
             guest.event = event;
             guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
             guest.user = { id: userId } as User;
-            guest.addedBy = { id: host.id } as User;
+            guest.addedBy = { id: host.data.id } as User;
             guest.privateGuestNote = payload.privateGuestNote;
             guest.invitationSource = UserSource.INVITED_BY_HOST;
             guest.inviteMessage = payload.inviteMessage;
@@ -387,7 +389,7 @@ export class GuestService {
       //To Do: Change email and sms template
       await Promise.all(
         emails.map((email) =>
-          serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+          serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
         ),
       );
     }
@@ -396,7 +398,7 @@ export class GuestService {
     const guestsTransform = await Promise.all(
       validGuests.map(async (guest) => {
         length
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
         return toGuest(guest, focuses);
       }),
     );
@@ -524,7 +526,7 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map((email) =>
-            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
           )
         );
       }
@@ -534,7 +536,7 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           confirmedGuestsEmails.map((email) =>
-            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
           ),
         );
       }
@@ -544,7 +546,7 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           declinedGuestsEmails.map((email) =>
-            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
           ),
         );
       }
@@ -559,7 +561,7 @@ export class GuestService {
       // Fetch additional user-related data and map it into the response format
       const guestsTransform = await Promise.all(
         rowsUpdated.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -753,8 +755,8 @@ export class GuestService {
               where: { id: additionalGuest.user.id },
             });
             const [plusOnesFocuses, plusOnesInterests] = await Promise.all([
-              await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id),
-              await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id),
+              (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), user.id)).data,
+              (await serviceMesh.userService().getUserInterests(config.get('API_BASE_URL'), user.id)).data,
             ]);
             const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
               where: {
@@ -765,14 +767,14 @@ export class GuestService {
             const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
             const guestData = []
             // TO DO: Add this functionality
-            // toAdditionalGuestData(additionalGuest, plusOnesFocuses, plusOnesInterests);
+            toAdditionalGuestData(additionalGuest, plusOnesFocuses, plusOnesInterests);
             return { ...guestData, isBanned };
           }),
         );
         const [focuses, interests, vouches] = await Promise.all([
-          await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id),
-          await serviceMesh.getUserInterests(config.get('API_BASE_URL'), guest.user.id),
-          await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id),
+          (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data,
+          (await serviceMesh.userService().getUserInterests(config.get('API_BASE_URL'), guest.user.id)).data,
+          (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data,
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -813,207 +815,207 @@ export class GuestService {
     userSource,
   ) {
     // Apply search value filter
-    // if (searchValue) {
-    //   const searchWords = searchValue.trim().split(/\s+/);
-    //   queryBuilder.andWhere(
-    //     new Brackets((qb) => {
-    //       searchWords.forEach((word) => {
-    //         qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
-    //       });
-    //     }),
-    //   );
-    // }
+    if (searchValue) {
+      const searchWords = searchValue.trim().split(/\s+/);
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          searchWords.forEach((word) => {
+            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+          });
+        }),
+      );
+    }
 
-    // if (Object.keys(socialNetworkObject).length > 0) {
-    //   const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
-    //     const columnName = `${networkKey.toLowerCase()}FollowersCount`;
-    //     return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
-    //   });
+    if (Object.keys(socialNetworkObject).length > 0) {
+      const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+        const columnName = `${networkKey.toLowerCase()}FollowersCount`;
+        return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+      });
 
-    //   queryBuilder.andWhere(
-    //     new Brackets((qb) => {
-    //       qb.where(socialConditions.join(' OR '), {
-    //         followerCountFrom: followerCountFrom || 0,
-    //         followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
-    //       });
-    //     }),
-    //   );
-    // }
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where(socialConditions.join(' OR '), {
+            followerCountFrom: followerCountFrom || 0,
+            followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+          });
+        }),
+      );
+    }
 
-    // if (favorite || followed || customListNames.length > 0) {
-    //   queryBuilder.andWhere(
-    //     new Brackets((qb) => {
-    //       if (favorite) {
-    //         qb.orWhere((subQb) => {
-    //           const subQuery = subQb
-    //             .subQuery()
-    //             .select('hostFavorite.member.id')
-    //             .from(HostFavorite, 'hostFavorite')
-    //             .where('hostFavorite.host.id = :hostId', { hostId: payload.hostId })
-    //             .getQuery();
-    //           return `user.id IN ${subQuery}`;
-    //         });
-    //       }
-    //       if (followed) {
-    //         qb.orWhere((subQb) => {
-    //           const subQuery = subQb
-    //             .subQuery()
-    //             .select('hostFollow.follower.id')
-    //             .from(HostFollowing, 'hostFollow')
-    //             .where('hostFollow.host.id = :hostId', { hostId: payload.hostId })
-    //             .getQuery();
-    //           return `user.id IN ${subQuery}`;
-    //         });
-    //       }
-    //       if (customListNames.length > 0) {
-    //         qb.orWhere((subQb) => {
-    //           const subQuery = subQb
-    //             .subQuery()
-    //             .select('listUsers.id')
-    //             .from(HostCustomUsersLists, 'customList')
-    //             .innerJoin('customList.users', 'listUsers')
-    //             .where('customList.listName IN (:...customListNames)', { customListNames })
-    //             .andWhere('customList.host.id = :hostId', { hostId: payload.hostId })
-    //             .getQuery();
-    //           return `user.id IN ${subQuery}`;
-    //         });
-    //       }
-    //     }),
-    //   );
-    // }
+    if (favorite || followed || customListNames.length > 0) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          if (favorite) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFavorite.member.id')
+                .from(HostFavorite, 'hostFavorite')
+                .where('hostFavorite.host.id = :hostId', { hostId: payload.hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (followed) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFollow.follower.id')
+                .from(HostFollowing, 'hostFollow')
+                .where('hostFollow.host.id = :hostId', { hostId: payload.hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (customListNames.length > 0) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('listUsers.id')
+                .from(HostCustomUsersLists, 'customList')
+                .innerJoin('customList.users', 'listUsers')
+                .where('customList.listName IN (:...customListNames)', { customListNames })
+                .andWhere('customList.host.id = :hostId', { hostId: payload.hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+        }),
+      );
+    }
 
-    // // Apply focuses filter
-    // if (focuses && typeof focuses === 'string') {
-    //   const focusIds = focuses.split(',').map((id) => id.trim());
-    //   queryBuilder.andWhere((qb) => {
-    //     const subQuery = qb
-    //       .subQuery()
-    //       .select('focus_users_user.userId')
-    //       .from('focus_users_user', 'focus_users_user')
-    //       .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
-    //       .getQuery();
-    //     return `user.id IN ${subQuery}`;
-    //   });
-    // }
+    // Apply focuses filter
+    if (focuses && typeof focuses === 'string') {
+      const focusIds = focuses.split(',').map((id) => id.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('focus_users_user.userId')
+          .from('focus_users_user', 'focus_users_user')
+          .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
 
-    // // Apply interests filter
-    // if (interest && typeof interest === 'string') {
-    //   const interestFilter = interest.split(',').map((interestName) => interestName.trim());
-    //   queryBuilder.andWhere((qb) => {
-    //     const subQuery = qb
-    //       .subQuery()
-    //       .select('interest_users_user.userId')
-    //       .from('interest_users_user', 'interest_users_user')
-    //       .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
-    //       .getQuery();
-    //     return `user.id IN ${subQuery}`;
-    //   });
-    // }
+    // Apply interests filter
+    if (interest && typeof interest === 'string') {
+      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('interest_users_user.userId')
+          .from('interest_users_user', 'interest_users_user')
+          .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
 
-    // // Apply gender filter
-    // if (gender && typeof gender === 'string') {
-    //   const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
-    //   const validGenders = Object.values(Gender) as string[];
-    //   const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
-    //   if (filteredGenders.length > 0) {
-    //     queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
-    //   }
-    // }
+    // Apply gender filter
+    if (gender && typeof gender === 'string') {
+      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const validGenders = Object.values(Gender) as string[];
+      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      if (filteredGenders.length > 0) {
+        queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
+      }
+    }
 
-    // // Apply baseCity filter
-    // if (baseCity && typeof baseCity === 'string') {
-    //   const placeIds = baseCity.split(',').map((id) => id.trim());
-    //   if (placeIds.length > 0) {
-    //     queryBuilder.andWhere((qb) => {
-    //       const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
-    //       return `user.address_id IN ${subQuery}`;
-    //     });
-    //   }
-    // }
+    // Apply baseCity filter
+    if (baseCity && typeof baseCity === 'string') {
+      const placeIds = baseCity.split(',').map((id) => id.trim());
+      if (placeIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+          return `user.address_id IN ${subQuery}`;
+        });
+      }
+    }
 
-    // // Apply age filter
-    // if (parsedQuery.ageFrom || parsedQuery.ageTo) {
-    //   const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
-    //   const ageTo =
-    //     parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
-    //   const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
-    //   const conditions: string[] = [`${ageQuery} >= :ageFrom`];
-    //   if (ageTo !== null) {
-    //     conditions.push(`${ageQuery} <= :ageTo`);
-    //   }
-    //   queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
-    // }
+    // Apply age filter
+    if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
+      const ageTo =
+        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
+      const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+      const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+      if (ageTo !== null) {
+        conditions.push(`${ageQuery} <= :ageTo`);
+      }
+      queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    }
 
-    // // Apply ticket type filter
+    // Apply ticket type filter
 
-    // if (ticketType) {
-    //   const ticketTypes = typeof ticketType === 'string' ? ticketType.split(',') : ticketType;
-    //   queryBuilder.andWhere('guest.ticketType.id IN (:...ticketTypes)', { ticketTypes });
-    // }
+    if (ticketType) {
+      const ticketTypes = typeof ticketType === 'string' ? ticketType.split(',') : ticketType;
+      queryBuilder.andWhere('guest.ticketType.id IN (:...ticketTypes)', { ticketTypes });
+    }
 
-    // // Apply partySize filter
+    // Apply partySize filter
 
-    // if (partySize) {
-    //   queryBuilder.andWhere('guest.maxAdditionalGuests + 1 = :partySize', { partySize: partySize });
-    // }
+    if (partySize) {
+      queryBuilder.andWhere('guest.maxAdditionalGuests + 1 = :partySize', { partySize: partySize });
+    }
 
-    // // Apply vouch filter
-    // if (vouch) {
-    //   const vouchFilters = typeof vouch === 'string' ? vouch.split(',') : vouch;
-    //   if (vouchFilters.includes('hasVouches')) {
-    //     queryBuilder.andWhere('vouchRequest.event_id = :eventId', { eventId: event.id }).andWhere('vouchRequest.user_id = user.id');
-    //   }
-    //   if (vouchFilters.includes('hasNoVouches')) {
-    //     queryBuilder.andWhere('NOT EXISTS (SELECT 1 FROM vouch_request v WHERE v.event_id = :eventId AND v.user_id = user.id)', { eventId: event.id });
-    //   }
-    // }
+    // Apply vouch filter
+    if (vouch) {
+      const vouchFilters = typeof vouch === 'string' ? vouch.split(',') : vouch;
+      if (vouchFilters.includes('hasVouches')) {
+        queryBuilder.andWhere('vouchRequest.event_id = :eventId', { eventId: event.id }).andWhere('vouchRequest.user_id = user.id');
+      }
+      if (vouchFilters.includes('hasNoVouches')) {
+        queryBuilder.andWhere('NOT EXISTS (SELECT 1 FROM vouch_request v WHERE v.event_id = :eventId AND v.user_id = user.id)', { eventId: event.id });
+      }
+    }
 
-    // // Apply declinedBy filter
-    // if (declinedBy) {
-    //   const declinedByFilters = typeof declinedBy === 'string' ? declinedBy.split(',') : declinedBy;
-    //   if (declinedByFilters.includes('declinedByCollaborator')) {
-    //     queryBuilder.leftJoin('Collaborator', 'collaborator1', 'collaborator1.user_id = guest.declinedBy.id').andWhere('collaborator1.user_id IS NOT NULL');
-    //   }
-    //   if (declinedByFilters.includes('declinedByUser')) {
-    //     queryBuilder
-    //       .leftJoin('Collaborator', 'collaborator2', 'collaborator2.user_id = guest.declinedBy.id')
-    //       .andWhere('collaborator2.user_id IS NULL')
-    //       .andWhere('guest.declinedBy.id != :hostId', { hostId: payload.hostId });
-    //   }
-    // }
+    // Apply declinedBy filter
+    if (declinedBy) {
+      const declinedByFilters = typeof declinedBy === 'string' ? declinedBy.split(',') : declinedBy;
+      if (declinedByFilters.includes('declinedByCollaborator')) {
+        queryBuilder.leftJoin('Collaborator', 'collaborator1', 'collaborator1.user_id = guest.declinedBy.id').andWhere('collaborator1.user_id IS NOT NULL');
+      }
+      if (declinedByFilters.includes('declinedByUser')) {
+        queryBuilder
+          .leftJoin('Collaborator', 'collaborator2', 'collaborator2.user_id = guest.declinedBy.id')
+          .andWhere('collaborator2.user_id IS NULL')
+          .andWhere('guest.declinedBy.id != :hostId', { hostId: payload.hostId });
+      }
+    }
 
-    // // Apply spam filter
+    // Apply spam filter
 
-    // if (spam) {
-    //   const spamFilters = typeof spam === 'string' ? spam.split(',') : spam;
-    //   const isSpammedSelected = spamFilters.includes('isSpammed');
-    //   const isNotSpammedSelected = spamFilters.includes('isNotSpammed');
+    if (spam) {
+      const spamFilters = typeof spam === 'string' ? spam.split(',') : spam;
+      const isSpammedSelected = spamFilters.includes('isSpammed');
+      const isNotSpammedSelected = spamFilters.includes('isNotSpammed');
 
-    //   if (isSpammedSelected || isNotSpammedSelected) {
-    //     queryBuilder.andWhere(
-    //       new Brackets((qb) => {
-    //         if (isSpammedSelected) qb.orWhere('hostUserSettings.isSpam = true');
-    //         if (isNotSpammedSelected) qb.orWhere('hostUserSettings.isSpam = false').orWhere('hostUserSettings.user IS NULL');
-    //       }),
-    //     );
-    //   }
-    // }
+      if (isSpammedSelected || isNotSpammedSelected) {
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            if (isSpammedSelected) qb.orWhere('hostUserSettings.isSpam = true');
+            if (isNotSpammedSelected) qb.orWhere('hostUserSettings.isSpam = false').orWhere('hostUserSettings.user IS NULL');
+          }),
+        );
+      }
+    }
 
-    // // Apply invitationSource filter
-    // if (userSource) {
-    //   const userSourceFilters = typeof userSource === 'string' ? userSource.split(',') : [];
-    //   if (userSourceFilters.length > 0) {
-    //     queryBuilder.andWhere(
-    //       new Brackets((qb) => {
-    //         userSourceFilters.forEach((source, index) => {
-    //           qb.orWhere('guest.invitationSource = :source' + index, { ['source' + index]: UserSource[source] });
-    //         });
-    //       }),
-    //     );
-    //   }
-    // }
+    // Apply invitationSource filter
+    if (userSource) {
+      const userSourceFilters = typeof userSource === 'string' ? userSource.split(',') : [];
+      if (userSourceFilters.length > 0) {
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            userSourceFilters.forEach((source, index) => {
+              qb.orWhere('guest.invitationSource = :source' + index, { ['source' + index]: UserSource[source] });
+            });
+          }),
+        );
+      }
+    }
 
-    // return queryBuilder;
+    return queryBuilder;
   }
 
   public static async deleteGuests(payload: GuestsRequestDto): Promise<GenericResponse> {
@@ -1113,7 +1115,7 @@ export class GuestService {
       });
       const guestsTransform = await Promise.all(
         guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -1245,7 +1247,7 @@ export class GuestService {
 
       const guestsTransform = await Promise.all(
         guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -1330,14 +1332,14 @@ export class GuestService {
       }),
     );
 
-    const focuses = await this.platformClient.getUserFocuses(guest.user.id, this.logger);
+    const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
     return responses.data(toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData));
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
       const { userId, query: initialQuery } = payload;
       const parsedQuery = parse(initialQuery) as ParsedQs;
-      const user = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), userId);
+      const user = await serviceMesh.userService().getBasicHostProfile(userId);
       if (!user) return responses.notFound('User is not a host.');
       let usersQuery = initialQuery;
       if (parsedQuery.eventId) {
@@ -1377,7 +1379,7 @@ export class GuestService {
         }
       }
 
-      const users = await serviceMesh.getMembersOrNonMembers(config.get('API_BASE_URL'), userId, usersQuery);
+      const users = (await serviceMesh.userService().getMembersOrNonMembers(userId, usersQuery)).data;
       const inviteesDataList = {
         data: await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus)),
       };
@@ -1780,7 +1782,7 @@ export class GuestService {
         return responses.notFound('Event not found');
       }
 
-      const user = await serviceMesh.getUser(config.get('API_BASE_URL'), payload.id);
+      const user = await serviceMesh.userService().getUser(config.get('API_BASE_URL'), payload.id);
 
       if (!user) {
         return responses.notFound('User not found');
@@ -1788,7 +1790,7 @@ export class GuestService {
 
       const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
-          user: { id: user.id },
+          user: { id: user.data.id },
           event: { id: payload.eventId },
         },
       });
@@ -1806,7 +1808,7 @@ export class GuestService {
         payload.answers.map(async (item) => {
           let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
             where: {
-              user: { id: user.id },
+              user: { id: user.data.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               deletedAt: null,
@@ -1815,7 +1817,7 @@ export class GuestService {
 
           if (!actualAnswer) {
             actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-              user: { id: user.id },
+              user: { id: user.data.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               answer: item?.answer || '',
@@ -1828,7 +1830,7 @@ export class GuestService {
 
       const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
-          user: { id: user.id },
+          user: { id: user.data.id },
           event: { id: payload.eventId },
         },
         relations: { question: true },
@@ -1844,7 +1846,7 @@ export class GuestService {
 
       const guest = new Guest();
       guest.event = event;
-      guest.user = { id: user.id };
+      guest.user = { id: user.data.id };
       guest.status = GuestStatus.APPLIED;
       guest.additionalRequestedGuests = payload.additionalGuests;
       guest.invitationSource = UserSource.REQUEST_IN_APP;
@@ -1866,7 +1868,7 @@ export class GuestService {
         return responses.notFound('Event not found');
       }
 
-      const user = await serviceMesh.getUser(config.get('API_BASE_URL'), payload.id);
+      const user = await serviceMesh.userService().getUser(config.get('API_BASE_URL'), payload.id);
 
       if (!user) {
         return responses.notFound('User not found');
@@ -1874,7 +1876,7 @@ export class GuestService {
 
       const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
-          user: { id: user.id },
+          user: { id: user.data.id },
           event: { id: payload.eventId },
         },
       });
@@ -1898,7 +1900,7 @@ export class GuestService {
         payload.answers.map(async (item) => {
           let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
             where: {
-              user: { id: user.id },
+              user: { id: user.data.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               deletedAt: null,
@@ -1907,7 +1909,7 @@ export class GuestService {
 
           if (!actualAnswer) {
             actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-              user: { id: user.id },
+              user: { id: user.data.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               answer: item?.answer || '',
@@ -1920,7 +1922,7 @@ export class GuestService {
 
       const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
-          user: { id: user.id },
+          user: { id: user.data.id },
           event: { id: payload.eventId },
         },
         relations: { question: true },
@@ -1953,7 +1955,7 @@ export class GuestService {
 
       const topAttendees = await Promise.all(
         users.map(async (user) => {
-          const socialStats = await serviceMesh.syncSocialStats(config.get('API_BASE_URL'), user.user_id);
+          const socialStats = await serviceMesh.userService().syncSocialStats(config.get('API_BASE_URL'), user.user_id);
           return {
             id: user.user_id,
             firstName: user.first_name,
@@ -1979,7 +1981,7 @@ export class GuestService {
           userAttendeeStats.linkedinFollowersCount = 0;
           userAttendeeStats.xFollowersCount = 0;
           userAttendeeStats.snapchatFollowersCount = 0;
-          attendee.socialStats.forEach((stat) => {
+          attendee.socialStats.data.forEach((stat) => {
             switch (stat.socialProviderType) {
               case ProviderType.FACEBOOK:
                 userAttendeeStats.facebookFollowersCount = stat.followersCount;
@@ -2135,9 +2137,9 @@ export class GuestService {
     let checkUser;
     // Step 5: Check if the guest exists by email or phone number
     if (payload.email) {
-      checkUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+      checkUser = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
     } else if (payload.phoneNumber) {
-      checkUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
+      checkUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
       checkUser = checkUser ? { ...checkUser, phoneNumber: payload.phoneNumber } : null;
     } else {
       return responses.badRequest('Phone number or email is required');
@@ -2195,7 +2197,7 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     } else {
       // Step 8: Register non-member guest if they do not exist
-      const member: SimpleUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), payload);
+      const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(payload)).data;
       const user: User = {
         id: member.id,
         firstName: member.firstName,
@@ -2216,7 +2218,7 @@ export class GuestService {
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
     if (payload.email) {
-      await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+      await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
         [{ key: 'first_name', value: payload?.firstName || '' }],
         'Host Application Submitted',
         [payload.email],
@@ -2224,7 +2226,7 @@ export class GuestService {
       );
     } else if (payload.phoneNumber) {
       const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+      const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
       if (!success) {
         return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
       }
@@ -2295,9 +2297,9 @@ export class GuestService {
         // Step 5: Check if user exists by email or phone
         let checkUser = null;
         if (guestPayload.email) {
-          checkUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), guestPayload.email);
+          checkUser = await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email);
         } else if (guestPayload.phoneNumber) {
-          checkUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), guestPayload.phoneNumber);
+          checkUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), guestPayload.phoneNumber);
           if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
         } else {
           return responses.badRequest('Phone number or email is required');
@@ -2335,8 +2337,8 @@ export class GuestService {
           });
         } else {
           // Step 7: Register non-member guest
-          const newUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), guestPayload);
-          guest = await this.dbConnection.getRepository(Guest).create({
+          const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(guestPayload)).data;
+          guest = this.dbConnection.getRepository(Guest).create({
             event: { id: guestPayload.eventId } as Event,
             user: newUser,
             status,
@@ -2349,7 +2351,7 @@ export class GuestService {
         // Step 8: Send invitation (email or SMS)
         // TO DO: Change email and sms template
         if (guestPayload.email) {
-          await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+          await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
             [{ key: 'first_name', value: guestPayload?.firstName || '' }],
             'Host Application Submitted',
             [guestPayload.email],
@@ -2357,7 +2359,7 @@ export class GuestService {
           );
         } else if (guestPayload.phoneNumber) {
           const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-          const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), guestPayload.phoneNumber, message);
+          const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), guestPayload.phoneNumber, message);
           if (!success) return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
         }
 
@@ -2419,7 +2421,7 @@ export class GuestService {
       // Step 4: Fetch existing users based on extracted emails
       const existingUsers = await Promise.all(
         emails.map(async (email) => {
-          const data = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), email);
+          const data = (await serviceMesh.userService().getUserWithRolesByEmail(email)).data;
           return data;
         }),
       );
@@ -2480,14 +2482,14 @@ export class GuestService {
         await Promise.all(
           updatedValidData.map(async (row: User) => {
             if (row.email && row.firstName && row.lastName) {
-              const user = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'),
+              const user = await serviceMesh.userService().registerInvitesAsNonMember(
                 {
                   ...row,
                   eventId: payload.eventId,
                   userId: payload.hostId,
                 }
               );
-              users.push(user);
+              users.push(user.data);
             }
           }),
         );
@@ -2631,7 +2633,7 @@ export class GuestService {
       if (!event) return responses.badRequest('Event not found');
 
       // Step 2: Verify the existence of the host
-      const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.userId);
+      const host = (await serviceMesh.userService().getBasicHostProfile(payload.userId)).data;
       if (!host) return responses.badRequest('Host not found');
 
       if (!payload.email && !payload.phoneNumber) {
@@ -2659,10 +2661,10 @@ export class GuestService {
       let checkExistingUser;
       // Step 6: Check if the user already exists in the system
       if (payload.email && !payload.phoneNumber) {
-        checkExistingUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+        checkExistingUser = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
         if (checkExistingUser) return responses.badRequest('User already exists');
       } else if (payload.phoneNumber && !payload.email) {
-        checkExistingUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
+        checkExistingUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
         if (checkExistingUser) return responses.badRequest('User already exists');
       }
 
@@ -2678,7 +2680,7 @@ export class GuestService {
           email: email || '',
           phoneNumber: phoneNumber || '',
         }))(payload);
-        const member: SimpleUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), memberPayload);
+        const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
 
         // Step 8: Create and save the guest record
         guest = this.dbConnection.getRepository(Guest).create({
@@ -2699,7 +2701,7 @@ export class GuestService {
       // Step 9: Send invite email or sms if required
       // TO DO: Change email and sms template
       if (payload.email) {
-        await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+        await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
           [{ key: 'first_name', value: payload?.firstName || '' }],
           'Host Application Submitted',
           [payload.email],
@@ -2707,7 +2709,7 @@ export class GuestService {
         );
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-        const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+        const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
         if (!success) {
           return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
         }
@@ -2730,8 +2732,8 @@ export class GuestService {
         .limit(1);
 
       const checkGuest = await queryBuilder.getOne();
-      const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
+      const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data
+      const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
       const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
           user: { id: guest.user.id },
@@ -2824,8 +2826,8 @@ export class GuestService {
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
       guests.map(async (guest) => {
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-        const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
+        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+        const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
         const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
           where: {
             user: { id: guest.user.id },
@@ -2876,8 +2878,8 @@ export class GuestService {
   
         const guest = await queryBuilder.getOne();
   
-        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-        const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
+        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+        const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
         const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
           where: {
             user: { id: guest.user.id },
@@ -2932,7 +2934,7 @@ export class GuestService {
           await this.dbConnection.getRepository(Guest).save(guest);
 
           if (payload.isSpam && guest.user) {
-            await serviceMesh.markUserAsSpam(config.get('API_BASE_URL'), guest.user.id);
+            await serviceMesh.userService().markUserAsSpam(config.get('API_BASE_URL'), guest.user.id);
           }
 
           return true;
@@ -2946,7 +2948,7 @@ export class GuestService {
       return responses.ok;
   }
 
-  public static async getGuestDetails(payload: RequestByIdDto): Promise<GuestDetailsResponse> {
+  public static async getGuestDetails(payload: UserAndIdRequestDto): Promise<GuestDetailsResponse> {
       if (!payload.id) return responses.badRequest('Invalid guest ID provided');
       const guestProfileResponse = await this.getGuestProfile(payload);
       const { error, data: guestProfile } = guestProfileResponse;
@@ -2964,7 +2966,7 @@ export class GuestService {
       const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
 
       const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
-      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id);
+      const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id)).data;
 
       const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
