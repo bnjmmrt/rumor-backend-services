@@ -6,8 +6,8 @@ import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
 import AuthMiddleware from '../server/middleware/auth';
-import { PlatformController } from 'src/controllers/platform.controller';
-import { ReferralRequestController } from 'src/controllers/referral-request.controller';
+import { PlatformController } from '../controllers/platform.controller';
+import { ReferralRequestController } from '../controllers/referral-request.controller';
 
 const router: Router = express.Router();
 
