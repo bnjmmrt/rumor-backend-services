@@ -120,8 +120,6 @@ export class Event extends RumorBaseEntity {
     onDelete: 'SET NULL',
   })
   featuredEventSection: FeaturedEventSection;
-  @Column({ type: 'varchar', nullable: true, name: 'timezone' })
-  timeZone?: string;
 
   @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.event)
   csvUploads: CsvUploadRecords[];
