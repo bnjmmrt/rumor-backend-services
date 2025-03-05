@@ -42,7 +42,7 @@ export const getUserInterests = (id: string) => apiService.getApi().get(`/auth/u
 
 export const getVouchRequests = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/users/${id}/vouch-requests`);
 
-export const getUserVouches = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/users/${id}/vouches`);
+export const getUserVouches = (id: string) => apiService.getApi().get(`/events/user/${id}/vouches`);
 
 export const syncSocialStats = (baseURL:string, userId: string) => apiService.getApi().post(`${baseURL}/users/${userId}/sync-social-stats`);
 

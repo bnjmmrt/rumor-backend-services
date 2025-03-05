@@ -148,7 +148,7 @@ export class AuthController {
 
   public static validate = asyncWrapper(
     async (req, res): Promise<void> => {
-      const { userId }:any = req.user;
+      const userId: any = req.user;
       res.json(new CreateResponse(userId));
     }
   );
