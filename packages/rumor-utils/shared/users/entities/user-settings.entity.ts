@@ -41,6 +41,8 @@ export class UserSettings extends RumorBaseEntity {
   })
   currentTimeSetDuration: Date;
 
+  // Using below entries
+
   @Column({ type: 'boolean', name: 'enable_sms_notification', default: true })
   enableSmsNotifications: boolean;
 

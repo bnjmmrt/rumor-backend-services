@@ -173,4 +173,8 @@ router.put("/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralR
 router.get("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
 router.get("/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
 
+
+router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );
+router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings );
+
 export default router;

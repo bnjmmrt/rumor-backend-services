@@ -14,6 +14,7 @@ import { EventStatusEnum } from '../interfaces/event.interface';
 import { Ticket } from './ticket.entity';
 import { FeaturedEventSection } from './featured-event-section.entity';
 import { EventSignupForms } from './event-signup-forms.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
 import { CsvUploadRecords } from './csv-upload-records.entity';
 import { RestrictedInvites } from './restricted-invites.entity';
 
@@ -36,7 +37,6 @@ export class Event extends RumorBaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true, name: 'end_date' })
   endDate?: Date;
-
 
   @Column({ type: "varchar", nullable: true, name: "timezone" })
   timeZone?: string;
@@ -126,4 +126,7 @@ export class Event extends RumorBaseEntity {
 
   @OneToMany(() => EventSignupForms, (esf) => esf.event)
   signupForms: EventSignupForms[];
+
+  @OneToMany(() => Notification, (notification) => notification.linkedEvent)
+  notifications: Notification[];
 }
