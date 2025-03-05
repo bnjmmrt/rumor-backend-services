@@ -41,4 +41,12 @@ export const responses = {
     error: null,
     data: data,
   }),
+
+  verification: (verified: boolean) => ({
+    status: StatusCodes.OK,
+    error: undefined,
+    data: {
+      verified,
+    },
+  }),
 };

@@ -4,8 +4,8 @@ import * as notificationsServiceMesh from 'rumor-utils/service-mesh/notification
 import apiService from 'rumor-utils/service-mesh/';
 
 class start {
-    userService(){
-        apiService.initialize(config.get('USERS_SERVICE_BASE_URL'))
+    userService(token?: string){
+        apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token)
         return usersServiceMesh; 
     }
 
