@@ -178,11 +178,19 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
   };
 };
 
-export const toGuestDataSimple = (guest: GuestEntity, focuses: FocusProto[], invitedGuests: GuestDataSimple[] = []): GuestDataSimple => {
+export const toGuestDataSimple = (
+  guest: GuestEntity,
+  focuses: FocusProto[],
+  isRestricted: boolean = false,
+  restrictedId?: string,
+  invitedGuests: GuestDataSimple[] = [],
+): GuestDataSimple => {
   const user = guest.user;
   const roleInfo = user.roles?.find((item) => item.role.name === 'member' || item.role.name === 'non_member');
   const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
   const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
 
   return {
     id: guest.id,
@@ -192,18 +200,18 @@ export const toGuestDataSimple = (guest: GuestEntity, focuses: FocusProto[], inv
     profilePicture: user.profilePicture || '',
     status: roleInfo?.status ? GuestStatus[roleInfo?.status] : GuestStatus.NO_STATUS,
     source: roleInfo?.source || '',
-    guestStatus: guest.status,
-    guestId: guest.id,
+    guestStatus: isRestricted ? GuestStatus.DECLINED : guest.status,
+    guestId: isRestricted && restrictedId ? restrictedId : guest.id,
     username: user.username || '',
     ticketType: guest.ticketType?.name,
     numberAdditionalGuests: guest.maxAdditionalGuests,
     category: focuses.map((focus) => focus.name),
-    checkIn: false,
+    checkIn: guest.checkIn,
     phoneNumber: user.phoneNumber,
     age: calculateAge(user.dateOfBirth),
     addedBy,
     addedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    invitationSource: invitationSourceNumber,
     userId: user.id,
     invitees: invitedGuests,
     maxAdditionalGuests: guest.maxAdditionalGuests,

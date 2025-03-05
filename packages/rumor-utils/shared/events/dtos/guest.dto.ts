@@ -114,6 +114,10 @@ export class AddGuestsRequestDto implements AddGuestsRequest {
 }
 
 export class UpdateGuestsRequestDto implements UpdateGuestsRequest {
+  @IsString()
+  @IsOptional()
+  hostId?: string;
+
   @IsArray()
   @IsNotEmpty()
   guests: string[];

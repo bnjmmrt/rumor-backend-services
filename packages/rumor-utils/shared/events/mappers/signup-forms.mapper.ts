@@ -22,8 +22,9 @@ export const buildSignupFormsResponse = (
     id: esf.id,
     name: event.name,
     startDate: event.startDate.toString() || new Date().toString(),
+    endDate: event.endDate.toString() || new Date().toString(),
     address: event.location,
-    timeZone: "", //event.timezone,
+    timeZone: event.timeZone,
     type: event.eventType?.name,
     ageLimit: event.ageLimit,
     talents: event.talents,
@@ -40,7 +41,12 @@ export const buildSignupFormsResponse = (
     questions:
       (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
+    eventStatus: event.status
   };
+  result.questions &&
+    result.questions.sort((a, b) => {
+      return a.ordering > b.ordering ? 1 : a.ordering == b.ordering ? 0 : -1;
+    });
   return result;
 };
 
@@ -51,5 +57,6 @@ const buildQuestion = (q: SignupFormQuestions) => {
     isDefault: q.isDefault,
     name: q.name,
     ordering: q.ordering,
+    value: q.value
   };
 };

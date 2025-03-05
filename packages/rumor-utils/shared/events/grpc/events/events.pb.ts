@@ -473,6 +473,7 @@ export interface GuestsRequest {
 
 /** Update Guests Request */
 export interface UpdateGuestsRequest {
+  hostId?: string | undefined;
   guests: string[];
   ticketTypeId?: string | undefined;
   maxAdditionalGuests?: number | undefined;

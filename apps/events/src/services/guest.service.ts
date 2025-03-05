@@ -8,12 +8,16 @@ import {
   ListEventGuestsResponse,
   ListUsersEventInviteesResponse,
   UsersAttendeesResponse,
+  BulkUploadGuestsResponse,
+  FetchBulkGuestsResponse,
+  GetAttendeeCountRequest,
+  GetAttendeeCountResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
 import { responses } from '../common/responses';
 import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
-import { Event, Guest, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
-import { EventLocationInterface, EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
+import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
 
 import {
   AddGuestsRequestDto,
@@ -29,12 +33,18 @@ import {
   RequestBecomeGuestRequestDto,
   UpdateGuestsRequestDto,
   UpdateRequestBecomeGuestRequestDto,
+  ManageGuestsRequestDto,
+  InvitedGuestsRequestDto,
+  BulkUploadGuestsRequestDto,
+  FetchBulkGuestsRequestDto,
+  InviteNewUserRequestDto,
+  AcceptEventInvitationRequestDto,
 } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { guestStatusToEntity, toGuest, toGuestData, toGuestDataSimple, toQuizData, toVouchesData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import { parse, ParsedQs } from 'qs';
-import { hasPagination } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { RequestByIdDto } from 'rumor-utils/shared/events/dtos';
-import { Member, SimpleUser } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
+import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils/event.utils';
@@ -45,6 +55,9 @@ import { GuestDataSimple, UserSource } from 'rumor-utils/shared/events/grpc/even
 import database from '../database';
 import config from '../config';
 import * as serviceMesh from 'rumor-utils/service-mesh';
+import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { toSimpleUser } from 'rumor-utils/shared/users/mappers/auth.mapper';
 
 export class GuestService {
   public static dbConnection = database;
@@ -57,88 +70,542 @@ export class GuestService {
     });
   }
 
-  public static async addGuests(payload: AddGuestsRequestDto): Promise<void> {
-    // try {
-    //   const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-    //   if (!event) return responses.badRequest('Event not found');
+  /**
+ * Manages guests for an event based on the provided action.
+ *
+ * This function:
+ * - Validates the event and host.
+ * - Ensures guest status and action are valid.
+ * - Handles guest creation, updates, and deletions based on action type.
+ * - Calls `fetchGuestsOperation` to get the list of guests.
+ * - Calls appropriate functions to modify guest data.
+ * - Returns success or error responses based on the operation.
+ */
+  public static async manageGuests(payload: ManageGuestsRequestDto): Promise<GenericResponse> {
+    const parsedQuery = parse(payload.query);
+    const eventId = parsedQuery?.eventId as string;
+    // Fetch the event by its ID
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
+    if (!event) return responses.badRequest('Event not found');
 
-    //   const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'),payload.hostId);
-    //   if (!host) return responses.badRequest('Host not found');
+    // Fetch the host profile
+    const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.hostId);
+    if (!host) return responses.badRequest('Host not found');
 
-    //   let ticketType = undefined;
-    //   if (payload.ticketTypeId) {
-    //     ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+    // Normalize and validate guest status (convert to uppercase and check if it exists in GuestStatus)
+    const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+    if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) return responses.badRequest('Invalid Guest status');
 
-    //     if (!ticketType) return responses.badRequest('Ticket type not found');
-    //   }
+    // Normalize and validate action (convert to uppercase and check if it exists in ManageGuestsAction)
+    const action = payload.action ? payload.action.toString().trim().toUpperCase() : undefined;
+    if (action && !Object.keys(ManageGuestsAction).includes(action)) return responses.badRequest('Invalid action for managing guest status');
 
-    //   const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+    // Extract relevant fields from payload
+    const { hostId, ticketTypeId, maxAdditionalGuests, inviteMessage, privateGuestNote, sendNotification } = payload;
 
-    //   if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
-    //     return responses.badRequest('Invalid guest status');
-    //   }
+    // Handle different actions for managing guests
+    switch (action) {
+      case ManageGuestsAction.CREATE:
+        // Only allow certain guest statuses for creation
+        if (guestStatus && (guestStatus === GuestStatus.DRAFT || guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED)) {
+          // Fetch guests based on the provided filters
+          const data = await this.getFilteredGuestIds(payload);
 
-    //   if (GuestStatus[guestStatus] === GuestStatus.CONFIRMED && event.status !== EventStatusEnum.APPROVED_STATUS) {
-    //     return responses.badRequest('Confirmed users can only be added to Approved events.');
-    //   }
+          // Ensure data is valid and contains an array of users
+          if (data && Array.isArray(data)) {
+            // Prepare the payload for creating guests
+            const payloadCreateGuest = {
+              eventId,
+              hostId,
+              users: data, // List of user IDs
+              ticketTypeId,
+              maxAdditionalGuests,
+              inviteMessage,
+              privateGuestNote,
+              guestStatus,
+              sendInvite: sendNotification,
+            };
 
-    //   let guests = await Promise.all(
-    //     payload.users.map(async (userId) => {
-    //       try {
-    //         const user = await serviceMesh.getCurrentUser(config.get('API_BASE_URL'),userId);
-    //         if (!user) return null;
+            // Call the function to create guests
+            const createGuests = await this.addGuests(payloadCreateGuest);
 
-    //         const alreadyUser = await this.dbConnection.getRepository(Guest).findOne({
-    //           where: {
-    //             event: { id: event.id },
-    //             user: { id: userId },
-    //           },
-    //           relations: ['user', 'addedBy', 'declinedBy'],
-    //         });
+            // Check if guests were successfully created
+            if (createGuests.data.users.length > 0) return responses.data(`Guest created with status ${guestStatus}`);
+          } else {
+            return responses.badRequest('Invalid guest status for CREATE action.');
+          }
+        }
+        break;
 
-    //         if (!alreadyUser) {
-    //           const guest = new Guest();
-    //           guest.status = guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS;
-    //           guest.event = event;
-    //           guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
-    //           guest.user = { id: userId } as User;
-    //           guest.addedBy = { id: host.id } as User;
-    //           guest.privateGuestNote = payload.privateGuestNote;
-    //           guest.invitationSource = UserSource.INVITED_BY_HOST;
+      case ManageGuestsAction.UPDATE:
+        if (
+          guestStatus &&
+          (guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED || guestStatus === GuestStatus.DECLINED || guestStatus === GuestStatus.DRAFT)
+        ) {
+          // Fetch guests based on the provided filters
+          const data = await this.getFilteredGuestIds(payload);
+          // Ensure data is valid and contains an array of users
+          if (data && Array.isArray(data)) {
+            // Prepare the payload for creating guests
+            const payloadUpdateGuest = {
+              eventId,
+              hostId,
+              guests: data, // List of user IDs
+              ticketTypeId,
+              maxAdditionalGuests,
+              inviteMessage,
+              privateGuestNote,
+              guestStatus,
+              sendInvite: sendNotification,
+            };
+            // Call the function to update guests
+            const updateGuests = await this.updateGuests(payloadUpdateGuest);
+            // Check if guests were successfully created
+            if (updateGuests.data.length > 0) return responses.data(`Guest updated with status ${guestStatus}`);
+          } else {
+            return responses.badRequest('Invalid guest status for CREATE action.');
+          }
+        }
+        break;
 
-    //           if (ticketType) {
-    //             guest.ticketType = { id: ticketType.id } as TicketType;
-    //           }
-    //           return await this.dbConnection.getRepository(Guest).save(guest);
-    //         } else {
-    //           return alreadyUser;
-    //         }
-    //       } catch (err) {
-    //         return null;
-    //       }
-    //     }),
-    //   );
+      case ManageGuestsAction.DELETE:
+        if (guestStatus && (guestStatus === GuestStatus.DRAFT || guestStatus === GuestStatus.INVITED)) {
+          // Fetch guests based on the provided filters
+          const data = await this.getFilteredGuestIds(payload);
+          if (data && Array.isArray(data)) {
+            const payloadRemoveGuests = {
+              eventId,
+              guests: data,
+            };
+            // Call the function to update guests
+            const deleteGuests = await this.manageGuestsRemoval(payloadRemoveGuests);
+            // Check if guests were successfully created
+            if (deleteGuests.data.length > 0) return responses.data(`Guest deleted with status ${guestStatus}`);
+          } else {
+            return responses.badRequest('Invalid guest status for CREATE action.');
+          }
+        }
+        break;
+      default:
+        return responses.badRequest('Invalid action.');
+    }
+  }
 
-    //   guests = guests.filter((guest) => guest !== null);
+  /**
+   * Fetches guest IDs based on provided filtering criteria.
+   *
+   * This function handles different scenarios:
+   * - If `isSelectedAll` is true and no query is provided, fetch all guests for the event.
+   * - If `isSelectedAll` is true with a query, fetch guests using `getGuests` and filter out `exclusiveIds`.
+   * - If `isSelectedAll` is false and `inclusiveIds` are provided, return only those specific guests.
+   * - Returns an error response for invalid payloads.
+   *
+   * @param payload - Request data containing filters and selection criteria.
+   * @returns Array of guest IDs or an error response.
+   */
+  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto): Promise<string[] | GenericResponse> {
+    const parsedQuery = payload.query ? parse(payload.query) : undefined;
+    const eventId = parsedQuery?.eventId as string;
+    const { isSelectedAll, inclusiveIds, exclusiveIds, hostId, filePath, bulkUploadStatus, guestStatus } = payload;
 
-    //   if (guestStatus === 'INVITED' && payload.sendInvite) {
-    //     //sendInvites(guests, payload.inviteMessage)
-    //   }
+    // Case 1: Select all guests based on a query
+    if (isSelectedAll) {
+      if (payload.action === ManageGuestsAction.CREATE) {
+        if (bulkUploadStatus && filePath) {
+          const csvData = await this.dbConnection.getRepository(CsvUploadRecords).findOne({ where: { originalCsvPath: filePath } });
+          const usersData = await this.dbConnection.getRepository(User).find({ where: { uploadedViaCsv: { id: csvData.id } } });
+          let userIds: string[] = usersData.map((user) => user.id);
+          if (exclusiveIds.length > 0) {
+            userIds = userIds.filter((id) => !exclusiveIds.includes(id));
+          }
+          return userIds;
+        }
+        // Extract main guest IDs
+        const fetchData = { userId: hostId, query: payload.query };
+        // TO DO: ServiceMesh Changes
+        // const usersData = await serviceMesh.getAllUsers(config.get('API_BASE_URL'), userId);
+        // if (usersData.users.length === 0 || usersData.totalCount === 0) {
+        //   return responses.badRequest('Users data not found');
+        // }
+        let userIds: string[]
+        // = usersData.users.map((user) => user.id);
+        if (exclusiveIds.length > 0) {
+          userIds = userIds.filter((id) => !exclusiveIds.includes(id));
+        }
+        return userIds;
+      }
+      const fetchData = {
+        query: payload.query,
+        hostId: payload.hostId,
+        eventId: eventId,
+      };
+      const getGuests = await this.getGuests(fetchData);
+      // Validate if guest data exists
+      if (!getGuests.data.users || getGuests.data.totalCount === 0) {
+        return responses.badRequest('Guest data not found');
+      }
 
-    //   const guestsTransform = await Promise.all(
-    //     guests.map(async (guest) => {
-    //       const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'),guest.user.id);
-    //       return toGuest(guest, focuses);
-    //     }),
-    //   );
-    //   return responses.data(guestsTransform);
-    // } catch (err) {
-    //   return responses.badRequest('Error adding guests');
-    // }
+      // Extract main guest IDs
+      let guestIds: string[] = getGuests.data.users
+        .filter(
+          (guest) => guest && guest.id && guest.status === GuestStatus[guestStatus], // Convert string to enum
+        )
+        .map((guest) => guest.id);
+
+      // Extract additional guest IDs (if any)
+      const additionalGuestIds: string[] = getGuests.data.users
+        .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
+        .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
+        .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
+
+      // Combine all guest IDs
+      guestIds = [...guestIds, ...additionalGuestIds];
+
+      // If exclusive IDs are provided, filter them out from guest list
+      if (exclusiveIds.length > 0) {
+        guestIds = guestIds.filter((id) => !exclusiveIds.includes(id));
+      }
+      return guestIds;
+    }
+
+    // Case 2: Select specific guests using inclusive IDs
+    else if (!isSelectedAll && inclusiveIds.length > 0) {
+      if (payload.action === ManageGuestsAction.CREATE) {
+        return inclusiveIds;
+      }
+      const guestData = await this.dbConnection.getRepository(Guest).find({
+        where: { id: In(inclusiveIds) },
+        select: { id: true }, // Fetch only the guest IDs
+      });
+      if (guestData.length > 0) {
+        return guestData.map((guest) => guest.id);
+      } else {
+        return responses.badRequest('Guest data not found');
+      }
+    }
+
+    // Case 3: Invalid payload data
+    else {
+      return responses.badRequest('Incorrect payload data');
+    }
+  }
+
+  /**
+   * Adds guests to an event based on the provided payload.
+   * - Validates event and host existence.
+   * - Checks for a valid ticket type if provided.
+   * - Validates guest status and ensures the event is approved before sending invites.
+   * - Fetches user profiles and emails, creating a new guest entry if not already present.
+   * - Sends invitation emails if the guest status is "INVITED" and `sendInvite` is true.
+   * - Transforms and returns the list of successfully added guests.
+   *
+   * @param {AddGuestsRequestDto} payltoAdditionalGuestDataoad - The request payload containing event, host, and guest details.
+   * @returns {Promise<GuestsResponse>} - A response containing the list of added guests or an error message.
+   */
+  public static async addGuests(payload: AddGuestsRequestDto): Promise<GuestsResponse> {
+    // Fetch event details based on the provided event ID
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    if (!event) return responses.badRequest('Event not found');
+
+    // Fetch host profile using the provided host ID
+    const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.hostId);
+    if (!host) return responses.badRequest('Host not found');
+
+    let ticketType = undefined;
+    if (payload.ticketTypeId) {
+      // Fetch ticket type details if a ticketTypeId is provided
+      ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+
+      if (!ticketType) return responses.badRequest('Ticket type not found');
+    }
+
+    // Validate and normalize guest status
+    const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+
+    // Ensure guest status is valid
+    if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
+      return responses.badRequest('Invalid guest status');
+    }
+
+    // Prevent sending invites if the event is not approved
+    if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
+      return responses.badRequest('You cannot send invites until the event has been approved by the Rumor admin');
+    }
+
+    const emails = []; // Store guest emails for invitations
+    const guests = await Promise.all(
+      payload.users.map(async (userId) => {
+        try {
+          // Fetch user details using the auth client
+          const user = await serviceMesh.getCurrentUser(config.get('API_BASE_URL'), userId);
+          if (!user) return null;
+
+          // Extract user data and email
+          const userData = user.pop();
+          const email = userData.hostProfile?.email || userData.memberProfile?.email || userData.userProfile?.email;
+          if (email) emails.push(email);
+
+          // Check if the guest already exists in the event
+          let guest = await this.dbConnection.getRepository(Guest).findOne({
+            where: {
+              event: { id: event.id },
+              user: { id: userId },
+            },
+            relations: ['user', 'addedBy', 'declinedBy'],
+          });
+
+          // If guest does not exist, create a new guest entry
+          if (!guest) {
+            const guest = new Guest();
+            guest.status = guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS;
+            guest.event = event;
+            guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
+            guest.user = { id: userId } as User;
+            guest.addedBy = { id: host.id } as User;
+            guest.privateGuestNote = payload.privateGuestNote;
+            guest.invitationSource = UserSource.INVITED_BY_HOST;
+            guest.inviteMessage = payload.inviteMessage;
+            if (ticketType) {
+              guest.ticketType = { id: ticketType.id } as TicketType;
+            }
+            return await this.dbConnection.getRepository(Guest).save(guest);
+          }
+
+          return guest;
+        } catch (err) {
+          return null;
+        }
+      }),
+    );
+
+    // Filter out any null values from guests (failed guest additions)
+    const validGuests = guests.filter((guest) => guest !== null);
+
+    // If guest status is "INVITED" and sendInvite is true, send invitation emails
+    // TO DO: Change email and sms template
+    if ((guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED) && payload.sendInvite) {
+      //To Do: Change email and sms template
+      await Promise.all(
+        emails.map((email) =>
+          serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+        ),
+      );
+    }
+
+    // Transform guests into the expected response format, fetching user focus data
+    const guestsTransform = await Promise.all(
+      validGuests.map(async (guest) => {
+        length
+        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+        return toGuest(guest, focuses);
+      }),
+    );
+
+    // Return the response containing guest details
+    return responses.data({ users: guestsTransform, totalCount: guestsTransform.length });
+  }
+
+  /**
+   * Updates guests based on the provided payload.
+   *
+   * This function performs the following tasks:
+   * - Validates the ticket type (if provided).
+   * - Validates the guest status (if provided).
+   * - Updates guest details such as max additional guests, private notes, status, and ticket type.
+   * - Sends email notifications if required.
+   * - Fetches and transforms the updated guest data before returning it.
+   *
+   * @param {UpdateGuestsRequestDto} payload - The request payload containing guest updates.
+   * @returns {Promise<GuestsDataResponse>} - A response containing updated guest data.
+   */
+  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestsDataResponse> {
+    try {
+      let ticketType;
+
+      // Validate ticket type if provided in the request
+      if (payload.ticketTypeId) {
+        ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+        if (!ticketType) return responses.badRequest('Ticket type not found');
+      }
+
+      // Validate guest status if provided
+      const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
+      if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
+        return responses.badRequest('Invalid guest status');
+      }
+
+      // Arrays to store guest emails for notifications
+      const invitedGuestsEmails = [];
+      const confirmedGuestsEmails = [];
+      const declinedGuestsEmails = [];
+
+      // Process each guest update asynchronously
+      const guests = await Promise.all(
+        payload.guests.map(async (guestId) => {
+          try {
+            // Fetch the guest details along with associated user information
+            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId } });
+
+            // If guest does not exist, log a warning and return null
+            if (!guest) {
+              return null;
+            }
+
+            // Update max additional guests and private notes if provided
+            guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
+            guest.privateGuestNote = payload.privateGuestNote ?? guest.privateGuestNote;
+            guest.inviteMessage = payload.inviteMessage ?? guest.inviteMessage;
+            if (payload.hostId) guest.addedBy = { id: payload.hostId } as User;
+
+            // Handle guest status updates if a new status is provided
+            if (guestStatus) {
+              switch (guestStatus) {
+                case GuestStatus.INVITED:
+                  // Only allow invitation if the current status is DRAFT or DECLINED
+                  if ([GuestStatus.DRAFT, GuestStatus.DECLINED].includes(guest.status)) {
+                    invitedGuestsEmails.push(guest.user.email);
+                  } else if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED, GuestStatus.REFUSED].includes(guest.status)) {
+                    throw new Error(`Cannot set status to INVITED from ${guest.status}`);
+                  }
+                  guest.status = GuestStatus.INVITED;
+                  break;
+
+                case GuestStatus.CONFIRMED:
+                  // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
+                  if ([GuestStatus.INVITED, GuestStatus.DRAFT, GuestStatus.APPLIED].includes(guest.status)) {
+                    confirmedGuestsEmails.push(guest.user.email);
+                  } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
+                    throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
+                  }
+                  guest.status = GuestStatus.CONFIRMED;
+                  break;
+
+                case GuestStatus.DECLINED:
+                  // Only allow declining if the current status is CONFIRMED or APPLIED
+                  if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED].includes(guest.status)) {
+                    declinedGuestsEmails.push(guest.user.email);
+                  } else if ([GuestStatus.DRAFT, GuestStatus.INVITED, GuestStatus.REFUSED].includes(guest.status)) {
+                    throw new Error(`Cannot set status to DECLINED from ${guest.status}`);
+                  }
+                  guest.status = GuestStatus.DECLINED;
+                  break;
+
+                case GuestStatus.DRAFT:
+                  // Only allow setting status to DRAFT if current status is INVITED, CONFIRMED or DECLINED
+                  if (![GuestStatus.INVITED, GuestStatus.DECLINED, GuestStatus.CONFIRMED].includes(guest.status)) {
+                    throw new Error(`Cannot set status to DRAFT from ${guest.status}`);
+                  }
+                  guest.status = GuestStatus.DRAFT;
+                  break;
+                default:
+                  throw new Error(`Invalid guest status: ${guestStatus}`);
+              }
+            }
+
+            // Assign the new ticket type if provided
+            if (ticketType) {
+              guest.ticketType = { id: ticketType.id } as TicketType;
+            }
+
+            // Save the updated guest data
+            return await this.dbConnection.getRepository(Guest).save(guest);
+          } catch (err) {
+            // Log error and return null in case of failure
+            return null;
+          }
+        }),
+      );
+
+      // Filter out null values (failed updates)
+      const updatedGuests = guests.filter((guest) => guest !== null);
+
+      // Send invitation emails if guests were updated and invitations are enabled
+      if (updatedGuests.length > 0 && invitedGuestsEmails.length > 0 && payload.sendInvite) {
+        // TO DO: Change email and sms template
+        await Promise.all(
+          invitedGuestsEmails.map((email) =>
+            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+          )
+        );
+      }
+
+      // Send confirmation emails if guests were updated and confirmations are enabled
+      if (updatedGuests.length > 0 && confirmedGuestsEmails.length > 0 && payload.sendInvite) {
+        // TO DO: Change email and sms template
+        await Promise.all(
+          confirmedGuestsEmails.map((email) =>
+            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+          ),
+        );
+      }
+
+      // Send declined emails if guests were updated and declines are enabled
+      if (updatedGuests.length > 0 && declinedGuestsEmails.length > 0 && payload.sendInvite) {
+        // TO DO: Change email and sms template
+        await Promise.all(
+          declinedGuestsEmails.map((email) =>
+            serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+          ),
+        );
+      }
+
+      // Fetch and transform updated guest data for response
+      const updatedGuestIds = updatedGuests.map((el) => el.id);
+      const rowsUpdated = await this.dbConnection.getRepository(Guest).find({
+        where: { id: In(updatedGuestIds) },
+        relations: { user: true },
+      });
+
+      // Fetch additional user-related data and map it into the response format
+      const guestsTransform = await Promise.all(
+        rowsUpdated.map(async (guest) => {
+          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+          return toGuestDataSimple(guest, focuses);
+        }),
+      );
+
+      // Return transformed guest data
+      return responses.data(guestsTransform);
+    } catch (err) {
+      // Log and return error response in case of failure
+      return responses.badRequest('Error updating guests');
+    }
+  }
+
+  /**
+   * Removes guests from an event based on the provided guest IDs.
+   *
+   * This function performs the following steps:
+   * - Validates the event existence.
+   * - Checks if guests are provided.
+   * - Deletes guests who match the provided IDs.
+   * - Handles errors and logs failures appropriately.
+   *
+   * @param {GuestsRequestDto} payload - The request payload containing event ID and guest IDs.
+   * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
+   */
+  private static async manageGuestsRemoval(payload: GuestsRequestDto): Promise<GenericResponse> {
+    const { eventId, guests } = payload;
+
+    // Validate event existence
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
+    if (!event) return responses.badRequest('Event not found');
+
+    // Ensure there are guests to delete
+    if (!guests || guests.length === 0) return responses.badRequest('No invites to withdraw');
+
+    try {
+      // Remove guests who match the provided guest IDs
+      await this.dbConnection.getRepository(Guest).delete({ id: In(guests) });
+
+      return responses.data('Guests removed successfully');
+    } catch (err) {
+      // Log error and return failure response
+      return responses.badRequest('Error handling guests data');
+    }
   }
 
   public static async withdrawInvites(payload: GuestsRequestDto): Promise<GenericResponse> {
-    try {
       const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
       if (!event) return responses.badRequest('Event not found');
 
@@ -155,168 +622,401 @@ export class GuestService {
         .execute();
 
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error removing guests');
-    }
   }
 
-  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestsDataResponse> {
-    try {
-      let ticketType;
-      if (payload.ticketTypeId) {
-        ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
-        if (!ticketType) return responses.badRequest('Ticket type not found');
+  public static async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+    const { hostId, eventId } = payload;
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
+    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
+    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+    const searchValue = parsedQuery?.searchValue as string; // Cast to string
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery?.category;
+    const baseCity = parsedQuery?.basecity;
+    const interest = parsedQuery?.interest;
+    const ticketType = parsedQuery?.ticketType;
+    const partySize = parsedQuery?.partySize;
+    const vouch = parsedQuery?.vouch;
+    // const checkedInStatus = parsedQuery?.checkedInStatus
+    const userSource = parsedQuery?.userSource;
+    const declinedBy = parsedQuery?.declinedBy;
+    const spam = parsedQuery?.spam;
+    const customListName = parsedQuery.list;
+    const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let favorite = false;
+    let followed = false;
+    let customListNames: string[] = [];
+    if (customListName && customListName.length) {
+      if (customListName && typeof customListName === 'string') {
+        const allListNames = customListName.split(',').map((name) => name.trim());
+        // Separate system default lists and update customListName
+        const separatedLists = allListNames.filter((item) => systemDefaultLists.includes(item));
+        customListNames = allListNames.filter((item) => !systemDefaultLists.includes(item));
+        favorite = separatedLists.includes('myFavourites-systemDefault');
+        followed = separatedLists.includes('myFollowers-systemDefault');
       }
-
-      const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
-      if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
-        return responses.badRequest('Invalid guest status');
-      }
-
-      const guests = await Promise.all(
-        payload.guests.map(async (guestId) => {
-          try {
-            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId } });
-            if (!guest) {
-              return null;
-            }
-            guest.maxAdditionalGuests = payload.maxAdditionalGuests !== undefined ? payload.maxAdditionalGuests : guest.maxAdditionalGuests;
-            guest.privateGuestNote = payload.privateGuestNote !== undefined ? payload.privateGuestNote : guest.privateGuestNote;
-
-            if (guestStatus) {
-              guest.status = guestStatus as GuestStatus;
-            }
-
-            if (ticketType) {
-              guest.ticketType = { id: ticketType.id } as TicketType;
-            }
-
-            return await this.dbConnection.getRepository(Guest).save(guest);
-          } catch (err) {
-            return null;
-          }
-        }),
-      );
-
-      const updatedGuests = guests.filter((guest) => guest !== null);
-
-      if (updatedGuests.length > 0 && guestStatus === 'INVITED' && payload.sendInvite) {
-        //sendInvites(guests, payload.inviteMessage)
-      }
-      const updatedGuestIds = updatedGuests.map((el) => el.id);
-      const rowsUpdated = await this.dbConnection.getRepository(Guest).find({
-        where: { id: In(updatedGuestIds) },
-        relations: { user: true },
-      });
-
-      const guestsTransform = await Promise.all(
-        rowsUpdated.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-          return toGuestDataSimple(guest, focuses);
-        }),
-      );
-
-      return responses.data(guestsTransform);
-    } catch (err) {
-      return responses.badRequest('Error updated guests');
     }
+
+    const { error: validationError, response: validation } = validateFilters(payload.query);
+    if (validationError) return responses.badRequest(validation);
+    const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
+
+    let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
+    if (typeof socialNetworkNames === 'string') {
+      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      socialNetworkObject = socialNetworkArray.reduce(
+        (acc, name) => {
+          acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
+          return acc;
+        },
+        {} as { [key in keyof typeof SocialProviderType]?: string },
+      );
+    }
+
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
+    if (!event) return responses.badRequest('Event not found');
+
+    const queryBuilder = this.dbConnection.getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.vouchRequests', 'vouchRequest')
+      .leftJoinAndSelect('user.managedByHosts', 'hostUserSettings') // Join using the managedByHosts relation
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('guest.addedBy', 'addedBy')
+      .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+      .leftJoinAndSelect('guest.ticketType', 'ticketType')
+      .where({ event: { id: event.id } })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('guest.addedBy.id = :hostId', { hostId: hostId }).orWhere('guest.status = :status AND guest.addedBy.id IS NULL', { status: 'APPLIED' });
+        }),
+      )
+      .take(take)
+      .skip(skip);
+
+    if (guestStatus) {
+      if (guestStatus === 'DECLINED') {
+        queryBuilder.andWhere('guest.status IN (:...statuses)', { statuses: [GuestStatus.DECLINED, GuestStatus.REFUSED] });
+      } else {
+        queryBuilder.andWhere({ status: GuestStatus[guestStatus] });
+      }
+    }
+
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('guest.createdAt', 'DESC');
+    }
+
+    await this.applyUserFilters(
+      queryBuilder,
+      parsedQuery,
+      payload,
+      searchValue,
+      focuses,
+      interest,
+      gender,
+      baseCity,
+      event,
+      declinedBy,
+      socialNetworkObject,
+      followerCountFrom,
+      followerCountTo,
+      ticketType,
+      partySize,
+      vouch,
+      spam,
+      favorite,
+      followed,
+      customListNames,
+      userSource,
+    );
+    const [guests, totalCount] = await queryBuilder.getManyAndCount();
+    const buildGuests = await Promise.all(
+      guests.map(async (guest) => {
+        const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+          relations: ['user', 'ticketType', 'declinedBy', 'user.address'],
+          where: { addedBy: { id: guest.user.id }, event: { id: event.id } },
+        });
+
+        const additionalGuestData = await Promise.all(
+          additionalGuests.map(async (additionalGuest) => {
+            const user = await this.dbConnection.getRepository(User).findOne({
+              where: { id: additionalGuest.user.id },
+            });
+            const [plusOnesFocuses, plusOnesInterests] = await Promise.all([
+              await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id),
+              await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id),
+            ]);
+            const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+              where: {
+                user: { id: user.id },
+                host: { id: payload.hostId },
+              },
+            });
+            const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
+            const guestData = []
+            // TO DO: Add this functionality
+            // toAdditionalGuestData(additionalGuest, plusOnesFocuses, plusOnesInterests);
+            return { ...guestData, isBanned };
+          }),
+        );
+        const [focuses, interests, vouches] = await Promise.all([
+          await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id),
+          await serviceMesh.getUserInterests(config.get('API_BASE_URL'), guest.user.id),
+          await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id),
+        ]);
+        const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+          where: {
+            user: { id: guest.user.id },
+            host: { id: payload.hostId },
+          },
+        });
+        const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
+        const guestData = toGuest(guest, focuses, socialNetworkObject, vouches, undefined, interests);
+        return { ...guestData, isBanned, additionalGuests: additionalGuestData };
+      }),
+    );
+    // TO DO: Fix this functionality
+    // return responses.data({ users: buildGuests, totalCount });
   }
 
-  public static async getGuests(payload: GuestsQueryRequestDto): Promise<void> {
-    // try {
-    //   const parsedQuery = parse(payload.query);
-    //   const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    //   const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    //   const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-    //   const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-    //   const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
-    //   const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    //   const { error: validationError, response: validation } = validateFilters(payload.query);
-    //   if (validationError) return responses.badRequest(validation);
-    //   const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
+  public static async applyUserFilters(
+    queryBuilder,
+    parsedQuery,
+    payload,
+    searchValue,
+    focuses,
+    interest,
+    gender,
+    baseCity,
+    event,
+    declinedBy,
+    socialNetworkObject,
+    followerCountFrom,
+    followerCountTo,
+    ticketType,
+    partySize,
+    vouch,
+    spam,
+    favorite,
+    followed,
+    customListNames,
+    userSource,
+  ) {
+    // Apply search value filter
+    // if (searchValue) {
+    //   const searchWords = searchValue.trim().split(/\s+/);
+    //   queryBuilder.andWhere(
+    //     new Brackets((qb) => {
+    //       searchWords.forEach((word) => {
+    //         qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+    //       });
+    //     }),
+    //   );
+    // }
 
-    //   let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
-    //   if (typeof socialNetworkNames === 'string') {
-    //     const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-    //     socialNetworkObject = socialNetworkArray.reduce(
-    //       (acc, name) => {
-    //         acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
-    //         return acc;
-    //       },
-    //       {} as { [key in keyof typeof SocialProviderType]?: string },
-    //     );
+    // if (Object.keys(socialNetworkObject).length > 0) {
+    //   const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+    //     const columnName = `${networkKey.toLowerCase()}FollowersCount`;
+    //     return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+    //   });
+
+    //   queryBuilder.andWhere(
+    //     new Brackets((qb) => {
+    //       qb.where(socialConditions.join(' OR '), {
+    //         followerCountFrom: followerCountFrom || 0,
+    //         followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+    //       });
+    //     }),
+    //   );
+    // }
+
+    // if (favorite || followed || customListNames.length > 0) {
+    //   queryBuilder.andWhere(
+    //     new Brackets((qb) => {
+    //       if (favorite) {
+    //         qb.orWhere((subQb) => {
+    //           const subQuery = subQb
+    //             .subQuery()
+    //             .select('hostFavorite.member.id')
+    //             .from(HostFavorite, 'hostFavorite')
+    //             .where('hostFavorite.host.id = :hostId', { hostId: payload.hostId })
+    //             .getQuery();
+    //           return `user.id IN ${subQuery}`;
+    //         });
+    //       }
+    //       if (followed) {
+    //         qb.orWhere((subQb) => {
+    //           const subQuery = subQb
+    //             .subQuery()
+    //             .select('hostFollow.follower.id')
+    //             .from(HostFollowing, 'hostFollow')
+    //             .where('hostFollow.host.id = :hostId', { hostId: payload.hostId })
+    //             .getQuery();
+    //           return `user.id IN ${subQuery}`;
+    //         });
+    //       }
+    //       if (customListNames.length > 0) {
+    //         qb.orWhere((subQb) => {
+    //           const subQuery = subQb
+    //             .subQuery()
+    //             .select('listUsers.id')
+    //             .from(HostCustomUsersLists, 'customList')
+    //             .innerJoin('customList.users', 'listUsers')
+    //             .where('customList.listName IN (:...customListNames)', { customListNames })
+    //             .andWhere('customList.host.id = :hostId', { hostId: payload.hostId })
+    //             .getQuery();
+    //           return `user.id IN ${subQuery}`;
+    //         });
+    //       }
+    //     }),
+    //   );
+    // }
+
+    // // Apply focuses filter
+    // if (focuses && typeof focuses === 'string') {
+    //   const focusIds = focuses.split(',').map((id) => id.trim());
+    //   queryBuilder.andWhere((qb) => {
+    //     const subQuery = qb
+    //       .subQuery()
+    //       .select('focus_users_user.userId')
+    //       .from('focus_users_user', 'focus_users_user')
+    //       .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+    //       .getQuery();
+    //     return `user.id IN ${subQuery}`;
+    //   });
+    // }
+
+    // // Apply interests filter
+    // if (interest && typeof interest === 'string') {
+    //   const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+    //   queryBuilder.andWhere((qb) => {
+    //     const subQuery = qb
+    //       .subQuery()
+    //       .select('interest_users_user.userId')
+    //       .from('interest_users_user', 'interest_users_user')
+    //       .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+    //       .getQuery();
+    //     return `user.id IN ${subQuery}`;
+    //   });
+    // }
+
+    // // Apply gender filter
+    // if (gender && typeof gender === 'string') {
+    //   const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+    //   const validGenders = Object.values(Gender) as string[];
+    //   const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+    //   if (filteredGenders.length > 0) {
+    //     queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
     //   }
+    // }
 
-    //   const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-    //   if (!event) return responses.badRequest('Event not found');
-
-    //   const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
-
-    //   queryBuilder
-    //     .leftJoinAndSelect('guest.user', 'user')
-    //     .leftJoinAndSelect('user.roles', 'roles')
-    //     .leftJoinAndSelect('user.socialStats', 'socialStats')
-    //     .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-    //     .leftJoinAndSelect('user.address', 'address')
-    //     .leftJoinAndSelect('roles.role', 'role')
-    //     .leftJoinAndSelect('guest.addedBy', 'addedBy')
-    //     .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-    //     .leftJoinAndSelect('guest.ticketType', 'ticketType')
-    //     .where({ event: { id: event.id } })
-    //     .offset(skip)
-    //     .limit(take);
-
-    //   if (guestStatus) {
-    //     queryBuilder.andWhere({ status: GuestStatus[guestStatus] });
+    // // Apply baseCity filter
+    // if (baseCity && typeof baseCity === 'string') {
+    //   const placeIds = baseCity.split(',').map((id) => id.trim());
+    //   if (placeIds.length > 0) {
+    //     queryBuilder.andWhere((qb) => {
+    //       const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+    //       return `user.address_id IN ${subQuery}`;
+    //     });
     //   }
+    // }
 
-    //   if (searchValue) {
+    // // Apply age filter
+    // if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+    //   const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
+    //   const ageTo =
+    //     parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
+    //   const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+    //   const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+    //   if (ageTo !== null) {
+    //     conditions.push(`${ageQuery} <= :ageTo`);
+    //   }
+    //   queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    // }
+
+    // // Apply ticket type filter
+
+    // if (ticketType) {
+    //   const ticketTypes = typeof ticketType === 'string' ? ticketType.split(',') : ticketType;
+    //   queryBuilder.andWhere('guest.ticketType.id IN (:...ticketTypes)', { ticketTypes });
+    // }
+
+    // // Apply partySize filter
+
+    // if (partySize) {
+    //   queryBuilder.andWhere('guest.maxAdditionalGuests + 1 = :partySize', { partySize: partySize });
+    // }
+
+    // // Apply vouch filter
+    // if (vouch) {
+    //   const vouchFilters = typeof vouch === 'string' ? vouch.split(',') : vouch;
+    //   if (vouchFilters.includes('hasVouches')) {
+    //     queryBuilder.andWhere('vouchRequest.event_id = :eventId', { eventId: event.id }).andWhere('vouchRequest.user_id = user.id');
+    //   }
+    //   if (vouchFilters.includes('hasNoVouches')) {
+    //     queryBuilder.andWhere('NOT EXISTS (SELECT 1 FROM vouch_request v WHERE v.event_id = :eventId AND v.user_id = user.id)', { eventId: event.id });
+    //   }
+    // }
+
+    // // Apply declinedBy filter
+    // if (declinedBy) {
+    //   const declinedByFilters = typeof declinedBy === 'string' ? declinedBy.split(',') : declinedBy;
+    //   if (declinedByFilters.includes('declinedByCollaborator')) {
+    //     queryBuilder.leftJoin('Collaborator', 'collaborator1', 'collaborator1.user_id = guest.declinedBy.id').andWhere('collaborator1.user_id IS NOT NULL');
+    //   }
+    //   if (declinedByFilters.includes('declinedByUser')) {
+    //     queryBuilder
+    //       .leftJoin('Collaborator', 'collaborator2', 'collaborator2.user_id = guest.declinedBy.id')
+    //       .andWhere('collaborator2.user_id IS NULL')
+    //       .andWhere('guest.declinedBy.id != :hostId', { hostId: payload.hostId });
+    //   }
+    // }
+
+    // // Apply spam filter
+
+    // if (spam) {
+    //   const spamFilters = typeof spam === 'string' ? spam.split(',') : spam;
+    //   const isSpammedSelected = spamFilters.includes('isSpammed');
+    //   const isNotSpammedSelected = spamFilters.includes('isNotSpammed');
+
+    //   if (isSpammedSelected || isNotSpammedSelected) {
     //     queryBuilder.andWhere(
     //       new Brackets((qb) => {
-    //         qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-    //           .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
+    //         if (isSpammedSelected) qb.orWhere('hostUserSettings.isSpam = true');
+    //         if (isNotSpammedSelected) qb.orWhere('hostUserSettings.isSpam = false').orWhere('hostUserSettings.user IS NULL');
     //       }),
     //     );
     //   }
+    // }
 
-    //   if (Object.keys(socialNetworkObject).length > 0) {
-    //     const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
-    //       const columnName = `${networkKey.toLowerCase()}FollowersCount`;
-    //       return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
-    //     });
-
+    // // Apply invitationSource filter
+    // if (userSource) {
+    //   const userSourceFilters = typeof userSource === 'string' ? userSource.split(',') : [];
+    //   if (userSourceFilters.length > 0) {
     //     queryBuilder.andWhere(
     //       new Brackets((qb) => {
-    //         qb.where(socialConditions.join(' OR '), {
-    //           followerCountFrom: followerCountFrom || 0,
-    //           followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+    //         userSourceFilters.forEach((source, index) => {
+    //           qb.orWhere('guest.invitationSource = :source' + index, { ['source' + index]: UserSource[source] });
     //         });
     //       }),
     //     );
     //   }
-
-    //   const guests = await queryBuilder.getMany();
-    //   const buildGuests = await Promise.all(
-    //     guests.map(async (guest) => {
-    //       const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-    //       const guestData = toGuest(guest, focuses, socialNetworkObject);
-    //       return { ...guestData, category: focuses.map((focus) => focus.name) };
-    //     }),
-    //   );
-    //   return responses.data(buildGuests);
-    // } catch (err) {
-    //   return responses.badRequest('Error getting guests');
     // }
+
+    // return queryBuilder;
   }
 
   public static async deleteGuests(payload: GuestsRequestDto): Promise<GenericResponse> {
-    try {
       const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
       if (!event) return responses.badRequest('Event not found');
 
@@ -333,13 +1033,9 @@ export class GuestService {
         .execute();
 
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error removing guests');
-    }
   }
 
   public static async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    try {
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -417,7 +1113,7 @@ export class GuestService {
       });
       const guestsTransform = await Promise.all(
         guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL') ,guest.user.id);
+          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -438,19 +1134,15 @@ export class GuestService {
       }
 
       return responses.data(filteredGuests);
-    } catch (err) {
-      return responses.badRequest('Error retrieving guest list.');
-    }
   }
 
   public static async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    try {
       const parsedQuery = parse(payload.query);
       const pagination = hasPagination(parsedQuery)
         ? {
-            take: parseInt(parsedQuery.take),
-            skip: parseInt(parsedQuery.skip),
-          }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
         : {};
 
       const andConditions = [];
@@ -530,8 +1222,8 @@ export class GuestService {
       const orClause = orConditions.length > 0 ? orConditions : undefined;
       const order = parsedQuery.sortBy
         ? {
-            [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-          }
+          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+        }
         : undefined;
       const relations = {
         user: {
@@ -559,56 +1251,90 @@ export class GuestService {
       );
 
       return responses.data(guestsTransform);
-    } catch (err) {
-      return responses.badRequest('Error retrieving guest list.');
-    }
   }
 
-  public static async getGuestProfile(payload: RequestByIdDto): Promise<void> {
-    // try {
-    //   const guest = (
-    //     await this.dbConnection.getRepository(Guest).find({
-    //       where: {
-    //         id: payload.id,
-    //         user: {
-    //           deletedAt: IsNull(),
-    //           roles: {
-    //             role: {
-    //               name: In(['member', 'non_member']),
-    //             },
-    //           },
-    //         },
-    //       },
-    //       take: 1,
-    //       relations: {
-    //         user: {
-    //           address: true,
-    //           hostedEvents: true,
-    //           socialStats: true,
-    //           interests: true,
-    //           roles: {
-    //             role: true,
-    //           },
-    //         },
-    //         addedBy: true,
-    //         declinedBy: true,
-    //       },
-    //     })
-    //   )[0];
+  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GetGuestProfileResponse> {
+    const guest = (
+      await this.dbConnection.getRepository(Guest).find({
+        where: {
+          id: payload.id,
+          user: {
+            deletedAt: IsNull(),
+            roles: {
+              role: {
+                name: In(['member', 'non_member']),
+              },
+            },
+          },
+        },
+        take: 1,
+        relations: {
+          user: {
+            address: true,
+            hostedEvents: true,
+            socialStats: true,
+            interests: true,
+            roles: {
+              role: true,
+            },
+            following: {
+              follower: true,
+              host: true,
+            },
+            favoritedByHosts: {
+              host: true,
+              member: true,
+            },
+          },
+          addedBy: true,
+          declinedBy: true,
+          event: true,
+        },
+      })
+    )[0];
 
-    //   if (!guest) {
-    //     return responses.notFound('Guest not found');
-    //   }
+    if (!guest) {
+      return responses.notFound('Guest not found');
+    }
+    const followsYou = guest.user.following?.some((f) => f.host?.id === payload.userId) ?? false;
+    const favorite = guest.user.favoritedByHosts?.some((f) => f.host?.id === payload.userId) ?? false;
 
-    //   const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-    //   return responses.data(toGuestData(guest.user, guest, focuses));
-    // } catch (err) {
-    //   return responses.badRequest('Error at get user list.');
-    // }
+    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+      relations: {
+        user: true,
+        addedBy: true,
+        event: true,
+      },
+      where: {
+        addedBy: { id: guest.user.id },
+        event: { id: guest.event.id },
+      },
+    });
+
+    const additionalGuestData = await Promise.all(
+      additionalGuests.map(async (additionalGuest) => {
+        const user = await this.dbConnection.getRepository(User).findOne({
+          where: { id: additionalGuest.user.id },
+        });
+        return {
+          id: user?.id,
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          guestId: additionalGuest?.id,
+          addedBy: additionalGuest?.addedBy.id,
+          addedByPicture: additionalGuest.addedBy ? additionalGuest.addedBy?.profilePicture : '',
+          privateGuestNote: additionalGuest?.privateGuestNote,
+          checkIn: additionalGuest?.checkIn,
+          status: additionalGuest?.status,
+        };
+      }),
+    );
+
+    const focuses = await this.platformClient.getUserFocuses(guest.user.id, this.logger);
+    return responses.data(toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData));
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
-    try {
       const { userId, query: initialQuery } = payload;
       const parsedQuery = parse(initialQuery) as ParsedQs;
       const user = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), userId);
@@ -657,9 +1383,6 @@ export class GuestService {
       };
 
       return responses.data(inviteesDataList);
-    } catch (err) {
-      return responses.badRequest('Error getting user invitees');
-    }
   }
 
   // Helper function to map users to invitees
@@ -694,10 +1417,14 @@ export class GuestService {
     );
   }
 
-  public static async listEventGuests(payload: ListEventGuestsDto): Promise<any> {
+  public static async listEventGuests(payload: ListEventGuestsDto): Promise<ListEventGuestsResponse> {
     try {
-      const currentGuest = await this.dbConnection.getRepository(Guest).findOne({ where: { user: { id: payload.userId } } });
-      if (!currentGuest) return { ...responses.notFound('User guest not found'), data: [] };
+      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+      const eventResponse = { data: [], totalCount: 0 };
+      if (!user) {
+        return { ...responses.notFound('User not found'), data: eventResponse };
+      }
+
       const parsedQuery = parse(payload.query);
       const pagination = hasPagination(parsedQuery)
         ? {
@@ -746,10 +1473,10 @@ export class GuestService {
         }
         return null;
       };
+
       const locationCondition = await addLocationCondition(Number(parsedQuery.longitude), Number(parsedQuery.latitude));
       addCondition(locationCondition, 'AND');
 
-      // AND conditions
       let status: EventStatusEnum[];
       if (parsedQuery.statusName) {
         status = String(parsedQuery.statusName)
@@ -763,12 +1490,24 @@ export class GuestService {
       addCondition(parsedQuery.eventTypeId && { eventType: { id: parsedQuery.eventTypeId } }, 'AND');
       addCondition(parsedQuery.eventTypeName && { eventType: { name: parsedQuery.eventTypeName } }, 'AND');
       addCondition(
-        parsedQuery.eventTypeId && {
+        parsedQuery.eventTypeIds && {
           eventType: {
             id: In(
-              String(parsedQuery.eventTypeId)
+              String(parsedQuery.eventTypeIds)
                 .split(',')
                 .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
+      addCondition(
+        parsedQuery.eventTypeNames && {
+          eventType: {
+            name: In(
+              String(parsedQuery.eventTypeNames)
+                .split(',')
+                .map((name) => name.trim()),
             ),
           },
         },
@@ -787,6 +1526,10 @@ export class GuestService {
         'AND',
       );
 
+      addCondition(parsedQuery.maxStartDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.maxStartDate))) }, 'AND');
+      addCondition(parsedQuery.minStartDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.minStartDate))) }, 'AND');
+      addCondition(parsedQuery.minEndDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.minEndDate))) }, 'AND');
+      addCondition(parsedQuery.maxEndDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.maxEndDate))) }, 'AND');
       addCondition(parsedQuery.startDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
       addCondition(parsedQuery.startDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
       addCondition(parsedQuery.endDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.endDate))) }, 'AND');
@@ -859,21 +1602,36 @@ export class GuestService {
       };
 
       const dateNow = new Date();
+      let guestStatusFilter = [];
       if (parsedQuery.guestEventStatus) {
-        if (parsedQuery.guestEventStatus == 'UPCOMING') {
-          addCondition({ startDate: LessThan(dateNow) });
-          userFilter.guests.status = In([GuestStatus.CONFIRMED]);
-        } else if (parsedQuery.guestEventStatus == 'PAST') {
-          addCondition({ endDate: MoreThan(dateNow) });
-          userFilter.guests.status = In([GuestStatus.CONFIRMED]);
-        } else if (parsedQuery.guestEventStatus == 'INVITED') {
-          userFilter.guests.status = In([GuestStatus.INVITED]);
-        } else if (parsedQuery.guestEventStatus == 'APPLIED') {
-          userFilter.guests.status = In([GuestStatus.APPLIED]);
+        switch (parsedQuery.guestEventStatus) {
+          case 'UPCOMING':
+            addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
+            guestStatusFilter = [GuestStatus.CONFIRMED];
+            break;
+          case 'PAST':
+            addCondition({ endDate: LessThan(dateNow) });
+            guestStatusFilter = [GuestStatus.CONFIRMED];
+            break;
+          case 'INVITED':
+            guestStatusFilter = [GuestStatus.INVITED];
+            break;
+          case 'APPLIED':
+            guestStatusFilter = [GuestStatus.APPLIED];
+            break;
         }
+        userFilter.guests.status = In(guestStatusFilter);
       }
+
       if (parsedQuery.feed) {
-        addCondition({ status: EventStatusEnum.APPROVED_STATUS });
+        addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events
+        addCondition(
+          {
+            status: EventStatusEnum.APPROVED_STATUS,
+            isPublished: true,
+          },
+          'AND',
+        );
       } else {
         addCondition(
           parsedQuery.statusName && {
@@ -884,13 +1642,44 @@ export class GuestService {
       }
 
       const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
-      const eventsPrefiltered = await this.dbConnection.getRepository(Event).find({
-        where: { ...whereClause, ...userFilter },
+
+      const [userEvents, publicEvents] = await Promise.all([
+        !parsedQuery.feed //if it is not for feed then only filter by userstatuses
+          ? await this.dbConnection.getRepository(Event).find({
+              where: {
+                ...whereClause,
+                ...userFilter, //to get the events based on provided status of guest
+              },
+              relations: {
+                guests: { user: true },
+              },
+            })
+          : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
+          this.dbConnection.getRepository(Event).find({
+          where: {
+            ...whereClause,
+            isPrivate: false,
+          },
+          relations: {
+            guests: { user: true },
+          },
+        }),
+      ]);
+
+      const filteredPublicEvents = parsedQuery.guestEventStatus
+        ? publicEvents.filter((event) => event.guests.some((guest) => guest.user.id === payload.userId && guest.status === guestStatusFilter[0]))
+        : publicEvents;
+
+      const eventsPrefiltered = [...userEvents];
+      filteredPublicEvents.forEach((publicEvent) => {
+        if (!eventsPrefiltered.find((event) => event.id === publicEvent.id)) {
+          eventsPrefiltered.push(publicEvent);
+        }
       });
+
       const eventsPrefilteredIds = eventsPrefiltered.map((item) => item.id);
       const filter = { id: In(eventsPrefilteredIds) };
 
-      // OR conditions
       if (parsedQuery.findByCollaboratorLikeNameOrEmail) {
         orConditions.push(
           {
@@ -929,27 +1718,56 @@ export class GuestService {
 
       const finalWhereClause = orConditions.length > 0 ? orConditions : filter;
 
-      const events = await this.dbConnection.getRepository(Event).find({
+      const [events, totalCount]: [Event[], number] = await this.dbConnection.getRepository(Event).findAndCount({
         where: finalWhereClause,
-        order: order,
-        ...pagination,
         relations: {
           owner: true,
           location: true,
           eventType: true,
           ageLimit: true,
-          guests: { user: true },
+          admissionType: true,
+          quizQuestions: true,
+          collaborators: true,
+          ticketTypes: true,
+          talents: true,
+          tickets: true,
+          featuredEventSection: true,
         },
+        order: order,
+        ...pagination,
       });
-
-      return responses.data(events.map((item) => toEventGuest(item, currentGuest)));
+      // Step 2: Get all event IDs from fetched events
+      const eventIds = events.map((event) => event.id);
+      const userId = payload.userId;
+      // Step 3: Fetch guests separately for only the needed events
+      const guests = await this.dbConnection.getRepository(Guest).find({
+        where: {
+          event: In(eventIds),
+          ...(userId ? { user: { id: userId } } : {}),
+        },
+        relations: ['user', 'event'],
+      });
+      // Step 4: Map guests to their respective events
+      const eventGuestMap = new Map<string, Guest[]>();
+      guests.forEach((guest: Guest) => {
+        if (!eventGuestMap.has(guest.event.id)) {
+          eventGuestMap.set(guest.event.id, []);
+        }
+        eventGuestMap.get(guest.event.id)?.push(guest);
+      });
+      // Step 5: Attach guests back to their events
+      events.forEach((event) => {
+        event.guests = eventGuestMap.get(event.id) || [];
+      });
+      eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
+      eventResponse.totalCount = totalCount;
+      return responses.data(eventResponse);
     } catch (err) {
-      return responses.badRequest('Error removing guests');
+      return responses.badRequest('Error retrieving events');
     }
   }
 
   public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: {
           id: payload.eventId,
@@ -1033,13 +1851,9 @@ export class GuestService {
       await this.dbConnection.getRepository(Guest).save(guest);
 
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error when request become guest.');
-    }
   }
 
   public static async updateRequestBecomeGuest(payload: UpdateRequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: {
           id: payload.eventId,
@@ -1121,13 +1935,9 @@ export class GuestService {
       }
 
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error when request become guest.');
-    }
   }
 
   public static async syncUserTopAttendee(): Promise<GenericResponse> {
-    try {
       const LIMIT_FOR_USER_ATTENDEE = parseInt(process.env.LIMIT_FOR_USER_ATTENDEE || '50', 10);
       const users = await this.dbConnection.getRepository(Guest)
         .createQueryBuilder('guest')
@@ -1200,13 +2010,9 @@ export class GuestService {
         }),
       );
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error syncing top attendees');
-    }
   }
 
   public static async getTopUsersAttendees(): Promise<UsersAttendeesResponse> {
-    try {
       const users = await this.dbConnection.getRepository(UserAttendeeStats).find({ relations: ['user'] });
 
       return responses.data(
@@ -1226,13 +2032,9 @@ export class GuestService {
           };
         }),
       );
-    } catch (err) {
-      return responses.badRequest('Error at get top users attendees');
-    }
   }
 
   public static async cancelEventInvitation(payload: CancelEventInvitationRequestDto): Promise<GenericResponse> {
-    try {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
           event: { id: payload.eventId },
@@ -1243,13 +2045,9 @@ export class GuestService {
       if (guest.status !== GuestStatus.APPLIED) return responses.badRequest('Guest is not cancelled');
       await this.dbConnection.getRepository(Guest).delete(guest.id);
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Cancel event invitation error');
-    }
   }
 
   public static async declineEventInvitation(payload: DeclineEventInvitationRequestDto): Promise<GenericResponse> {
-    try {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
           event: { id: payload.eventId },
@@ -1263,52 +2061,141 @@ export class GuestService {
       guest.declinedBy = { id: payload.userId } as User;
       await this.dbConnection.getRepository(Guest).save(guest);
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Decline event invitation error');
-    }
   }
 
-  /**
-   * Added functionality to invite guest
+    /**
+   * Accepts an event invitation for a guest by updating their status to CONFIRMED.
    *
-   * Logic:
-   *    1. Verify event existence.
-   *    2. Confirm lead guest presence.
-   *    3. Check if the max allowed additional guests exceed current invites.
-   *    4. Create non-member user if guest doesn't exist.
-   *    5. Ensure guest isn't already invited for same event.
-   *    6. Add guest to table with "invited" status.
-   * @param payload
-   * @returns GuestsDataResponse
+   * @param {AcceptEventInvitationRequestDto} payload - The request data containing the event ID and user ID.
+   * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
+   *
+   * @throws {Error} Logs an error and returns a bad request response if an exception occurs.
    */
+    public static async acceptEventInvitation(payload: AcceptEventInvitationRequestDto): Promise<GenericResponse> {
+        const guest = await this.dbConnection.getRepository(Guest).findOne({
+          where: {
+            event: { id: payload.eventId },
+            user: { id: payload.userId },
+          },
+        });
+        if (!guest) return responses.badRequest('Guest not found');
+        if (guest.status === GuestStatus.CONFIRMED) return responses.badRequest('Guest is already confirmed');
+        guest.status = GuestStatus.CONFIRMED;
+        await this.dbConnection.getRepository(Guest).save(guest);
+        return responses.ok;
+    }
+
+  /**
+ * Added functionality to invite guest
+ *
+ * Logic:
+ *    1. Verify if the event exists and is active.
+ *    2. Confirm the presence of the lead guest (who must be CONFIRMED).
+ *    3. Check if the lead guest has exceeded their allowed additional guest limit.
+ *    4. Determine if the guest already exists (by email or phone number).
+ *    5. If the guest exists, check if they were already in any guestStatus apart from DRAFT or NO_STATUS.
+ *       - If already in guestStatus, check if they are restricted from being re-invited.
+ *       - If restricted, update the guest's status to DECLINED and add them to restricted invites.
+ *       - If guestStatus is DRAFT or NO_STATUS, update the guest's status to CONFIRMED.
+ *    6. If the guest does not exist, create a non-member user.
+ *    7. Add the guest to the event with an "CONFIRMED" status.
+ *    8. Send an email or SMS invitation to the guest.
+ *
+ * @param payload - Contains guest details such as email, phone number, and event ID.
+ * @returns GuestsDataResponse - Response containing the invited guest data or error message.
+ */
   public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestsDataResponse> {
-    try {
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
-      if (!event) return responses.badRequest('Event not found');
+    // Step 1: Check if the event exists
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+    if (!event) return responses.badRequest('Event not found');
 
-      const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: {
-          event: { id: event.id },
-          user: { id: payload.userId },
-          deletedAt: IsNull(),
-        },
-      });
-      if (!leadGuest) return responses.badRequest('Lead Guest not found');
+    // Step 2: Verify the lead guest's presence and CONFIRMED status
+    const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
+      where: {
+        event: { id: event.id },
+        user: { id: payload.userId },
+        status: GuestStatus.CONFIRMED,
+        deletedAt: IsNull(),
+      },
+    });
+    if (!leadGuest) return responses.badRequest('Lead Guest not found');
 
-      const guestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
-        where: { event: { id: event.id }, deletedAt: IsNull() },
-        relations: {
-          user: true,
-          addedBy: true,
-        },
-      });
-      const invitedGuestList: Guest[] = guestList.filter((g: Guest) => g.addedBy?.id === payload.userId);
-      if (leadGuest.maxAdditionalGuests === invitedGuestList.length) {
-        return responses.badRequest('Guest limit reached. Unable to invite additional guests');
+    // Step 3: Fetch all guests associated with the event
+    const guestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
+      where: { event: { id: event.id }, deletedAt: IsNull() },
+      relations: { user: true, addedBy: true },
+    });
+
+    // Step 4: Check if lead guest has reached the additional guest limit
+    const invitedGuestList: Guest[] = guestList.filter((g: Guest) => g.addedBy?.id === payload.userId);
+    if (leadGuest.maxAdditionalGuests === invitedGuestList.length) {
+      return responses.badRequest('Guest limit reached. Unable to invite additional guests');
+    }
+
+    let checkUser;
+    // Step 5: Check if the guest exists by email or phone number
+    if (payload.email) {
+      checkUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+    } else if (payload.phoneNumber) {
+      checkUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
+      checkUser = checkUser ? { ...checkUser, phoneNumber: payload.phoneNumber } : null;
+    } else {
+      return responses.badRequest('Phone number or email is required');
+    }
+
+    let status = GuestStatus.CONFIRMED;
+    let guest = new Guest();
+
+    if (checkUser) {
+      // Step 6: Check if the user is already invited or confirmed for the event
+      const isInvitedGuest = guestList.find((guest: Guest) => guest.user.id === checkUser.id && Object.values(GuestStatus).includes(guest.status));
+      if (isInvitedGuest) {
+        if (isInvitedGuest.status !== GuestStatus.NO_STATUS && isInvitedGuest.status !== GuestStatus.DRAFT) {
+          // Step 7: Check if the guest is restricted from being re-invited
+          // const isGuestAlreadyRestricted = await this.RestrictedInvitesRepository.findOne({
+          //   where: { event: { id: payload.eventId }, guest: { id: isInvitedGuest.id } },
+          // });
+
+          // if (isGuestAlreadyRestricted) {
+          //   // Update restricted status to DECLINED and restrict from being invited again
+          //   status = GuestStatus.DECLINED;
+          // } else {
+          // Restrict guest from being invited again
+          status = GuestStatus.DECLINED;
+          const restrictedGuest = new RestrictedInvites();
+          restrictedGuest.event = { id: payload.eventId } as Event;
+          restrictedGuest.guest = { id: isInvitedGuest.id } as Guest;
+          restrictedGuest.restrictedBy = { id: payload.userId } as User;
+          await this.dbConnection.getRepository(RestrictedInvites).create(restrictedGuest);
+          await this.dbConnection.getRepository(RestrictedInvites).save(restrictedGuest);
+          // }
+
+          isInvitedGuest.status = status;
+          return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+        } else {
+          if (isInvitedGuest.status === GuestStatus.NO_STATUS || isInvitedGuest.status === GuestStatus.DRAFT) {
+            isInvitedGuest.status = GuestStatus.CONFIRMED;
+            await this.dbConnection.getRepository(Guest).save(isInvitedGuest);
+            return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+          }
+        }
       }
-
+      const user: SimpleUser = {
+        id: checkUser.id,
+        firstName: checkUser.firstName,
+        lastName: checkUser.lastName,
+        email: checkUser.email,
+        phoneNumber: checkUser.phoneNumber,
+      };
+      guest.event = { id: payload.eventId } as Event;
+      guest.user = user;
+      guest.status = status;
+      guest.addedBy = { id: payload.userId } as User;
+      await this.dbConnection.getRepository(Guest).create(guest);
+      guest = await this.dbConnection.getRepository(Guest).save(guest);
+    } else {
+      // Step 8: Register non-member guest if they do not exist
       const member: SimpleUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), payload);
-      let guest = new Guest();
       const user: User = {
         id: member.id,
         firstName: member.firstName,
@@ -1317,152 +2204,534 @@ export class GuestService {
         phoneNumber: member.phoneNumber,
       } as User;
 
-      const isInvitedGuest = guestList.find((guest: Guest) => guest.user.id === user.id);
-      if (isInvitedGuest) {
-        return responses.badRequest('This guest is already invited.');
-      }
-
+      // Step 9: Create a new guest entry with status INVITED
       guest.event = { id: payload.eventId } as Event;
       guest.user = user;
-      guest.status = GuestStatus.INVITED;
+      guest.status = status;
       guest.addedBy = { id: payload.userId } as User;
-      this.dbConnection.getRepository(Guest).create(guest);
+      await this.dbConnection.getRepository(Guest).create(guest);
       guest = await this.dbConnection.getRepository(Guest).save(guest);
-
-      return responses.data([guest].map((guest) => toGuestDataSimple(guest, [])));
-    } catch (err) {
-      return responses.badRequest('Error sending invite to guests.');
     }
+
+    // Step 10: Send invitation via email or SMS
+    // TO DO: Change email and sms template
+    if (payload.email) {
+      await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+        [{ key: 'first_name', value: payload?.firstName || '' }],
+        'Host Application Submitted',
+        [payload.email],
+        null
+      );
+    } else if (payload.phoneNumber) {
+      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+      const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+      if (!success) {
+        return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
+      }
+    }
+
+    return responses.data([guest].map((guest) => toGuestDataSimple(guest, [])));
   }
 
-  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<any> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-      const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-      const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
-      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-      const { error: validationError, response: validation } = validateFilters(payload.query);
-      if (validationError) return responses.badRequest(validation);
+  /**
+ * /**
+ * Invites guests to an event by validating the lead guest, checking guest limits,
+ * verifying user existence, and sending invitations via email or SMS.
+ *
+ * @param {InvitedGuestsRequestDto} payload - The request payload containing a list of guests to be invited.
+ * @returns {Promise<GuestsDataResponse>} A response containing the invited guest details or an error message.
+ *
+ * ### Process:
+ * 1. Fetch Event and Validate:** Ensure the event exists and is not deleted.
+ * 2. Check Lead Guest Presence and Confirmation:** Confirm the inviter is a lead guest.
+ * 3. Fetch Existing Guests:** Retrieve all guests for the event.
+ * 4. Check Additional Guest Limit:** Ensure the lead guest has not exceeded their invite limit.
+ * 5. Check if User Exists:** Find user by email or phone number.
+ * 6. Handle Existing Guest Cases:**
+ *    If already invited, update status accordingly.
+ *    If not, create a new guest entry.
+ * 7. Register Non-Member Guest:** If user does not exist, register them as a non-member.
+ * 8. Send Invitation:**
+ *    Send an email if an email is provided.
+ *    Send an SMS if a phone number is provided.
+ * 9. Execute Invitations Concurrently:** Process all invitations asynchronously.
+ *
+ * @param payload
+ * @returns
+ */
+  public static async inviteGuests(payload: InvitedGuestsRequestDto): Promise<GuestsDataResponse> {
+      const guests = payload.guests;
 
-      let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
-      if (typeof socialNetworkNames === 'string') {
-        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-        socialNetworkObject = socialNetworkArray.reduce(
-          (acc, name) => {
-            acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
-            return acc;
+      const invites = guests.map(async (guestPayload) => {
+        // Step 1: Fetch event and validate
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: guestPayload.eventId, deletedAt: IsNull() },
+        });
+        if (!event) return responses.badRequest('Event not found');
+
+        // Step 2: Check lead guest presence and confirmation
+        const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
+          where: {
+            event: { id: event.id },
+            user: { id: guestPayload.userId },
+            status: GuestStatus.CONFIRMED,
+            deletedAt: IsNull(),
           },
-          {} as { [key in keyof typeof SocialProviderType]?: string },
-        );
-      }
+        });
+        if (!leadGuest) return responses.badRequest('Lead Guest not found');
 
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-      if (!event) return responses.badRequest('Event not found');
-
-      const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
-
-      queryBuilder
-        .leftJoinAndSelect('guest.user', 'user')
-        .leftJoinAndSelect('user.roles', 'roles')
-        .leftJoinAndSelect('user.socialStats', 'socialStats')
-        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-        .leftJoinAndSelect('user.address', 'address')
-        .leftJoinAndSelect('roles.role', 'role')
-        .leftJoinAndSelect('guest.addedBy', 'addedBy')
-        .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-        .leftJoinAndSelect('guest.ticketType', 'ticketType')
-        .where({ event: { id: event.id } })
-        .andWhere({ status: GuestStatus.APPLIED })
-        .offset(skip)
-        .limit(take);
-
-      if (searchValue) {
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-              .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
-          }),
-        );
-      }
-
-      if (Object.keys(socialNetworkObject).length > 0) {
-        const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
-          const columnName = `${networkKey.toLowerCase()}FollowersCount`;
-          return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+        // Step 3: Fetch all existing guests for the event
+        const guestList = await this.dbConnection.getRepository(Guest).find({
+          where: { event: { id: event.id }, deletedAt: IsNull() },
+          relations: { user: true, addedBy: true },
         });
 
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where(socialConditions.join(' OR '), {
-              followerCountFrom: followerCountFrom || 0,
-              followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
-            });
+        // Step 4: Check additional guest limit
+        const invitedGuestList = guestList.filter((g) => g.addedBy?.id === guestPayload.userId);
+        if (leadGuest.maxAdditionalGuests === invitedGuestList.length) {
+          return responses.badRequest('Guest limit reached. Unable to invite additional guests');
+        }
+
+        // Step 5: Check if user exists by email or phone
+        let checkUser = null;
+        if (guestPayload.email) {
+          checkUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), guestPayload.email);
+        } else if (guestPayload.phoneNumber) {
+          checkUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), guestPayload.phoneNumber);
+          if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
+        } else {
+          return responses.badRequest('Phone number or email is required');
+        }
+
+        let guest: Guest;
+        let status = GuestStatus.CONFIRMED;
+
+        if (checkUser) {
+          // Step 6: Check if user is already invited
+          const existingGuest = guestList.find((g) => g.user.id === checkUser.id);
+          if (existingGuest) {
+            if (existingGuest.status !== GuestStatus.NO_STATUS && existingGuest.status !== GuestStatus.DRAFT) {
+              status = GuestStatus.DECLINED;
+              const restrictedGuest = new RestrictedInvites();
+              restrictedGuest.event = { id: guestPayload.eventId } as Event;
+              restrictedGuest.guest = { id: existingGuest.id } as Guest;
+              restrictedGuest.restrictedBy = { id: guestPayload.userId } as User;
+
+              await this.dbConnection.getRepository(RestrictedInvites).save(restrictedGuest);
+              existingGuest.status = status;
+              return toGuestDataSimple(existingGuest, []);
+            } else {
+              existingGuest.status = GuestStatus.CONFIRMED;
+              await this.dbConnection.getRepository(Guest).save(existingGuest);
+              return toGuestDataSimple(existingGuest, []);
+            }
+          }
+
+          guest = await this.dbConnection.getRepository(Guest).create({
+            event: { id: guestPayload.eventId } as Event,
+            user: checkUser,
+            status,
+            addedBy: { id: guestPayload.userId } as User,
+          });
+        } else {
+          // Step 7: Register non-member guest
+          const newUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), guestPayload);
+          guest = await this.dbConnection.getRepository(Guest).create({
+            event: { id: guestPayload.eventId } as Event,
+            user: newUser,
+            status,
+            addedBy: { id: guestPayload.userId } as User,
+          });
+        }
+
+        guest = await this.dbConnection.getRepository(Guest).save(guest);
+
+        // Step 8: Send invitation (email or SMS)
+        // TO DO: Change email and sms template
+        if (guestPayload.email) {
+          await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+            [{ key: 'first_name', value: guestPayload?.firstName || '' }],
+            'Host Application Submitted',
+            [guestPayload.email],
+            null
+          );
+        } else if (guestPayload.phoneNumber) {
+          const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+          const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), guestPayload.phoneNumber, message);
+          if (!success) return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
+        }
+
+        return toGuestDataSimple(guest, []);
+      });
+
+      // Execute all guest invites concurrently
+      const invitedGuestsResults = await Promise.all(invites);
+      const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
+
+      return responses.data(invitedGuests);
+  }
+
+  /**
+   * Bulk upload guests for an event.
+   *
+   * Logic:
+   *    1. Verify event existence and ensure the host is the event owner.
+   *    2. Retrieve and parse the CSV file containing guest details.
+   *    3. Extract valid guest data and filter out garbage/invalid entries.
+   *    4. Check if the guests already exist as users in the system.
+   *    5. Identify and remove guests already associated with the event.
+   *    6. Register new non-member users for valid guests.
+   *    7. Generate and upload an error CSV for invalid or duplicate entries.
+   *    8. Record the CSV upload details in the database.
+   *    9. Return success and failure counts along with error CSV details.
+   *
+   * @param payload - Contains event details, file path, and host ID.
+   * @returns BulkUploadGuestsResponse - Response containing processed guest details.
+   */
+  public static async bulkUploadGuests(payload: BulkUploadGuestsRequestDto): Promise<BulkUploadGuestsResponse> {
+      // Step 1: Verify event existence and ownership
+      const event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.eventId, deletedAt: IsNull() },
+        relations: { owner: true },
+      });
+
+      // If the event does not exist, return a bad request response
+      if (!event) return responses.badRequest('Event not found');
+
+      // Ensure that the provided hostId is the owner of the event
+      if (event.owner.id !== payload.hostId) return responses.badRequest('Host is not the owner of the event');
+
+      // TO DO: ServiceMesh Changes
+      // Step 2: Fetch the CSV file from S3 storage
+      // const fileUrl = await serviceMesh.getFileUrl(config.get('API_BASE_URL'), payload.filePath);
+
+      // Step 3: Parse the CSV file to extract guest data
+      const validData = [];
+      const garbageData = [];
+      // TO DO: Add this functionality
+      // const { validData, garbageData } = await processCsvFile(fileUrl, true);
+
+      // Extract email addresses from valid data
+      const emails = []
+      // TO DO: Add this functionality
+      // validData.map((row) => row.email).filter((email) => email);
+
+      // Step 4: Fetch existing users based on extracted emails
+      const existingUsers = await Promise.all(
+        emails.map(async (email) => {
+          const data = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), email);
+          return data;
+        }),
+      );
+
+      // Create a map of email to user ID for quick lookup
+      const userMap = new Map<string, string>();
+      let updatedValidData;
+      if (existingUsers.length > 0) {
+        existingUsers.forEach((user) => {
+          if (user) userMap.set(user.email, user.id);
+        });
+
+        // Step 5: Retrieve guests already associated with the event
+        const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
+          where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
+          relations: { user: true, addedBy: true },
+        });
+
+        const removedEmails = new Set<string>();
+        if (existingGuestList.length > 0) {
+          existingGuestList.map((guest) => {
+            if (userMap.has(guest.user.email)) {
+              const user: CsvRecord = {
+                firstName: guest.user.firstName,
+                lastName: guest.user.lastName,
+                email: guest.user.email,
+                phoneNumber: guest.user.phoneNumber,
+                reason: `User already exists in the event with status ${guest.status}`,
+              };
+              garbageData.push(user);
+              userMap.delete(guest.user.email);
+              removedEmails.add(guest.user.email);
+            }
+          });
+        }
+
+        // Step 6: Remove users from validData who were moved to garbageData
+        updatedValidData = validData.filter((row) => {
+          if (removedEmails.has(row.email)) {
+            return false; // Remove from validData
+          }
+          if (userMap.has(row.email)) {
+            const user = {
+              firstName: row.firstName,
+              lastName: row.lastName,
+              email: row.email,
+              reason: 'User already exists',
+            };
+            garbageData.push(user);
+            userMap.delete(row.email);
+            return false; // Remove from validData
+          }
+          return true; // Keep row in validData
+        });
+      }
+      const users: SimpleUser[] = [];
+      if (updatedValidData.length > 0) {
+        await Promise.all(
+          updatedValidData.map(async (row: User) => {
+            if (row.email && row.firstName && row.lastName) {
+              const user = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'),
+                {
+                  ...row,
+                  eventId: payload.eventId,
+                  userId: payload.hostId,
+                }
+              );
+              users.push(user);
+            }
           }),
         );
       }
 
-      const guests = await queryBuilder.getMany();
-      const buildGuests = await Promise.all(
-        guests.map(async (guest) => {
-          const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-          const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
-          const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-            where: {
-              user: { id: guest.user.id },
-              event: { id: payload.eventId },
-            },
-            relations: {
-              question: true,
-            },
-          });
-          const guestData = toGuest(guest, focuses, socialNetworkObject, vouches, answers);
-          return { ...guestData, category: focuses.map((focus) => focus.name) };
-        }),
-      );
-      return responses.data(buildGuests);
-    } catch (err) {
-      return responses.badRequest('Error getting guests requested');
-    }
+      // Step 7: Generate an error CSV file for invalid or duplicate data
+      // TO DO: Add this functionality
+      // const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
+      const errorCsvContent = null;
+      let errFileUrl: string | null = null;
+      let errFilePath: string | null = null;
+      const fileName = `${uuidv4()}.csv`;
+
+      if (errorCsvContent) {
+        errFilePath = `error_csv/${fileName}`;
+        // TO DO: ServiceMesh Changes
+        // await this.s3Service.uploadFile({
+        //   file: errorCsvContent,
+        //   filename: fileName,
+        //   size: errorCsvContent.length,
+        //   type: 'text/csv',
+        //   contentType: 'text/csv',
+        //   fileKeyId: errFilePath,
+        // });
+        // errFileUrl = await this.s3Service.getFileUrl(errFilePath);
+      }
+
+      // Step 8: Record CSV upload details in the database
+      let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
+        event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
+        host: { id: payload.hostId }, // Reference the User entity correctly
+        uploadType: UploadType.EVENT_UPLOAD,
+        originalCsvPath: payload.filePath,
+        errorCsvPath: errFilePath || null, // Ensure it's null if no error file
+      });
+      // Save the entity
+      csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).save(csvUploadRecord);
+      users.map(async (user) => {
+        await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+      // Step 9: Return the response with success and failure counts
+      return responses.data({
+        message: 'Bulk user creation completed.',
+        SuccessUserCount: users.length,
+        failedUserCount: garbageData.length,
+        hostId: payload.hostId,
+        users,
+        eventId: payload.eventId,
+        errFileUrl: errFileUrl,
+        errFilepath: errFilePath,
+      });
   }
 
-  public static async getUserRequests(payload: RequestByIdDto): Promise<GetUserRequestsResponse> {
-    try {
-      const guestExists = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id }, relations: { event: true } });
-      if (!guestExists) return responses.notFound('Guest not found');
+  /**
+   * Fetches a paginated list of guests based on the provided filters.
+   *
+   * Functionality:
+   * 1. Retrieves the most recently created users (up to `maxUsers`).
+   * 2. Applies a name-based search filter (if provided) on these users.
+   * 3. Paginates the filtered results based on the provided `take` and `skip` values.
+   * 4. Returns the paginated list of users along with the total count.
+   *
+   * @param payload - The request payload containing pagination and filter options.
+   * @returns A paginated response containing filtered users.
+   */
+  public static async fetchBulkGuests(payload: FetchBulkGuestsRequestDto): Promise<FetchBulkGuestsResponse> {
+      const parsedQuery = parse(payload.query) as ParsedQs;
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : 10; // Number of users per page
+      const page = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : 0; // Page number (starting from 0)
+      const filePath = parsedQuery.filePath as string;
+      const eventId = parsedQuery.eventId as string;
+      const maxUsers = payload.successUserCount; // Maximum number of users to consider
 
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: guestExists?.event?.id, deletedAt: null } });
+      if (!filePath && !eventId) return responses.badRequest('filePath and eventId should be present to fetch bulk users');
+
+      const csvData = await this.dbConnection.getRepository(CsvUploadRecords).findOne({ where: { originalCsvPath: filePath, event: { id: eventId } } });
+      // Step 1: Fetch the latest `maxUsers` users (ordered by creation date, excluding deleted users)
+      const usersQuery = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .where('user.csv_upload_id = :csvUploadId', { csvUploadId: csvData.id }) // Filter by csv_upload_id
+        .andWhere('user.deletedAt IS NULL') // Exclude soft-deleted users
+        .orderBy('user.createdAt', 'DESC') // Fetch the most recent users first
+        .take(maxUsers); // Limit the number of users fetched
+
+      const allRecentUsers = await usersQuery.getMany(); // Execute query and store users
+
+      // Step 2: Apply filtering by name (if provided)
+      let filteredUsers = allRecentUsers;
+
+      if (parsedQuery.findByName) {
+        const searchValue = typeof parsedQuery.findByName === 'string' ? parsedQuery.findByName.toLowerCase() : '';
+
+        // Filter users based on first name or last name containing the search value
+        filteredUsers = allRecentUsers.filter((user) => user.firstName.toLowerCase().includes(searchValue) || user.lastName.toLowerCase().includes(searchValue));
+      }
+
+      // Step 3: Apply pagination AFTER filtering
+      const totalCount = filteredUsers.length; // Total users after filtering
+      const safeTake = Math.min(take, totalCount); // Ensure we don’t fetch more than available users
+      const skip = page * safeTake; // Calculate the starting index for pagination
+
+      // If `skip` exceeds total count, return an empty result set
+      if (skip >= totalCount) {
+        return responses.data({
+          users: [],
+          page,
+          totalPages: Math.ceil(totalCount / safeTake),
+          totalCount,
+        });
+      }
+
+      // Extract the relevant portion of the filtered list based on pagination
+      const paginatedUsers = filteredUsers.slice(skip, skip + safeTake);
+
+      return responses.data({
+        users: paginatedUsers.map((user) => toSimpleUser(user)), // Transform users to the expected response format
+        totalCount,
+      });
+  }
+
+  /**
+   * Invite a new guest user to an event by a host.
+   *
+   * Logic:
+   *    1. Verify event existence.
+   *    2. Verify host existence.
+   *    3. Check if the provided ticket type is valid (if applicable).
+   *    4. Validate the guest status.
+   *    5. Ensure that invitations can only be sent for approved events.
+   *    6. Check if the guest already exists in the system.
+   *    7. Register a new non-member user if the guest does not exist.
+   *    8. Add the guest to the event with the "invited" status.
+   *    9. Send an invite email if required.
+   *    10. Retrieve and return guest details.
+   * @param payload - Data required to invite a new guest.
+   * @returns GetUserRequestsResponse - The transformed guest data response.
+   */
+  public static async inviteNewUser(payload: InviteNewUserRequestDto): Promise<GetUserRequestsResponse> {
+      // Step 1: Check if the event exists and is not deleted
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
       if (!event) return responses.badRequest('Event not found');
 
+      // Step 2: Verify the existence of the host
+      const host = await serviceMesh.getBasicHostProfile(config.get('API_BASE_URL'), payload.userId);
+      if (!host) return responses.badRequest('Host not found');
+
+      if (!payload.email && !payload.phoneNumber) {
+        return responses.badRequest('Atleast phoneNumber or email should be there');
+      }
+
+      // Step 3: Validate the ticket type if provided
+      let ticketType = undefined;
+      if (payload.ticketTypeId) {
+        ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+        if (!ticketType) return responses.badRequest('Ticket type not found');
+      }
+
+      // Step 4: Normalize and validate guest status
+      const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+      if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
+        return responses.badRequest('Invalid guest status');
+      }
+
+      // Step 5: Ensure invites can only be sent for approved events
+      if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
+        return responses.badRequest('You cannot send invites until the event has been approved by the Rumor admin');
+      }
+
+      let checkExistingUser;
+      // Step 6: Check if the user already exists in the system
+      if (payload.email && !payload.phoneNumber) {
+        checkExistingUser = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+        if (checkExistingUser) return responses.badRequest('User already exists');
+      } else if (payload.phoneNumber && !payload.email) {
+        checkExistingUser = await serviceMesh.getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
+        if (checkExistingUser) return responses.badRequest('User already exists');
+      }
+
+      // Step 7: Register a new guest user
+      let guest = new Guest();
+      try {
+        // Extract relevant fields for non-member registration
+        const memberPayload = (({ eventId, userId, firstName, lastName, email, phoneNumber }) => ({
+          eventId,
+          userId,
+          firstName,
+          lastName,
+          email: email || '',
+          phoneNumber: phoneNumber || '',
+        }))(payload);
+        const member: SimpleUser = await serviceMesh.registerInvitesAsNonMember(config.get('API_BASE_URL'), memberPayload);
+
+        // Step 8: Create and save the guest record
+        guest = this.dbConnection.getRepository(Guest).create({
+          status: guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS,
+          event,
+          maxAdditionalGuests: payload.maxAdditionalGuests || 1,
+          user: { id: member.id } as User,
+          addedBy: { id: host.id } as User,
+          privateGuestNote: payload.privateGuestNote,
+          invitationSource: UserSource.INVITED_BY_HOST,
+          ticketType: ticketType ? ({ id: ticketType.id } as TicketType) : undefined,
+        });
+        guest = await this.dbConnection.getRepository(Guest).save(guest);
+      } catch (err) {
+        return null;
+      }
+
+      // Step 9: Send invite email or sms if required
+      // TO DO: Change email and sms template
+      if (payload.email) {
+        await serviceMesh.sendEmailFromTemplate(config.get('API_BASE_URL'),
+          [{ key: 'first_name', value: payload?.firstName || '' }],
+          'Host Application Submitted',
+          [payload.email],
+          null
+        );
+      } else if (payload.phoneNumber) {
+        const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+        const success = await serviceMesh.sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+        if (!success) {
+          return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
+        }
+      }
+
+      // Step 10: Fetch user and transform guest data
       const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
 
       queryBuilder
-
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('user.roles', 'roles')
-        .leftJoinAndSelect('user.socialStats', 'socialStats')
-        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
         .leftJoinAndSelect('user.address', 'address')
         .leftJoinAndSelect('roles.role', 'role')
         .leftJoinAndSelect('guest.addedBy', 'addedBy')
         .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
         .leftJoinAndSelect('guest.ticketType', 'ticketType')
         .where({ event: { id: event.id } })
-        .andWhere({ status: GuestStatus.APPLIED })
+        .andWhere({ status: In([GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
+        .andWhere({ user: { id: guest.user.id } })
         .limit(1);
 
-      const guest = await queryBuilder.getOne();
-
-      const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'),guest.user.id);
-      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'),guest.user.id);
+      const checkGuest = await queryBuilder.getOne();
+      const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
       const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
           user: { id: guest.user.id },
@@ -1472,17 +2741,159 @@ export class GuestService {
           question: true,
         },
       });
-      const guestData = toGuest(guest, focuses, undefined, vouches, answers);
+      const guestData = toGuest(checkGuest, focuses, undefined, vouches, answers, undefined);
       const data = { ...guestData, category: focuses.map((focus) => focus.name) };
 
       return responses.data(data);
-    } catch (err) {
-      return responses.badRequest('Error getting guests requested');
+  }
+
+  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
+    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
+    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const { error: validationError, response: validation } = validateFilters(payload.query);
+    if (validationError) return responses.badRequest(validation);
+
+    let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
+    if (typeof socialNetworkNames === 'string') {
+      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      socialNetworkObject = socialNetworkArray.reduce(
+        (acc, name) => {
+          acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
+          return acc;
+        },
+        {} as { [key in keyof typeof SocialProviderType]?: string },
+      );
     }
+
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    if (!event) return responses.badRequest('Event not found');
+
+    const queryBuilder = await this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+
+    queryBuilder
+      .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('guest.addedBy', 'addedBy')
+      .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+      .leftJoinAndSelect('guest.ticketType', 'ticketType')
+      .where({ event: { id: event.id } })
+      .andWhere({ status: GuestStatus.APPLIED })
+      .offset(skip)
+      .limit(take);
+
+    if (searchValue) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
+        }),
+      );
+    }
+
+    if (Object.keys(socialNetworkObject).length > 0) {
+      const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+        const columnName = `${networkKey.toLowerCase()}FollowersCount`;
+        return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+      });
+
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where(socialConditions.join(' OR '), {
+            followerCountFrom: followerCountFrom || 0,
+            followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+          });
+        }),
+      );
+    }
+
+    const [guests, totalCount] = await queryBuilder.getManyAndCount();
+    const buildGuests = await Promise.all(
+      guests.map(async (guest) => {
+        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+        const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
+        const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
+          where: {
+            user: { id: guest.user.id },
+            event: { id: payload.eventId },
+          },
+          relations: {
+            question: true,
+          },
+        });
+        const guestData = toGuest(guest, focuses, socialNetworkObject, vouches, answers, undefined);
+        return { ...guestData, category: focuses.map((focus) => focus.name) };
+      }),
+    );
+    return responses.data({ users: buildGuests, totalCount });
+  }
+
+  public static async getUserRequests(payload: RequestByUserAndEventDto): Promise<GetUserRequestsResponse> {
+        // Find guest by userId and eventId
+        const guestExists = await this.dbConnection.getRepository(Guest).findOne({
+          where: { user: { id: payload.userId }, event: { id: payload.eventId } },
+          relations: { event: true, user: true },
+        });
+        const guestUserId = payload.userId;
+        if (!guestExists) return responses.notFound('Guest not found');
+  
+        // Ensure event exists and is not deleted
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: payload.eventId, deletedAt: null },
+        });
+        if (!event) return responses.badRequest('Event not found');
+  
+        const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+  
+        queryBuilder
+          .leftJoinAndSelect('guest.user', 'user')
+          .leftJoinAndSelect('user.roles', 'roles')
+          .leftJoinAndSelect('user.socialStats', 'socialStats')
+          .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+          .leftJoinAndSelect('user.address', 'address')
+          .leftJoinAndSelect('roles.role', 'role')
+          .leftJoinAndSelect('guest.addedBy', 'addedBy')
+          .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+          .leftJoinAndSelect('guest.ticketType', 'ticketType')
+          .where({ event: { id: event.id } })
+          .andWhere({ status: GuestStatus.APPLIED })
+          .andWhere({ user: { id: guestUserId } })
+          .limit(1);
+  
+        const guest = await queryBuilder.getOne();
+  
+        const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
+        const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guest.user.id);
+        const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
+          where: {
+            user: { id: guest.user.id },
+            event: { id: event.id },
+          },
+          relations: {
+            question: true,
+          },
+        });
+        const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
+        const data = { ...guestData, category: focuses.map((focus) => focus.name) };
+  
+        return responses.data(data);
   }
 
   public static async manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {
-    try {
       const validateManageBulkGuests = this.validateManageBulkGuests(payload);
       if (!validateManageBulkGuests.validate) return responses.badRequest(validateManageBulkGuests.message);
       let ticketType;
@@ -1533,60 +2944,52 @@ export class GuestService {
         return responses.badRequest('No guests were successfully updated');
       }
       return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error manage Bulk guest');
-    }
   }
 
-  public static async getGuestDetails(payload: RequestByIdDto): Promise<void> {
-    // try {
-    //   if (!payload.id) return responses.badRequest('Invalid guest ID provided');
-    //   const guestProfileResponse = await this.getGuestProfile(payload);
-    //   const { error, data: guestProfile } = guestProfileResponse;
-    //   if (error) {
-    //     return responses.badRequest(error.message);
-    //   }
-    //   const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
-    //     where: { id: payload.id },
-    //     relations: { ticketType: true, user: true, event: true },
-    //   });
-    //   if (!guestDetail) {
-    //     return responses.badRequest('Guest not found');
-    //   }
+  public static async getGuestDetails(payload: RequestByIdDto): Promise<GuestDetailsResponse> {
+      if (!payload.id) return responses.badRequest('Invalid guest ID provided');
+      const guestProfileResponse = await this.getGuestProfile(payload);
+      const { error, data: guestProfile } = guestProfileResponse;
+      if (error) {
+        return responses.badRequest(error.message);
+      }
+      const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
+        where: { id: payload.id },
+        relations: { ticketType: true, user: true, event: true },
+      });
+      if (!guestDetail) {
+        return responses.badRequest('Guest not found');
+      }
 
-    //   const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
+      const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
 
-    //   const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
-    //   const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id);
+      const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
+      const vouches = await serviceMesh.getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id);
 
-    //   const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-    //     where: {
-    //       user: { id: guestDetail.user.id },
-    //       event: { id: guestDetail.event.id },
-    //     },
-    //   });
+      const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+        where: {
+          user: { id: guestDetail.user.id },
+          event: { id: guestDetail.event.id },
+        },
+      });
 
-    //   return responses.data({
-    //     guestDetail: {
-    //       guestId,
-    //       userId: user?.id || null,
-    //       ticketType: ticketType?.name || null,
-    //       maxAdditionalGuests,
-    //       privateGuestNote,
-    //       guestStatus,
-    //     },
-    //     guestProfile,
-    //     quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
-    //     vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
-    //   });
-    // } catch (err) {
-    //   return responses.badRequest('Error at get guest details');
-    // }
+      return responses.data({
+        guestDetail: {
+          guestId,
+          userId: user?.id || null,
+          ticketType: ticketType?.name || null,
+          maxAdditionalGuests,
+          privateGuestNote,
+          guestStatus,
+        },
+        guestProfile,
+        quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
+        vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
+      });
   }
 
   public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {
-    try {
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
       if (!event) return responses.badRequest('Event not found');
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
@@ -1597,6 +3000,7 @@ export class GuestService {
       });
       if (!leadGuest) return responses.badRequest('Lead Guest not found');
       leadGuest.user = { id: payload.userId } as User;
+
       const invitedGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
         where: { event: { id: event.id }, addedBy: { id: payload.userId }, deletedAt: IsNull() },
         relations: {
@@ -1604,11 +3008,18 @@ export class GuestService {
         },
       });
 
-      const invitedGuest: GuestDataSimple[] = invitedGuestList.map((guest) => toGuestDataSimple(guest, []));
-      return responses.data([leadGuest].map((guest) => toGuestDataSimple(guest, [], invitedGuest)));
-    } catch (err) {
-      return responses.badRequest('Error at get invited guest details');
-    }
+      const restrictedGuests: RestrictedInvites[] = await this.dbConnection.getRepository(RestrictedInvites).find({
+        where: { event: { id: event.id }, restrictedBy: { id: payload.userId } },
+        relations: ['guest', 'guest.user'],
+      });
+
+      // Merge both lists
+      const allGuests: GuestDataSimple[] = [
+        ...invitedGuestList.map((guest) => toGuestDataSimple(guest, [], false)),
+        ...restrictedGuests.map((restricted) => toGuestDataSimple(restricted.guest, [], true, restricted.id)),
+      ];
+
+      return responses.data([leadGuest].map((guest) => toGuestDataSimple(guest, [], false, undefined, allGuests)));  
   }
 
   public static validateManageBulkGuests(payload: ManageBulkGuestsRequestDto): {
@@ -1652,5 +3063,81 @@ export class GuestService {
       [GuestStatus.REVIEW]: defaultValidation,
     };
     return validations[status]?.() ?? null;
+  }
+
+    /**
+   * Fetch guests for a given event and filter by status.
+   * @param eventId - The event ID.
+   * @param statuses - List of guest statuses to filter.
+   * @returns List of guests with required event details.
+   */
+    public static async fetchGuestsByStatuses(eventId: string, statuses: GuestStatus[]): Promise<Guest[]> {
+      return await this.dbConnection.getRepository(Guest)
+        .createQueryBuilder('guest')
+        .leftJoinAndSelect('guest.user', 'user')
+        .leftJoinAndSelect('guest.event', 'event')
+        .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+        .where({ event: { id: eventId } })
+        .andWhere('guest.status IN (:...statuses)', { statuses })
+        .getMany();
+    }
+
+      /* Deletes a guest or a restricted invite based on the provided ID.
+   *
+   * This function first checks if the ID exists in the `RestrictedInvites` table.
+   * If found, it deletes the entry from that table.
+   * If not found, it then checks the `Guest` table and deletes the entry if present.
+   * If the ID is not found in either table, it returns an error response.
+   *
+   * @param {string} id - The ID of the guest or restricted invite to be deleted.
+   * @returns {Promise<BaseResponse>} - Response indicating success or failure of the deletion process.
+   */
+  public static async deleteInvitedGuest(payload: IdRequestDto): Promise<GenericResponse> {
+    try {
+      const restrictedInvite = await this.dbConnection.getRepository(RestrictedInvites).findOne({ where: { id: payload.id } });
+      if (restrictedInvite) {
+        await this.dbConnection.getRepository(RestrictedInvites).delete(payload.id);
+        return responses.ok;
+      }
+
+      const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id } });
+      if (guest) {
+        await this.dbConnection.getRepository(RestrictedInvites).delete({ guest: { id: payload.id } });
+        await this.dbConnection.getRepository(Guest).delete(payload.id);
+        return responses.ok;
+      }
+
+      return responses.badRequest('Guest or restricted entry not found');
+    } catch (err) {
+      return responses.badRequest('Error deleting guest or restricted entry.');
+    }
+  }
+
+  public static async getEventAttendeeCountByTicketType(payload: GetAttendeeCountRequest): Promise<GetAttendeeCountResponse> {
+      const eventId = payload.eventId;
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+      if (!event) return responses.badRequest('Event not found');
+      const ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId, event: { id: eventId }, deletedAt: IsNull() } });
+      if (!ticketType) return responses.badRequest('Ticket Type not found');
+      const ticketTypeId = payload.ticketTypeId;
+      const count = await this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: eventId },
+          ticketType: { id: ticketTypeId },
+          deletedAt: IsNull(),
+        },
+      });
+      return responses.data({ attendeeCount: count });
+  }
+
+  public static async hasGuestsAssignedToTicketTypes(ticketTypeIds: string[], eventId: string): Promise<boolean> {
+    const count = await this.dbConnection.getRepository(Guest).count({
+      where: {
+        event: { id: eventId },
+        ticketType: { id: In(ticketTypeIds) },
+        deletedAt: IsNull(),
+      },
+    });
+    return count > 0;
   }
 }
