@@ -398,7 +398,7 @@ export class GuestService {
     const guestsTransform = await Promise.all(
       validGuests.map(async (guest) => {
         length
-        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
         return toGuest(guest, focuses);
       }),
     );
@@ -561,7 +561,7 @@ export class GuestService {
       // Fetch additional user-related data and map it into the response format
       const guestsTransform = await Promise.all(
         rowsUpdated.map(async (guest) => {
-          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+          const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -755,8 +755,8 @@ export class GuestService {
               where: { id: additionalGuest.user.id },
             });
             const [plusOnesFocuses, plusOnesInterests] = await Promise.all([
-              (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), user.id)).data,
-              (await serviceMesh.userService().getUserInterests(config.get('API_BASE_URL'), user.id)).data,
+              (await serviceMesh.userService().getUserFocuses(user.id)).data,
+              (await serviceMesh.userService().getUserInterests(user.id)).data,
             ]);
             const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
               where: {
@@ -772,9 +772,9 @@ export class GuestService {
           }),
         );
         const [focuses, interests, vouches] = await Promise.all([
-          (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data,
-          (await serviceMesh.userService().getUserInterests(config.get('API_BASE_URL'), guest.user.id)).data,
-          (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data,
+          (await serviceMesh.userService().getUserFocuses(guest.user.id)).data,
+          (await serviceMesh.userService().getUserInterests(guest.user.id)).data,
+          (await serviceMesh.userService().getUserVouches(guest.user.id)).data,
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -1115,7 +1115,7 @@ export class GuestService {
       });
       const guestsTransform = await Promise.all(
         guests.map(async (guest) => {
-          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+          const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -1247,7 +1247,7 @@ export class GuestService {
 
       const guestsTransform = await Promise.all(
         guests.map(async (guest) => {
-          const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+          const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
           return toGuestDataSimple(guest, focuses);
         }),
       );
@@ -1332,7 +1332,7 @@ export class GuestService {
       }),
     );
 
-    const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
+    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
     return responses.data(toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData));
   }
 
@@ -2732,8 +2732,8 @@ export class GuestService {
         .limit(1);
 
       const checkGuest = await queryBuilder.getOne();
-      const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data
-      const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
+      const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data
+      const vouches = (await serviceMesh.userService().getUserVouches(guest.user.id)).data;
       const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
           user: { id: guest.user.id },
@@ -2826,8 +2826,8 @@ export class GuestService {
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
       guests.map(async (guest) => {
-        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
-        const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
+        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+        const vouches = (await serviceMesh.userService().getUserVouches(guest.user.id)).data;
         const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
           where: {
             user: { id: guest.user.id },
@@ -2878,8 +2878,8 @@ export class GuestService {
   
         const guest = await queryBuilder.getOne();
   
-        const focuses = (await serviceMesh.userService().getUserFocuses(config.get('API_BASE_URL'), guest.user.id)).data;
-        const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guest.user.id)).data;
+        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+        const vouches = (await serviceMesh.userService().getUserVouches(guest.user.id)).data;
         const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
           where: {
             user: { id: guest.user.id },
@@ -2934,7 +2934,7 @@ export class GuestService {
           await this.dbConnection.getRepository(Guest).save(guest);
 
           if (payload.isSpam && guest.user) {
-            await serviceMesh.userService().markUserAsSpam(config.get('API_BASE_URL'), guest.user.id);
+            await serviceMesh.userService().markUserAsSpam(guest.user.id);
           }
 
           return true;
@@ -2966,7 +2966,7 @@ export class GuestService {
       const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
 
       const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
-      const vouches = (await serviceMesh.userService().getUserVouches(config.get('API_BASE_URL'), guestDetail.user.id)).data;
+      const vouches = (await serviceMesh.userService().getUserVouches(guestDetail.user.id)).data;
 
       const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
