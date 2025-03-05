@@ -1,15 +1,17 @@
 import apiService from './apiService';
 
-export const sendVerificationCode = (baseURL:string, phoneNumber: string) => apiService.getApi().post(`${baseURL}/send-verification-code`, { phoneNumber });
+export const sendVerificationCode = (phoneNumber: string) => apiService.getApi().post(`/communication/send-verification-code`, { phoneNumber });
 
-export const verifyPhoneNumber = (baseURL:string, phoneNumber: string, code: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumber, code });
+// export const verifyPhoneNumber = (phoneNumber: string, code: string) => apiService.getApi().post(`/auth/validate`, { phoneNumber, code });
 
-export const sendInvitationMessages = (baseURL:string, phoneNumbers: string[], senderName: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumbers, senderName });
+export const verifyCode = (phoneNumber: string, code: string) => apiService.getApi().post(`/communication/verify-code`, { phoneNumber, code });
+
+export const sendInvitationMessages = (phoneNumbers: string[], senderName: string) => apiService.getApi().post(`/communication/send-invitation-messages`, { phoneNumbers, senderName });
 
 export const sendTextMessage = (baseURL:string, phoneNumber: string, message: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumber, message });
 
-export const sendEmailFromTemplate = (baseURL:string, dynamicData, template: string, to: string[], from?: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { dynamicData, template, to, from });
+export const sendEmailFromTemplate = (dynamicData, template: string, to: string[], from?: string) => apiService.getApi().post(`/auth/validate`, { dynamicData, template, to, from });
 
-export const getTemplateById = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/auth/validate`);
+export const getTemplateById = (id: string) => apiService.getApi().get(`/auth/validate`);
 
-export const sendPushNotification = (baseURL:string, tokens: string[], title: string, body: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { tokens, title, body });
+export const sendPushNotification = (tokens: string[], title: string, body: string) => apiService.getApi().post(`/auth/validate`, { tokens, title, body });
