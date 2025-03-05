@@ -271,7 +271,8 @@ export class AuthController {
 
   public static getUser = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
+      const { id } = req.params;
+      const payload: IdRequestDto = { id };
       const response: SimpleUserResponse = await AuthService.getUser(payload);
       const successResponse = new GetResponse(response,);
       res.status(successResponse.statusCode).json(successResponse);
