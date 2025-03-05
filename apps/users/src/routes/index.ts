@@ -6,7 +6,8 @@ import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
 import AuthMiddleware from '../server/middleware/auth';
-import { PlatformController } from '../controllers/platform.controller';
+import { PlatformController } from 'src/controllers/platform.controller';
+import { ReferralRequestController } from 'src/controllers/referral-request.controller';
 
 const router: Router = express.Router();
 
@@ -51,7 +52,7 @@ router.post('/auth/check-member-login', AuthController.checkMemberLogin);
 router.post('/auth/member-login', AuthController.memberLogin);
 router.post('/auth/host-login', AuthController.hostLogin);
 router.get('/auth/get-current-member', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentMember);
-router.post('/auth/user/get-user', AuthController.getUser);
+router.post('/auth/user/:id/get-user', AuthController.getUser);
 router.get('/auth/current-user', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentUser);
 router.post('/auth/save-or-update-provider', AuthController.saveOrUpdateProvider);
 router.post('/auth/send-invitations', AuthMiddleware.fusionAuthRequired, AuthController.sendInvitations);
@@ -165,5 +166,11 @@ router.get('/auth/interest/:id', PlatformController.deleteInterest);
 router.get('/auth/user-interests/:id', PlatformController.getUserInterests);
 router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser);
 router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
+
+//Referral Requests
+router.post("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
+router.put("/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
+router.get("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
+router.get("/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
 
 export default router;
