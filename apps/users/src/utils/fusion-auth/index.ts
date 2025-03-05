@@ -24,7 +24,7 @@ class AuthMiddleware {
             res.status(401).send("Unauthorized");
         }
 
-        (req as any).user = response;
+        (req as any).user = response.userId;
         (req as any).token = token;
 
         next();
