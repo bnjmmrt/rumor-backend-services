@@ -42,7 +42,7 @@ import {
 } from 'rumor-utils/shared/events/dtos/guest.dto';
 import { guestStatusToEntity, toGuest, toGuestData, toGuestDataSimple, toQuizData, toVouchesData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import { parse, ParsedQs } from 'qs';
-import { hasPagination, IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { RequestByIdDto } from 'rumor-utils/shared/events/dtos';
 import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -58,7 +58,6 @@ import * as serviceMesh from 'rumor-utils/service-mesh';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { toSimpleUser } from 'rumor-utils/shared/users/mappers/auth.mapper';
-import { RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 
 export class GuestService {
   public static dbConnection = database;
@@ -207,7 +206,7 @@ export class GuestService {
   private static async getFilteredGuestIds(payload: ManageGuestsRequestDto): Promise<string[] | GenericResponse> {
     const parsedQuery = payload.query ? parse(payload.query) : undefined;
     const eventId = parsedQuery?.eventId as string;
-    const { isSelectedAll, inclusiveIds, exclusiveIds, hostId, filePath, bulkUploadStatus } = payload;
+    const { isSelectedAll, inclusiveIds, exclusiveIds, hostId, filePath, bulkUploadStatus, guestStatus } = payload;
 
     // Case 1: Select all guests based on a query
     if (isSelectedAll) {
@@ -247,10 +246,15 @@ export class GuestService {
       }
 
       // Extract main guest IDs
-      let guestIds: string[] = getGuests.data.users.map((guest) => guest.id);
+      let guestIds: string[] = getGuests.data.users
+        .filter(
+          (guest) => guest && guest.id && guest.status === GuestStatus[guestStatus], // Convert string to enum
+        )
+        .map((guest) => guest.id);
 
       // Extract additional guest IDs (if any)
       const additionalGuestIds: string[] = getGuests.data.users
+        .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
         .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
         .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
 
@@ -451,6 +455,7 @@ export class GuestService {
             guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
             guest.privateGuestNote = payload.privateGuestNote ?? guest.privateGuestNote;
             guest.inviteMessage = payload.inviteMessage ?? guest.inviteMessage;
+            if (payload.hostId) guest.addedBy = { id: payload.hostId } as User;
 
             // Handle guest status updates if a new status is provided
             if (guestStatus) {
@@ -1248,43 +1253,85 @@ export class GuestService {
       return responses.data(guestsTransform);
   }
 
-  public static async getGuestProfile(payload: RequestByIdDto): Promise<GetGuestProfileResponse> {
-      const guest = (
-        await this.dbConnection.getRepository(Guest).find({
-          where: {
-            id: payload.id,
-            user: {
-              deletedAt: IsNull(),
-              roles: {
-                role: {
-                  name: In(['member', 'non_member']),
-                },
+  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GetGuestProfileResponse> {
+    const guest = (
+      await this.dbConnection.getRepository(Guest).find({
+        where: {
+          id: payload.id,
+          user: {
+            deletedAt: IsNull(),
+            roles: {
+              role: {
+                name: In(['member', 'non_member']),
               },
             },
           },
-          take: 1,
-          relations: {
-            user: {
-              address: true,
-              hostedEvents: true,
-              socialStats: true,
-              interests: true,
-              roles: {
-                role: true,
-              },
+        },
+        take: 1,
+        relations: {
+          user: {
+            address: true,
+            hostedEvents: true,
+            socialStats: true,
+            interests: true,
+            roles: {
+              role: true,
             },
-            addedBy: true,
-            declinedBy: true,
+            following: {
+              follower: true,
+              host: true,
+            },
+            favoritedByHosts: {
+              host: true,
+              member: true,
+            },
           },
-        })
-      )[0];
+          addedBy: true,
+          declinedBy: true,
+          event: true,
+        },
+      })
+    )[0];
 
-      if (!guest) {
-        return responses.notFound('Guest not found');
-      }
+    if (!guest) {
+      return responses.notFound('Guest not found');
+    }
+    const followsYou = guest.user.following?.some((f) => f.host?.id === payload.userId) ?? false;
+    const favorite = guest.user.favoritedByHosts?.some((f) => f.host?.id === payload.userId) ?? false;
 
-      const focuses = await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), guest.user.id);
-      return responses.data(toGuestData(guest.user, guest, focuses, null, null, null));
+    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+      relations: {
+        user: true,
+        addedBy: true,
+        event: true,
+      },
+      where: {
+        addedBy: { id: guest.user.id },
+        event: { id: guest.event.id },
+      },
+    });
+
+    const additionalGuestData = await Promise.all(
+      additionalGuests.map(async (additionalGuest) => {
+        const user = await this.dbConnection.getRepository(User).findOne({
+          where: { id: additionalGuest.user.id },
+        });
+        return {
+          id: user?.id,
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          guestId: additionalGuest?.id,
+          addedBy: additionalGuest?.addedBy.id,
+          addedByPicture: additionalGuest.addedBy ? additionalGuest.addedBy?.profilePicture : '',
+          privateGuestNote: additionalGuest?.privateGuestNote,
+          checkIn: additionalGuest?.checkIn,
+          status: additionalGuest?.status,
+        };
+      }),
+    );
+
+    const focuses = await this.platformClient.getUserFocuses(guest.user.id, this.logger);
+    return responses.data(toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData));
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
