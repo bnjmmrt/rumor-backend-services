@@ -1,74 +1,110 @@
-// import { Controller } from '@nestjs/common';
-// import { PlatformService } from '../services/platform.service';
-// import { GrpcMethod } from '@nestjs/microservices';
-// import { FocusResponse, GenericResponse, InterestResponse, InterestsResponse, PLATFORM_SERVICE_NAME } from '../grpc/platform/platform.pb';
-// import {
-//   AddFocusRequestDto,
-//   CreateInterestRequestDto,
-//   EditFocusNameRequestDto,
-//   IdRequestDto,
-//   SaveFocusesForUserRequestoDto,
-//   SaveInterestsForUserRequestDto,
-//   UpdateInterestRequestDto,
-// } from '../dtos/platform.dto';
+import { FocusResponse, GenericResponse, InterestResponse, InterestsResponse } from "rumor-utils/shared/events/grpc/platform/platform.pb";
+import { ForgotPasswordRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
+import { CreateResponse, GetResponse } from "rumor-utils/success";
+import asyncWrapper from "../server/helpers/asyncWrapper";
+import { AuthService } from "../services/auth.service";
+import { PlatformService } from "../services/platform.service";
+import { AddFocusRequestDto, CreateInterestRequestDto, EditFocusNameRequestDto, IdRequestDto, SaveFocusesForUserRequestoDto, SaveInterestsForUserRequestDto, UpdateInterestRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
 
-// @Controller()
-// export class PlatformController {
-//   constructor(private readonly service: PlatformService) {}
+export class PlatformController {
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'GetFocuses')
-//   private async getFocuses(): Promise<FocusResponse> {
-//     return this.service.getFocuses();
-//   }
+    public static getFocuses = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const response: FocusResponse = await PlatformService.getFocuses();
+            const getResponse = new GetResponse(response);
+            res.status(getResponse.statusCode).json(getResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'GetUserFocuses')
-//   private async getUserFocuses(payload: IdRequestDto): Promise<FocusResponse> {
-//     return this.service.getUserFocuses(payload);
-//   }
+    public static getUserFocuses = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const {id} = req.params
+            const payload: IdRequestDto = {id};
+            const response: FocusResponse = await PlatformService.getUserFocuses(payload);
+            const getResponse = new GetResponse(response);
+            res.status(getResponse.statusCode).json(getResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'AddFocus')
-//   private async addFocus(payload: AddFocusRequestDto): Promise<GenericResponse> {
-//     return this.service.addFocus(payload);
-//   }
+    public static addFocus = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: AddFocusRequestDto = req.body;
+            const response: GenericResponse = await PlatformService.addFocus(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'EditFocusName')
-//   private async editFocusName(payload: EditFocusNameRequestDto): Promise<GenericResponse> {
-//     return this.service.editFocusName(payload);
-//   }
+    public static editFocusName = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: EditFocusNameRequestDto = req.body;
+            const response: GenericResponse = await PlatformService.editFocusName(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'SaveFocusesForUser')
-//   private async saveFocusesForUser(payload: SaveFocusesForUserRequestoDto): Promise<GenericResponse> {
-//     return this.service.saveFocusesForUser(payload);
-//   }
+    public static saveFocusesForUser = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const { userId } = req.params
+            const payload: SaveFocusesForUserRequestoDto = { ...req.body, userId };
+            const response: GenericResponse = await PlatformService.saveFocusesForUser(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   //Interest Controller
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'CreateInterest')
-//   public async createInterest(payload: CreateInterestRequestDto): Promise<InterestResponse> {
-//     return this.service.createInterest(payload);
-//   }
+    public static createInterest = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: CreateInterestRequestDto = req.body;
+            const response: GenericResponse = await PlatformService.createInterest(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'ListInterests')
-//   public async listInterest(): Promise<InterestsResponse> {
-//     return this.service.listInterests();
-//   }
+    public static listInterests = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const response: GenericResponse = await PlatformService.listInterests();
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'GetUserInterests')
-//   public async getUserInterests(payload: IdRequestDto): Promise<InterestsResponse> {
-//     return this.service.getUserInterests(payload);
-//   }
+    public static getUserInterests = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const { id } = req.params
+            const payload: IdRequestDto = { id };
+            const response: InterestsResponse = await PlatformService.getUserInterests(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'SaveInterestsForUser')
-//   public async saveInterestsForUser(payload: SaveInterestsForUserRequestDto): Promise<GenericResponse> {
-//     return this.service.saveInterestsForUser(payload);
-//   }
+    public static saveInterestsForUser = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: SaveInterestsForUserRequestDto = req.body;
+            const response: GenericResponse = await PlatformService.saveInterestsForUser(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'UpdateInterest')
-//   public async updateInterest(payload: UpdateInterestRequestDto): Promise<InterestResponse> {
-//     return this.service.updateInterest(payload);
-//   }
+    public static updateInterest = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: UpdateInterestRequestDto = req.body;
+            const response: InterestResponse = await PlatformService.updateInterest(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'DeleteInterest')
-//   public async deleteInterest(payload: IdRequestDto): Promise<GenericResponse> {
-//     return this.service.deleteInterest(payload);
-//   }
-// }
+    public static deleteInterest = asyncWrapper(
+        async (req, res): Promise<void> => {
+            const payload: IdRequestDto = req.body;
+            const response: GenericResponse = await PlatformService.deleteInterest(payload);
+            const createResponse = new CreateResponse(response);
+            res.status(createResponse.statusCode).json(createResponse);
+        }
+    );
+}

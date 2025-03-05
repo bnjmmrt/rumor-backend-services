@@ -1,6 +1,6 @@
-import { EventStatus, GuestStatus } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventStatus, Gender, GuestStatus } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { parse } from 'qs';
-import { Gender } from 'rumor-utils/shared/events/utils/event.utils';
+
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { CreateEventRequestDto, EventLocationDto, UpdateEventRequestDto } from 'rumor-utils/shared/events/dtos/events.dto';
 import { Event, EventLocation } from 'rumor-utils/shared/entities';

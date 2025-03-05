@@ -43,7 +43,7 @@ import { parse } from 'qs';
 import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { normalizeCatalogName } from '../common/helpers';
-import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, FeaturedEventSection, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from 'rumor-utils/shared/entities';
+import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, FeaturedEventSection, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates } from '../utils/event.utils';
@@ -58,12 +58,12 @@ import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-
 import database from '../database'
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 import { CreateCollaboratorDto, CreateTalentRequestDto, CreateTicketTypeRequestDto, UpdateCollaboratorDto, UpdateTalentRequestDto, UpdateTicketTypeRequestDto } from 'packages/rumor-utils/shared/events/dtos';
-import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from 'packages/rumor-utils/shared/events/dtos/quiz-question.dto';
-import { RoleData } from 'packages/rumor-utils/shared/users/grpc/auth/role.pb';
-import { UserWithRoles } from 'packages/rumor-utils/shared/users/grpc/auth/auth.pb';
-import { createCollaboratorEntity } from 'src/utils/collaborator.utils';
+import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
+import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role.pb';
+import { UserWithRoles } from '../../packages/rumor-utils/shared/users/grpc/auth/auth.pb';
+import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
-import { Role } from 'packages/rumor-utils/shared/users/entities';
+import { Role } from '../../packages/rumor-utils/shared/users/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -1474,7 +1474,7 @@ export class EventsService {
         }
       }
       //check if deleteIds contains the guest associated with it (it should not delete without reassigning)
-      const hasAssignedGuests = await this.guestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId);   //TODO: check this after taking pull from dev-temp
+      const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId);   //TODO: check this after taking pull from dev-temp
       if (hasAssignedGuests) {
         throw new Error('Cannot delete ticket types as they are assigned to guests.');
       }
@@ -1649,7 +1649,7 @@ export class EventsService {
     await queryRunner.startTransaction();
 
     try {
-      const event = await this.eventRepository.findOne({
+      const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.id, deletedAt: IsNull() },
         relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
       });
@@ -1724,19 +1724,19 @@ export class EventsService {
       }
       // 3 Update Relations if Sent in Payload
       if (payload.eventTypeId) {
-        const eventType = await this.eventTypesRepository.findOne({
+        const eventType = await this.dbConnection.getRepository(EventTypes).findOne({
           where: { id: payload.eventTypeId },
         });
         if (eventType) event.eventType = eventType;
       }
       if (payload.ageLimitId) {
-        const eventAgeLimit = await this.eventAgeLimitRepository.findOne({
+        const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
           where: { id: payload.ageLimitId },
         });
         if (eventAgeLimit) event.ageLimit = eventAgeLimit;
       }
       if (payload.admissionTypeId) {
-        const admissionType = await this.admissionTypeRepository.findOne({
+        const admissionType = await this.dbConnection.getRepository(AdmissionType).findOne({
           where: { id: payload.admissionTypeId },
         });
         if (admissionType) event.admissionType = admissionType;
@@ -1837,7 +1837,7 @@ export class EventsService {
         // this.logger.warn('No statuses provided for guest filtering.');
         return;
       }
-      const guests: Guest[] = await this.guestService.fetchGuestsByStatuses(eventId, guestStatuses);
+      const guests: Guest[] = await GuestService.fetchGuestsByStatuses(eventId, guestStatuses);
       if (!guests.length) {
         // this.logger.warn(`No guests found for event ${eventId} with statuses ${guestStatuses.join(', ')}`);
         return;

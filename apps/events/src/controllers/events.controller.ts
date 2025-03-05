@@ -90,7 +90,7 @@ export class EventsController {
     const {id} = req.params;
     const payload: RequestByIdDto = {id}
     const response: GenericResponse = await EventsService.deleteEventType(payload);
-    const successResponse = new DeleteResponse();
+    const successResponse = new DeleteResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -156,7 +156,7 @@ export class EventsController {
       payload
     );
 
-    const successResponse = new DeleteResponse();
+    const successResponse = new DeleteResponse(event);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -262,7 +262,7 @@ export class EventsController {
     const response: GenericResponse = await EventsService.deleteEventAgeLimit(
       payload
     );
-    const successResponse = new DeleteResponse();
+    const successResponse = new DeleteResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   }
   )

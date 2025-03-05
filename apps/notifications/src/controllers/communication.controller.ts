@@ -1,5 +1,4 @@
-import asyncWrapper from "../server/helpers/asyncWrapper"; // Assuming you have this utility
-
+import asyncWrapper from "../server/helpers/asyncWrapper";
 import { CommunicationService } from "../services/communication.service";
 import {
   GenericResponse,
@@ -18,7 +17,7 @@ import {
   DeleteEmailTemplateRequestDto,
   RequestByIdDto,
 } from "rumor-utils/shared/notifications/dtos/communication.dto";
-import twilioServiceInstance from "../utils/twilio/twilio.service";
+import { TwilioService } from '../utils/twilio'
 import {
   CreateResponse,
   DeleteResponse,
@@ -30,49 +29,47 @@ export class CommunicationController {
   public static sendVerificationCode = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendVerificationCodeRequestDto = req.body;
-      const response: any = await twilioServiceInstance.sendVerificationCode(
-        payload
-      );
+      const response: any = await TwilioService.sendVerificationCode(payload);
       const successResponse = new CreateResponse(
         response,
-        "Code Sent Successfully"
+        "Verification code sent successfully"
       );
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static verifyCode = asyncWrapper(async (req, res): Promise<void> => {
     const payload: VerifyCodeRequestDto = req.body;
-    const result = await twilioServiceInstance.verifyCode(payload);
+    const result = await TwilioService.verifyCode(payload);
     const response: VerifyResponse = {
       status: result.verified ? 200 : 400,
       data: result,
     };
-    const successResponse = new GetResponse(response, "Code Verified");
-    res.json(successResponse).status(successResponse.statusCode);
+    const successResponse = new GetResponse(response, "Code verified");
+    res.status(successResponse.statusCode).json(successResponse);
   });
 
   public static sendInvitationMessages = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendInvitationMessagesRequestDto = req.body;
-      twilioServiceInstance.sendInvitationMessages(payload);
+      TwilioService.sendInvitationMessages(payload);
       const response: StatusResponse = {
         success: true,
       };
       const successResponse = new GetResponse(response, "ok");
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static sendTextMessage = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SendTextMessageRequestDto = req.body;
-      twilioServiceInstance.sendTextMessage(payload);
+      TwilioService.sendTextMessage(payload);
       const response: StatusResponse = {
         success: true,
       };
       const successResponse = new GetResponse(response, "ok");
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
@@ -95,7 +92,7 @@ export class CommunicationController {
         response,
         "Template created successfully"
       );
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
@@ -104,7 +101,7 @@ export class CommunicationController {
       const response: ListEmailTemplatesResponse =
         await CommunicationService.listEmailTemplates();
       const successResponse = new GetResponse(response, "Ok");
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
@@ -114,7 +111,7 @@ export class CommunicationController {
       const response: GenericResponse =
         await CommunicationService.deleteEmailTemplate(payload);
       const deleteResponse = new DeleteResponse("Template deleted");
-      res.json(deleteResponse).status(deleteResponse.statusCode);
+      res.status(deleteResponse.statusCode).json(deleteResponse);
     }
   );
 
@@ -124,7 +121,7 @@ export class CommunicationController {
       const response: EmailTemplatesResponse =
         await CommunicationService.getEmailTemplate(payload);
       const successResponse = new GetResponse(response, "Ok");
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 }

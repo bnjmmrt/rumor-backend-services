@@ -40,6 +40,8 @@ import { PushNotificationToken } from "./push-notification-token.entity";
 import { HostUserMapping } from "./host-user-mapping.entity";
 import { SignupFormSubmissions } from "../../events/entities/signup-form-submissions.entity";
 import { EventSignupForms } from "../../events/entities/event-signup-forms.entity";
+import { Notification } from "../../notifications/entities/notification.entity";
+
 import { HostFeedback } from "./host-feedback.entity";
 import { HostUserSettings } from "./host-user-settings.entity";
 import { RestrictedInvites } from "../../events/entities";
@@ -193,6 +195,11 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => EventSignupForms, (esf) => esf.event)
   signupForms: EventSignupForms[];
 
+  @OneToMany(() => Notification, (notification) => notification.linkedUser)
+  triggeredNotifications: Notification[];
+
+  @ManyToMany(() => Notification, (notification) => notification.recipients)
+  notifications: Notification[];
   @OneToMany(() => HostFeedback, (hostFeedback) => hostFeedback.user)
   hostFeedbacks: Relation<HostFeedback[]>;
 

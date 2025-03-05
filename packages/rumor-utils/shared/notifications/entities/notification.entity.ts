@@ -1,41 +1,48 @@
 import { RumorBaseEntity } from '../../../shared/entities/rumor-base.entity';
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { NotificationSource, NotificationStatus, NotificationType, RecipientsType } from '../interfaces/notification.interface';
-import { EmailTemplate } from './email-templates.entity';
+import { Entity, Column, ManyToOne, ManyToMany, JoinTable, JoinColumn } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { Event } from '../../events/entities/event.entity';
 
-@Entity()
+@Entity({ name: 'notifications' })
 export class Notification extends RumorBaseEntity {
-  @Column({ name: 'title', type: 'varchar' })
-  title: string;
+    @Column({ type: 'varchar', name: 'title', nullable: false })
+    title: string;
 
-  @Column({ name: 'message', type: 'varchar' })
-  message: string;
+    @Column({ type: 'text', name: 'message', nullable: false })
+    message: string;
 
-  @Column({ name: 'date', type: 'date' })
-  date: string;
+    @Column({ type: 'jsonb', name: 'body', nullable: false })
+    body: object;
 
-  @Column({ name: 'time', type: 'varchar' })
-  time: string;
+    @Column({ type: 'date', name: 'date', nullable: true })
+    date?: string;
 
-  @Column({ name: 'type', type: 'jsonb', nullable: true })
-  type?: NotificationType[];
+    @Column({ type: 'varchar', name: 'time', nullable: true })
+    time?: string;
 
-  @Column({ name: 'recipients', type: 'jsonb', nullable: true })
-  recipients?: RecipientsType[];
+    @Column({ type: 'varchar', name: 'notification_type', nullable: false })
+    notificationType: string;
 
-  @Column({ name: 'emails', type: 'jsonb', nullable: true })
-  emails?: string[];
+    @Column({ type: 'varchar', name: 'notification_module', nullable: false })
+    notificationModule: string;
 
-  @Column({ name: 'user_ids', type: 'jsonb', nullable: true })
-  userIds?: string[];
+    @Column({ type: 'boolean', name: 'is_seen', default: false })
+    isSeen: boolean;
 
-  @Column({ name: 'status', type: 'enum', enum: NotificationStatus, default: NotificationStatus.DRAFT })
-  status: NotificationStatus;
+    @ManyToMany(() => User, (user) => user.notifications, { cascade: ['insert', 'update'] })
+    @JoinTable({
+        name: 'notification_recipients',
+        joinColumn: { name: 'notification_id', referencedColumnName: 'id' },
+        inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    })
+    recipients: User[];
 
-  @Column({ name: 'source', type: 'enum', enum: NotificationSource, default: NotificationSource.CUSTOM })
-  source: NotificationSource;
+    @ManyToOne(() => Event, { nullable: true, onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+    @JoinColumn({ name: 'linked_event_id' })
+    linkedEvent?: Event;
 
-  @ManyToOne(() => EmailTemplate, (template) => template.notifications, { nullable: true, cascade: true })
-  @JoinColumn({ name: 'related_template', referencedColumnName: 'id' })
-  relatedTemplate?: Partial<EmailTemplate>;
+    @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+    @JoinColumn({ name: 'linked_user_id' })
+    linkedUser?: User;
 }
+
