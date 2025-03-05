@@ -17,7 +17,8 @@ export class RoleController {
 
   public static assignRoleToUser = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: RoleRequestDto = req.body;
+      const { id } = req.params;
+      const payload: RoleRequestDto = { ...req.body, userId: id };
       const response: GenericResponse = await RoleService.assignRoleToUser(payload);
       res.json(response);
     }
@@ -73,7 +74,8 @@ export class RoleController {
 
   public static markUserAsSpam = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
+      const { id } = req.params
+      const payload: IdRequestDto = { id };
       const response: GenericResponse = await RoleService.markUserAsSpam(payload);
       res.json(response);
     }

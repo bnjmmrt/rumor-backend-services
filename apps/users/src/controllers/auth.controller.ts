@@ -429,7 +429,8 @@ export class AuthController {
 
   public static getMembersOrNonMembers = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: ListUsersInviteesDto = req.body;
+      const queryParams = req.query
+      const payload: ListUsersInviteesDto = { ...req.body, query: queryParams };
       const response: GetMembersResponse = await AuthService.getMembersOrNonMembers(payload);
       const successResponse = new GetResponse(response,);
       res.status(successResponse.statusCode).json(successResponse);
