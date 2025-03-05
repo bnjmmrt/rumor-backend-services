@@ -16,6 +16,9 @@ export class SignupFormQuestions extends RumorBaseEntity {
   @Column({ type: "varchar", name: "name" })
   name: string;
 
+  @Column({ type: "varchar", name: "value", default: null })
+  value: string;
+
   @Column({ type: "integer", name: "ordering", default: 0 })
   ordering: number;
 

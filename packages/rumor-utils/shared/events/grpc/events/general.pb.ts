@@ -4,6 +4,8 @@
 //   protoc               v5.29.1
 // source: grpc/events/general.proto
 
+import { EventStatusEnum } from "shared/events/interfaces/event.interface";
+
 /* eslint-disable */
 
 export const protobufPackage = "events";
@@ -696,6 +698,7 @@ export interface SignupFormsResponse {
   type?: string;
   ageLimit?: EventAgeLimit;
   timeZone: string;
+  eventStatus: EventStatusEnum;
 }
 
 export interface ISignupFormQuestionsRequest {
@@ -705,6 +708,7 @@ export interface ISignupFormQuestionsRequest {
   isRequired: boolean;
   answers?: string;
   ordering?: number;
+  value?: string;
 }
 
 export const EVENTS_PACKAGE_NAME = "events";
