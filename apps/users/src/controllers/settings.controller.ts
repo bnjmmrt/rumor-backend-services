@@ -1,4 +1,3 @@
-import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { SettingsService } from '../services/settings.service';
 import {
   DeleteNotificationTokenRequestDto,
@@ -6,35 +5,43 @@ import {
   UpdateNotificationSettingRequestDto,
   SaveNotificationTokenRequestDto,
 } from 'rumor-utils/shared/users/dtos/settings.dto';
-import { GetPushNotificationTokensResponse, SETTINGS_SERVICE_NAME, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
+import { GetPushNotificationTokensResponse, UserSettingResponse } from 'rumor-utils/shared/users/grpc/auth/settings.pb';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 
-// @Controller('settings')
+import {
+  GetResponse,
+  UpdateResponse,
+} from "rumor-utils/success";
 export class SettingsController {
-  // @Inject(SettingsService)
-  //private readonly service: SettingsService;
-  // Profile Notifications Settings
 
-  //@GrpcMethod(SETTINGS_SERVICE_NAME, 'GetUserSettings')
   public static getNotificationSettings = asyncWrapper(
     async (req, res): Promise<void> => {
-      const userId = req.user;
+      const { userId } = req.user;
       const response: UserSettingResponse = await SettingsService.getNotificationSettings(userId);
-      res.json(response);
+      const successResponse = new GetResponse(
+        response
+      );
+      res.json(successResponse).status(successResponse.statusCode);
     }
   );
 
-  //@GrpcMethod(SETTINGS_SERVICE_NAME, 'UpdateNotificationSettings')
   public static updateNotificationSettings = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateNotificationSettingRequestDto = req.body;
+      const payload: UpdateNotificationSettingRequestDto = {
+          userId: req.user.userId,
+          enableSmsNotifications: req.body.enableSmsNotifications,
+          enableAppNotifications: req.body.enableAppNotifications,
+          enableEmailNotifications: req.body.enableEmailNotifications
+      } 
       const response: UserSettingResponse = await SettingsService.updateNotificationSettings(payload);
-      res.json(response);
+      const successResponse = new UpdateResponse(
+        response
+      );
+      res.json(successResponse).status(successResponse.statusCode);
     }
   );
 
-  //@GrpcMethod(SETTINGS_SERVICE_NAME, 'GetPushNotificationTokens')
   public static getPushNotificationTokens = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: GetPushNotificationTokensRequestDto = req.body;
@@ -43,7 +50,6 @@ export class SettingsController {
     }
   );
 
-  //@GrpcMethod(SETTINGS_SERVICE_NAME, 'SavePushNotificationToken')
   public static savePushNotificationToken = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: SaveNotificationTokenRequestDto = req.body;
@@ -52,7 +58,6 @@ export class SettingsController {
     }
   );
 
-  //@GrpcMethod(SETTINGS_SERVICE_NAME, 'DeletePushNotificationToken')
   public static deletePushNotificationToken = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: DeleteNotificationTokenRequestDto = req.body;
