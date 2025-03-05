@@ -180,6 +180,11 @@ export interface GetUserVouchesResponse {
   data: UserVouch[];
 }
 
+export interface GetUserVouchRequest {
+  requesterId: string;
+  eventId: string;
+}
+
 /** Save Referred User */
 export interface ReferredUserRequest {
   userId: string;
@@ -209,7 +214,6 @@ export interface GetSentReferralRequestsResponse {
   error?: Error | undefined;
   data: ReferralRequestStatus[];
 }
-
 export const PLATFORM_PACKAGE_NAME = "platform";
 
 export interface PlatformServiceClient {

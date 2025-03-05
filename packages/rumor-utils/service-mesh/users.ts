@@ -2,7 +2,7 @@ import apiService from './apiService';
 
 import { InvitedGuestRequestDto } from '../shared/events/dtos/guest.dto';
 
-export const validate = (baseURL:string, token: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { token });
+export const validate = () => apiService.getApi().post(`/auth/validate`);
 
 export const getCurrentMember = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/users/${id}`);
 

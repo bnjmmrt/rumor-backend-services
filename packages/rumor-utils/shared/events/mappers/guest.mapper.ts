@@ -1,6 +1,6 @@
 import { Guest as GuestEntity } from "../entities/guest.entity";
 import { User } from '../../users/entities/user.entity';
-import { Guest, GuestData, GuestDataSimple, GuestStatus as GuestStatusProto, QuizData, UserSource, VouchesData } from '../grpc/events/general.pb';
+import { Guest, GuestData, GuestDataSimple, GuestStatus as GuestStatusProto, InterestData, QuizData, UserSource, VouchesData } from '../grpc/events/general.pb';
 import { GuestStatus, TicketStatusEnum } from '../interfaces/event.interface';
 import { calculateAge } from '../../../utils/utils';
 import { entityToUserSource, entityToUserStatus } from '../../users/mappers/shared.mapper';
@@ -56,6 +56,7 @@ export const toGuest = (
   socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
   vouches?: UserVouch[] | undefined,
   answers?: UserQuizAnswer[] | undefined,
+  interests: InterestData[] = [],
 ): Guest => {
   let totalFollowerCount = 0;
 
@@ -75,13 +76,15 @@ export const toGuest = (
   const roles = guest?.user?.roles?.length > 0 ? guest.user.roles[0] : undefined;
   const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
   const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   return {
     userId: guest.user?.id,
     id: guest.id,
     name: `${guest.user?.firstName || ''} ${guest.user?.lastName || ''}`,
     addedBy,
     addedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    invitationSource: invitationSourceNumber,
     declinedBy: `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`,
     declinedByPicture: guest.declinedBy ? guest.declinedBy?.profilePicture : '',
     status: entityToGuestStatus[guest.status],
@@ -92,8 +95,8 @@ export const toGuest = (
     category: focuses.map((focus) => focus.name),
     maxAdditionalGuests: guest.maxAdditionalGuests,
     source: roles ? entityToUserSource[roles.source] : null,
-    checkIn: false,
-    additionalRequestedGuests: guest?.additionalRequestedGuests || null,
+    checkIn: guest.checkIn,
+    additionalRequestedGuests: guest?.additionalRequestedGuests || 0,
     profilePicture: guest?.user?.profilePicture || '',
     questions: answers?.length
       ? answers.map((item) => {
@@ -107,7 +110,10 @@ export const toGuest = (
       : [],
     email: guest?.user?.email,
     privateGuestNote: guest?.privateGuestNote,
-    isBanned: guest?.user?.roles?.some((item) => item.isBlacklisted) ?? false,
+    age: calculateAge(guest.user.dateOfBirth),
+    interest: interests ? interests.map((interest) => interest.name) : [],
+    gender: 0,
+    additionalGuests: [],
   };
 };
 
@@ -131,7 +137,7 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
   };
 };
 
-export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[]): GuestData => {
+export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
   const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
   const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
   const declinedBy = guest.declinedBy ? `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}` : '';
@@ -155,8 +161,8 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     age: calculateAge(user.dateOfBirth),
     address: user.address,
     interest: user.interests || [],
-    followsYou: false,
-    favorite: false,
+    followsYou,
+    favorite,
     addedBy,
     addedByPicture,
     declinedBy,
@@ -166,6 +172,9 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     categories: focuses.map((focus) => focus.name),
     guestId: guest.id,
     userId: user.id,
+    additionalGuests: additionalGuestData,
+    checkIn: guest.checkIn,
+    addedById: guest.addedBy?.id,
   };
 };
 

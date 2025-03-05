@@ -26,7 +26,7 @@ export const buildSignupFormsResponse = (
     type: event.eventType?.name,
     ageLimit: event.ageLimit,
     talents: event.talents,
-    collaborators: event.collaborators,
+    collaborators: [],
     styling: esf.styling,
     userId: esf.createdBy.id,
     userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,

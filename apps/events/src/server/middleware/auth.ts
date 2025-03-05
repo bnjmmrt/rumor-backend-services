@@ -1,0 +1,35 @@
+import * as serviceMesh from 'rumor-utils/service-mesh';
+import { Request, Response, NextFunction } from 'express';
+import config from '../../config';
+import apiService from 'rumor-utils/service-mesh';
+import { AuthorizationError } from 'rumor-utils/errors';
+class AuthMiddleware {
+    static fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+       
+        const authorization = req.header("Authorization");
+        if (!authorization) {
+            res.status(401).send("Unauthorized");
+        }
+
+        const tokenParts = authorization.split("Bearer ");
+        if (tokenParts.length < 2) {
+            res.status(401).send("Unauthorized");
+        }
+        const token = tokenParts[1];
+
+        apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+        
+        const response = await serviceMesh.validate();
+
+        if (!response || !response.data) {
+            throw new AuthorizationError('Authorization Error')
+        }
+
+        const userId = response.data;
+        (req as any).user = userId;
+        
+        next();
+    };
+}
+
+export default AuthMiddleware;

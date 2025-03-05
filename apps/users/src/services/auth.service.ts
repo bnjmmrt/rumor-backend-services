@@ -32,6 +32,10 @@ import {
   NonMemberSignUpRequestDto,
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
+  UpdateCustomUsersListRequestDto,
+  FilterRequestDto,
+  DuplicateCustomListRequestDto,
+  ManageUserRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -56,6 +60,11 @@ import {
   SimpleUserResponse,
   GetUserWithRolesByEmailResponse,
   CreateUserResponse,
+  GetUsersResponse,
+  UserResponseData,
+  UserFilterOptionsResponse,
+  customListData,
+  FocusProto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -72,7 +81,7 @@ import {
   ChangePasswordRequest,
 } from '@fusionauth/typescript-client';
 
-import { newAddress, newHost, newMember } from '../utils/auth.util';
+import { formatDateToMMDDYYYYHHmm, newAddress, newHost, newMember, prepareQueryString } from '../utils/auth.util';
 import {
   entityToGender,
   genderToEntity,
@@ -82,12 +91,14 @@ import {
   toCurrentUser,
   toSimpleUser,
   toUserDataSimple,
+  toUser,
+  toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
-import { hasPagination, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { hasPagination, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import { AdditionalHostInformation, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { entityToProviderType, providerTypeToEntity } from 'rumor-utils/shared/users/mappers/social.mapper';
@@ -120,10 +131,10 @@ import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } fr
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
 import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
-import { toBasicHostProfile, toHostProfile, toMemberProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
+import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { GenericResponse, NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -138,6 +149,11 @@ import * as tz from 'dayjs/plugin/timezone';
 import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
+import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
+import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
+
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -161,7 +177,7 @@ export class AuthService {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: { email: payload.email, deletedAt: IsNull() },
       });
-      
+
       if (!user) {
         return responses.forbidden('Verify your password and email');
       }
@@ -329,12 +345,12 @@ export class AuthService {
       newUser.id = fusionAuthUser.response?.user?.id;
       newUser = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'member' });
-      
+
       // Micro-service call - need to shift the focus from platfrom to users
       //await this.platformClient.saveFocusesForUser(newUser.id, payload.focusIds, this.logger);
-      
+
       // await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
-      
+
       // Micro-service call - need to shift this call to notifications services, right now at commununication service
 
       // await this.communicationClient.sendEmailFromTemplate(
@@ -392,9 +408,9 @@ export class AuthService {
       newUser = await this.dbConnection.getRepository(User).save(newUser);
 
       await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
-      
+
       // Micro-service call
-      
+
       // await this.communicationClient.sendEmailFromTemplate(
       //   [
       //     {
@@ -448,6 +464,14 @@ export class AuthService {
       return responses.badRequest('Unknown error occurred, please try again later.');
     }
   }
+
+  public static async checkService(){
+    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
+    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
+    let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
+    return response
+  }
+
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
     try {
@@ -520,7 +544,6 @@ export class AuthService {
       const request: ChangePasswordRequest = {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
         loginId: user.email,
-        currentPassword: payload.currentPassword,
         password: payload.newPassword,
       };
 
@@ -556,7 +579,7 @@ export class AuthService {
         return responses.badRequest('Unable to call forgot password, please try again later.');
       }
       const redirectPath = `auth/reset-password/${token}`;
-      
+
       // Micro-service call
 
       // const mailServiceResponse = await this.communicationClient.sendEmailFromTemplate(
@@ -691,7 +714,7 @@ export class AuthService {
       //   }),
       // );
       //const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
-      
+
       //Micro-service call
       // const success = await this.communicationClient.sendInvitationMessages(successfulInvitations, user.firstName);      
       // if (!success) return responses.badRequest('An error occured while sending invitations, please try again.');
@@ -759,9 +782,9 @@ export class AuthService {
         const message =
           `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
           (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
-        
+
         //Micro-service call
-          // const success = await this.communicationClient.sendTextMessage(payload.phoneNumber, message);
+        // const success = await this.communicationClient.sendTextMessage(payload.phoneNumber, message);
         // if (!success) {
         //   return responses.badRequest('An error occured while sending SMS invitation, please try again.');
         // }
@@ -961,7 +984,7 @@ export class AuthService {
 
       if (isEmailLogin) {
         //TODO: change and proper format
-        
+
         // Micro-service call
         // await this.communicationClient.sendEmailFromTemplate(
         //   [
@@ -1012,8 +1035,8 @@ export class AuthService {
       if (!user && !payload.isExist) {
         const verificationResult = isEmailLogin
         // Micro-servc
-          // ? await this.verifyCodeByEmail(payload.email, payload.code)
-          // : await this.communicationClient.verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
+        // ? await this.verifyCodeByEmail(payload.email, payload.code)
+        // : await this.communicationClient.verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
 
         if (!verificationResult) {
           return responses.notFound('Invalid or expired verification code, please try again.');
@@ -1155,7 +1178,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-      return responses.data(toCurrentMember(user, [{id:"1",name:"focuses"}], memberRole, socialProvider?.username));
+      return responses.data(toCurrentMember(user, [{ id: "1", name: "focuses" }], memberRole, socialProvider?.username));
     } catch (err) {
       return responses.badRequest('Unable to get user, please try again.');
     }
@@ -1191,7 +1214,7 @@ export class AuthService {
 
       //Micro-service call
       //const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-      return responses.data(user.roles.map((role) => toCurrentUser(user, [{id:"1",name:"focuses"}], role)));
+      return responses.data(user.roles.map((role) => toCurrentUser(user, [{ id: "1", name: "focuses" }], role)));
     } catch (err) {
       return responses.badRequest('Unable to get user, please try again.');
     }
@@ -1336,13 +1359,13 @@ export class AuthService {
         source: memberRole.source ? entityToUserSource[memberRole.source] : null,
         address: responseUser.address
           ? {
-              id: responseUser.address.id,
-              address: responseUser.address?.address,
-              googlePlaceId: responseUser.address.googlePlaceId,
-              latitude: String(responseUser.address.latitude),
-              longitude: String(responseUser.address.longitude),
-              city: responseUser.address.city,
-            }
+            id: responseUser.address.id,
+            address: responseUser.address?.address,
+            googlePlaceId: responseUser.address.googlePlaceId,
+            latitude: String(responseUser.address.latitude),
+            longitude: String(responseUser.address.longitude),
+            city: responseUser.address.city,
+          }
           : null,
       });
     } catch (err) {
@@ -1484,6 +1507,79 @@ export class AuthService {
     }
   }
 
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<GenericResponse> {
+      const payloadStatus = userStatusToEntity[payload.status];
+      const users = await this.dbConnection.getRepository(User).find({
+        where: { id: In(payload.ids), deletedAt: null },
+        relations: { roles: { role: true } },
+      });
+
+      if (users.length === 0) return responses.notFound('Users not found!');
+
+      const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+      if (!memberRole) {
+        return responses.badRequest('Error updating user status.');
+      }
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: In(payload.ids) } },
+        relations: ['user', 'role'],
+      });
+
+      if (userRoles.length === 0) {
+        return responses.badRequest('Error updating user status.');
+      }
+
+      const failedUsers: string[] = [];
+      const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
+
+      for (const userRole of userRoles) {
+        if (payloadStatus === UserStatus.WAITLISTED && userRole.status === UserStatus.ACTIVE) {
+          failedUsers.push(userRole.user.id);
+          continue;
+        }
+        if (payloadStatus === UserStatus.ACTIVE) {
+          const user = users.find((u) => u.id === userRole.user.id);
+          if (user && user.roles.some((role) => role.role.name === 'non_member')) {
+            usersToUpdate.push({ userRole, newStatus: payloadStatus, newRole: memberRole });
+            continue;
+          }
+        }
+        usersToUpdate.push({ userRole, newStatus: payloadStatus });
+      }
+
+      // Perform bulk updates only for valid users
+      for (const update of usersToUpdate) {
+        update.userRole.status = update.newStatus;
+        if (update.newRole) {
+          update.userRole.role = update.newRole;
+        }
+        await this.dbConnection.getRepository(UserRole).save(update.userRole);
+
+        // Send email only to users who are now "ACTIVE" and got the "member" role
+        if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
+          const user = users.find((u) => u.id === update.userRole.user.id);
+          // if (user) {
+          //   await this.communicationClient.sendEmailFromTemplate(
+          //     [
+          //       {
+          //         key: 'link_to_application',
+          //         value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+          //       },
+          //     ],
+          //     'Member Approved into Rumor',
+          //     [user.email], // Send email to the approved member
+          //     null,
+          //     this.logger,
+          //   );
+          // }
+        }
+      }
+
+      return responses.ok;
+   
+  }
+
   public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<CreateNonMemberUserResponse> {
     try {
       const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
@@ -1506,9 +1602,9 @@ export class AuthService {
     const hostId = payload.userId;
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
     const where: unknown = { deletedAt: null };
     let customListName = parsedQuery.customListName;
@@ -1524,7 +1620,7 @@ export class AuthService {
           relations: ['users'],
         });
         if (customList) {
-          const customListUserIds = customList.users.map((user) => user.id);
+          const customListUserIds = customList.usersLists.map((listUser) => listUser.user.id);
           const existingUserIds = Array.isArray(parsedQuery.usersIds)
             ? parsedQuery.usersIds.filter((id): id is string => typeof id === 'string')
             : typeof parsedQuery.usersIds === 'string'
@@ -1565,7 +1661,7 @@ export class AuthService {
     );
     const members = await Promise.all(
       users.map(async (user) => {
-        
+
         // Micro-service call
         // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
         // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
@@ -1635,7 +1731,7 @@ export class AuthService {
   }
 
   public static async addFollowHost(follower: User, host: User): Promise<void> {
-    const followHost = {follower, host}
+    const followHost = { follower, host }
     await this.dbConnection.getRepository(HostFollowing).save(followHost);
   }
 
@@ -1695,51 +1791,68 @@ export class AuthService {
     }
   }
 
-  public static async getCustomUsersLists(payload: IdRequestDto): Promise<CustomUsersListsResponse> {
-    const { id: userId } = payload;
-    try {
+  public static async getCustomUsersLists(payload: CustomUsersListRequestDto): Promise<CustomUsersListsResponse> {
+    const { userId } = payload;
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined; try {
+
+
       const user = await this.dbConnection.getRepository(User).findOne({
         where: { id: userId },
         relations: {
-          customLists: {
-            users: {
-              address: true,
-              roles: { role: true },
-              socialProviders: true,
-              hostedEvents: true,
-            },
-          },
+          customLists: { usersLists: true },
+          favoritedMembers: true,
+          followers: true,
+        },
+        order: {
+          customLists: { createdAt: 'DESC' },
         },
       });
 
-      if (!user || !user.customLists?.length) {
-        return responses.data([]);
+      if (!user) {
+        return responses.data({ count: 0, list: [] });
       }
 
-      const customLists = user.customLists.map((list) => ({
-        customName: list.listName,
-        users: list.users.map((user) => toUserDataSimple(user)),
-      }));
+      const allLists = [
+        { id: null, name: 'Followed', count: user.followers.length, users: [] },
+        { id: null, name: 'Favorite', count: user.favoritedMembers.length, users: [] },
+        ...user.customLists.map((list) => ({
+          id: list.id,
+          name: list.listName,
+          count: list.usersLists.length,
+          users: [],
+        })),
+      ];
 
-      return responses.data(customLists);
+      return responses.data({
+        count: allLists.length,
+        list: allLists.slice(skip, take ? skip + take : undefined),
+      });
+
     } catch (err) {
       return responses.badRequest('Error at get custom users list.');
     }
   }
 
   public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId } = payload;
-    try {
-      const parsedQuery = parse(payload.query);
-      if (!parsedQuery.customName) {
-        return responses.badRequest('Custom name is required!');
-      }
-
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: {
-          customLists: {
-            users: {
+    const parsedQuery = parse(payload.query) as ParsedQs;
+    const customListId = payload.id;
+    const hostId = payload.userId;
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: {
+        customLists: {
+          usersLists: {
+            user: {
               address: true,
               roles: { role: true },
               socialProviders: true,
@@ -1747,130 +1860,233 @@ export class AuthService {
             },
           },
         },
-      });
+      },
+    });
 
-      if (!user) {
-        return responses.notFound('User not found!');
-      }
-
-      const customList = user.customLists.find((list) => list.listName === parsedQuery.customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found!');
-      }
-
-      return responses.data({
-        customName: parsedQuery.customName as string,
-        users: customList.users.map((user) => toUserDataSimple(user)),
-      });
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+    if (!user) {
+      throw new NotFoundError("User");
     }
+
+    const customList = user.customLists.find((list) => list.id === customListId);
+    if (!customList) {
+      throw new NotFoundError("CustomList");
+    }
+
+    const userIds = customList.usersLists.map((listUser) => listUser.user.id);
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .innerJoin('host_custom_users_lists_users', 'usersList', 'user.id = usersList.user_id')
+      .innerJoin('host_custom_users_lists', 'customList', 'usersList.list_id = customList.id')
+      .where('customList.host_id = :hostId', { hostId: hostId })
+      .andWhere('customList.id = :listId', { listId: customListId });
+
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('usersList.createdAt', 'DESC');
+    }
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes);
+
+    const [allUsers, totalCount] = await queryBuilder.getManyAndCount();
+    let paginatedUsers = allUsers;
+    if (take !== undefined && skip !== undefined) {
+      paginatedUsers = allUsers.slice(skip, skip + take);
+    }
+
+
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: hostId } },
+      relations: ['member'],
+    });
+    const favoriteUserIds = favorites.map((fav) => fav.member.id);
+    this.dbConnection.getRepository(HostCustomUsersListsUsers).find
+    const userMappingIds = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+      where: {
+        list: { id: customListId },
+        user: In(userIds),
+      },
+      relations: ['user'],
+      select: ['id', 'user'],
+    });
+
+    const mappingIdMap: { [key: string]: string } = {};
+    userMappingIds.forEach((mapping) => {
+      mappingIdMap[mapping.user.id] = mapping.id;
+    });
+
+    const users = await Promise.all(
+      paginatedUsers.map(async (user) => {
+        const focuses = [] // await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = [] // await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
+
+        const socialProviderUsername = socialProvider?.username || null;
+
+        const userData = toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        const mappingId = mappingIdMap[user.id];
+        userData.listMappingId = mappingId;
+        return userData;
+      }),
+    );
+
+    return responses.data({
+      name: customList.listName,
+      id: customList.id,
+      count: totalCount,
+      users: users,
+    });
   }
 
-  public static async deleteCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId } = payload;
-    try {
-      const parsedQuery = parse(payload.query);
-      if (!parsedQuery.customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: { customLists: true },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const customList = user.customLists.find((list) => list.listName === parsedQuery.customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found.');
-      }
-      await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+  public static async deleteCustomUsersList(payload: UserAndIdRequestDto): Promise<GenericResponse> {
+    const { userId, id } = payload;
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+    if (!user) {
+      throw new NotFoundError("User");
     }
+    const customList = user.customLists.find((list) => list.id === id);
+    if (!customList) {
+      throw new NotFoundError("Custom List");
+    }
+    await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
+    return responses.ok;
   }
 
   public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
     const { userId, customName, userIds } = payload;
-    try {
-      if (!customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: { customLists: true },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const existingList = user.customLists.find((list) => list.listName === customName);
-      if (existingList) {
-        return responses.badRequest('Custom list already exists.');
-      }
-      const validUsers = await this.dbConnection.getRepository(User).find({
-        where: { id: In(userIds) },
-      });
-      if (validUsers.length !== userIds.length) {
-        return responses.badRequest('Invalid user IDs provided.');
-      }
-
-      const customList = new HostCustomUsersLists();
-      customList.listName = customName;
-      customList.users = validUsers; // Set the users directly instead of userIds
-      customList.host = user;
-      await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
-
-      const customListSaved = await this.getCustomUsersList({
-        userId,
-        query: `customName=${encodeURIComponent(customName)}`,
-      });
-      return responses.data(customListSaved.data);
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+    if (!customName) {
+      return responses.badRequest('Custom list name is required.');
     }
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+    if (!user) {
+      throw new NotFoundError("User");
+    }
+    const existingList = user.customLists.find((list) => list.listName === customName);
+    if (existingList) {
+      throw new BadRequestError("existingList");
+    }
+    const validUsers = await this.dbConnection.getRepository(User).find({
+      where: { id: In(userIds) },
+    });
+    if (validUsers.length !== userIds.length) {
+      throw new BadRequestError("userIds");
+    }
+
+    const customList = new HostCustomUsersLists();
+    customList.listName = customName;
+    customList.host = user;
+    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
+    const userListEntries = validUsers.map((validUser) => {
+      const listUser = new HostCustomUsersListsUsers();
+      listUser.user = validUser;
+      listUser.list = customList;
+      return listUser;
+    });
+
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+
+    const customListSaved = await this.getCustomUsersList({
+      userId: userId,
+      id: savedCustomList.id,
+      query: 'take=10&skip=0',
+    });
+    return responses.data(customListSaved.data);
+
   }
 
-  public static async updateCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId, customName, userIds } = payload;
-    try {
-      if (!customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: {
-          customLists: {
-            users: true, // Include users relation
-          },
-        },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const customList = user.customLists.find((list) => list.listName === customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found.');
-      }
-      const validUsers = await this.dbConnection.getRepository(User).find({
-        where: { id: In(userIds) },
-      });
-      if (validUsers.length !== userIds.length) {
-        return responses.badRequest('Invalid user IDs provided.');
-      }
-
-      customList.users = validUsers; // Update the users relation directly
-      await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
-
-      const customListSaved = await this.getCustomUsersList({
-        userId,
-        query: `customName=${encodeURIComponent(customName)}`,
-      });
-      return responses.data(customListSaved.data);
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+  public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
+    const { hostId, name, userIds, customListId, mappingIds } = payload;
+    if (!name) {
+      throw new BadRequestError("CustomName");
     }
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: { customLists: { usersLists: { user: true } } },
+    });
+    if (!host) {
+      throw new NotFoundError("Host");
+    }
+    const customList = host.customLists.find((list) => list.id === customListId);
+    if (!customList) {
+      throw new NotFoundError("customList");
+    }
+
+    if (customList.listName !== name) {
+      customList.listName = name;
+      await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
+    }
+
+    const existingUserIds = customList.usersLists.map((listUser) => listUser.user.id);
+    const userIdsToAdd = userIds.filter((id) => !existingUserIds.includes(id));
+
+    if (userIdsToAdd.length) {
+      const validUsers = await this.dbConnection.getRepository(User).find({ where: { id: In(userIdsToAdd) } });
+
+      if (validUsers.length !== userIdsToAdd.length) {
+        throw new NotFoundError("InvalidIds");
+      }
+
+      const userListEntries = validUsers.map((validUser) => {
+        const listUser = new HostCustomUsersListsUsers();
+        listUser.user = validUser;
+        listUser.list = customList;
+        return listUser;
+      });
+
+      await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+    }
+
+    if (mappingIds.length) {
+      const existingMappings = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+        where: { id: In(mappingIds) },
+      });
+
+      const existingMappingIds = existingMappings.map((mapping) => mapping.id);
+      const invalidMappingIds = mappingIds.filter((id) => !existingMappingIds.includes(id));
+
+      if (invalidMappingIds.length) {
+        throw new NotFoundError("invalidMappingIds");
+      }
+
+      await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({
+        id: In(existingMappingIds),
+      });
+    }
+
+    const customListSaved = await this.getCustomUsersList({
+      userId: hostId,
+      id: customList.id,
+      query: 'take=10&skip=0',
+    });
+    return responses.data(customListSaved.data);
   }
 
   public static async manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<GenericResponse> {
@@ -1904,59 +2120,72 @@ export class AuthService {
     }
   }
 
-  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
-    try {
+  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+   
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const name = parsedQuery?.name ? parsedQuery.name : undefined;
+      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+      const type = parsedQuery?.type;
+      const gender = parsedQuery?.gender;
+      const focuses = parsedQuery.category;
+      const baseCity = parsedQuery.basecity;
+      const interest = parsedQuery.interest;
       const user = await this.dbConnection.getRepository(User).findOne({
         where: { id: payload.userId },
         relations: { favoritedMembers: { member: true } },
       });
       if (!user) return responses.badRequest('User not found!');
-      const favoriteIds = user.favoritedMembers.map((favorite) => favorite.member.id);
-      const whereCondition: any = { id: In(favoriteIds) };
-      if (name) {
-        whereCondition.firstName = ILike(`%${name}%`);
-      }
-      const favoriteUsers = await this.dbConnection.getRepository(User).find({
-        where: [whereCondition, { lastName: ILike(`%${name}%`) }],
-        relations: {
-          address: true,
-          roles: { role: true },
-          socialProviders: true,
-          hostedEvents: true,
-          socialStats: true,
-        },
-        take,
-        skip,
-      });
-      const members = await Promise.all(
-        favoriteUsers.map(async (user) => {
+      const queryBuilder = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.address', 'address')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
+        .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+        .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+        .leftJoinAndSelect('user.socialStats', 'socialStats')
+        .innerJoin('user.favoritedByHosts', 'hf')
+        .addSelect(['hf.createdAt'])
+        .where('hf.host.id = :hostId', { hostId: payload.userId })
+        .take(take)
+        .skip(skip);
 
-          //Micro-service call
-          // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-          // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
+      let userTypes: string[] = [];
+      if (type && typeof type === 'string') {
+        userTypes = type.split(',').map((name) => name.trim());
+      }
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      } else {
+        queryBuilder.orderBy('hf.createdAt', 'DESC');
+      }
+      await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+      const [favoriteUsers, totalCount] = await queryBuilder.getManyAndCount();
+      const users = await Promise.all(
+        favoriteUsers.map(async (user) => {
+          const focuses = [];
+          const interests = [];
 
           const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
             where: {
               user: {
                 id: user.id,
               },
-              type: SocialProviderType.FACEBOOK,
+              type: SocialProviderType.INSTAGRAM,
             },
             relations: ['user'],
           });
 
-          return toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-          //return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+          const socialProviderUsername = socialProvider?.username || null;
+
+          return toUser(user, focuses, interests, user.roles[0], {
+            INSTAGRAM: socialProviderUsername,
+          });
         }),
       );
-      return responses.data(members);
-    } catch (err) {
-      return responses.badRequest('Error at get favorite users.');
-    }
+      return responses.data({ users, totalCount });
+    
   }
 
   public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
@@ -2013,9 +2242,11 @@ export class AuthService {
         name: user.firstName + ' ' + user.lastName,
         email: user.email,
         id: user.id,
+        profilePicture: user.profilePicture,
         roles: user.roles.map((item) => {
           return {
             name: item.role.name,
+            status: item.status,
             id: item.role.id,
           };
         }),
@@ -2064,44 +2295,70 @@ export class AuthService {
     }
   }
 
-  public static async createUser(payload: NonMemberSignUpRequestDto): Promise<CreateUserResponse> {
-    try {
-      const userByEmail = payload.email ? await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } }) : null;
-      const userByPhone = payload.phoneNumber ? await this.dbConnection.getRepository(User).findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } }) : null;
-      const hasEmail = !!userByEmail;
-      const hasPhone = !!userByPhone;
-      if (userByEmail || userByPhone) {
-        const existingUser = userByEmail || userByPhone;
-        return responses.data({
-          message: 'User already exists.',
+  public static async createUser(payload: NonMemberSignUpRequestDto): Promise<UserResponseData> {
+    // Check if the user exists by email or phone concurrently
+    const [userByEmail, userByPhone] = await Promise.all([
+      payload.email ? this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } }) : null,
+      payload.phoneNumber ? this.dbConnection.getRepository(User).findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } }) : null
+    ]);
+    const hasEmail = !!userByEmail;
+    const hasPhone = !!userByPhone;
+    // If user exists by either email or phone
+    if (userByEmail || userByPhone) {
+      const existingUser = userByEmail || userByPhone;
+      const existingMapping = await this.dbConnection.getRepository(HostUserMapping).find({
+        where: { host: { id: payload.id }, user: { id: existingUser.id } },
+      });
+
+      if (existingMapping.length > 0) {
+        return {
+          message: 'User already exists',
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
-        });
+        };
       }
-      const newUser = this.dbConnection.getRepository(User).create({
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        email: payload.email,
-        phoneNumber: payload.phoneNumber,
-      });
-      const user = await this.dbConnection.getRepository(User).save(newUser);
+
       const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
       const hostCreated = this.dbConnection.getRepository(HostUserMapping).create({
-        user: user,
+        user: existingUser,
         host: host,
       });
+
       await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
-      return responses.data({
+
+      return {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
-        user: toCreateUser(user),
-      });
-    } catch (err: any) {
-      return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
+        user: toCreateUser(existingUser),
+      };
     }
+    // If user doesn't exist, create a new user
+    const newUser = this.dbConnection.getRepository(User).create({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      email: payload.email,
+      phoneNumber: payload.phoneNumber,
+    });
+
+    const user = await this.dbConnection.getRepository(User).save(newUser);
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+
+    const hostCreated = this.dbConnection.getRepository(HostUserMapping).create({
+      user: user,
+      host: host,
+    });
+
+    await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+    return {
+      message: 'User created successfully.',
+      hasEmail,
+      hasPhone,
+      user: toCreateUser(user),
+    };
   }
 
   public static async sendVerificationCodeByEmail(email: string): Promise<GenericResponse> {
@@ -2158,46 +2415,40 @@ export class AuthService {
     }
   }
 
-  public static async getAllusers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
+  public static async getAllusers(payload: ListUsersInviteesDto): Promise<GetUsersResponse> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const eventId = parsedQuery?.eventId;
     const hostId = payload.userId;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    const where: unknown = {
-      deletedAt: null,
-      id: In(
-        (
-          await this.dbConnection.getRepository(HostUserMapping).find({
-            where: { host: { id: hostId } },
-            relations: ['user'],
-          })
-        ).map((entry) => entry.user.id),
-      ),
-    };
-    let customListName = parsedQuery.customListName;
-    if (typeof customListName === 'string' && customListName.trim() !== '') {
-      customListName = customListName.trim();
-    } else {
-      customListName = null;
-    }
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const customListName = parsedQuery.list;
+    const customListId = parsedQuery?.customListId ? (parsedQuery.customListId as string) : undefined;
+    const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let favorite = false;
+    let followed = false;
+    let customListNames: string[] = [];
     if (customListName && customListName.length) {
-      if (typeof customListName === 'string') {
-        const customList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
-          where: { listName: customListName },
-          relations: ['users'],
-        });
-        if (customList) {
-          const customListUserIds = customList.users.map((user) => user.id);
-          const existingUserIds = Array.isArray(parsedQuery.usersIds)
-            ? parsedQuery.usersIds.filter((id): id is string => typeof id === 'string')
-            : typeof parsedQuery.usersIds === 'string'
-              ? parsedQuery.usersIds.split(',')
-              : [];
-          parsedQuery.usersIds = [...existingUserIds, ...customListUserIds];
-        }
+      if (customListName && typeof customListName === 'string') {
+        const allListNames = customListName.split(',').map((name) => name.trim());
+        // Separate system default lists and update customListName
+        const separatedLists = allListNames.filter((item) => systemDefaultLists.includes(item));
+        customListNames = allListNames.filter((item) => !systemDefaultLists.includes(item));
+        favorite = separatedLists.includes('myFavourites-systemDefault');
+        followed = separatedLists.includes('myFollowers-systemDefault');
       }
     }
+
+    const idsResult = await this.dbConnection.getRepository(HostUserMapping).find({
+      where: { host: { id: hostId } },
+      relations: ['user'],
+    });
+    const ids = idsResult.map((result) => result.user.id);
 
     const usersQuery = this.dbConnection.getRepository(User)
       .createQueryBuilder('user')
@@ -2206,19 +2457,86 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
-      .groupBy('user.id')
-      .addGroupBy('userRole.id')
-      .addGroupBy('role.id')
-      .addGroupBy('socialProvider.id')
-      .addGroupBy('socialStats.id')
-      .addGroupBy('address.id')
-      .addGroupBy('userRole.role.id')
-      .offset(skip)
-      .limit(take)
-      .orderBy('user.createdAt', 'DESC');
+      .where('user.deletedAt IS NULL')
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
+            new Brackets((subQb) => {
+              subQb.where('role.name = :nonMemberRole', { nonMemberRole: 'non_member' });
+              if (ids.length > 0) {
+                subQb.andWhere('user.id IN (:...ids)', { ids });
+              } else {
+                subQb.andWhere('user.id IS NULL');
+              }
+            }),
+          );
+        }),
+      )
+      .skip(skip)
+      .take(take);
+    if (eventId) {
+      usersQuery.andWhere(
+        `NOT EXISTS (
+            SELECT 1 FROM guest WHERE guest.user_id = user.id AND guest.event_id = :eventId
+          )`,
+        { eventId },
+      );
+    }
+    let userTypes = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+    if (userTypes.length) {
+      usersQuery.andWhere(
+        new Brackets((qb) => {
+          qb.where('role.name IN (:...roleNames)', { roleNames: userTypes }); // Separate condition for userTypes
+        }),
+      );
+    }
 
+    // Apply OR conditions for followed, favorite, and custom lists
+    if (favorite || followed || customListNames.length > 0) {
+      usersQuery.andWhere(
+        new Brackets((qb) => {
+          if (favorite) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFavorite.member.id')
+                .from(HostFavorite, 'hostFavorite')
+                .where('hostFavorite.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (followed) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFollow.follower.id')
+                .from(HostFollowing, 'hostFollow')
+                .where('hostFollow.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (customListNames.length > 0) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('listUsers.id')
+                .from(HostCustomUsersLists, 'customList')
+                .innerJoin('customList.users', 'listUsers')
+                .where('customList.listName IN (:...customListNames)', { customListNames })
+                .andWhere('customList.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+        }),
+      );
+    }
+    // Apply AND conditions for other filters
     if (searchValue) {
       usersQuery.andWhere(
         new Brackets((qb) => {
@@ -2228,135 +2546,88 @@ export class AuthService {
         }),
       );
     }
-    const followed = parsedQuery.followed === 'true' ? true : parsedQuery.followed === 'false' ? false : false;
-    const favorite = parsedQuery.favorite === 'true' ? true : parsedQuery.favorite === 'false' ? false : false;
-    if (followed) {
-      where['following'] = { host: { id: hostId } };
+    if (focuses && typeof focuses === 'string') {
+      const focusIds = focuses.split(',').map((id) => id.trim());
+      usersQuery.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('focus_users_user.userId')
+          .from('focus_users_user', 'focus_users_user')
+          .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
     }
-    if (favorite) {
-      where['favoritedByHosts'] = { host: { id: hostId } };
+    if (interest && typeof interest === 'string') {
+      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+      usersQuery.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('interest_users_user.userId')
+          .from('interest_users_user', 'interest_users_user')
+          .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
     }
-    if (parsedQuery.usersIds) {
-      where['id'] = In(
-        String(parsedQuery.usersIds)
-          .split(',')
-          .map((id) => id.trim()),
-      );
+    if (gender && typeof gender === 'string') {
+      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const validGenders = Object.values(Gender) as string[];
+      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      if (filteredGenders.length > 0) {
+        usersQuery.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
+      }
     }
-    const users = await usersQuery.getMany();
+
+    if (baseCity && typeof baseCity === 'string') {
+      const placeIds = baseCity.split(',').map((id) => id.trim());
+      if (placeIds.length > 0) {
+        usersQuery.andWhere((qb) => {
+          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+          return `user.address_id IN ${subQuery}`;
+        });
+      }
+    }
+    if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0; // Default minimum age is 0
+      const ageTo =
+        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null; // Null indicates no upper limit
+      const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+      const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+      if (ageTo !== null) {
+        conditions.push(`${ageQuery} <= :ageTo`);
+      }
+      usersQuery.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    }
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      usersQuery.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      usersQuery.orderBy('user.createdAt', 'DESC');
+    }
+
+    const [allUsers, totalCount] = await usersQuery.getManyAndCount();
+
     const favorites = await this.dbConnection.getRepository(HostFavorite).find({
       where: { host: { id: hostId } },
       relations: ['member'],
     });
     const favoriteUserIds = favorites.map((fav) => fav.member.id);
-    const members = await Promise.all(
-      users.map(async (user) => {
-        // Micro-service Call
-        // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-        // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
-            },
-            type: SocialProviderType.FACEBOOK,
-          },
-          relations: ['user'],
-        });
-        const member = toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
 
-        //const member = toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
-        member.isFavourite = favoriteUserIds.includes(user.id);
-        return member;
-      }),
-    );
-    return responses.data(members);
-  }
-
-// ADMIN Sevice Code
-
-public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //GetMembersResponse
-  try {
-    const parsedQuery = parse(payload.query);
-    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
-    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    const { error: validationError, response: validation } = this.validateFilters(payload.query);
-
-    if (validationError) return responses.badRequest(validation);
-    let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
-    if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-      socialNetworkObject = socialNetworkArray.reduce(
-        (acc, name) => {
-          acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
-          return acc;
-        },
-        {} as { [key in keyof typeof SocialProviderType]?: string },
-      );
-    }
-    const usersQuery = this.dbConnection.getRepository(User)
-      .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'userRole')
-      .innerJoinAndSelect('userRole.role', 'role')
-      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-      .leftJoinAndSelect('user.socialStats', 'socialStats')
-      .leftJoinAndSelect('user.address', 'address')
-      .where('role.name = :roleName', { roleName: 'member' })
-      .andWhere('user.deletedAt IS NULL')
-      .groupBy('user.id')
-      .addGroupBy('userRole.id')
-      .addGroupBy('role.id')
-      .addGroupBy('socialProvider.id')
-      .addGroupBy('socialStats.id')
-      .addGroupBy('address.id')
-      .addGroupBy('userRole.role.id')
-      .offset(skip)
-      .limit(take)
-      .orderBy('user.createdAt', 'DESC');
-    if (searchValue) {
-      usersQuery.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('CAST(userRole.status AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
-        }),
-      );
-    }
-
-    if (Object.keys(socialNetworkObject).length > 0) {
-      const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
-        const columnName = `${networkKey.toLowerCase()}FollowersCount`;
-        return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+    let listUserIds: string[] = [];
+    if (customListId) {
+      const customListUsers = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+        where: { list: { id: customListId } },
+        relations: ['user'],
       });
 
-      usersQuery.andWhere(
-        new Brackets((qb) => {
-          qb.where(socialConditions.join(' OR '), {
-            followerCountFrom: followerCountFrom || 0,
-            followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
-          });
-        }),
-      );
+      listUserIds = customListUsers.map((listUser) => listUser.user.id);
     }
 
-    const users = await usersQuery.getMany();
-    const members = await Promise.all(
-      users.map(async (user) => {
-
-        // Micro-service call
-        const focuses = [] //await this.platformClient.getUserFocuses(user.id, this.logger);
-        const interests = [] //await this.platformClient.getUserInterests(user.id, this.logger);
-
+    const users = await Promise.all(
+      allUsers.map(async (user) => {
+        const focuses = []//await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
+        const interests = []//await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {
@@ -2364,529 +2635,1088 @@ public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //
             },
             type: SocialProviderType.INSTAGRAM,
           },
+          relations: ['user'],
         });
 
-        return toMember(user, focuses, interests, user.roles[0], socialNetworkObject, socialProvider?.username);
+        const socialProviderUsername = socialProvider?.username || null;
+
+        const userData = toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        if (customListId) {
+          userData.isInCustomList = listUserIds.includes(user.id);
+        }
+        return userData;
       }),
     );
-    return responses.data(members);
-  } catch (err) {
-    return responses.badRequest('Unkown error occured, please try again later.');
+    return responses.data({ users, totalCount });
   }
-}
 
-public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
-  try {
-    const parsedQuery = parse(payload.query);
-    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+  // ADMIN Sevice Code
 
-    const allEventsQuery = `
+  public static async getMembers(payload: PaginatedRequestDto): Promise<any> { //GetMembersResponse
+    try {
+      const parsedQuery = parse(payload.query);
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+      const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
+      const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
+      const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+      const { error: validationError, response: validation } = this.validateFilters(payload.query);
+
+      if (validationError) return responses.badRequest(validation);
+      let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
+      if (typeof socialNetworkNames === 'string') {
+        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+        socialNetworkObject = socialNetworkArray.reduce(
+          (acc, name) => {
+            acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
+            return acc;
+          },
+          {} as { [key in keyof typeof SocialProviderType]?: string },
+        );
+      }
+      const usersQuery = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .innerJoinAndSelect('user.roles', 'userRole')
+        .innerJoinAndSelect('userRole.role', 'role')
+        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+        .leftJoinAndSelect('user.socialStats', 'socialStats')
+        .leftJoinAndSelect('user.address', 'address')
+        .where('role.name = :roleName', { roleName: 'member' })
+        .andWhere('user.deletedAt IS NULL')
+        .groupBy('user.id')
+        .addGroupBy('userRole.id')
+        .addGroupBy('role.id')
+        .addGroupBy('socialProvider.id')
+        .addGroupBy('socialStats.id')
+        .addGroupBy('address.id')
+        .addGroupBy('userRole.role.id')
+        .offset(skip)
+        .limit(take)
+        .orderBy('user.createdAt', 'DESC');
+      if (searchValue) {
+        usersQuery.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('user.username ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` })
+              .orWhere('CAST(userRole.status AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
+          }),
+        );
+      }
+
+      if (Object.keys(socialNetworkObject).length > 0) {
+        const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+          const columnName = `${networkKey.toLowerCase()}FollowersCount`;
+          return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
+        });
+
+        usersQuery.andWhere(
+          new Brackets((qb) => {
+            qb.where(socialConditions.join(' OR '), {
+              followerCountFrom: followerCountFrom || 0,
+              followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
+            });
+          }),
+        );
+      }
+
+      const users = await usersQuery.getMany();
+      const members = await Promise.all(
+        users.map(async (user) => {
+
+          // Micro-service call
+          const focuses = [] //await this.platformClient.getUserFocuses(user.id, this.logger);
+          const interests = [] //await this.platformClient.getUserInterests(user.id, this.logger);
+
+          const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
+            },
+          });
+
+          return toMember(user, focuses, interests, user.roles[0], socialNetworkObject, socialProvider?.username);
+        }),
+      );
+      return responses.data(members);
+    } catch (err) {
+      return responses.badRequest('Unkown error occured, please try again later.');
+    }
+  }
+
+  public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
+    try {
+      const parsedQuery = parse(payload.query);
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+      const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+
+      const allEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
       GROUP BY e.owner_id
     `;
-    const upcomingEventsQuery = `
+      const upcomingEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
       AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
     `;
-    const pastEventsQuery = `
+      const pastEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
       AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
     `;
-    const declinedEventsQuery = `
+      const declinedEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
       AND e.deleted_at IS NULL GROUP BY e.owner_id
     `;
-    const draftEventsQuery = `
+      const draftEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
       AND e.deleted_at IS NULL GROUP BY e.owner_id
     `;
-    const pendingEventsQuery = `
+      const pendingEventsQuery = `
       SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
       AND e.deleted_at IS NULL GROUP BY e.owner_id
     `;
 
-    const queryBuilder = this.dbConnection.getRepository(User)
-      .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'user_role')
-      .innerJoinAndSelect('user_role.role', 'role')
-      .leftJoinAndSelect('user.address', 'address')
-      .where('role.name = :roleName', { roleName: 'host' })
-      .leftJoin(`(${allEventsQuery})`, 'all_events', 'user.id = all_events.owner_id')
-      .addSelect('all_events.count', 'all_events_count')
-      .leftJoin(`(${upcomingEventsQuery})`, 'upcoming_events', 'user.id = upcoming_events.owner_id')
-      .addSelect('upcoming_events.count', 'upcoming_events_count')
-      .leftJoin(`(${pastEventsQuery})`, 'past_events', 'user.id = past_events.owner_id')
-      .addSelect('past_events.count', 'past_events_count')
-      .leftJoin(`(${declinedEventsQuery})`, 'declined_events', 'user.id = declined_events.owner_id')
-      .addSelect('declined_events.count', 'declined_events_count')
-      .leftJoin(`(${draftEventsQuery})`, 'draft_events', 'user.id = draft_events.owner_id')
-      .addSelect('draft_events.count', 'draft_events_count')
-      .leftJoin(`(${pendingEventsQuery})`, 'pending_events', 'user.id = pending_events.owner_id')
-      .addSelect('pending_events.count', 'pending_events_count')
-      .offset(skip)
-      .limit(take);
+      const queryBuilder = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .innerJoinAndSelect('user.roles', 'user_role')
+        .innerJoinAndSelect('user_role.role', 'role')
+        .leftJoinAndSelect('user.address', 'address')
+        .where('role.name = :roleName', { roleName: 'host' })
+        .leftJoin(`(${allEventsQuery})`, 'all_events', 'user.id = all_events.owner_id')
+        .addSelect('all_events.count', 'all_events_count')
+        .leftJoin(`(${upcomingEventsQuery})`, 'upcoming_events', 'user.id = upcoming_events.owner_id')
+        .addSelect('upcoming_events.count', 'upcoming_events_count')
+        .leftJoin(`(${pastEventsQuery})`, 'past_events', 'user.id = past_events.owner_id')
+        .addSelect('past_events.count', 'past_events_count')
+        .leftJoin(`(${declinedEventsQuery})`, 'declined_events', 'user.id = declined_events.owner_id')
+        .addSelect('declined_events.count', 'declined_events_count')
+        .leftJoin(`(${draftEventsQuery})`, 'draft_events', 'user.id = draft_events.owner_id')
+        .addSelect('draft_events.count', 'draft_events_count')
+        .leftJoin(`(${pendingEventsQuery})`, 'pending_events', 'user.id = pending_events.owner_id')
+        .addSelect('pending_events.count', 'pending_events_count')
+        .offset(skip)
+        .limit(take);
 
+      if (searchValue) {
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('user.email ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('address.city ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('CAST(user_role.status AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
+              .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` });
+          }),
+        );
+      }
+      const users = await queryBuilder.getRawMany();
+      const hosts = users.map((user) => {
+        return toHost(user as RawHost);
+      });
+
+      return responses.data(hosts);
+    } catch (err) {
+      return responses.badRequest('Unkown error occured, please try again later.');
+    }
+  }
+
+  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse> {
+    try {
+      const user: User = await this.dbConnection.getRepository(User).findOne({
+        where: { email: payload.email, deletedAt: IsNull() },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      if (!user) return responses.forbidden('Invalid credentials');
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: user.id } },
+        relations: ['role', 'role.parentRole'],
+      });
+
+      const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
+      if (isAllowed === undefined) return responses.forbidden('Invalid credentials');
+
+      const loginResponse = await this.fusionAuthClient.login({ loginId: payload.email, password: payload.password });
+
+      if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
+        return responses.forbidden('Invalid credentials');
+      }
+
+      if (loginResponse?.response?.user?.passwordChangeRequired) {
+        return responses.forbidden('Password change is required');
+      }
+
+      return responses.data({
+        token: loginResponse.response.token,
+        roles: user.roles.map((item) => {
+          return { roleName: item.role.name, roleId: item.role.id };
+        }),
+      });
+    } catch (err) {
+      return responses.badRequest('Unable to login.');
+    }
+  }
+
+  public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpResponse> {
+    try {
+      let nonMember: UserRole | null;
+      try {
+        const response = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+        if (response.statusCode == 200 && response?.response?.user) {
+          return responses.conflict('The user with provided email already exists.');
+        }
+      } catch (e) {
+        if (e.statusCode != 404) {
+          return responses.conflict('An error happens when trying register an user ' + e + '.');
+        }
+      }
+
+      let user = await this.dbConnection.getRepository(User).findOne({
+        where: { email: payload.email, deletedAt: IsNull() },
+        relations: {
+          roles: { role: true },
+        },
+      });
+      if (user) {
+        nonMember = user.roles.find((item) => {
+          if (item.role.name == 'non_member') return item;
+        });
+
+        if (!nonMember) {
+          if (user.phoneNumber === payload.phoneNumber) {
+            return responses.badRequest('Phone number is already in use, please try with a different phone number.');
+          }
+
+          if (user.email === payload.email) {
+            return responses.badRequest('Email is already in use, please try with a different email.');
+          }
+        }
+      } else {
+        const newUser = new User();
+
+        if (nonMember) {
+          newUser.id = user.id;
+          await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
+        }
+
+        newUser.email = payload.email;
+        newUser.firstName = payload.firstName;
+        newUser.lastName = payload.lastName;
+        newUser.dateOfBirth = payload.dateOfBirth;
+        newUser.phoneNumber = payload.phoneNumber;
+        user = this.dbConnection.getRepository(User).create(newUser);
+      }
+
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: payload.email.split('@')[0],
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: payload.email.split('@')[0],
+          birthDate: payload.dateOfBirth,
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          mobilePhone: payload.phoneNumber,
+          password: payload.password,
+          verified: true,
+          active: true,
+        },
+      };
+
+      const newUser = await this.fusionAuthClient.register(user.id, registrationRequest);
+      if (newUser.statusCode !== 200) {
+        return responses.conflict(`There wass an issue creating an admin: ${newUser.exception.name}`);
+      }
+
+      user.id = newUser.response?.user?.id;
+      await this.dbConnection.getRepository(User).save(user);
+
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
+
+      return responses.ok;
+    } catch (err) {
+      return responses.badRequest('Unable to sign up, please try again later.');
+    }
+  }
+
+  public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
+    console.log('getHostProfile() payload: ', payload);
+
+    try {
+      const memberId = payload.userId; //Only valid if endpoint was called by a member
+      let isMemberFollowingHost = false;
+
+      const host: User = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id, deletedAt: IsNull() },
+        relations: {
+          hostedEvents: true,
+        },
+      });
+      if (!host) return responses.notFound('Host not found.');
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: host.id } },
+        relations: {
+          role: true,
+        },
+      });
+
+      const hostRole = userRoles.find((role) => role.role.name === 'host');
+      if (hostRole === undefined) return responses.notFound('Host not found');
+
+      if (memberId !== host.id) {
+        const hostFollowing = await this.dbConnection.getRepository(HostFollowing).findOne({
+          where: {
+            follower: { id: memberId },
+            host: { id: host.id },
+          },
+        });
+
+        if (hostFollowing) isMemberFollowingHost = true;
+      }
+
+      return responses.data(toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost));
+    } catch (err) {
+      return responses.badRequest(`Unable to get host profile: ${err}`);
+    }
+  }
+
+  public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
+    try {
+      const host: User = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id, deletedAt: IsNull() },
+      });
+
+      if (!host) return responses.notFound('Host not found.');
+
+      if (payload?.email) {
+        const existingUser = await this.dbConnection.getRepository(User).findOne({
+          where: [{ email: payload.email }],
+        });
+
+        if (existingUser && host.id !== existingUser.id) {
+          return responses.badRequest('Email is already in use, please use different email.');
+        }
+      }
+
+      if (payload?.phoneNumber) {
+        const existingUser = await this.dbConnection.getRepository(User).findOne({
+          where: [{ phoneNumber: payload.phoneNumber }],
+        });
+        if (existingUser && host.id !== existingUser.id) {
+          return responses.badRequest('Phone number is already in use, please use a different phone number.');
+        }
+      }
+
+      const updatedUser = await this.dbConnection.getRepository(User).save(hostToUpdate(host, payload));
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: updatedUser.id } },
+        relations: {
+          role: true,
+        },
+      });
+
+      const hostRole = userRoles.find((role) => role.role.name === 'host');
+      if (hostRole === undefined) return responses.notFound('Host not found');
+
+      await this.dbConnection.getRepository(UserRole).update(hostRole.id, { profileSetupCompleted: true });
+
+      return responses.data(toBasicHostProfile(updatedUser, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
+    } catch (err) {
+      return responses.badRequest(`Unable to get host profile: ${err}`);
+    }
+  }
+
+  public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfileResponse> {
+    try {
+      const user: User = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id, deletedAt: IsNull() },
+      });
+      if (!user) return responses.notFound('Host not found.');
+
+      const userRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: { user: { id: user.id } },
+        relations: {
+          role: true,
+        },
+      });
+
+      const hostRole = userRoles.find((role) => role.role.name === 'host');
+      if (hostRole === undefined) return responses.notFound('Host not found');
+
+      return responses.data(toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
+    } catch (err) {
+      return responses.badRequest(`Unable to get host profile: ${err}`);
+    }
+  }
+
+  public static validateFilters(query: string): { error: boolean; response: string } {
+    const parsedFilters = parse(query);
+    const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
+    const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
+    const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+    const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
     if (searchValue) {
+      if (typeof searchValue !== 'string' || searchValue.length === 0) {
+        return { error: true, response: 'searchValue must be a string.' };
+      }
+    }
+
+    if (socialNetworkNames) {
+      if (followerCountFrom === undefined || followerCountTo === undefined) {
+        return {
+          error: true,
+          response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
+        };
+      }
+      if (followerCountFrom > followerCountTo) {
+        return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
+      }
+
+      if (typeof socialNetworkNames === 'string') {
+        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+
+        const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+
+        if (invalidNames.length > 0) {
+          return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+        }
+
+        return { error: false, response: socialNetworkArray.join(',') };
+      }
+    }
+    return { error: false, response: '' };
+  }
+
+  public static async updateHostStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
+    try {
+      const user = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
+      if (hostRole === undefined) return responses.notFound('Host not found');
+
+      const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: hostRole.id } });
+      if (!hostRole) return responses.notFound('Host not found');
+
+      userRole.status = newUserStatusTosUserStatus[payload.status];
+      await this.dbConnection.getRepository(UserRole).save(userRole);
+
+      if (payload.status === NewUserStatus.APPROVE) {
+        const users = await this.fusionAuthClient.searchUsersByIds([user.id]);
+        if (users.response.total === 0) {
+          await this.approveHost(user);
+          const token = await this.generateToken(user);
+
+          // Micro-service call
+          // await this.communicationClient.sendEmailFromTemplate(
+          //   [
+          //     {
+          //       key: 'first_name',
+          //       value: user.firstName,
+          //     },
+          //     {
+          //       key: 'company_name',
+          //       value: user.additionalHostInformation?.companyName ?? user.firstName,
+          //     },
+          //     {
+          //       key: 'password_token',
+          //       value: this.configService.get<string>('RUMOR_WEBSITE') + `token/${token}`,
+          //     },
+          //   ],
+          //   'Host Application Approved',
+          //   [user.email],
+          //   null,
+          //   this.logger,
+          // );
+        }
+      } else if (payload.status === NewUserStatus.WAITLIST) {
+        // Micro-service call
+        // await this.communicationClient.sendEmailFromTemplate([], 'Host Application Denied', [user.email], null, this.logger);
+      } else if (payload.status === NewUserStatus.DEACTIVATE) {
+        const today = new Date();
+        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+        // example December 31, 2024, at 11:59PM EST
+        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+        // Micro-service call
+        //   await this.communicationClient.sendEmailFromTemplate(
+        //     [
+        //       { key: 'first_name', value: user.firstName },
+        //       { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+        //     ],
+        //     'Account Deactivated',
+        //     [user.email],
+        //     null,
+        //     this.logger,
+        //   );
+        // }
+
+        return responses.ok;
+      }
+    } catch (err) {
+      return responses.badRequest(`Unable to update host status: ${err}`);
+    }
+  }
+
+  public static async approveHost(user: User): Promise<void> {
+    try {
+      const password = generateRandomPassword(12);
+      const temporaryPassword = new TemporaryPassword();
+      temporaryPassword.password = password;
+      user.temporaryPassword = temporaryPassword;
+      user = await this.dbConnection.getRepository(User).save(user);
+
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: user.email.split('@')[0],
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: user.email.split('@')[0],
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobilePhone: user.phoneNumber,
+          password,
+          verified: true,
+          active: true,
+        },
+      };
+
+      await this.fusionAuthClient.register(user.id, registrationRequest);
+    } catch (err) {
+      // throw new BadRequestException(`Unable to approve host: ${err}`);
+    }
+  }
+
+  public static async generateToken(user: User): Promise<string> {
+    try {
+      const token = generateTemporaryToken(36);
+      const temporaryPasswordToken = new TemporaryPasswordToken();
+      temporaryPasswordToken.token = token;
+      temporaryPasswordToken.expiresAt = dayjs().add(24, 'hours').toDate();
+      user.temporaryPasswordToken = temporaryPasswordToken;
+      await this.dbConnection.getRepository(User).save(user);
+      return token;
+    } catch (err) {
+      // this.logger.error(`Unable to approve host: ${err}`);
+      // throw new BadRequestException(`Unable to approve host: ${err}`);
+    }
+  }
+
+  public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
+    try {
+      const user = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const memberRole = user.roles.find((role) => role.role.name === 'member');
+      if (memberRole === undefined) return responses.notFound('Member not found');
+
+      const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
+      if (!userRole) return responses.notFound('Member not found');
+
+      userRole.status = newUserStatusTosUserStatus[payload.status];
+      await this.dbConnection.getRepository(UserRole).save(userRole);
+
+      return responses.ok;
+    } catch (err) {
+      // this.logger.error(err);
+      return responses.badRequest(`Unable to update host status: ${err}`);
+    }
+  }
+
+  public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfileResponse> {
+    try {
+      const user = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: {
+          roles: {
+            role: true,
+          },
+          address: true,
+          socialStats: true,
+        },
+      });
+
+      const memberRole = user.roles.find((role) => role.role.name === 'member');
+      if (memberRole === undefined) return responses.notFound('Member not found');
+
+      const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
+      if (!userRole) return responses.notFound('Member not found');
+
+      // Micro-service call
+      const focuses = []//await this.platformClient.getUserFocuses(user.id, this.logger);
+
+      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+        where: {
+          user: {
+            id: user.id,
+          },
+          type: SocialProviderType.FACEBOOK,
+        },
+        relations: ['user'],
+      });
+
+      return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username));
+    } catch (err) {
+      return responses.badRequest(`Unable to get host profile: ${err}`);
+    }
+  }
+  public static async applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes) {
+    //Apply type filter
+    if (userTypes.length > 0) {
       queryBuilder.andWhere(
         new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.email ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('address.city ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user_role.status AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` });
+          qb.where('role.name IN (:...roleNames)', { roleNames: userTypes });
         }),
       );
     }
-    const users = await queryBuilder.getRawMany();
-    const hosts = users.map((user) => {
-      return toHost(user as RawHost);
-    });
 
-    return responses.data(hosts);
-  } catch (err) {
-    return responses.badRequest('Unkown error occured, please try again later.');
+    // Apply search value filter
+    if (searchValue) {
+      const searchWords = searchValue.trim().split(/\s+/);
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          searchWords.forEach((word) => {
+            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+          });
+        }),
+      );
+    }
+
+    // Apply focuses filter
+    if (focuses && typeof focuses === 'string') {
+      const focusIds = focuses.split(',').map((id) => id.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('focus_users_user.userId')
+          .from('focus_users_user', 'focus_users_user')
+          .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+
+    // Apply interests filter
+    if (interest && typeof interest === 'string') {
+      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('interest_users_user.userId')
+          .from('interest_users_user', 'interest_users_user')
+          .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+
+    // Apply gender filter
+    if (gender && typeof gender === 'string') {
+      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const validGenders = Object.values(Gender) as string[];
+      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      if (filteredGenders.length > 0) {
+        queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
+      }
+    }
+
+    // Apply baseCity filter
+    if (baseCity && typeof baseCity === 'string') {
+      const placeIds = baseCity.split(',').map((id) => id.trim());
+      if (placeIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+          return `user.address_id IN ${subQuery}`;
+        });
+      }
+    }
+
+    // Apply age filter
+    if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
+      const ageTo =
+        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
+      const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+      const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+      if (ageTo !== null) {
+        conditions.push(`${ageQuery} <= :ageTo`);
+      }
+      queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    }
+    return queryBuilder;
   }
-}
 
-public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse> {
-  try {
-    const user: User = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: IsNull() },
+  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<UserFilterOptionsResponse> {
+    const { userId } = payload;
+    const parsedQuery = parse(payload.query) as ParsedQs;
+    const eventId = parsedQuery?.eventId as string;
+    const filterOptionsSequence = [
+      'list',
+      'pastEvents',
+      'category',
+      'baseCity',
+      'gender',
+      'age',
+      'interest',
+      'type',
+      'ticketType',
+      'partySize',
+      'checkedIn',
+      'spammed',
+      'userSource',
+      'declinedBy',
+      'vouch',
+    ];
+    const focuses = [];
+
+    const categoryObj = {
+      id: 'category',
+      label: 'Category',
+      options: focuses,
+      isSearchable: true,
+      type: FilterTypeValues.category,
+    };
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId },
       relations: {
-        roles: {
-          role: true,
+        customLists: {
+          usersLists: {
+            user: {
+              address: true,
+              roles: { role: true },
+              socialProviders: true,
+              hostedEvents: true,
+            },
+          },
         },
       },
     });
-
-    if (!user) return responses.forbidden('Invalid credentials');
-
-    const userRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: { user: { id: user.id } },
-      relations: ['role', 'role.parentRole'],
-    });
-
-    const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
-    if (isAllowed === undefined) return responses.forbidden('Invalid credentials');
-
-    const loginResponse = await this.fusionAuthClient.login({ loginId: payload.email, password: payload.password });
-
-    if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      return responses.forbidden('Invalid credentials');
-    }
-
-    if (loginResponse?.response?.user?.passwordChangeRequired) {
-      return responses.forbidden('Password change is required');
-    }
-
-    return responses.data({
-      token: loginResponse.response.token,
-      roles: user.roles.map((item) => {
-        return { roleName: item.role.name, roleId: item.role.id };
-      }),
-    });
-  } catch (err) {
-    return responses.badRequest('Unable to login.');
-  }
-}
-
-public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpResponse> {
-  try {
-    let nonMember: UserRole | null;
-    try {
-      const response = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
-      if (response.statusCode == 200 && response?.response?.user) {
-        return responses.conflict('The user with provided email already exists.');
-      }
-    } catch (e) {
-      if (e.statusCode != 404) {
-        return responses.conflict('An error happens when trying register an user ' + e + '.');
-      }
-    }
-
-    let user = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: IsNull() },
-      relations: {
-        roles: { role: true },
-      },
-    });
-    if (user) {
-      nonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member') return item;
-      });
-
-      if (!nonMember) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          return responses.badRequest('Phone number is already in use, please try with a different phone number.');
-        }
-
-        if (user.email === payload.email) {
-          return responses.badRequest('Email is already in use, please try with a different email.');
-        }
-      }
-    } else {
-      const newUser = new User();
-
-      if (nonMember) {
-        newUser.id = user.id;
-        await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
-      }
-
-      newUser.email = payload.email;
-      newUser.firstName = payload.firstName;
-      newUser.lastName = payload.lastName;
-      newUser.dateOfBirth = payload.dateOfBirth;
-      newUser.phoneNumber = payload.phoneNumber;
-      user = this.dbConnection.getRepository(User).create(newUser);
-    }
-
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: payload.email.split('@')[0],
-        birthDate: payload.dateOfBirth,
-        email: payload.email,
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        mobilePhone: payload.phoneNumber,
-        password: payload.password,
-        verified: true,
-        active: true,
-      },
+    const customLists = user?.customLists?.map((list) => ({
+      name: list.listName,
+      id: list.listName,
+    }));
+    const hostDefaultList = [
+      { id: 'myFavourites-systemDefault', name: 'My Favorites' },
+      { id: 'myFollowers-systemDefault', name: 'My Followers' },
+    ];
+    const hostCustomLists = [...hostDefaultList, ...customLists];
+    const listObj = {
+      id: 'list',
+      label: 'My Lists',
+      options: hostCustomLists,
+      type: FilterTypeValues.list,
+    };
+    const baseCityObj = {
+      id: 'basecity',
+      label: 'Base City',
+      options: [],
+      type: FilterTypeValues.baseCity,
+    };
+    const genderObj = {
+      id: 'gender',
+      label: 'Gender',
+      options: [
+        { id: Gender.MALE, name: 'Male' },
+        { id: Gender.FEMALE, name: 'Female' },
+        { id: Gender.NON_BINARY, name: 'Non-Binary' },
+      ],
+      type: FilterTypeValues.gender,
+    };
+    const ageObj = {
+      id: 'age',
+      label: 'Age',
+      options: [],
+      type: FilterTypeValues.age,
+    };
+    const interests = [];
+    const mappedInterests = interests?.map((interest) => ({
+      name: interest.name,
+      id: interest.id,
+    }));
+    const interestObj = {
+      id: 'interest',
+      label: 'Interests',
+      options: mappedInterests,
+      type: FilterTypeValues.interest,
+    };
+    const typeObj = {
+      id: 'type',
+      label: 'Type',
+      options: [
+        { id: RoleType.Member, name: 'Member' },
+        { id: RoleType.NonMember, name: 'Non-Member' },
+      ],
+      type: FilterTypeValues.type,
+    };
+    const now = new Date();
+    //TODO: check if this logic affects on date format changes
+    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    const queryParams = {
+      ownerId: userId,
+      statusName: 'PAST_STATUS',
+      maxEndDate: formattedDate,
+      isPublished: true,
+    };
+    const queryString = prepareQueryString(queryParams);
+    const listEvents = [];
+    const mappedEvents = listEvents?.map((event) => ({
+      name: event.name,
+      id: event.id,
+    }));
+    const pastEventsObj = {
+      id: 'pastEvents',
+      label: 'Past Events',
+      options: mappedEvents,
+      type: FilterTypeValues.pastEvents,
     };
 
-    const newUser = await this.fusionAuthClient.register(user.id, registrationRequest);
-    if (newUser.statusCode !== 200) {
-      return responses.conflict(`There wass an issue creating an admin: ${newUser.exception.name}`);
-    }
-
-    user.id = newUser.response?.user?.id;
-    await this.dbConnection.getRepository(User).save(user);
-
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
-
-    return responses.ok;
-  } catch (err) {
-    return responses.badRequest('Unable to sign up, please try again later.');
-  }
-}
-
-public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
-  console.log('getHostProfile() payload: ', payload);
-
-  try {
-    const memberId = payload.userId; //Only valid if endpoint was called by a member
-    let isMemberFollowingHost = false;
-
-    const host: User = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id, deletedAt: IsNull() },
-      relations: {
-        hostedEvents: true,
-      },
-    });
-    if (!host) return responses.notFound('Host not found.');
-
-    const userRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: { user: { id: host.id } },
-      relations: {
-        role: true,
-      },
-    });
-
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
-
-    if (memberId !== host.id) {
-      const hostFollowing = await this.dbConnection.getRepository(HostFollowing).findOne({
-        where: {
-          follower: { id: memberId },
-          host: { id: host.id },
-        },
-      });
-
-      if (hostFollowing) isMemberFollowingHost = true;
-    }
-
-    return responses.data(toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
-  }
-}
-
-public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
-  try {
-    const host: User = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id, deletedAt: IsNull() },
-    });
-
-    if (!host) return responses.notFound('Host not found.');
-
-    if (payload?.email) {
-      const existingUser = await this.dbConnection.getRepository(User).findOne({
-        where: [{ email: payload.email }],
-      });
-
-      if (existingUser && host.id !== existingUser.id) {
-        return responses.badRequest('Email is already in use, please use different email.');
-      }
-    }
-
-    if (payload?.phoneNumber) {
-      const existingUser = await this.dbConnection.getRepository(User).findOne({
-        where: [{ phoneNumber: payload.phoneNumber }],
-      });
-      if (existingUser && host.id !== existingUser.id) {
-        return responses.badRequest('Phone number is already in use, please use a different phone number.');
-      }
-    }
-
-    const updatedUser = await this.dbConnection.getRepository(User).save(hostToUpdate(host, payload));
-
-    const userRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: { user: { id: updatedUser.id } },
-      relations: {
-        role: true,
-      },
-    });
-
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
-
-    await this.dbConnection.getRepository(UserRole).update(hostRole.id, { profileSetupCompleted: true });
-
-    return responses.data(toBasicHostProfile(updatedUser, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
-  }
-}
-
-public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfileResponse> {
-  try {
-    const user: User = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id, deletedAt: IsNull() },
-    });
-    if (!user) return responses.notFound('Host not found.');
-
-    const userRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: { user: { id: user.id } },
-      relations: {
-        role: true,
-      },
-    });
-
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
-
-    return responses.data(toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
-  }
-}
-
-public static validateFilters(query: string): { error: boolean; response: string } {
-  const parsedFilters = parse(query);
-  const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-  const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-  const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
-  const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
-  if (searchValue) {
-    if (typeof searchValue !== 'string' || searchValue.length === 0) {
-      return { error: true, response: 'searchValue must be a string.' };
-    }
-  }
-
-  if (socialNetworkNames) {
-    if (followerCountFrom === undefined || followerCountTo === undefined) {
-      return {
-        error: true,
-        response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
-      };
-    }
-    if (followerCountFrom > followerCountTo) {
-      return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
-    }
-
-    if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-
-      const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
-
-      if (invalidNames.length > 0) {
-        return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
-      }
-
-      return { error: false, response: socialNetworkArray.join(',') };
-    }
-  }
-  return { error: false, response: '' };
-}
-
-public static async updateHostStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
-  try {
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id },
-      relations: {
-        roles: {
-          role: true,
-        },
-      },
-    });
-
-    const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
-
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: hostRole.id } });
-    if (!hostRole) return responses.notFound('Host not found');
-
-    userRole.status = newUserStatusTosUserStatus[payload.status];
-    await this.dbConnection.getRepository(UserRole).save(userRole);
-
-    if (payload.status === NewUserStatus.APPROVE) {
-      const users = await this.fusionAuthClient.searchUsersByIds([user.id]);
-      if (users.response.total === 0) {
-        await this.approveHost(user);
-        const token = await this.generateToken(user);
-
-        // Micro-service call
-        // await this.communicationClient.sendEmailFromTemplate(
-        //   [
-        //     {
-        //       key: 'first_name',
-        //       value: user.firstName,
-        //     },
-        //     {
-        //       key: 'company_name',
-        //       value: user.additionalHostInformation?.companyName ?? user.firstName,
-        //     },
-        //     {
-        //       key: 'password_token',
-        //       value: this.configService.get<string>('RUMOR_WEBSITE') + `token/${token}`,
-        //     },
-        //   ],
-        //   'Host Application Approved',
-        //   [user.email],
-        //   null,
-        //   this.logger,
-        // );
-      }
-    } else if (payload.status === NewUserStatus.WAITLIST) {
-      // Micro-service call
-      // await this.communicationClient.sendEmailFromTemplate([], 'Host Application Denied', [user.email], null, this.logger);
-    } else if (payload.status === NewUserStatus.DEACTIVATE) {
-      const today = new Date();
-      const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-      const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-      // example December 31, 2024, at 11:59PM EST
-      const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-    // Micro-service call
-    //   await this.communicationClient.sendEmailFromTemplate(
-    //     [
-    //       { key: 'first_name', value: user.firstName },
-    //       { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-    //     ],
-    //     'Account Deactivated',
-    //     [user.email],
-    //     null,
-    //     this.logger,
-    //   );
-    // }
-
-    return responses.ok;
-  } 
-  } catch (err) {
-    return responses.badRequest(`Unable to update host status: ${err}`);
-  }
-}
-
-public static async approveHost(user: User): Promise<void> {
-  try {
-    const password = generateRandomPassword(12);
-    const temporaryPassword = new TemporaryPassword();
-    temporaryPassword.password = password;
-    user.temporaryPassword = temporaryPassword;
-    user = await this.dbConnection.getRepository(User).save(user);
-
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: user.email.split('@')[0],
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobilePhone: user.phoneNumber,
-        password,
-        verified: true,
-        active: true,
-      },
+    const ticketTypes = [];
+    const mappedticketTypes = ticketTypes?.map((ticketType) => ({
+      name: ticketType.name,
+      id: ticketType.id,
+    }));
+    const ticketTypeObj = {
+      id: 'ticketType',
+      label: 'Ticket Type',
+      options: mappedticketTypes,
+      type: FilterTypeValues.ticketType,
     };
 
-    await this.fusionAuthClient.register(user.id, registrationRequest);
-  } catch (err) {
-    // throw new BadRequestException(`Unable to approve host: ${err}`);
-  }
-}
+    const partySizeObj = {
+      id: 'partySize',
+      label: 'Party Size',
+      options: [],
+      type: FilterTypeValues.partySize,
+    };
 
-public static async generateToken(user: User): Promise<string> {
-  try {
-    const token = generateTemporaryToken(36);
-    const temporaryPasswordToken = new TemporaryPasswordToken();
-    temporaryPasswordToken.token = token;
-    temporaryPasswordToken.expiresAt = dayjs().add(24, 'hours').toDate();
-    user.temporaryPasswordToken = temporaryPasswordToken;
-    await this.dbConnection.getRepository(User).save(user);
-    return token;
-  } catch (err) {
-    // this.logger.error(`Unable to approve host: ${err}`);
-    // throw new BadRequestException(`Unable to approve host: ${err}`);
-  }
-}
+    const checkedInObj = {
+      id: 'checkedIn',
+      label: 'Check-in Status',
+      options: [
+        { id: 'checkedIn', name: 'Checked-in' },
+        { id: 'notCheckedIn', name: 'Not Checked-in' },
+      ],
+      type: FilterTypeValues.checkedIn,
+    };
 
-public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
-  try {
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id },
-      relations: {
-        roles: {
-          role: true,
+    const spammedObj = {
+      id: 'spammed',
+      label: 'Spam',
+      options: [
+        { id: 'isSpammed', name: 'Marked as Spam' },
+        { id: 'isNotSpammed', name: 'Not marked as Spam' },
+      ],
+      type: FilterTypeValues.spammed,
+    };
+
+    const userSourceObj = {
+      id: 'userSource',
+      label: 'Request Source',
+      options: [
+        // { id: UserSource.INVITED_BY_HOST, name: 'Invited by Host' },
+        // { id: UserSource.INVITED_BY_ADMIN, name: 'Invited by Admin' },
+        // { id: UserSource.INVITED_BY_COLLABORATOR, name: 'Invited by Collaborator' },
+        { id: UserSource.SIGN_UP_FORM, name: 'Sign Up Form' },
+        { id: UserSource.REQUEST_IN_APP, name: 'In App' },
+      ],
+      type: FilterTypeValues.userSource,
+    };
+
+    const declinedByObj = {
+      id: 'declinedBy',
+      label: 'Declined By',
+      options: [
+        { id: 'declinedByUser', name: 'Declined By User' },
+        // { id: 'declinedByCollaborator', name: 'Declined By Event Collaborator' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const vouchObj = {
+      id: 'vouch',
+      label: 'Vouch',
+      options: [
+        { id: 'hasVouches', name: 'Has Vouches' },
+        { id: 'hasNoVouches', name: 'Does Not Have Vouches' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const followersObj = {
+      id: 'followers',
+      label: 'Followers',
+      options: [
+        {
+          id: 'instagram',
+          name: 'Instagram',
         },
-      },
+      ],
+      type: FilterTypeValues.followers,
+    };
+
+    const objectsMap = {
+      baseCity: baseCityObj,
+      gender: genderObj,
+      age: ageObj,
+      interest: interestObj,
+      category: categoryObj,
+      type: typeObj,
+      list: listObj,
+      pastEvents: pastEventsObj,
+      ticketType: ticketTypeObj,
+      partySize: partySizeObj,
+      checkedIn: checkedInObj,
+      spammed: spammedObj,
+      userSource: userSourceObj,
+      declinedBy: declinedByObj,
+      vouch: vouchObj,
+      followersObj,
+    };
+    // Arrange objects in the desired sequence
+    const orderedObjects = filterOptionsSequence.map((id) => objectsMap[id]).filter((node) => node);
+    //ends here
+    return responses.data(orderedObjects);
+  }
+
+  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersListResponse> {
+    const { customListId, customName, hostId, listType } = payload;
+
+
+    if (!customName) {
+      throw new BadRequestError("customName");
+    }
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: { customLists: true },
     });
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    if (!host) {
+      throw new NotFoundError("host");
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) return responses.notFound('Member not found');
+    }
 
-    userRole.status = newUserStatusTosUserStatus[payload.status];
-    await this.dbConnection.getRepository(UserRole).save(userRole);
+    if (host.customLists.some((list) => list.listName === customName)) {
+      throw new BadRequestError("customName exists");
+    }
 
-    return responses.ok;
-  } catch (err) {
-    // this.logger.error(err);
-    return responses.badRequest(`Unable to update host status: ${err}`);
+    let existingList;
+
+    switch (true) {
+      case !customListId: {
+        switch (listType) {
+          case 'followed':
+
+            existingList = await this.dbConnection.getRepository(HostFollowing).find({
+              where: { host: { id: hostId } },
+              relations: { follower: true },
+            });
+            break;
+          case 'favorite':
+            existingList = await this.dbConnection.getRepository(HostFavorite).find({
+              where: { host: { id: hostId } },
+              relations: { member: true },
+            });
+            break;
+          default:
+            return responses.badRequest('Invalid list type provided.');
+        }
+
+        if (!existingList || existingList.length === 0) {
+          throw new NotFoundError("listType");
+        }
+        break;
+      }
+
+      default: {
+        existingList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
+          where: { id: customListId, host: { id: hostId } },
+          relations: ['usersLists', 'usersLists.user'],
+        });
+
+        if (!existingList) {
+          throw new NotFoundError("existingList");
+        }
+      }
+    }
+
+    const newCustomList = new HostCustomUsersLists();
+    newCustomList.listName = customName;
+    newCustomList.host = host;
+    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(newCustomList);
+
+    const userListEntries = (customListId ? existingList.usersLists : existingList).map((listUser) => {
+      const newListUser = new HostCustomUsersListsUsers();
+      newListUser.user = customListId ? listUser.user : listType === 'followed' ? listUser.follower : listUser.member;
+      newListUser.list = savedCustomList;
+      return newListUser;
+    });
+
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+    const customListSaved = await this.getCustomUsersList({
+      userId: hostId,
+      id: savedCustomList.id,
+      query: 'take=10&skip=0',
+    });
+    return responses.data(customListSaved.data);
   }
-}
 
-public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfileResponse> {
-  try {
-    const user = await this.dbConnection.getRepository(User).findOne({
+  public static async deleteHostUserMapping(payload: IdRequestDto): Promise<GenericResponse> {
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
       where: { id: payload.id },
+    });
+
+    if (!hostUserMapping) {
+      return responses.notFound('Host is not associated with user!');
+    }
+
+    await this.dbConnection.getRepository(HostUserMapping).remove(hostUserMapping);
+    return responses.ok;
+  }
+
+  public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfileResponse> {
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
       relations: {
         roles: {
           role: true,
@@ -2895,29 +3725,158 @@ public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfi
         socialStats: true,
       },
     });
+    if (!user) return responses.notFound('User not found!');
+    const [focuses, interests] = await Promise.all([
+      [],
+      [],
+    ]);
+    const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
+      this.dbConnection.getRepository(HostUserSettings).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+      this.dbConnection.getRepository(HostFavorite).findOne({
+        where: { host: { id: payload.id }, member: { id: user.id } },
+      }),
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) return responses.notFound('Member not found');
+      this.dbConnection.getRepository(HostFollowing).findOne({
+        where: { follower: { id: user.id }, host: { id: payload.id } },
+      }),
 
-    // Micro-service call
-    const focuses = []//await this.platformClient.getUserFocuses(user.id, this.logger);
+      this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
+    ]);
+    const formattedLists = await this.getUserCustomLists(payload.id, user.id);
+    const userRole = user.roles.find((r) => ['member', 'non_member'].includes(r.role.name));
 
-    const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+    const isFollow = !!hostFollowing;
+    const isFavorite = !!hostUserFavorite;
+    const isSpam = hostUserSettings?.isSpam ?? false;
+    const note = hostUserSettings?.note ?? '';
+    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    userData.isFavourite = isFavorite;
+    userData.isFollow = isFollow;
+    userData.isSpam = isSpam;
+    userData.note = note;
+    userData.hostUserMappingId = hostUserMapping?.id ?? '';
+    return responses.data(userData);
+  }
+
+  public static async getUserCustomLists(hostId: string, userId: string): Promise<customListData[]> {
+
+    const result = await this.dbConnection.getRepository(HostCustomUsersListsUsers)
+      .createQueryBuilder('listUserMapping')
+      .leftJoin('listUserMapping.list', 'list')
+      .leftJoin('listUserMapping.user', 'listUser')
+      .where('list.host.id = :hostId', { hostId })
+      .andWhere(':userId IN (SELECT user_id FROM host_custom_users_lists_users WHERE list_id = list.id)', { userId })
+      .select('list.id', 'id')
+      .addSelect('list.listName', 'customName')
+      .addSelect('COUNT(listUser.id)', 'userCount')
+      .groupBy('list.id')
+      .getRawMany();
+
+    return result.map((list) => ({
+      id: list.id,
+      customName: list.customName,
+      totalCount: list.userCount,
+    }));
+  }
+
+  public static async getFollowedUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: { followers: { follower: true } },
+    });
+    if (!user) return responses.badRequest('User not found!');
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .innerJoin('user.following', 'hf')
+      .addSelect(['hf.createdAt'])
+      .where('hf.host.id = :hostId', { hostId: payload.userId })
+      .take(take)
+      .skip(skip);
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('hf.createdAt', 'DESC');
+    }
+
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
+
+    const users = await Promise.all(
+      followedUsers.map(async (user) => {
+        const focuses = [];
+        const interests = [];
+
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
+
+        const socialProviderUsername = socialProvider?.username || null;
+
+        return toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+      }),
+    );
+    return responses.data({ users, totalCount });
+
+  }
+
+  public static async manageUserSpam(payload: ManageUserRequestDto): Promise<GenericResponse> {
+
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+
+    if (!user || !host) {
+      return responses.notFound(`User or Host not found`);
+    }
+    let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
-        user: {
-          id: user.id,
-        },
-        type: SocialProviderType.FACEBOOK,
+        user: { id: payload.userId },
+        host: { id: payload.id },
       },
-      relations: ['user'],
     });
 
-    return responses.data(toMemberProfile(user, focuses, userRole, socialProvider?.username));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
+    if (!hostUserSettings) {
+      hostUserSettings = new HostUserSettings();
+      hostUserSettings.user = user;
+      hostUserSettings.host = host;
+      hostUserSettings.isSpam = payload.isSpam;
+    } else {
+      hostUserSettings.isSpam = payload.isSpam;
+    }
+    await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    return responses.ok;
   }
-}
 }

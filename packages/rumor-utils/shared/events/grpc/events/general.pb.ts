@@ -40,6 +40,7 @@ export enum EventStatus {
   PAST_STATUS = 7,
   ARCHIVED_STATUS = 8,
   CANCELLED_STATUS = 9,
+  REJECTED_STATUS = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -60,6 +61,14 @@ export enum GuestStatus {
   APPLIED = 5,
   REFUSED = 6,
   REVIEW = 7,
+  UNRECOGNIZED = -1,
+}
+
+export enum Gender {
+  MALE = 0,
+  FEMALE = 1,
+  NON_BINARY = 2,
+  NOT_APPLICABLE = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -101,6 +110,29 @@ export interface Talent {
   enabled?: boolean | undefined;
 }
 
+export interface SimpleUser {
+  id: string;
+  phoneNumber?: string | undefined;
+  firstName: string;
+  lastName: string;
+  email?: string | undefined;
+  dateOfBirth?: string | undefined;
+  approved?: boolean | undefined;
+  referralCode?: string | undefined;
+  imageUrl?: string | undefined;
+}
+
+export interface BulkUserData {
+  eventId: string;
+  message?: string | undefined;
+  SuccessUserCount: number;
+  failedUserCount: number;
+  hostId: string;
+  errFileUrl: string;
+  errFilepath: string;
+  users: SimpleUser[];
+}
+
 export interface EventTypeData {
   id: string;
   name: string;
@@ -118,6 +150,20 @@ export interface QuizQuestion {
   required?: boolean | undefined;
   enabled?: boolean | undefined;
   order?: number | undefined;
+}
+
+/** Reassign Ticket Type */
+export interface ReassignTo {
+  id?: string | undefined;
+  name?: string | undefined;
+}
+
+export interface CollaboratorTicket {
+  limitInvitationsNumber: number;
+  name: string;
+  id?: string | undefined;
+  action?: string | undefined;
+  reassignTo?: ReassignTo | undefined;
 }
 
 export interface EventData {
@@ -148,16 +194,20 @@ export interface EventData {
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   capacity?: number | undefined;
-  qrCodeUtilization?: number | undefined;
+  totalConfirmedGuests?: number | undefined;
   guestsCount?: number | undefined;
   currentGuestStatus?: GuestStatus | undefined;
   guestId?: string | undefined;
   userId?: string | undefined;
   featuredEventSection?: FeaturedEventSection | undefined;
+  timeZone?: string | undefined;
+  invitationDeclinedBy?: string | undefined;
+  isPublished?: boolean | undefined;
+  totalCheckedInGuests?: number | undefined;
 }
 
 export interface FeaturedEventSection {
-  id: string | undefined;
+  id: string;
   name: string;
   index: number;
 }
@@ -192,6 +242,9 @@ export interface OwnerEvent {
   lastName?: string | undefined;
   email?: string | undefined;
   profilePicture?: string | undefined;
+  companyLogo?: string | undefined;
+  companyName?: string | undefined;
+  isFollowedByCurrentGuest?: boolean | undefined;
 }
 
 export interface EventTypeEvent {
@@ -238,10 +291,30 @@ export interface TicketTypesEvent {
 }
 
 export interface CollaboratorsEvent {
-  id?: string | undefined;
-  name?: string | undefined;
-  email?: string | undefined;
-  enabled?: boolean | undefined;
+  id: string;
+  name: string;
+  email: string;
+  role: Role | undefined;
+  displayName: string;
+  displayNameListEvent: boolean;
+  limitInvitations: boolean;
+  editEventDetailsSettings: boolean;
+  inviteGuestsToEvent: boolean;
+  addGuestsToDrafts: boolean;
+  chatWithAllGuests: boolean;
+  chatWithGuestsByCollaborator: boolean;
+  viewFullGuestList: boolean;
+  manageInAppRsvpRequests: boolean;
+  manageDedicatedSignUpForm: boolean;
+  postAnnouncementsToAllGuests: boolean;
+  postAnnouncementsByCollaborator: boolean;
+  checkInGuests: boolean;
+  generateEventReports: boolean;
+  limitInvitationsNumber?: number | undefined;
+  tickets: CollaboratorTicket[];
+  companyLogo?: string | undefined;
+  companyName?: string | undefined;
+  isFollowedByCurrentGuest?: boolean | undefined;
 }
 
 export interface Collaborator {
@@ -323,6 +396,33 @@ export interface Guest {
   vouches: VouchesData[];
   addedByPicture?: string | undefined;
   declinedByPicture?: string | undefined;
+  interest: string[];
+  gender: Gender;
+  age?: number | undefined;
+  additionalGuests: AdditionalGuest[];
+}
+
+export interface AdditionalGuest {
+  id: string;
+  firstName: string;
+  lastName: string;
+  guestId: string;
+  addedBy?: string | undefined;
+  addedByPicture?: string | undefined;
+  privateGuestNote?: string | undefined;
+  checkIn?: boolean | undefined;
+  profilePicture?: string | undefined;
+  interest: string[];
+  category: string[];
+  ticketType?: string | undefined;
+  numFollowers?: string | undefined;
+  status?: GuestStatus | undefined;
+  baseCity?: string | undefined;
+  declinedByPicture?: string | undefined;
+  declinedBy?: string | undefined;
+  gender: Gender;
+  isBanned?: boolean | undefined;
+  invitationSource: UserSource;
 }
 
 export interface GuestData {
@@ -348,6 +448,9 @@ export interface GuestData {
   addedByPicture?: string | undefined;
   declinedBy?: string | undefined;
   declinedByPicture?: string | undefined;
+  additionalGuests: AdditionalGuest[];
+  checkIn?: boolean | undefined;
+  addedById?: string | undefined;
 }
 
 export interface GuestDataSimple {
@@ -453,6 +556,8 @@ export interface GuestEventData {
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   guest?: GuestDataEvent | undefined;
+  featuredEventSection?: FeaturedEventSection | undefined;
+  isCurrentUserIsGuest?: boolean | undefined;
 }
 
 export interface GuestDataEvent {
@@ -486,6 +591,7 @@ export interface VouchesData {
   email?: string | undefined;
   picture?: string | undefined;
   isApproved?: boolean | undefined;
+  idUserVouch?: string | undefined;
 }
 
 export interface QuizData {
@@ -526,6 +632,7 @@ export interface GuestDetail {
   maxAdditionalGuests?: number | undefined;
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;
+  inviteMessage?: string | undefined;
 }
 
 export interface GuestDetails {
@@ -544,6 +651,15 @@ export interface GenerateTicketForGuestData {
   ticketStatus?: TicketStatus | undefined;
   b64QRCode?: string | undefined;
   eventQr: boolean;
+  checkInStatus?: boolean | undefined;
+}
+
+export interface ToggleGuestCheckStatusData {
+  guestId?: string | undefined;
+  ticketStatus?: TicketStatus | undefined;
+  checkInStatus: boolean;
+  totalConfirmedGuests?: number | undefined;
+  totalCheckedInGuests?: number | undefined;
 }
 
 export interface ListEventUsedTicketsData {

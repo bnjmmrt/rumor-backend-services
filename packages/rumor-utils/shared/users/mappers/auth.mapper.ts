@@ -11,6 +11,9 @@ import {
   CurrentUser,
   ConfirmedMember,
   SimpleUser,
+  UsersList,
+  MemberProfile,
+  customListData,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -214,6 +217,44 @@ export const toMember = (
   };
 };
 
+export const toUser = (
+  user: User,
+  focuses: FocusProto[] = [],
+  interests: InterestData[] = [],
+  role: UserRole,
+  socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
+): UsersList => {
+  let totalFollowerCount = 0;
+
+  if (user.socialStats) {
+    if (Object.keys(socialNetworkObject).length > 0) {
+      totalFollowerCount = Object.keys(socialNetworkObject).reduce((acc, key) => {
+        const statKey = `${key.toLowerCase()}FollowersCount`;
+        return acc + (user.socialStats[statKey] || 0);
+      }, 0);
+    } else {
+      totalFollowerCount = Object.values(user.socialStats).reduce((acc, val) => {
+        return typeof val === 'number' ? acc + val : acc;
+      }, 0);
+    }
+  }
+
+  const followerCount = formatToUnits(totalFollowerCount) || 'N/A';
+
+  return {
+    id: user.id,
+    name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
+    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    categories: focuses.map((focus) => focus.name),
+    interests: interests.map((interest) => interest.name),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    followerCount,
+    profilePicture: user.profilePicture,
+    type: role.role.name,
+    age: calculateAge(user.dateOfBirth),
+  };
+};
+
 export const toHost = (user: RawHost): Host => {
   const hostedEvents: HostedEvent[] = [];
   hostedEvents.push({ type: 'all', count: user.all_events_count });
@@ -258,5 +299,36 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+  };
+};
+
+export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string): MemberProfile => {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    category: focuses.map((focus) => focus.name).join(', '),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    dateOfBirth: user.dateOfBirth,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    gender: entityToGender[user.gender],
+    socialStats: {
+      instagramFollowersCount: user.socialStats?.instagramFollowersCount || 0,
+    },
+    referredBy: [],
+    upcomingEvents: [],
+    pastEvents: [],
+    invitedEvents: [],
+    requestedEvents: [],
+    status: entityToUserStatus[role.status],
+    role: role.role.name,
+    roleId: role.role.id,
+    interest: interests.map((interest) => interest.name).join(', '),
+    age: calculateAge(user.dateOfBirth),
+    imageUrl: user.profilePicture || '',
+    instagramUsername: instagramUsername,
+    customLists: customLists,
+    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
   };
 };

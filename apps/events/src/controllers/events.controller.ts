@@ -51,7 +51,7 @@ export class EventsController {
   }
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventTypes')
-  public async listEventTypes(payload: QueryRequestDto): Promise<EventTypesResponse> {
+  public async listEventTypes(payload: QueryRequestDto): Promise<void> {
     return EventsService.listEventTypes(payload);
   }
 
@@ -72,7 +72,7 @@ export class EventsController {
 
   //Event Controller
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
-  public async createEvent(payload: CreateEventRequestDto): Promise<EventResponse> {
+  public async createEvent(payload: CreateEventRequestDto): Promise<void> {
     return EventsService.createEvent(payload);
   }
 
@@ -87,7 +87,7 @@ export class EventsController {
   }
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEvent')
-  public async updateEvent(payload: UpdateEventRequestDto): Promise<EventResponse> {
+  public async updateEvent(payload: UpdateEventRequestDto): Promise<void> {
     return EventsService.updateEvent(payload);
   }
 

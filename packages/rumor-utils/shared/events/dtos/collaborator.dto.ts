@@ -1,19 +1,41 @@
-import { IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { CreateCollaboratorRequest, GetDefaultRoleConfigByRoleRequest, UpdateCollaboratorRequest } from '../grpc/events/events.pb';
 import { RoleCollaboratorEnum } from '../grpc/events/general.pb';
+import { Type } from 'class-transformer';
+
+export class CollaboratorTicketDto {
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  limitInvitationsNumber: number;
+
+  @IsUUID()
+  @IsOptional()
+  id?: string;
+
+  @IsString()
+  @IsOptional()
+  action?: string;
+}
 
 export class CreateCollaboratorDto implements CreateCollaboratorRequest {
   @IsNotEmpty()
   @IsUUID()
-  eventId: string;
+  @IsOptional()
+  eventId?: string;
 
   @IsNotEmpty()
   @IsString()
+  @IsEmail()
   email: string;
 
   @IsNotEmpty()
   @IsString()
-  displayName: string;
+  @IsOptional()
+  displayName?: string;
 
   @IsNotEmpty()
   @IsBoolean()
@@ -80,12 +102,11 @@ export class CreateCollaboratorDto implements CreateCollaboratorRequest {
   limitInvitationsNumber?: number;
 
   @IsOptional()
-  @IsString()
-  ticketTypeId?: string;
+  tickets: CollaboratorTicketDto[];
 }
 
 export class UpdateCollaboratorDto implements UpdateCollaboratorRequest {
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
   id: string;
 
@@ -174,8 +195,14 @@ export class UpdateCollaboratorDto implements UpdateCollaboratorRequest {
   limitInvitationsNumber?: number;
 
   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CollaboratorTicketDto)
+  tickets: CollaboratorTicketDto[];
+
   @IsString()
-  ticketTypeId?: string;
+  @IsOptional()
+  action: string;
 }
 
 export class GetDefaultRoleConfigByRoleRequestDto implements GetDefaultRoleConfigByRoleRequest {
@@ -187,3 +214,16 @@ export class GetDefaultRoleConfigByRoleRequestDto implements GetDefaultRoleConfi
   @IsOptional()
   roleName?: string;
 }
+
+export class TicketReassignToDto {
+  @IsNotEmpty()
+  @IsUUID()
+  @IsOptional()
+  id: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @IsOptional()
+  name: string;
+}
+

@@ -1,11 +1,11 @@
 import * as express from 'express';
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { AdminController } from '../controllers/admin.controller';
 import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
-// import F from '../server/middleware/auth';
+import AuthMiddleware from '../server/middleware/auth';
 
 const router: Router = express.Router();
 
@@ -28,7 +28,13 @@ router.get('/auth/admin/member/{id}', AdminController.getMemberProfile);
 router.post('/auth/forgot-password', AuthController.forgotPassword);
 router.post('/auth/set-password', AuthController.setPassword);
 router.post('/auth/login', AuthController.login);
-router.post('/auth/validate', AuthController.validate);
+
+// Auth Validator - For Inter Service Call
+router.post('/auth/validate', AuthMiddleware.fusionAuthRequired, AuthController.validate);
+
+//Testing the interservice COmmunication
+router.get('/check-service-call', AuthController.checkService);
+
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthController.logout);
@@ -74,7 +80,7 @@ router.get('/auth/hosts/favorites', AuthController.getFavoriteUsers);
 router.post('/auth/get-confirmed-members', AuthController.getConfirmedMembers);
 router.post('/auth/get-user-with-roles-by-email', AuthController.getUserWithRolesByEmail);
 // router.post('/auth/admin/reactivate-account', AuthController.registerInvitesAsNonMember);
-router.post('/auth/create-user', AuthController.createUser);
+router.post('/auth/create-user',AuthMiddleware.fusionAuthRequired, AuthController.createUser);
 router.get('/auth/users-list', AuthController.getAllUsers);
 
 //Role routes
@@ -128,6 +134,7 @@ router.get('/auth/x-auth-callback', SocialController.getXAuthData);
 
 
 
-router.get('notification-preferences', SettingsController.getNotificationSettings );
+router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );
+router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings );
 
 export default router;

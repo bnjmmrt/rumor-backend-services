@@ -139,21 +139,24 @@ export class EventsService {
     }
   }
 
-  public static async listEventTypes(payload: QueryRequestDto): Promise<EventTypesResponse> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const pagination = hasPagination(parsedQuery)
-        ? {
-            take: parseInt(parsedQuery.take),
-            skip: parseInt(parsedQuery.skip),
-          }
-        : {};
+  public static async listEventTypes(payload: QueryRequestDto): Promise<void> {
+    // try {
+    //   const parsedQuery = parse(payload.query);
+    //   const pagination = hasPagination(parsedQuery)
+    //     ? {
+    //         take: parseInt(parsedQuery.take),
+    //         skip: parseInt(parsedQuery.skip),
+    //       }
+    //     : {};
 
-      const eventTypes = await this.dbConnection.getRepository(EventTypes).find({ ...pagination });
-      return responses.data(eventTypes);
-    } catch (err) {
-      return responses.badRequest('Error at get list of items of EventTypes');
-    }
+    //   const eventTypes = await this.dbConnection.getRepository(EventTypes).find({ ...pagination });
+    //   return responses.data({
+    //     items: eventTypes,
+    //     total,
+    //   });
+    //     } catch (err) {
+    //   return responses.badRequest('Error at get list of items of EventTypes');
+    // }
   }
 
   public static async getEventType(payload: RequestByIdDto): Promise<EventTypeResponse> {
@@ -212,82 +215,82 @@ export class EventsService {
     }
   }
 
-  public static async createEvent(payload: CreateEventRequestDto): Promise<EventResponse> {
-    try {
-      if (!payload.ownerId) return responses.badRequest('OwnerId is required');
-      if (payload.publishDate && new Date(payload.publishDate) > new Date(payload.startDate))
-        return responses.conflict('Publish date cannot be later than the start date.');
-      if ((payload.status && payload.status === EventStatusEnum.APPROVED_STATUS) || payload.status === EventStatusEnum.DECLINED_STATUS)
-        return responses.conflict(`The event cannot be ${payload.status} at this time.`);
+  public static async createEvent(payload: CreateEventRequestDto): Promise<void> {
+    // try {
+    //   if (!payload.ownerId) return responses.badRequest('OwnerId is required');
+    //   if (payload.publishDate && new Date(payload.publishDate) > new Date(payload.startDate))
+    //     return responses.conflict('Publish date cannot be later than the start date.');
+    //   if ((payload.status && payload.status === EventStatusEnum.APPROVED_STATUS) || payload.status === EventStatusEnum.DECLINED_STATUS)
+    //     return responses.conflict(`The event cannot be ${payload.status} at this time.`);
 
-      const event = new Event();
-      event.name = payload.name;
-      event.description = payload.description;
-      event.enabled = payload.enabled;
-      if (payload.startDate) {
-        event.startDate = new Date(payload.startDate);
-      }
-      if (payload.endDate) {
-        event.endDate = new Date(payload.endDate);
-      }
-      if (payload.rsvpDeadline) {
-        event.rsvpDeadline = new Date(payload.rsvpDeadline);
-      }
-      if (!payload.status) {
-        payload.status = EventStatusEnum.DRAFT_STATUS;
-      }
-      event.limitOnePlus = payload.limitOnePlus;
-      event.useQr = payload.useQr;
-      event.isPrivate = payload.isPrivate;
-      event.capacity = payload.capacity;
-      event.imageFlyer = payload.imageFlyer;
-      event.imageCover = payload.imageCover;
-      event.furtherInstructions = payload.furtherInstructions;
-      event.showLocation = payload.showLocation;
-      event.publishDate = payload.publishDate && new Date(payload.publishDate);
-      event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
-      if (payload.ownerId) {
-        const owner = serviceMesh.getUser(config.get('API_BASE_URL') ,payload.ownerId);
-        if (!owner) return responses.badRequest(`The ID ${payload.ownerId} is not a valid user or the user does not exist!`);
-        event.owner = { id: payload.ownerId } as User;
-      }
+    //   const event = new Event();
+    //   event.name = payload.name;
+    //   event.description = payload.description;
+    //   event.enabled = payload.enabled;
+    //   if (payload.startDate) {
+    //     event.startDate = new Date(payload.startDate);
+    //   }
+    //   if (payload.endDate) {
+    //     event.endDate = new Date(payload.endDate);
+    //   }
+    //   if (payload.rsvpDeadline) {
+    //     event.rsvpDeadline = new Date(payload.rsvpDeadline);
+    //   }
+    //   if (!payload.status) {
+    //     payload.status = EventStatusEnum.DRAFT_STATUS;
+    //   }
+    //   event.limitOnePlus = payload.limitOnePlus;
+    //   event.useQr = payload.useQr;
+    //   event.isPrivate = payload.isPrivate;
+    //   event.capacity = payload.capacity;
+    //   event.imageFlyer = payload.imageFlyer;
+    //   event.imageCover = payload.imageCover;
+    //   event.furtherInstructions = payload.furtherInstructions;
+    //   event.showLocation = payload.showLocation;
+    //   event.publishDate = payload.publishDate && new Date(payload.publishDate);
+    //   event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
+    //   if (payload.ownerId) {
+    //     const owner = serviceMesh.getUser(config.get('API_BASE_URL') ,payload.ownerId);
+    //     if (!owner) return responses.badRequest(`The ID ${payload.ownerId} is not a valid user or the user does not exist!`);
+    //     event.owner = { id: payload.ownerId } as User;
+    //   }
 
-      if (payload.eventTypeId) {
-        const eventType = await this.dbConnection.getRepository(EventTypes).findOne({
-          where: { id: payload.eventTypeId },
-        });
-        if (eventType) event.eventType = eventType;
-      }
-      if (payload.locationId) {
-        const eventLocation = await this.dbConnection.getRepository(EventLocation).findOne({
-          where: { id: payload.locationId },
-        });
-        if (eventLocation) event.location = eventLocation;
-      }
+    //   if (payload.eventTypeId) {
+    //     const eventType = await this.dbConnection.getRepository(EventTypes).findOne({
+    //       where: { id: payload.eventTypeId },
+    //     });
+    //     if (eventType) event.eventType = eventType;
+    //   }
+    //   if (payload.locationId) {
+    //     const eventLocation = await this.dbConnection.getRepository(EventLocation).findOne({
+    //       where: { id: payload.locationId },
+    //     });
+    //     if (eventLocation) event.location = eventLocation;
+    //   }
 
-      if (payload.ageLimitId) {
-        const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
-          where: { id: payload.ageLimitId },
-        });
-        if (eventAgeLimit) event.ageLimit = eventAgeLimit;
-      }
-      if (payload.admissionTypeId) {
-        const addmissionType = await this.dbConnection.getRepository(AdmissionType).findOne({
-          where: { id: payload.admissionTypeId },
-        });
-        if (addmissionType) event.admissionType = addmissionType;
-      }
+    //   if (payload.ageLimitId) {
+    //     const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
+    //       where: { id: payload.ageLimitId },
+    //     });
+    //     if (eventAgeLimit) event.ageLimit = eventAgeLimit;
+    //   }
+    //   if (payload.admissionTypeId) {
+    //     const addmissionType = await this.dbConnection.getRepository(AdmissionType).findOne({
+    //       where: { id: payload.admissionTypeId },
+    //     });
+    //     if (addmissionType) event.admissionType = addmissionType;
+    //   }
 
-      let createdEvent = await this.dbConnection.getRepository(Event).save(event);
-      createdEvent = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: createdEvent.id },
-        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
-      });
+    //   let createdEvent = await this.dbConnection.getRepository(Event).save(event);
+    //   createdEvent = await this.dbConnection.getRepository(Event).findOne({
+    //     where: { id: createdEvent.id },
+    //     relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
+    //   });
 
-      return responses.data(toEvent(createdEvent, null));
-    } catch (err) {
-      return responses.badRequest('Error at create item for Event');
-    }
+    //   return responses.data(toEvent(createdEvent, null));
+    // } catch (err) {
+    //   return responses.badRequest('Error at create item for Event');
+    // }
   }
 
   public static async listEvents(payload: QueryRequestDto): Promise<EventsResponse | ListEventsFeedResponse> {
@@ -667,113 +670,113 @@ export class EventsService {
     }
   }
 
-  public static async updateEvent(payload: UpdateEventRequestDto): Promise<EventResponse> {
-    try {
-      const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: payload.id, deletedAt: IsNull() },
-        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
-      });
+  public static async updateEvent(payload: UpdateEventRequestDto): Promise<void> {
+    // try {
+    //   const event = await this.dbConnection.getRepository(Event).findOne({
+    //     where: { id: payload.id, deletedAt: IsNull() },
+    //     relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
+    //   });
 
-      if (!event) return responses.notFound('Item of Event not found');
-      const validateEvenData = await this.validateEventUpdate(event, payload);
-      if (!validateEvenData.validate) return responses.conflict(validateEvenData.message);
-      if (payload.status && payload.status === EventStatusEnum.APPROVED_STATUS && !event.publishDate && !payload.publishDate) {
-        await this.publishEvent(payload.id);
-      }
-      if (payload.status === EventStatusEnum.CANCELLED_STATUS) {
-        // TODO: Add functionality to send notification to all guests for cancelled event
-      } else if (payload.status === EventStatusEnum.DECLINED_STATUS && event.owner) {
-        await serviceMesh.sendEmailFromTemplate(
-          config.get('API_BASE_URL'),
-          [
-            {
-              key: 'event_name',
-              value: event.name,
-            },
-            {
-              key: 'host_name',
-              value: event.owner.firstName,
-            },
-          ],
-          'Event Submission Rejected',
-          [event.owner.email],
-          null
-        );
-      }
+    //   if (!event) return responses.notFound('Item of Event not found');
+    //   const validateEvenData = await this.validateEventUpdate(event, payload);
+    //   if (!validateEvenData.validate) return responses.conflict(validateEvenData.message);
+    //   if (payload.status && payload.status === EventStatusEnum.APPROVED_STATUS && !event.publishDate && !payload.publishDate) {
+    //     await this.publishEvent(payload.id);
+    //   }
+    //   if (payload.status === EventStatusEnum.CANCELLED_STATUS) {
+    //     // TODO: Add functionality to send notification to all guests for cancelled event
+    //   } else if (payload.status === EventStatusEnum.DECLINED_STATUS && event.owner) {
+    //     await serviceMesh.sendEmailFromTemplate(
+    //       config.get('API_BASE_URL'),
+    //       [
+    //         {
+    //           key: 'event_name',
+    //           value: event.name,
+    //         },
+    //         {
+    //           key: 'host_name',
+    //           value: event.owner.firstName,
+    //         },
+    //       ],
+    //       'Event Submission Rejected',
+    //       [event.owner.email],
+    //       null
+    //     );
+    //   }
 
-      if (payload.publishDate) {
-        event.publishDate = new Date(payload.publishDate);
-      }
-      event.name = payload.name ?? event.name;
-      event.description = payload.description ?? event.description;
-      event.enabled = payload.enabled ?? event.enabled;
-      event.limitOnePlus = payload.limitOnePlus ?? event.limitOnePlus;
-      event.useQr = payload.useQr ?? event.useQr;
-      event.imageFlyer = payload.imageFlyer ?? event.imageFlyer;
-      event.imageCover = payload.imageCover ?? event.imageCover;
-      event.furtherInstructions = payload.furtherInstructions ?? event.furtherInstructions;
-      event.showLocation = payload.showLocation ?? event.showLocation;
-      event.isPrivate = payload.isPrivate ?? event.isPrivate;
-      event.capacity = payload.capacity ?? event.capacity;
-      event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
-      if (payload.status) {
-        if (payload.status !== EventStatusEnum.APPROVED_STATUS) {
-          event.isPublished = false;
-        } else if (payload.status === EventStatusEnum.APPROVED_STATUS && !event.publishDate) {
-          event.isPublished = true;
-        }
-      }
-      if (payload.startDate) {
-        event.startDate = new Date(payload.startDate);
-      }
-      if (payload.endDate) {
-        event.endDate = new Date(payload.endDate);
-      }
-      if (payload.rsvpDeadline) {
-        event.rsvpDeadline = new Date(payload.rsvpDeadline);
-      }
+    //   if (payload.publishDate) {
+    //     event.publishDate = new Date(payload.publishDate);
+    //   }
+    //   event.name = payload.name ?? event.name;
+    //   event.description = payload.description ?? event.description;
+    //   event.enabled = payload.enabled ?? event.enabled;
+    //   event.limitOnePlus = payload.limitOnePlus ?? event.limitOnePlus;
+    //   event.useQr = payload.useQr ?? event.useQr;
+    //   event.imageFlyer = payload.imageFlyer ?? event.imageFlyer;
+    //   event.imageCover = payload.imageCover ?? event.imageCover;
+    //   event.furtherInstructions = payload.furtherInstructions ?? event.furtherInstructions;
+    //   event.showLocation = payload.showLocation ?? event.showLocation;
+    //   event.isPrivate = payload.isPrivate ?? event.isPrivate;
+    //   event.capacity = payload.capacity ?? event.capacity;
+    //   event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
+    //   if (payload.status) {
+    //     if (payload.status !== EventStatusEnum.APPROVED_STATUS) {
+    //       event.isPublished = false;
+    //     } else if (payload.status === EventStatusEnum.APPROVED_STATUS && !event.publishDate) {
+    //       event.isPublished = true;
+    //     }
+    //   }
+    //   if (payload.startDate) {
+    //     event.startDate = new Date(payload.startDate);
+    //   }
+    //   if (payload.endDate) {
+    //     event.endDate = new Date(payload.endDate);
+    //   }
+    //   if (payload.rsvpDeadline) {
+    //     event.rsvpDeadline = new Date(payload.rsvpDeadline);
+    //   }
 
-      if (payload.ownerId) {
-        const owner = serviceMesh.getCurrentMember(config.get('API_BASE_URL'), payload.ownerId);
-        if (owner) event.owner = { id: owner.id } as User;
-      }
-      if (payload.eventTypeId) {
-        const eventType = await this.dbConnection.getRepository(EventTypes).findOne({
-          where: { id: payload.eventTypeId },
-        });
-        if (eventType) event.eventType = eventType;
-      }
+    //   if (payload.ownerId) {
+    //     const owner = serviceMesh.getCurrentMember(config.get('API_BASE_URL'), payload.ownerId);
+    //     if (owner) event.owner = { id: owner.id } as User;
+    //   }
+    //   if (payload.eventTypeId) {
+    //     const eventType = await this.dbConnection.getRepository(EventTypes).findOne({
+    //       where: { id: payload.eventTypeId },
+    //     });
+    //     if (eventType) event.eventType = eventType;
+    //   }
 
-      if (payload.locationId && event.location.id != payload.locationId) {
-        await this.dbConnection.getRepository(EventLocation).delete({ id: event.location.id });
-        const eventLocation = await this.dbConnection.getRepository(EventLocation).findOne({
-          where: { id: payload.locationId },
-        });
-        if (eventLocation) event.location = eventLocation;
-      }
+    //   if (payload.locationId && event.location.id != payload.locationId) {
+    //     await this.dbConnection.getRepository(EventLocation).delete({ id: event.location.id });
+    //     const eventLocation = await this.dbConnection.getRepository(EventLocation).findOne({
+    //       where: { id: payload.locationId },
+    //     });
+    //     if (eventLocation) event.location = eventLocation;
+    //   }
 
-      if (payload.ageLimitId) {
-        const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
-          where: { id: payload.ageLimitId },
-        });
-        if (eventAgeLimit) event.ageLimit = eventAgeLimit;
-      }
+    //   if (payload.ageLimitId) {
+    //     const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
+    //       where: { id: payload.ageLimitId },
+    //     });
+    //     if (eventAgeLimit) event.ageLimit = eventAgeLimit;
+    //   }
 
-      if (payload.admissionTypeId) {
-        const admissionType = await this.dbConnection.getRepository(AdmissionType).findOne({
-          where: { id: payload.admissionTypeId },
-        });
-        if (admissionType) event.admissionType = admissionType;
-      }
-      await this.dbConnection.getRepository(Event).save(event);
-      const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: event.id },
-        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
-      });
-      return responses.data(toEvent(updatedEvent, null));
-    } catch (err) {
-      return responses.badRequest('Error at update an item for Event');
-    }
+    //   if (payload.admissionTypeId) {
+    //     const admissionType = await this.dbConnection.getRepository(AdmissionType).findOne({
+    //       where: { id: payload.admissionTypeId },
+    //     });
+    //     if (admissionType) event.admissionType = admissionType;
+    //   }
+    //   await this.dbConnection.getRepository(Event).save(event);
+    //   const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
+    //     where: { id: event.id },
+    //     relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
+    //   });
+    //   return responses.data(toEvent(updatedEvent, null));
+    // } catch (err) {
+    //   return responses.badRequest('Error at update an item for Event');
+    // }
   }
 
   public static async validateAddress(payload: AddressValidationRequest): Promise<AddressValidationResponse> {
@@ -1351,10 +1354,10 @@ export class EventsService {
         event.featuredEventSection = null;
         await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-        if (!featuredEventSection) return responses.notFound('Featured event section was not found');
+        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
+        //if (!featuredEventSection) return responses.notFound('Featured event section was not found');
 
-        event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
+        //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
         await this.dbConnection.getRepository(Event).save(event);
       }
 

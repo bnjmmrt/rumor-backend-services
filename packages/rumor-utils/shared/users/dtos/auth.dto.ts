@@ -35,10 +35,23 @@ import {
   GetUserWithRolesByEmailRequest,
   InviteNewHostRequest,
   LoginVerificationRequest,
+  UpdateCustomUsersListRequest,
+  duplicateCustomListRequest,
+  BlockHostRequest,
+  ReportRequest,
+  AddHostUserSettingsRequest,
+  BulkCreateUsersRequest,
+  VerifyCodeByEmailRequest,
+  SendVerificationCodeByEmailRequest,
+  HostFeedbackRequest,
+  GetUserWithRolesByPhoneRequest,
+  CreateHostCollaboratorRequest,
 } from '../grpc/auth/auth.pb';
 import { Type } from 'class-transformer';
-import { NewUserStatus, ProviderType } from '../grpc/auth/shared.pb';
+import { NewUserStatus, PaginatedRequest, ProviderType } from '../grpc/auth/shared.pb';
 import { IsPasswordMatch, IsStrongPassword } from '../../../decorators';
+import { Tag } from '../interfaces/auth.interface';
+import { UserStatus } from '../interfaces/shared.interface';
 
 export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsString()
@@ -186,6 +199,13 @@ export class MemberSignUpRequestDto implements MemberSignUpRequest {
   @IsString()
   @IsOptional()
   instagramUserName?: string;
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  interestsIds: string[];
 }
 
 export class HostSignUpRequestDto implements HostSignUpRequest {
@@ -308,6 +328,9 @@ export class MemberLoginRequestDto implements MemberLoginRequest {
 
   @IsNotEmpty()
   isExist: boolean;
+
+  @IsNotEmpty()
+  isGuest: boolean;
 }
 
 export class UpdateUserProfilePictureRequestDto implements UpdateUserProfilePictureRequest {
@@ -345,6 +368,10 @@ export class UpdateUserProfileRequestDto implements UpdateUserProfileRequest {
   @ValidateNested()
   @Type(() => MemberAddressUpdateDto)
   address?: MemberAddressUpdateDto;
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  focusIds: string[];
 }
 
 export class BioProfileRequestDto implements BioProfileRequest {
@@ -377,6 +404,24 @@ export class CreateNonMemberUserRequestDto implements CreateNonMemberUserRequest
   lastName?: string;
 }
 
+export class CreateHostCollaboratorRequestDto implements CreateHostCollaboratorRequest {
+  @IsString()
+  @IsOptional()
+  email?: string;
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+  @IsString()
+  @IsOptional()
+  role?: string;
+}
+
 export class ManageFollowHostRequestDto implements ManageFollowHostRequest {
   @IsUUID()
   @IsNotEmpty()
@@ -391,10 +436,24 @@ export class ManageFollowHostRequestDto implements ManageFollowHostRequest {
   follow: boolean;
 }
 
+export class CustomUsersListsRequestDto implements CustomUsersListRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  query: string;
+}
+
 export class CustomUsersListRequestDto implements CustomUsersListRequest {
   @IsUUID()
   @IsNotEmpty()
   userId: string;
+
+  @IsString()
+  @IsOptional()
+  id: string;
 
   @IsString()
   @IsNotEmpty()
@@ -406,6 +465,10 @@ export class ManageCustomUsersListRequestDto implements ManageCustomUsersListReq
   @IsNotEmpty()
   userId: string;
 
+  @IsUUID()
+  @IsOptional()
+  customListId: string;
+
   @IsString()
   @IsNotEmpty()
   customName: string;
@@ -414,6 +477,30 @@ export class ManageCustomUsersListRequestDto implements ManageCustomUsersListReq
   @IsUUID('4', { each: true })
   @IsNotEmpty()
   userIds: string[];
+}
+
+export class UpdateCustomUsersListRequestDto implements UpdateCustomUsersListRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  hostId: string;
+
+  @IsUUID()
+  @IsOptional()
+  customListId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  userIds: string[];
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  mappingIds: string[];
 }
 
 export class ManageFavoriteUserRequestDto implements ManageFavoriteUserRequest {
@@ -463,12 +550,8 @@ export class UpdateHostPasswordRequestDto implements UpdateHostPasswordRequest {
   @IsUUID()
   @IsNotEmpty()
   id: string;
+
   @IsString()
-  @IsNotEmpty()
-  currentPassword: string;
-  @IsStrongPassword({
-    message: 'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
-  })
   @IsNotEmpty()
   newPassword: string;
 }
@@ -486,6 +569,12 @@ export class GetUserWithRolesByEmailRequestDto implements GetUserWithRolesByEmai
   email: string;
 }
 
+export class GetUserWithRolesByPhoneRequestDto implements GetUserWithRolesByPhoneRequest {
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
+}
+
 export class NonMemberSignUpRequestDto implements CreateNonMemberUserRequest {
   @IsString()
   @IsNotEmpty()
@@ -496,12 +585,15 @@ export class NonMemberSignUpRequestDto implements CreateNonMemberUserRequest {
   lastName: string;
 
   @IsString()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
-  phoneNumber: string;
+  @IsOptional()
+  phoneNumber?: string;
 
   @IsString()
+  @IsOptional()
   id: string;
 }
 
@@ -514,4 +606,162 @@ export class VerifyCodeRequestDto {
   @IsString()
   @IsNotEmpty()
   verificationCode: string;
+}
+
+export class HostFeedbackRequestDto implements HostFeedbackRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+
+  @IsString()
+  @IsNotEmpty()
+  tag: Tag;
+}
+
+export class SendVerificationCodeByEmailRequestDto implements SendVerificationCodeByEmailRequest {
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class VerifyCodeByEmailRequestDto implements VerifyCodeByEmailRequest {
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+  @IsString()
+  @IsNotEmpty()
+  verificationCode: string;
+}
+export class BulkCreateUsersRequestDto implements BulkCreateUsersRequest {
+  @IsString()
+  id: string;
+
+  @IsNotEmpty()
+  file: Buffer;
+
+  @IsOptional()
+  @IsString()
+  filename: string;
+
+  @IsOptional()
+  @IsString()
+  type: string;
+
+  @IsOptional()
+  @IsString()
+  contentType: string;
+
+  @IsOptional()
+  size: number;
+}
+
+export class AddUserNoteRequestDto implements AddHostUserSettingsRequest {
+  @IsString()
+  id: string;
+
+  @IsString()
+  userId: string;
+
+  @IsString()
+  note: string;
+}
+
+export class ManageUserRequestDto implements AddHostUserSettingsRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsString()
+  userId: string;
+
+  @IsBoolean()
+  isSpam: boolean;
+}
+
+export class ReportUserRequestDto implements ReportRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  reportedById: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  reportedToId: string;
+
+  @IsString()
+  reportMessage: string;
+
+  @IsString()
+  reportedByRoleId: string;
+
+  @IsString()
+  reportedToRoleId: string;
+}
+
+export class BlockHostRequestDto implements BlockHostRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  blockedById: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  blockedToId: string;
+
+  @IsString()
+  blockedByRoleId: string;
+
+  @IsString()
+  blockedToRoleId: string;
+}
+
+export class DuplicateCustomListRequestDto implements duplicateCustomListRequest {
+  @IsString()
+  @IsOptional()
+  customListId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  customName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  hostId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  listType: string;
+}
+
+export class FilterRequestDto implements PaginatedRequest {
+  @IsUUID()
+  @IsOptional()
+  userId: string;
+
+  @IsString()
+  query: string;
+}
+
+export class sendSupportEmailRequestDto {
+  @IsUUID()
+  @IsOptional()
+  userId: string;
+
+  @IsString()
+  subject: string;
+
+  @IsString()
+  message: string;
+}
+
+export class UpdateUsersStatusDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsNotEmpty()
+  ids: string[];
+
+  @IsNotEmpty()
+  status: UserStatus;
 }

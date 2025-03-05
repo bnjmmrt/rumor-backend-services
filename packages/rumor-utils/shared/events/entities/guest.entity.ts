@@ -1,20 +1,12 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  OneToOne,
-} from "typeorm";
-import { RumorBaseEntity } from "../../entities/rumor-base.entity";
-import { Event } from "./event.entity";
-import { User } from "../../users/entities/user.entity";
-import { GuestStatus } from "../interfaces/event.interface";
-import { TicketType } from "./ticket-type.entity";
-import { UserSource } from "../interfaces/event.interface";
-import { Ticket } from "./ticket.entity";
-import { SignupFormSubmissions } from "./signup-form-submissions.entity";
-
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne, OneToMany } from 'typeorm';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Event } from './event.entity';
+import { User } from '../../users/entities/user.entity';
+import { GuestStatus } from '../interfaces/event.interface';
+import { TicketType } from './ticket-type.entity';
+import { Ticket } from './ticket.entity';
+import { RestrictedInvites } from './restricted-invites.entity';
+import { UserSource } from '../grpc/events/general.pb';
+import { SignupFormSubmissions } from './signup-form-submissions.entity';
 @Entity()
 export class Guest extends RumorBaseEntity {
   @Column({
@@ -33,6 +25,9 @@ export class Guest extends RumorBaseEntity {
 
   @Column({ type: "integer", name: "additional_requested_guests", default: 0 })
   additionalRequestedGuests: number;
+
+  @Column({ type: 'boolean', name: 'check_in', default: false })
+  checkIn: boolean;
 
   @Column({ type: "varchar", name: "private_guest_note", nullable: true })
   privateGuestNote: string;
@@ -54,7 +49,8 @@ export class Guest extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.guests, {
-    onUpdate: "CASCADE",
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: "event_id" })
   event: Event;
@@ -89,4 +85,8 @@ export class Guest extends RumorBaseEntity {
   @OneToOne(() => SignupFormSubmissions, (sfs) => sfs.guest)
   @JoinColumn({ name: "signup_form_submission_id" })
   signupFormSubmissions: SignupFormSubmissions;
+
+  @OneToMany(() => RestrictedInvites, (ri) => ri.guest, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  restrictedGuest: RestrictedInvites;
 }
+
