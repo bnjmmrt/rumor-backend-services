@@ -389,7 +389,7 @@ export class GuestService {
       //To Do: Change email and sms template
       await Promise.all(
         emails.map((email) =>
-          serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+          serviceMesh.notificationService().sendEmailFromTemplate([{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
         ),
       );
     }
@@ -526,7 +526,14 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map((email) =>
-            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                [{ key: "first_name", value: "" }],
+                "Host Application Submitted",
+                [email],
+                null
+              )
           )
         );
       }
@@ -536,8 +543,15 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           confirmedGuestsEmails.map((email) =>
-            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
-          ),
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                [{ key: "first_name", value: "" }],
+                "Host Application Submitted",
+                [email],
+                null
+              )
+          )
         );
       }
 
@@ -546,8 +560,15 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           declinedGuestsEmails.map((email) =>
-            serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'), [{ key: 'first_name', value: '' }], 'Host Application Submitted', [email], null)
-          ),
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                [{ key: "first_name", value: "" }],
+                "Host Application Submitted",
+                [email],
+                null
+              )
+          )
         );
       }
 
@@ -2218,15 +2239,17 @@ export class GuestService {
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
     if (payload.email) {
-      await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
-        [{ key: 'first_name', value: payload?.firstName || '' }],
-        'Host Application Submitted',
-        [payload.email],
-        null
-      );
+      await serviceMesh
+        .notificationService()
+        .sendEmailFromTemplate(
+          [{ key: "first_name", value: payload?.firstName || "" }],
+          "Host Application Submitted",
+          [payload.email],
+          null
+        );
     } else if (payload.phoneNumber) {
       const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
       if (!success) {
         return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
       }
@@ -2351,15 +2374,17 @@ export class GuestService {
         // Step 8: Send invitation (email or SMS)
         // TO DO: Change email and sms template
         if (guestPayload.email) {
-          await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
-            [{ key: 'first_name', value: guestPayload?.firstName || '' }],
-            'Host Application Submitted',
-            [guestPayload.email],
-            null
-          );
+          await serviceMesh
+            .notificationService()
+            .sendEmailFromTemplate(
+              [{ key: "first_name", value: guestPayload?.firstName || "" }],
+              "Host Application Submitted",
+              [guestPayload.email],
+              null
+            );
         } else if (guestPayload.phoneNumber) {
           const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-          const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), guestPayload.phoneNumber, message);
+          const success = await serviceMesh.notificationService().sendTextMessage(guestPayload.phoneNumber, message);
           if (!success) return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
         }
 
@@ -2701,15 +2726,17 @@ export class GuestService {
       // Step 9: Send invite email or sms if required
       // TO DO: Change email and sms template
       if (payload.email) {
-        await serviceMesh.notificationService().sendEmailFromTemplate(config.get('API_BASE_URL'),
-          [{ key: 'first_name', value: payload?.firstName || '' }],
-          'Host Application Submitted',
-          [payload.email],
-          null
-        );
+        await serviceMesh
+          .notificationService()
+          .sendEmailFromTemplate(
+            [{ key: "first_name", value: payload?.firstName || "" }],
+            "Host Application Submitted",
+            [payload.email],
+            null
+          );
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-        const success = await serviceMesh.notificationService().sendTextMessage(config.get('API_BASE_URL'), payload.phoneNumber, message);
+        const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
         if (!success) {
           return responses.badRequest('An error occurred while sending SMS invitation, please try again.');
         }
