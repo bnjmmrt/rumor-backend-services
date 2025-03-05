@@ -11,7 +11,7 @@ export const getBasicHostProfile = (id: string) => apiService.getApi().get(`/aut
 
 export const getMembersOrNonMembers = (userId: string, query: string) => apiService.getApi().post(`/auth/user/get-member-or-non-member/?query=${query}`, { userId });
 
-export const getUser = (baseURL:string, userId: string) => apiService.getApi().get(`${baseURL}/users/${userId}`);
+export const getUser = (baseURL:string, userId: string) => apiService.getApi().get(`/auth/user/${userId}/get-user`);
 
 export const getRoleByName = (name: string) => apiService.getApi().post(`/auth/roles/get-role-by-name`, { name });
 
@@ -21,14 +21,15 @@ export const getUserWithRolesByPhone = (baseURL:string, phoneNumber: string) => 
 
 export const createNonMemberUser = (payload: CreateNonMemberUserRequestDto) => apiService.getApi().post(`/auth/non-member`, { email: payload.email, phoneNumber: payload.phoneNumber, firstName: payload.firstName, lastName: payload.lastName });
 
-export const assignRoleToUser = (baseURL:string, userId: string, roleName?: string, roleId?: string) => apiService.getApi().post(`/auth/role/assign/${userId}`, { roleName, roleId });
+export const assignRoleToUser = (userId: string, roleName?: string, roleId?: string) => apiService.getApi().post(`/auth/role/assign/${userId}`, { roleName, roleId });
 
-export const markUserAsSpam = (baseURL:string, userId: string) => apiService.getApi().post(`${baseURL}/users/${userId}/spam`);
+export const markUserAsSpam = (userId: string) => apiService.getApi().post(`/auth/roles/mark-spam`, { userId });
 
 export const registerInvitesAsNonMember = (payload: InvitedGuestRequestDto) => apiService.getApi().post(`/auth/user/invite-as-non-member`, { firstName: payload.firstName, lastName: payload.lastName, phoneNumber: payload.phoneNumber, email: payload.email , id: payload.userId});
 
 export const getCurrentUser = () => apiService.getApi().get(`/auth/current-user`);
 
+//TO DO
 export const getUserSettings = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/users/${id}/settings`);
 
 export const getPushNotificationTokens = (baseURL:string, userId: string) => apiService.getApi().get(`${baseURL}/users/${userId}/push-notification-tokens`);
