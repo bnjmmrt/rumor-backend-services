@@ -1,7 +1,8 @@
 import { Event } from "../entities";
 import { EventSignupForms } from "../entities/event-signup-forms.entity";
 import { SignupFormQuestions } from "../entities/signup-form-questions.entity";
-import { SignupFormsResponse } from "../grpc/events/general.pb";
+import { CollaboratorsEvent, SignupFormsResponse } from "../grpc/events/general.pb";
+import { groupCollaborators } from "./events.mapper";
 
 export const buildSignupFormsResponse = (
   event: Event,
@@ -15,6 +16,7 @@ export const buildSignupFormsResponse = (
     .split(" ")
     .join("");
   const eventName = event.name.split(" ").join("");
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators);
 
   const result: SignupFormsResponse = {
     id: esf.id,
@@ -25,7 +27,7 @@ export const buildSignupFormsResponse = (
     type: event.eventType?.name,
     ageLimit: event.ageLimit,
     talents: event.talents,
-    collaborators: [],
+    collaborators: collaborators,
     styling: esf.styling,
     userId: esf.createdBy.id,
     userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,

@@ -44,6 +44,7 @@ import {
   BlockHostRequestDto,
   sendSupportEmailRequestDto,
   SwitchProfileDto,
+  GetUserWithRolesByPhoneRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -78,6 +79,7 @@ import {
   VerifyResponse,
   ReportResponse,
   FeedbacksResponse,
+  MemberSignUpResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -170,6 +172,9 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.entity';
 import { Report } from 'rumor-utils/shared/users/entities/report.entity';
 import { Block } from 'rumor-utils/shared/users/entities/block.entity';
+import { Guest } from 'rumor-utils/shared/entities';
+import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { PlatformService } from './platform.service';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -277,8 +282,12 @@ export class AuthService {
     }
   }
 
-  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<SignUpResponse> {
-    let nonMember: UserRole | null = null;
+  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<MemberSignUpResponse> {
+    let existingUser: User | null = null;
+    let fusionAuthUser = null;
+    let requiresFusionAuthRegistration = false;
+    let fusionAuthToken: string | null = null;
+
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -290,39 +299,57 @@ export class AuthService {
     });
 
     if (user) {
-      nonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member') return item;
-      });
-      if (!nonMember) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError("Phone number is already in use.");
-        }
+      existingUser = user;
+      const isHost = user.roles.some((item) => item.role.name === 'host');
+      const isMember = user.roles.some((item) => item.role.name === 'member');
+      const isNonMember = user.roles.some((item) => item.role.name === 'non_member');
 
-        if (user.email === payload.email) {
-          throw new BadRequestError("Email is already in use.");
-        }
+      if (isMember) {
+        throw new BadRequestError('You are already registered as a member.')
       }
+
+      if (isHost) {
+        const request: PasswordlessStartRequest = {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          loginId: user.email,
+        };
+        const code = await this.fusionAuthClient.startPasswordlessLogin(request);
+        const authenticatedUser = await this.fusionAuthClient.passwordlessLogin({ code: code.response.code });
+        fusionAuthToken = authenticatedUser.response.token;
+
+        requiresFusionAuthRegistration = false;
+      } else if (isNonMember) {
+        try {
+          const fusionAuthResponse = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+          requiresFusionAuthRegistration = fusionAuthResponse.statusCode !== 200;
+        } catch (error) {
+          requiresFusionAuthRegistration = true;
+        }
+      } else {
+        requiresFusionAuthRegistration = true;
+      }
+    } else {
+      requiresFusionAuthRegistration = true;
     }
 
-    /* eslint-disable @typescript-eslint/no-explicit-any */
-    let placeLocation: any = null;
+    // Get address
+    let placeLocation = null;
     if (payload.address.placeId) {
       placeLocation = await GoogleAddressClient.geodecodePlaceId(payload.address.placeId);
     }
     const userAddress = await newAddress(payload.address, placeLocation);
     const address = await this.dbConnection.getRepository(Address).save(userAddress);
+
+    // Always use `newMember` for user creation
     let newUser = newMember(payload, address);
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = {
-        socialUrl: payload.socialUrl,
-      };
+    // Retain ID if user exists
+    if (existingUser) {
+      newUser.id = existingUser.id;
     }
-    if (nonMember) {
-      newUser.id = user.id;
-      await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
-    } else {
-      newUser = this.dbConnection.getRepository(User).create(newUser);
+
+    if (payload.socialUrl) {
+      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
     }
 
     if (payload.instagramAccessToken) {
@@ -333,46 +360,57 @@ export class AuthService {
       SocialService.getFacebookData(newUser.id, payload.linkedInAccessToken, payload.platform);
     }
 
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        username: payload.email.split('@')[0],
-        birthDate: payload.dateOfBirth,
-        email: payload.email,
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        mobilePhone: payload.phoneNumber,
-        password: generateRandomPassword(12),
-        verified: true,
-        active: true,
-      },
-    };
+    if (!existingUser || requiresFusionAuthRegistration) {
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: payload.email.split('@')[0],
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          username: payload.email.split('@')[0],
+          birthDate: payload.dateOfBirth,
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          mobilePhone: payload.phoneNumber,
+          password: generateRandomPassword(12),
+          verified: true,
+          active: true,
+        },
+      };
 
-    const fusionAuthUser = await this.fusionAuthClient.register(newUser.id, registrationRequest);
-    if (fusionAuthUser.statusCode !== 200) {
-      throw new ConflictError(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+      fusionAuthUser = await this.fusionAuthClient.register(newUser.id, registrationRequest);
+      if (fusionAuthUser.statusCode !== 200) {
+        return responses.conflict(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+      }
+      newUser.id = fusionAuthUser.response?.user?.id;
+      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
     }
 
-    newUser.id = fusionAuthUser.response?.user?.id;
     newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'member' });
-
-    // Micro-service call - need to shift the focus from platfrom to users
-    //await this.platformClient.saveFocusesForUser(newUser.id, payload.focusIds, this.logger);
-
-    // await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
-
-    // Micro-service call - need to shift this call to notifications services, right now at commununication service
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    // await this.platformClient.saveFocusesForUser(newUser.id, payload.focusIds, this.logger);
+    // await this.platformClient.saveInterestsForUser(newUser.id, payload.interestsIds);
+    await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
 
     // await this.communicationClient.sendEmailFromTemplate(
     //   [
     //     {
+    //       key: 'applicants_name',
+    //       value: `${newUser.firstName} ${newUser.lastName}`,
+    //     },
+    //   ],
+    //   'Application Submitted',
+    //   [newUser.email], // Send email to the member
+    //   null,
+    //   this.logger,
+    // );
+    // await this.communicationClient.sendEmailFromTemplate(
+    //   [
+    //     {
     //       key: 'link_to_application',
-    //       value: config.get('RUMOR_WEBSITE') + `users/${newUser.id}/new-applicant`,
+    //       value: this.configService.get<string>('RUMOR_WEBSITE_ADMIN') + `users/${newUser.id}/new-applicant`,
     //     },
     //   ],
     //   'Super Admin - New Member Application',
@@ -381,7 +419,24 @@ export class AuthService {
     //   this.logger,
     // );
 
-    return responses.data(fusionAuthUser.response.token);
+    const savedUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: newUser.id },
+      relations: { roles: { role: true } },
+    });
+
+    if (!savedUser) {
+      return responses.badRequest('Error retrieving user after sign-up.');
+    }
+
+    return responses.data({
+      id: savedUser.id,
+      roles: savedUser.roles.map((role) => ({
+        roleName: role.role.name,
+        roleId: role.role.id,
+      })),
+      token: fusionAuthToken, // Now token is set correctly
+    });
+
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<SignUpResponse> {
@@ -474,7 +529,7 @@ export class AuthService {
     }
   }
 
-  public static async checkService(){
+  public static async checkService() {
     let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
     let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
     let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
@@ -747,21 +802,21 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.phoneNumber === payload.phoneNumber) {
-        throw new BadRequestError('Phone number is already in use')
+        throw new BadRequestError('This user is already a part of our database')
       }
 
       if (existingUser.email === payload.email) {
-        throw new BadRequestError('Email is already in use')
+        throw new BadRequestError('This user is already a part of our database')
       }
     }
 
-    // const invitation = new Invitation();
-    // invitation.phoneNumber = payload.phoneNumber;
-    // invitation.email = payload.email;
-    // invitation.referralCode = payload.referralCode;
-    // invitation.inviteeUser = invitee;
+    const invitation = new Invitation();
+    invitation.phoneNumber = payload.phoneNumber;
+    invitation.email = payload.email;
+    invitation.referralCode = payload.referralCode;
+    invitation.inviteeUser = invitee;
 
-    // await this.dbConnection.getRepository(Invitation).save(invitation);
+    await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
       const message =
@@ -952,6 +1007,23 @@ export class AuthService {
       );
     }
 
+    try {
+      await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+    } catch (error) {
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: { user: { id: user.id }, status: GuestStatus.INVITED },
+      });
+
+      if (guest) {
+        // if (isEmailLogin) {
+        //   await this.sendVerificationCodeByEmail({ email: payload.email });
+        // } else {
+        //   await this.communicationClient.sendVerificationCode(payload.phoneNumber, this.logger);
+        // }
+        return responses.data({ isValid: true, isGuest: true });
+      }
+    }
+
     // Start a new login and save the code
     const code = await this.fusionAuthClient.startPasswordlessLogin(request);
     const temporaryLoginCode = new TemporaryLoginCode();
@@ -1006,15 +1078,18 @@ export class AuthService {
     }
 
     // If user is not found, verify OTP and create a new user entry
-    if (!user && !payload.isExist) {
+    if (payload.isGuest) {
       const verificationResult = isEmailLogin
       // Micro-servc
       // ? await this.verifyCodeByEmail(payload.email, payload.code)
       // : await this.communicationClient.verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
 
-      if (!verificationResult) {
-        throw new NotFoundError('Invalid or expired verification code.');
-      }
+      // const isVerified =
+      //     ('data' in verificationResult && verificationResult.data?.verified === true) || ('verified' in verificationResult && verificationResult.verified === true);
+
+      // if (!isVerified) {
+      //   throw new NotFoundError('Invalid or expired verification code, please try again.');
+      // }
 
       // Check for invitation and set flags
       // const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1033,8 +1108,46 @@ export class AuthService {
             roleId: role[0].id,
           },
         ],
+        id: user.id,
+        user: user,
+        isGuest: true,
+      });
+    }
+
+    if (!user && !payload.isExist) {
+      // const verificationResult = isEmailLogin
+      //   ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+      //   : await this.communicationClient.verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
+
+      // const isVerified =
+      //   ('data' in verificationResult && verificationResult.data?.verified === true) || ('verified' in verificationResult && verificationResult.verified === true);
+
+      // if (!isVerified) {
+      //   return responses.notFound('Invalid or expired verification code, please try again.');
+      // }
+
+      // Check for invitation and set flags
+      const invitation = await this.dbConnection.getRepository(Invitation).findOne({
+        where: { phoneNumber: payload.phoneNumber, email: payload.email },
+      });
+      const isSignUpCompleted = invitation?.signUpComplete || false;
+      const isInvited = !!invitation;
+
+      const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
+
+      return responses.data({
+        id: '',
+        token: '',
+        roles: [
+          {
+            roleName: role[0].name,
+            roleId: role[0].id,
+          },
+        ],
         isSignUpCompleted,
         isInvited,
+        user: user,
+        isGuest: false,
       });
     }
 
@@ -1043,19 +1156,22 @@ export class AuthService {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
 
-      const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: temporaryCode.code });
+      const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
-        throw new NotFoundError('Unable to login.');
+        throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
       }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
       return responses.data({
+        id: user.id,
         token: completedLogin.response.token,
         roles: user.roles.map((item) => ({
           roleName: item.role.name,
           roleId: item.role.id,
         })),
+        user: user,
+        isGuest: false,
       });
     } else {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
@@ -1081,6 +1197,9 @@ export class AuthService {
           roleName: item.role.name,
           roleId: item.role.id,
         })),
+        id: user.id,
+        user: user,
+        isGuest: false,
       });
     }
   }
@@ -1140,7 +1259,7 @@ export class AuthService {
     }
 
     // Mirco-service call
-    // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
+    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -1152,7 +1271,7 @@ export class AuthService {
       relations: ['user'],
     });
 
-    return responses.data(toCurrentMember(user, [{ id: "1", name: "focuses" }], memberRole, socialProvider?.username));
+    return responses.data(toCurrentMember(user, focuses, memberRole, socialProvider?.username));
   }
 
   public static async getUser(payload: IdRequestDto): Promise<SimpleUserResponse> {
@@ -1187,8 +1306,8 @@ export class AuthService {
     }
 
     //Micro-service call
-    //const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-    return responses.data(user.roles.map((role) => toCurrentUser(user, [{ id: "1", name: "focuses" }], role)));
+    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    return responses.data(user.roles.map((role) => toCurrentUser(user, focuses, role)));
   }
 
   public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UpdateUserProfileResponse> {
@@ -1208,7 +1327,7 @@ export class AuthService {
         updateUserPayload[key] = genderToEntity[genderKey];
       } else if (key == 'birthDate') {
         updateUserPayload.dateOfBirth = payload.birthDate;
-      } else if (key !== 'address') {
+      } else if (key !== 'address' && key != 'focusIds') {
         updateUserPayload[key] = val;
       }
     }
@@ -1307,6 +1426,9 @@ export class AuthService {
     }
 
     await this.dbConnection.getRepository(User).update({ id: payload.id }, updateUserPayload);
+    if (payload.focusIds && payload.focusIds.length > 0) {
+      // await this.platformClient.saveFocusesForUser(payload.id, payload.focusIds, this.logger);
+    }
     const responseUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
       relations: {
@@ -1318,17 +1440,32 @@ export class AuthService {
     });
 
     const memberRole = responseUser.roles.find((role) => role.role.name === 'member');
-    if (memberRole === undefined) return responses.notFound('User not found!');
+    const nonMemberRole = responseUser.roles.find((role) => role.role.name === 'non-member');
+    const hostRole = responseUser.roles.find((role) => role.role.name === 'host');
+
+    let userStatus = null;
+    let userSource = null;
+
+    if (memberRole) {
+      userStatus = entityToUserStatus[memberRole.status];
+      userSource = memberRole.source ? entityToUserSource[memberRole.source] : null;
+    } else if (nonMemberRole) {
+      userStatus = entityToUserStatus[nonMemberRole.status];
+      userSource = nonMemberRole.source ? entityToUserSource[nonMemberRole.source] : null;
+    } else if (hostRole) {
+      userStatus = entityToUserStatus[hostRole.status];
+      userSource = hostRole.source ? entityToUserSource[hostRole.source] : null;
+    }
 
     return responses.data({
       firstName: responseUser.firstName || null,
       email: responseUser.email || null,
       lastName: responseUser.lastName || null,
-      dateOfBirth: responseUser.dateOfBirth || null,
+      dateOfBirth: responseUser.dateOfBirth,
       phoneNumber: responseUser.phoneNumber || null,
       gender: entityToGender[responseUser.gender || 'NOT_APPLICABLE'],
-      status: entityToUserStatus[memberRole.status],
-      source: memberRole.source ? entityToUserSource[memberRole.source] : null,
+      status: userStatus,
+      source: userSource,
       address: responseUser.address
         ? {
           id: responseUser.address.id,
@@ -1438,13 +1575,40 @@ export class AuthService {
       throw new NotFoundError('user')
     }
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
-    if (memberRole === undefined) {
-      throw new NotFoundError('user')
+    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
+    if (nonMemberRole === undefined) {
+      throw new NotFoundError('User')
     }
 
-    await RoleService.updateUserStatus(memberRole.id, UserStatus.ACTIVE);
-    await user.save();
+
+    const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+    if (!memberRole) {
+      throw new NotFoundError('Member role not found');
+    }
+
+    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { user: { id: payload.id } } });
+    if (!userRole) {
+      throw new NotFoundError('User role entry not found');
+    }
+
+    userRole.role = memberRole;
+    userRole.status = UserStatus.ACTIVE;
+    await this.dbConnection.getRepository(UserRole).save(userRole);
+
+    // await this.communicationClient.sendEmailFromTemplate(
+    //   [
+    //     {
+    //       key: 'link_to_application',
+    //       value: this.configService.get<string>('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+    //     },
+    //   ],
+    //   'Member Approved into Rumor',
+    //   [user.email],
+    //   null,
+    //   this.logger,
+    // );
+
+
     return responses.ok;
   }
 
@@ -1595,7 +1759,7 @@ export class AuthService {
       if (typeof customListName === 'string') {
         const customList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
           where: { listName: customListName },
-          relations: ['users'],
+          relations: ['usersLists', 'usersLists.user'],
         });
         if (customList) {
           const customListUserIds = customList.usersLists.map((listUser) => listUser.user.id);
@@ -1641,8 +1805,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-        // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
+        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
 
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -1655,9 +1819,7 @@ export class AuthService {
           relations: ['user'],
         });
 
-        return toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-
-        //return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+        return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
       }),
     );
     return responses.data(members);
@@ -1897,8 +2059,8 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses = [] // await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = [] // await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses =  (await PlatformService.getUserFocuses({ id: user.id })).data;
+        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -1940,10 +2102,16 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError("User");
     }
+
+    if (!userId) {
+      throw new NotFoundError('User ids not found.');
+    }
+
     const customList = user.customLists.find((list) => list.id === id);
     if (!customList) {
       throw new NotFoundError("Custom List");
     }
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({ list: { id: customList.id } });
     await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
     return responses.ok;
   }
@@ -1951,7 +2119,7 @@ export class AuthService {
   public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
     const { userId, customName, userIds } = payload;
     if (!customName) {
-      throw new BadRequestError("custom Name");
+      throw new BadRequestError("Custom list name is required.");
     }
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: userId, deletedAt: IsNull() },
@@ -1962,13 +2130,13 @@ export class AuthService {
     }
     const existingList = user.customLists.find((list) => list.listName === customName);
     if (existingList) {
-      throw new BadRequestError("existingList");
+      throw new BadRequestError("Custom list already exists.");
     }
     const validUsers = await this.dbConnection.getRepository(User).find({
       where: { id: In(userIds) },
     });
     if (validUsers.length !== userIds.length) {
-      throw new BadRequestError("userIds");
+      throw new BadRequestError("Invalid user IDs provided.");
     }
 
     const customList = new HostCustomUsersLists();
@@ -1996,7 +2164,7 @@ export class AuthService {
   public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
     const { hostId, name, userIds, customListId, mappingIds } = payload;
     if (!name) {
-      throw new BadRequestError("CustomName");
+      throw new BadRequestError("Custom list name is required.");
     }
     const host = await this.dbConnection.getRepository(User).findOne({
       where: { id: hostId, deletedAt: IsNull() },
@@ -2007,7 +2175,7 @@ export class AuthService {
     }
     const customList = host.customLists.find((list) => list.id === customListId);
     if (!customList) {
-      throw new NotFoundError("customList");
+      throw new NotFoundError("Custom list not found.");
     }
 
     if (customList.listName !== name) {
@@ -2025,7 +2193,7 @@ export class AuthService {
       const validUsers = await this.dbConnection.getRepository(User).find({ where: { id: In(userIdsToAdd) } });
 
       if (validUsers.length !== userIdsToAdd.length) {
-        throw new NotFoundError("InvalidIds");
+        throw new NotFoundError("Invalid user IDs provided.");
       }
 
       const userListEntries = validUsers.map((validUser) => {
@@ -2047,7 +2215,7 @@ export class AuthService {
       const invalidMappingIds = mappingIds.filter((id) => !existingMappingIds.includes(id));
 
       if (invalidMappingIds.length) {
-        throw new NotFoundError("invalidMappingIds");
+        throw new BadRequestError("Invalid mapping IDs provided");
       }
 
       await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({
@@ -2230,6 +2398,69 @@ export class AuthService {
     });
   }
 
+
+  public static async getUserWithRolesById(payload: IdRequestDto): Promise<GetUserWithRolesByEmailResponse> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+
+    return responses.data({
+      name: user.firstName + ' ' + user.lastName,
+      email: user.email,
+      id: user.id,
+      phoneNumber: user.phoneNumber,
+      profilePicture: user.profilePicture,
+      isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles.map((item) => {
+        return {
+          name: item.role.name,
+          status: item.status,
+          id: item.role.id,
+        };
+      }),
+    });
+  }
+
+  public static async getUserWithRolesByPhone(payload: GetUserWithRolesByPhoneRequestDto): Promise<GetUserWithRolesByEmailResponse> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { phoneNumber: payload.phoneNumber, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+
+    return responses.data({
+      name: user.firstName + ' ' + user.lastName,
+      email: user.email,
+      id: user.id,
+      profilePicture: user.profilePicture,
+      roles: user.roles.map((item) => {
+        return {
+          name: item.role.name,
+          status: item.status,
+          id: item.role.id,
+        };
+      }),
+    });
+  }
+
   /**
    * Functionality to create an invited guest as a user with the non_member role if they don't exist.
    * Logic:
@@ -2251,10 +2482,10 @@ export class AuthService {
 
     const newUser: User | null = new User();
     if (!user) {
-      newUser.email = payload.email;
+      newUser.email = payload.email ?? '';
       newUser.firstName = payload.firstName;
       newUser.lastName = payload.lastName;
-      newUser.phoneNumber = payload.phoneNumber;
+      newUser.phoneNumber = payload.phoneNumber ?? '';
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
@@ -2648,8 +2879,8 @@ export class AuthService {
 
     const users = await Promise.all(
       allUsers.map(async (user) => {
-        const focuses = []//await serviceMesh.getUserFocuses(config.get('API_BASE_URL'), user.id);
-        const interests = []//await serviceMesh.getUserInterests(config.get('API_BASE_URL'), user.id);
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
+        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {
@@ -2758,8 +2989,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = [] //await this.platformClient.getUserFocuses(user.id, this.logger);
-        const interests = [] //await this.platformClient.getUserInterests(user.id, this.logger);
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
+        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -3282,7 +3513,7 @@ export class AuthService {
     };
 
     // Micro-service call
-    const focuses = []//await this.platformClient.getUserFocuses(user.id, this.logger);
+    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
