@@ -19,8 +19,8 @@ export class SettingsController {
   //@GrpcMethod(SETTINGS_SERVICE_NAME, 'GetUserSettings')
   public static getNotificationSettings = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
-      const response: UserSettingResponse = await SettingsService.getNotificationSettings(payload);
+      const userId = req.user;
+      const response: UserSettingResponse = await SettingsService.getNotificationSettings(userId);
       res.json(response);
     }
   );

@@ -5,6 +5,7 @@ import { AdminController } from '../controllers/admin.controller';
 import { RoleController } from '../controllers/role.controller';
 import { SettingsController } from '../controllers/settings.controller';
 import { SocialController } from '../controllers/social.controller';
+// import F from '../server/middleware/auth';
 
 const router: Router = express.Router();
 
@@ -125,5 +126,8 @@ router.get('/auth/social/microsoft/callback', SocialController.xAuthCallback);
 router.get('/auth/x-auth-callback', SocialController.getXAuthData);
 // router.get('/auth/social/microsoft/callback', SocialController.syncSocialStats);
 
+
+
+router.get('notification-preferences', SettingsController.getNotificationSettings );
 
 export default router;
