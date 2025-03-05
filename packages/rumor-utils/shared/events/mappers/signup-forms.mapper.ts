@@ -39,6 +39,7 @@ export const buildSignupFormsResponse = (
     questions:
       (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
+    eventStatus: event.status
   };
   result.questions &&
     result.questions.sort((a, b) => {
@@ -54,5 +55,6 @@ const buildQuestion = (q: SignupFormQuestions) => {
     isDefault: q.isDefault,
     name: q.name,
     ordering: q.ordering,
+    value: q.value
   };
 };

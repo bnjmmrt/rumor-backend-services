@@ -13,7 +13,7 @@ export class SignupFormsController {
     async (req: Request, res: Response): Promise<void> => {
       const data: SignupFormStaticQuestions[] =
         await SignupFormsServices.getStaticQuestions();
-        res.json(new GetResponse(data));
+      res.json(new GetResponse(data));
     }
   );
 
@@ -99,6 +99,15 @@ export class SignupFormsController {
         payload
       );
       res.json(new GetResponse(submissions));
+    }
+  );
+
+  public static setName = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const payload = req.body;
+      const id = req.params.id;
+      const sforms = await SignupFormsServices.setName(id, payload.name);
+      res.json(new GetResponse(sforms));
     }
   );
 }

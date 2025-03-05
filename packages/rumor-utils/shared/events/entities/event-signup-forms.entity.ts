@@ -13,6 +13,9 @@ export class EventSignupForms extends RumorBaseEntity {
   @Column({ type: "boolean", default: false, name: "is_published" })
   isPublished: boolean;
 
+  @Column({ type: "varchar", name: "name", default: "" })
+  name: string;
+
   @Column({ type: "varchar", name: "styling", nullable: false })
   styling: string;
 
