@@ -51,6 +51,10 @@ export class QuestionsDto implements ISignupFormQuestionsRequest {
 
   @IsBoolean()
   isRequired: boolean;
+
+  @IsString()
+  @IsOptional()
+  value: string;
 }
 
 export class SignupFormAnswersDto implements ISignupFormQuestionsRequest {

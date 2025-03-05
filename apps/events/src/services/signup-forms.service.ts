@@ -179,10 +179,16 @@ export class SignupFormsServices {
       }
       let random = (Math.random() + 1).toString(6).substring(6);
 
+      const companyName = (
+        event.owner?.additionalHostInformation?.companyName || ""
+      )
+        .split(" ")
+        .join("");
       const signupForm = new EventSignupForms();
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
+      signupForm.name = companyName;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
@@ -198,6 +204,7 @@ export class SignupFormsServices {
         const question = new SignupFormQuestions();
         question.name = q.name;
         question.isDefault = q.id ? true : false;
+        question.value = q.value;
         question.isRequired = q.isRequired;
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
@@ -246,6 +253,7 @@ export class SignupFormsServices {
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
     signupForm.styling = body.styling;
+    signupForm.isPublished = true;
 
     const ids = [];
     const questionPromises: any[] = [];
@@ -278,6 +286,7 @@ export class SignupFormsServices {
       } else {
         ids.push(q.id);
         question.ordering = index;
+        question.value = q.value;
         const updatesQuestion = SignupFormQuestions.update(q.id, question);
         questionPromises.push(updatesQuestion);
       }
@@ -519,6 +528,21 @@ export class SignupFormsServices {
       const submissionList = await submissionsQuery.getRawMany();
       const result = { count, result: submissionList };
       return result;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  public static async setName(id: string, name: string) {
+    try {
+      const signupForm: EventSignupForms = await EventSignupForms.findOne({
+        where: { id: id },
+      });
+      if (!signupForm) {
+        throw new ForbiddenError("Signup Forms does not exists.");
+      }
+      signupForm.name = name;
+      await signupForm.save();
     } catch (err) {
       throw err;
     }

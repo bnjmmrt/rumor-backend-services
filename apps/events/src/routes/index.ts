@@ -39,6 +39,11 @@ router.get(
   SignupFormsController.listSubmissions
 );
 
+router.patch(
+  "/signup-forms/:id/set-name",
+  SignupFormsController.setName
+);
+
 // router.post(
 //   "/events/:eventId/signup-forms/:id/publish",
 //   (req: Request, res: Response) => {}
