@@ -29,6 +29,7 @@ import {
   UserResponseData,
   UserFilterOptionsResponse,
   MemberProfileResponse,
+  CreateHostCollaboratorResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -66,6 +67,7 @@ import {
   FilterRequestDto,
   DuplicateCustomListRequestDto,
   ManageUserRequestDto,
+  CreateHostCollaboratorRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
@@ -535,6 +537,15 @@ export class AuthController {
       const payload: ManageUserRequestDto = req.body;
       const response: GenericResponse = await AuthService.manageUserSpam(payload);
       res.json(new CreateResponse(response));
+    }
+  );
+
+  public static createHostCollaborator = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload:CreateHostCollaboratorRequestDto  = req.body;
+      const response: CreateHostCollaboratorResponse = await AuthService.createHostCollaborator(payload);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 }

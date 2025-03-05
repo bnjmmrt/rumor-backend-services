@@ -82,7 +82,7 @@ export class CommunicationController {
       const response: GenericResponse =
         await CommunicationService.sendEmailFromTemplate(payload);
       const successResponse = new GetResponse(response, "ok");
-      res.json(successResponse).status(successResponse.statusCode);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 

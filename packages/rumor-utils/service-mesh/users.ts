@@ -12,9 +12,9 @@ export const getMembersOrNonMembers = (baseURL:string, userId: string, query: st
 
 export const getUser = (baseURL:string, userId: string) => apiService.getApi().get(`${baseURL}/users/${userId}`);
 
-export const getRoleByName = (baseURL:string, name: string) => apiService.getApi().get(`${baseURL}/roles/${name}`);
+export const getRoleByName = (name: string) => apiService.getApi().get(`/roles/${name}`);
 
-export const getUserWithRolesByEmail = (baseURL:string, email: string) => apiService.getApi().get(`${baseURL}/users/${email}`);
+export const getUserWithRolesByEmail = (email: string) => apiService.getApi().get(`/users/${email}`);
 
 export const createNonMemberUser = (baseURL:string, email?: string, phoneNumber?: string, firstName?: string, lastName?: string) => apiService.getApi().post(`${baseURL}/users`, { email, phoneNumber, firstName, lastName });
 
@@ -41,3 +41,5 @@ export const getVouchRequests = (baseURL:string, id: string) => apiService.getAp
 export const getUserVouches = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/users/${id}/vouches`);
 
 export const syncSocialStats = (baseURL:string, userId: string) => apiService.getApi().post(`${baseURL}/users/${userId}/sync-social-stats`);
+
+export const createHostCollaborator = (email?: string, phoneNumber?: string, firstName?: string, lastName?: string, role?: string) => apiService.getApi().post(`/users/host-collaborator/create`, { email, phoneNumber, firstName, lastName, role });

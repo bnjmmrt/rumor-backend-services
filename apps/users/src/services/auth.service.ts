@@ -36,6 +36,7 @@ import {
   FilterRequestDto,
   DuplicateCustomListRequestDto,
   ManageUserRequestDto,
+  CreateHostCollaboratorRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -65,6 +66,7 @@ import {
   UserFilterOptionsResponse,
   customListData,
   FocusProto,
+  CreateHostCollaboratorResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -3878,5 +3880,28 @@ export class AuthService {
     }
     await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
     return responses.ok;
+  }
+  public static async createHostCollaborator(payload: CreateHostCollaboratorRequestDto): Promise<CreateHostCollaboratorResponse> {
+    try {
+      const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }] });
+      if (exists) return responses.badRequest('User already exists');
+      let user = new User();
+
+      user.email = payload.email;
+      user.firstName = payload.firstName || 'NA';
+      user.lastName = payload.lastName || 'NA';
+      user.phoneNumber = payload.phoneNumber || '';
+      user = await await this.dbConnection.getRepository(User).save(user);
+      //check if user role is already in the database
+      const userWithRoles: any = await this.getUserWithRolesByEmail({ email: payload.email });
+      const hasRole = userWithRoles.roles.some((role) => role.name === payload.role);
+      if (!hasRole) {
+        await RoleService.assignRoleToUser({ userId: user.id, roleName: payload.role });
+      }
+      return responses.data({ userId: user.id });
+    } catch (err) {
+      // this.logger.error(err);
+      return responses.badRequest('Error at get user list.');
+    }
   }
 }

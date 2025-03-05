@@ -19,7 +19,9 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/users/entities/*.js",
             "packages/rumor-utils/shared/events/entities/*.js",
             "packages/rumor-utils/shared/users/entities/*.ts",
-            "packages/rumor-utils/shared/events/entities/*.ts"
+            "packages/rumor-utils/shared/events/entities/*.ts",
+            "packages/rumor-utils/shared/notifications/entities/*.ts",
+            "packages/rumor-utils/shared/notifications/entities/*.js"
           ],
           ...(["development", "staging", "production", "uat"].includes(config.get('NODE_ENV')) && { ssl: { rejectUnauthorized: false } }),
           synchronize: false,

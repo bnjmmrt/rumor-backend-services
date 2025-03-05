@@ -91,7 +91,7 @@ router.post('/auth/role/assign', RoleController.assignRoleToUser);
 router.put('/auth/roles/role/user', RoleController.updateUserRole);
 router.get('/roles/user/{id}', RoleController.listUserRoles);
 router.post('/auth/roles/revoke/{id}', RoleController.revokeRoleFromUser);
-// router.post('/auth/roles/revoke', RoleController.getRoleByName);
+router.post('/auth/roles/name', RoleController.getRoleByName);
 // router.post('/auth/roles/revoke', RoleController.markUserAsSpam);
 
 

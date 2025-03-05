@@ -448,9 +448,9 @@ export class GuestService {
       const parsedQuery = parse(payload.query);
       const pagination = hasPagination(parsedQuery)
         ? {
-            take: parseInt(parsedQuery.take),
-            skip: parseInt(parsedQuery.skip),
-          }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
         : {};
 
       const andConditions = [];
@@ -530,8 +530,8 @@ export class GuestService {
       const orClause = orConditions.length > 0 ? orConditions : undefined;
       const order = parsedQuery.sortBy
         ? {
-            [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-          }
+          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+        }
         : undefined;
       const relations = {
         user: {
@@ -701,9 +701,9 @@ export class GuestService {
       const parsedQuery = parse(payload.query);
       const pagination = hasPagination(parsedQuery)
         ? {
-            take: parseInt(parsedQuery.take),
-            skip: parseInt(parsedQuery.skip),
-          }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
         : {};
 
       const andConditions = [];
@@ -923,8 +923,8 @@ export class GuestService {
 
       const order = parsedQuery.sortBy
         ? {
-            [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-          }
+          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+        }
         : undefined;
 
       const finalWhereClause = orConditions.length > 0 ? orConditions : filter;
@@ -1652,5 +1652,23 @@ export class GuestService {
       [GuestStatus.REVIEW]: defaultValidation,
     };
     return validations[status]?.() ?? null;
+  }
+
+  /**
+  * Fetch guests for a given event and filter by status.
+  * @param eventId - The event ID.
+  * @param statuses - List of guest statuses to filter.
+  * @returns List of guests with required event details.
+  */
+  public static async fetchGuestsByStatuses(eventId: string, statuses: GuestStatus[]): Promise<Guest[]> {
+    return this.dbConnection.getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('guest.event', 'event')
+      .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+      .where({ event: { id: eventId } })
+      .andWhere('guest.status IN (:...statuses)', { statuses })
+      .getMany();
+    // return
   }
 }

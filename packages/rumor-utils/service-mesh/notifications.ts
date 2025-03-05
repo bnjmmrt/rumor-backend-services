@@ -6,9 +6,9 @@ export const verifyPhoneNumber = (baseURL:string, phoneNumber: string, code: str
 
 export const sendInvitationMessages = (baseURL:string, phoneNumbers: string[], senderName: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumbers, senderName });
 
-export const sendTextMessage = (baseURL:string, phoneNumber: string, message: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { phoneNumber, message });
+export const sendTextMessage = (phoneNumber: string, message: string) => apiService.getApi().post(`/communication/send-text-message`, { phoneNumber, message });
 
-export const sendEmailFromTemplate = (baseURL:string, dynamicData, template: string, to: string[], from?: string) => apiService.getApi().post(`${baseURL}/auth/validate`, { dynamicData, template, to, from });
+export const sendEmailFromTemplate = (dynamicData, template: string, to: string[], from?: string) => apiService.getApi().post(`/communication/template-email/send`, { dynamicData, template, to, from });
 
 export const getTemplateById = (baseURL:string, id: string) => apiService.getApi().get(`${baseURL}/auth/validate`);
 
