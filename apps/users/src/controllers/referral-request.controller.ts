@@ -5,7 +5,7 @@ import {
   UpdateReferralRequestDto,
 } from "rumor-utils/shared/users/dtos/referral-request.dto";
 import asyncWrapper from "../server/helpers/asyncWrapper";
-import { ReferralRequestService } from "src/services/referral-request.service";
+import { ReferralRequestService } from "../services/referral-request.service";
 import { IdRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
 import {
   GetSentReferralRequestsResponse,
