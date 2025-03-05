@@ -1,5 +1,5 @@
-import { UserVouch, VouchRequest } from '../grpc/platform/general.pb';
-import { VouchRequest as VouchRequestEntity } from '../entities/vouch-request.entity';
+import { UserVouch, VouchRequest } from '../../users/grpc/platform/general.pb';
+import { VouchRequest as VouchRequestEntity } from '../../users/entities/vouch-request.entity';
 
 export const toVouchRequest = (request: VouchRequestEntity): VouchRequest => {
   return {
