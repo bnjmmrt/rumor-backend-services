@@ -4,6 +4,7 @@ import { EventAnnouncementController } from "../controllers/event-announcement.c
 import { SignupFormsController } from "../controllers/signup-forms.controller";
 import { GuestController } from "../controllers/guest.controller";
 import AuthMiddleware from '../server/middleware/auth';
+import { EventsController } from "../controllers/events.controller";
 import { VouchRequestController } from "../controllers/vouch-request.controller";
 
 const router: Router = express.Router();
@@ -57,6 +58,28 @@ router.patch(
 //   (req: Request, res: Response) => {}
 // );
 
+//events routes
+router.post("/event/:eventId/cancel", EventsController.CancelEventAndNotify);
+router.get("/event-status", EventsController.listEventStatus);
+
+
+//event types starts
+router.post("/event-type", EventsController.createEventType)
+router.put("/event-type/:id", EventsController.updateEventType)
+router.get("/event-type/:id", EventsController.getEventType)
+router.get("/event-types", EventsController.listEventTypes)
+router.delete("/event-type/:id", EventsController.deleteEventType)
+//ends here
+
+//Event age limit
+router.post("/event-age-limit", EventsController.createEventAgeLimit)
+router.put("/event-age-limit/:id", EventsController.updateEventAgeLimit)
+router.get("/event-age-limit/:id", EventsController.getEventAgeLimit)
+router.get("/event-age-limits", EventsController.listEventAgeLimits)
+router.delete("/event-age-limit/:id", EventsController.deleteEventAgeLimit)
+
+
+//ends here
 /**
  * Complete Guest functionality------------------------------------------
  */
