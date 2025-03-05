@@ -4,8 +4,7 @@ import * as dayjs from 'dayjs';
 import { EventStatusEnum, HostsFollowedByGuestInterface } from '../interfaces/event.interface';
 import { Collaborator, Guest } from '../entities';
 import { entityToGuestStatus } from './guest.mapper';
-// import { formatDateFromDB } from '../utils/event.utils';
-// import {formatDateFromDB} from '../utils/event.utils'
+import { formatDateFromDB } from '../utils/event.utils';
 
 export const toEvent = (
   event: Event,
@@ -14,10 +13,11 @@ export const toEvent = (
   guest?: Guest,
   totalConfirmedGuests?: number | null | undefined,
   hostsFollowedByGuest?: HostsFollowedByGuestInterface[],
+  memberUserId?: string,
 ): EventData => {
   const currentGuestStatus = guest?.status;
   const invitationDeclinedBy = guest?.declinedBy?.id || '';
-  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest);
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest, memberUserId);
   const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
   const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
   const location = event.location ? { ...event.location, placeId: event.location.googlePlaceId } : undefined;
@@ -25,14 +25,14 @@ export const toEvent = (
     ...event.owner,
     companyLogo: event?.owner?.additionalHostInformation?.companyLogo,
     companyName: event?.owner?.additionalHostInformation?.companyName,
-    isFollowedByCurrentGuest: hostsFollowedByGuest?.some((follow) => follow.hostId === event.owner?.id && follow.followerId === guest?.user?.id),
+    isFollowedByCurrentGuest: hostsFollowedByGuest?.some((follow) => follow.hostId === event.owner?.id && follow.followerId === memberUserId),
   };
   return {
     admissionType: event.admissionType || undefined,
     collaborators: collaborators,
     description: event.description || '',
     enabled: event.enabled || false,
-    // endDate: formatDateFromDB(event.endDate),
+    endDate: formatDateFromDB(event.endDate),
     eventType: event.eventType || undefined,
     furtherInstructions: event.furtherInstructions || '',
     imageCover: event.imageCover || '',
@@ -43,7 +43,7 @@ export const toEvent = (
     quizQuestions: event.quizQuestions || [],
     rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || '' : '',
     showLocation: event.showLocation || false,
-    // startDate: formatDateFromDB(event.startDate),
+    startDate: formatDateFromDB(event.startDate),
     status: eventStatus,
     talents: event.talents || [],
     ticketTypes: event.ticketTypes || [],
@@ -51,7 +51,7 @@ export const toEvent = (
     id: event.id,
     name: event.name || '',
     ageLimit: event.ageLimit || undefined,
-    // publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
+    publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
     capacity: event.capacity || 0,
@@ -74,7 +74,12 @@ export const toEvent = (
   };
 };
 
-export const groupCollaborators = (collaborators: Collaborator[], hostsFollowedByGuest?: HostsFollowedByGuestInterface[], guest?: Guest): CollaboratorsEvent[] => {
+export const groupCollaborators = (
+  collaborators: Collaborator[],
+  hostsFollowedByGuest?: HostsFollowedByGuestInterface[],
+  guest?: Guest,
+  memberUserId?: string,
+): CollaboratorsEvent[] => {
   try {
     if (!Array.isArray(collaborators)) {
       return [];
@@ -88,7 +93,7 @@ export const groupCollaborators = (collaborators: Collaborator[], hostsFollowedB
       if (!grouped[user.id]) {
         let isFollowedByCurrentGuest = false;
         if (guest && hostsFollowedByGuest.length) {
-          isFollowedByCurrentGuest = hostsFollowedByGuest.some((follow) => follow.hostId === user.id && follow.followerId === guest?.user?.id);
+          isFollowedByCurrentGuest = hostsFollowedByGuest.some((follow) => follow.hostId === user.id && follow.followerId === memberUserId);
         }
         grouped[user.id] = {
           ...collaboratorDetails,
@@ -100,7 +105,7 @@ export const groupCollaborators = (collaborators: Collaborator[], hostsFollowedB
           role: role,
           tickets: [],
           isFollowedByCurrentGuest,
-          //TODO:add the status if collaboartor is approved or accepted the invite
+          //TODO:add the status if collaborator is approved or accepted the invite
         };
       }
       if (ticketType?.id && ticketType?.name) {
@@ -121,20 +126,20 @@ export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentU
   return {
     description: event.description || '',
     enabled: event.enabled || false,
-    // endDate: formatDateFromDB(event.endDate),
+    endDate: formatDateFromDB(event.endDate),
     eventType: event.eventType || undefined,
     imageCover: event.imageCover || '',
     imageFlyer: event.imageFlyer || '',
     location: event.location || undefined,
     owner: event.owner || undefined,
-    // rsvpDeadline: event.rsvpDeadline ? formatDateFromDB(event.rsvpDeadline) : '',
+    rsvpDeadline: event.rsvpDeadline ? formatDateFromDB(event.rsvpDeadline) : '',
     showLocation: event.showLocation || false,
-    // startDate: formatDateFromDB(event.startDate),
+    startDate: formatDateFromDB(event.startDate),
     status: formatEventStatus(event),
     id: event.id,
     name: event.name || '',
     ageLimit: event.ageLimit || undefined,
-    // publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
+    publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
     guest: currentGuest

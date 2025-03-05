@@ -1,6 +1,16 @@
 import { Guest as GuestEntity } from "../entities/guest.entity";
+import {
+  AdditionalGuest,
+  Guest,
+  GuestData,
+  GuestDataSimple,
+  GuestStatus as GuestStatusProto,
+  InterestData,
+  QuizData,
+  UserSource,
+  VouchesData,
+} from '../grpc/events/general.pb';
 import { User } from '../../users/entities/user.entity';
-import { Guest, GuestData, GuestDataSimple, GuestStatus as GuestStatusProto, InterestData, QuizData, UserSource, VouchesData } from '../grpc/events/general.pb';
 import { GuestStatus, TicketStatusEnum } from '../interfaces/event.interface';
 import { calculateAge } from '../../../utils/utils';
 import { entityToUserSource, entityToUserStatus } from '../../users/mappers/shared.mapper';
@@ -11,6 +21,7 @@ import { SocialProviderType } from '../../users/interfaces/shared.interface';
 import { UserQuizAnswer } from '../entities/user-quiz-question-answer.entity';
 import { ListEventUsedTicketsData, TicketStatus } from '../grpc/events/general.pb';
 import { Ticket } from '../entities/ticket.entity';
+import { entityToGender } from '../../users/mappers/auth.mapper';
 
 export const entityToGuestStatus: { [s in GuestStatus]: GuestStatusProto } = {
   [GuestStatus.NO_STATUS]: GuestStatusProto.NO_STATUS,
@@ -112,7 +123,7 @@ export const toGuest = (
     privateGuestNote: guest?.privateGuestNote,
     age: calculateAge(guest.user.dateOfBirth),
     interest: interests ? interests.map((interest) => interest.name) : [],
-    gender: 0,
+    gender: entityToGender[guest.user.gender] ?? entityToGender.NOT_APPLICABLE,
     additionalGuests: [],
   };
 };
@@ -134,6 +145,7 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
     email: vouch?.email,
     picture: vouch?.picture,
     isApproved: vouch?.isApproved,
+    idUserVouch: vouch?.idUserVouch,
   };
 };
 
@@ -224,5 +236,44 @@ export const toTicketData = (ticket: Ticket): ListEventUsedTicketsData => {
     guestId: ticket.guest.id,
     ticketId: ticket.id,
     status: entityToTicketStatus[ticket.status],
+  };
+};
+
+export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocuses: FocusProto[], plusOnesInterests: InterestData[] = []): AdditionalGuest => {
+  let totalFollowerCount = 0;
+
+  if (additionalGuest?.user?.socialStats) {
+    totalFollowerCount = Object.values(additionalGuest.user.socialStats).reduce((acc, val) => {
+      return typeof val === 'number' ? acc + val : acc;
+    }, 0);
+  }
+
+  const addedBy = additionalGuest.addedBy ? `${additionalGuest.addedBy?.firstName || ''} ${additionalGuest.addedBy?.lastName || ''}` : '';
+  const addedByPicture = additionalGuest.addedBy ? additionalGuest.addedBy?.profilePicture : '';
+  const invitationSourceNumber =
+    typeof additionalGuest.invitationSource === 'number' && UserSource[additionalGuest.invitationSource] !== undefined
+      ? additionalGuest.invitationSource
+      : UserSource.UNRECOGNIZED;
+
+  return {
+    id: additionalGuest.user?.id,
+    firstName: additionalGuest.user?.firstName,
+    lastName: additionalGuest.user?.lastName,
+    guestId: additionalGuest.id,
+    interest: plusOnesInterests ? plusOnesInterests.map((interest) => interest.name) : [],
+    category: plusOnesFocuses ? plusOnesFocuses.map((focus) => focus.name) : [],
+    profilePicture: additionalGuest?.user?.profilePicture,
+    ticketType: additionalGuest?.ticketType?.name,
+    numFollowers: formatToUnits(totalFollowerCount),
+    status: entityToGuestStatus[additionalGuest.status],
+    baseCity: additionalGuest?.user?.address?.address || '',
+    checkIn: additionalGuest.checkIn,
+    gender: entityToGender[additionalGuest.user.gender] ?? entityToGender.NOT_APPLICABLE,
+    invitationSource: invitationSourceNumber,
+    isBanned: false,
+    addedBy,
+    addedByPicture,
+    declinedBy: additionalGuest.declinedBy ? `${additionalGuest.declinedBy?.firstName || ''} ${additionalGuest.declinedBy?.lastName || ''}` : '',
+    declinedByPicture: additionalGuest.declinedBy ? additionalGuest.declinedBy?.profilePicture : '',
   };
 };
