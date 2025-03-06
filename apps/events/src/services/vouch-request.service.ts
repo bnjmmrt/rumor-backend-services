@@ -67,7 +67,7 @@ export class VouchRequestService {
       return responses.ok;
   }
 
-  public static async getUserVouches(payload: IdRequestDto): Promise<GetUserVouchesResponse> {
+  public static async getUserVouches(payload: IdRequestDto): Promise<any> {
       const result = await this.dbConnection.getRepository(VouchRequest).find({
         where: { requester: { id: payload.id } },
         relations: {
@@ -75,11 +75,10 @@ export class VouchRequestService {
           user: true,
         },
       });
-      return responses.data(
-        result.map((item) => {
+      const data = result.map((item) => {
           return toUserVouchRequest(item);
-        }),
-      );
+        })
+    return data
   }
 
   public static async getUserVouchesByEvent(payload: GetUserVouchRequestDto): Promise<GetUserVouchesResponse> {
