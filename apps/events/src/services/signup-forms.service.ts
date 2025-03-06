@@ -188,7 +188,7 @@ export class SignupFormsServices {
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
-      signupForm.name = companyName;
+      signupForm.name = body.name || companyName;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
@@ -254,6 +254,7 @@ export class SignupFormsServices {
     signupForm.description = body.description;
     signupForm.styling = body.styling;
     signupForm.isPublished = true;
+    signupForm.name = body.name;
 
     const ids = [];
     const questionPromises: any[] = [];

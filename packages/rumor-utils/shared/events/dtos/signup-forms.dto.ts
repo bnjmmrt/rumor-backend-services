@@ -26,6 +26,10 @@ export class CreateSignupFormDto implements CreateSignupFormRequest {
   @IsString()
   description: string;
 
+  @IsOptional()
+  @IsString()
+  name: string;
+
   @IsNotEmpty()
   @IsBoolean()
   hasAccessForAdditionalGuests: boolean;
