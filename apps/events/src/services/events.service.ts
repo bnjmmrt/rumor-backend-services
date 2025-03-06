@@ -11,8 +11,10 @@ import {
   CreateEventTypeRequestDto,
   EventAgeLimitDto,
   EventLocationDto,
+  ListHostEventsDto,
   ManualEventStatusUpdateRequestDto,
   QueryRequestDto,
+  ToggleGuestCheckStatusRequestDto,
   UpdateEventAgeLimitRequestDto,
   UpdateEventLocationRequestDto,
   UpdateEventRequestDto,
@@ -37,6 +39,8 @@ import {
   ListEventsFeedResponse,
   ListEventStatusResponse,
   ListEventUsedTicketsResponse,
+  ListHostEventsResponse,
+  ToggleGuestCheckStatusResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { parse } from 'qs';
@@ -47,7 +51,7 @@ import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, E
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates } from '../utils/event.utils';
-import { EventLocationInterface, EventStatusEnum, GuestStatus, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventLocationInterface, EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
@@ -2342,6 +2346,33 @@ export class EventsService {
     }
   }
 
+  public static async getPublicEvent(payload: UserAndIdRequestDto): Promise<EventResponse> {
+    try {
+      const event: Event = await this.dbConnection.getRepository(Event).findOne({
+        where: {
+          id: payload.id,
+          isPrivate: false, // Only fetch public events (isPrivate === false)
+        },
+        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'quizQuestions'],
+      });
+
+      if (!event) return responses.notFound('Public event not found.');
+
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          event: { id: payload.id },
+          user: { id: payload.userId },
+        },
+        relations: { user: true },
+      });
+
+      return responses.data(toEvent(event, undefined, undefined, guest));
+    } catch (err) {
+      // this.logger.error(err);
+      return responses.badRequest('Error at get an item  of Event');
+    }
+  }
+
   public static async publishEventById(payload: RequestByIdDto): Promise<GenericResponse> {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
@@ -2675,4 +2706,291 @@ export class EventsService {
         { isPublished: false }
       );
   }
+
+    /**
+   * Functionality for get host events.
+   * Logic:
+   *    1. Get all events for provided user id.
+   *    2. Filter events by status.
+   *    3. Search events by event name.
+   * @param payload
+   * @returns EventsResponse
+   */
+    public static async listHostEvents(payload: ListHostEventsDto): Promise<ListHostEventsResponse> {
+      try {
+        const { userId } = payload;
+        const parsedQuery = parse(payload.query);
+        const currentTime = new Date().toISOString();
+  
+        // Check and set pagination if available
+        const pagination: { take?: number; skip?: number } = hasPagination(parsedQuery)
+          ? {
+            take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
+            skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
+          }
+          : {};
+  
+        // Create the base query
+        const query = this.dbConnection.getRepository(Event)
+          .createQueryBuilder('event')
+          .leftJoinAndSelect('event.owner', 'owner')
+          .leftJoinAndSelect('event.collaborators', 'collaborators')
+          .leftJoinAndSelect('collaborators.user', 'user')
+          .leftJoinAndSelect('collaborators.role', 'role')
+          .leftJoin('event.guests', 'guest') // Ensure guests are linked to event
+          .where('(owner.id = :userId OR collaborators.user.id = :userId)', { userId })
+          .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', (qb) =>
+            qb.where('confirmedGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
+          )
+          .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', (qb) =>
+            qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
+          );
+  
+        let status: EventStatusEnum | undefined;
+        if (parsedQuery.status && typeof parsedQuery.status === 'string') {
+          status = parsedQuery.status as EventStatusEnum; // Casting to EventStatusEnum
+        }
+        // Check if status is one of the specified values (DRAFT_STATUS, PENDING_STATUS, DECLINED_STATUS, CANCELLED_STATUS)
+        const validStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+  
+        if (status && validStatuses.includes(status)) {
+          // Apply the status filter directly for the specified status values
+          query.andWhere('event.status = :status', { status });
+        } else if (status === EventStatusEnum.UPCOMING_STATUS || status === EventStatusEnum.PAST_STATUS) {
+          // Filter for approved events first
+          query.andWhere('event.status = :approvedStatus', {
+            approvedStatus: EventStatusEnum.APPROVED_STATUS,
+          });
+  
+          // Add specific date filtering based on the requested status
+          if (status === EventStatusEnum.UPCOMING_STATUS) {
+            query.andWhere('event.end_date > :currentTime', { currentTime });
+          } else if (status === EventStatusEnum.PAST_STATUS) {
+            query.andWhere('event.end_date < :currentTime', { currentTime });
+          }
+        }
+  
+        // Apply pagination if necessary
+        if (pagination.take > 0) query.take(pagination.take);
+        if (pagination.skip > 0) query.skip(pagination.skip);
+  
+        // Add eventName filter if provided
+        if (parsedQuery.eventName) {
+          const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
+          const eventName = decodedEventName.replace(/\s+/g, ' ').trim(); // Normalize spaces
+          query.andWhere('event.name ILIKE :eventName', { eventName: `%${eventName}%` });
+        }
+  
+        const totalCount = await query.getCount();
+        const events = await query.getMany();
+        type EventWithGuestCounts = Event & {
+          checkedInGuestCount: string;
+          confirmedGuestCount: string;
+        };
+        const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map((event: EventWithGuestCounts) => {
+          const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
+          const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
+          return toEvent(event as Event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+        });
+        return responses.data({
+          eventsResponse: formattedEvents,
+          totalCount,
+        });
+      } catch (err) {
+        // this.logger.error(err);
+        return responses.badRequest('Error while getting events');
+      }
+    }
+
+    public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
+      try {
+        if (!payload.id || !payload.userId) {
+          return responses.badRequest('Invalid payload: id and userId are required');
+        }
+        const guest = await this.dbConnection.getRepository(Guest).findOne({
+          where: {
+            event: { id: payload.id },
+            user: { id: payload.userId },
+          },
+          relations: { user: true, declinedBy: true },
+        });
+  
+        const event = await this.getEventWithAllRelations(payload.id);
+        if (!event) {
+          return responses.notFound('Event not found.');
+        }
+  
+        let hostUserIds = [];
+        event.collaborators.forEach((collab) => {
+          if (collab?.user?.id && !hostUserIds.includes(collab?.user?.id)) {
+            hostUserIds.push(collab?.user?.id);
+          }
+        });
+        hostUserIds = [event.owner.id, ...hostUserIds];
+        let followedByGuest: HostsFollowedByGuestInterface[] = [];
+        const guestUserId = payload.userId; // Guest's userId
+        followedByGuest = await this.getGuestFollowingHosts(guestUserId, hostUserIds);
+        return responses.data(toEvent(event, undefined, undefined, guest, undefined, followedByGuest, guestUserId));
+      } catch (err) {
+        // this.logger.error('Error in getEventByInvitedUserId:', err);
+        return responses.badRequest('Error retrieving event details');
+      }
+    }
+
+  /**
+   * Toggles the check-in status of a guest for an event.
+   *
+   * - Fetches the guest and associated event.
+   * - Validates the guest's ticket status.
+   * - Updates the ticket status if needed.
+   * - Sets the check-in status based on the payload.
+   * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
+   * - Returns updated check-in status, ticket status, and total guest counts.
+   *
+   * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
+   * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
+   */
+  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusResponse> {
+    try {
+      // Step 1: Fetch guest details along with associated event.
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: { id: payload.id },
+        relations: ['user', 'event'], // Load related user and event details.
+      });
+
+      // If guest does not exist, return an error response.
+      if (!guest) return responses.badRequest('Guest not found');
+
+      // Step 2: Fetch the guest's ticket details dynamically.
+      const ticket = await this.dbConnection.getRepository(Ticket).findOne({
+        where: {
+          guest: { id: guest.id },
+          event: { id: guest.event.id },
+        },
+      });
+
+      // If the ticket is not found, canceled, or expired, return an error response.
+      if (!ticket || [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+        return responses.badRequest('Ticket not found or is cancelled or expired');
+      }
+
+      // Step 3: Update ticket status if it's currently "Generated".
+      if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
+        await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+      }
+
+      // Step 4: Update guest check-in status based on the payload.
+      if (guest.checkIn !== payload.checkIn) {
+        await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: payload.checkIn });
+      } else return responses.badRequest('Check-in value is not valid, Guest already in checked-in or checked-out state');
+
+      // Step 5: Fetch updated guest check-in status, ticket status, and total guest counts in parallel.
+      const [updatedGuest, updatedTicket, totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+        // Fetch updated guest check-in status.
+        this.dbConnection.getRepository(Guest).findOne({ where: { id: guest.id }, select: ['checkIn'] }),
+
+        // Fetch updated ticket status.
+        this.dbConnection.getRepository(Ticket).findOne({ where: { id: ticket.id }, select: ['status'] }),
+
+        // Count total confirmed guests for the event.
+        this.dbConnection.getRepository(Guest).count({
+          where: {
+            event: { id: guest.event.id },
+            status: GuestStatus.CONFIRMED,
+          },
+        }),
+
+        // Count total guests who have checked in.
+        this.dbConnection.getRepository(Guest).count({
+          where: {
+            event: { id: guest.event.id },
+            checkIn: true,
+            status: GuestStatus.CONFIRMED,
+          },
+        }),
+      ]);
+
+      // Step 6: Return the updated guest details, ticket status, and guest counts.
+      return responses.data({
+        guestId: guest.id,
+        ticketStatus: entityToTicketStatus[updatedTicket?.status ?? TicketStatusEnum.TICKET_GENERATED], // Fetch dynamically.
+        checkInStatus: updatedGuest?.checkIn ?? false, // Fetch dynamically.
+        totalConfirmedGuests,
+        totalCheckedInGuests,
+      });
+    } catch (err) {
+      // Log any errors encountered and return an error response.
+      // this.logger.error(err);
+      return responses.badRequest('Error at validate ticket');
+    }
+  }
+
+
+    /**
+   * Retrieves a list of hosts that a guest is following within a specific event.
+   *
+   * @param guestUserId - The ID of the guest user whose follow status needs to be checked.
+   * @param eventId - The ID of the event in which the guest is participating.
+   * @param userIds - An array of user IDs to check if they are followed by the guest.
+   * @returns An object containing an array of followed host details (followerId and hostId).
+   */
+    public static async getGuestFollowingHosts(memberUserId: string, userIds: string[]): Promise<HostsFollowedByGuestInterface[]> {
+      try {
+        // If no user IDs are provided, return an empty array
+        if (!userIds.length) {
+          return [];
+        }
+        const followings = (await this.dbConnection.getRepository(User)
+          .createQueryBuilder('user')
+          .innerJoin('host_following', 'hf', 'hf.follower_id = user.id')
+          .where('user.id = :memberUserId', { memberUserId })
+          .andWhere('hf.host_id IN (:...userIds)', { userIds })
+          .select(['hf.follower_id AS "followerId"', 'hf.host_id AS "hostId"'])
+          .getRawMany()) as HostsFollowedByGuestInterface[];
+  
+        // Return the list of follow relationships
+        return followings;
+      } catch (error) {
+        // Log any errors that occur during execution
+        // this.logger.error('Error in getGuestFollowingHosts:', error);
+  
+        // Return an empty response to avoid breaking functionality
+        return [];
+      }
+    }
+  // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
+  //   try {
+  //     if (!payload.id || !payload.userId) {
+  //       return responses.badRequest('Invalid payload: id and userId are required');
+  //     }
+
+  //     const guest = await this.dbConnection.getRepository(Event).findOne({
+  //       where: {
+  //         event: { id: payload.id },
+  //         user: { id: payload.userId },
+  //       },
+  //       relations: { user: true, declinedBy: true },
+  //     });
+
+  //     const event = await this.getEventWithAllRelations(payload.id);
+  //     if (!event) {
+  //       return responses.notFound('Event not found.');
+  //     }
+
+  //     let hostUserIds = [];
+  //     event.collaborators.forEach((collab) => {
+  //       if (collab?.user?.id && !hostUserIds.includes(collab?.user?.id)) {
+  //         hostUserIds.push(collab?.user?.id);
+  //       }
+  //     });
+  //     hostUserIds = [event.owner.id, ...hostUserIds];
+  //     let followedByGuest: HostsFollowedByGuestInterface[] = [];
+  //     const guestUserId = payload.userId; // Guest's userId
+  //     followedByGuest = await this.getGuestFollowingHosts(guestUserId, hostUserIds);
+  //     return responses.data(toEvent(event, undefined, undefined, guest, undefined, followedByGuest, guestUserId));
+  //   } catch (err) {
+  //     this.logger.error('Error in getEventByInvitedUserId:', err);
+  //     return responses.badRequest('Error retrieving event details');
+  //   }
+  // }
 }

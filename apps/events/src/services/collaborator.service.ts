@@ -209,10 +209,10 @@ export class CollaboratorService {
     }
   }
 
-  public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<GetDefaultRoleConfigByRoleResponse> {
+   public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<GetDefaultRoleConfigByRoleResponse> {
     try {
       let response;
-      if (payload.roleId) {
+      if (payload.roleId) {   
         response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
           where: {
             role: { id: payload.roleId },
