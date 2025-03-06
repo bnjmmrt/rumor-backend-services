@@ -4,25 +4,36 @@ import { CommunicationController } from "../controllers/communication.controller
 import { NotificationController } from "../controllers/notification.controller";
 const router: Router = express.Router();
 
+/**
+ * @description - Routes used for sending Text Messages
+ */
 
 router.post('/communication/send-verification-code', CommunicationController.sendVerificationCode);
 router.post('/communication/verify-code', CommunicationController.verifyCode);
 router.post('/communication/send-invitation-messages', CommunicationController.sendInvitationMessages);
 router.post('/communication/send-text-message', CommunicationController.sendTextMessage);
+
+/**
+ * @description - Route for sending email using template ID
+ */
 router.post('/communication/template-email/send', CommunicationController.sendEmailFromTemplate);
+
+/**
+ * @description - Routes for managing Email Templates
+ */
 router.post('/communication/template-email', CommunicationController.createEmailTemplate);
 router.get('/communication/template-emails', CommunicationController.listEmailTemplates);
 router.delete('/communication/template-email', CommunicationController.deleteEmailTemplate);
-router.post('/get-email-template', CommunicationController.getEmailTemplate);
+router.get('/get-email-template', CommunicationController.getEmailTemplate);
 
 /**
  * Route for Notification Creation - Will be used in service Mesh for interservice communication call
  */
 
-router.post('/notification/create',NotificationController.createNotification);
+router.post('/notification', NotificationController.createNotification);
 
 /**
- * Routes for  - Will be used by user apps - host, member
+ * Routes for  - User Notifications - Host, Member
  */
 
 router.get('/notifications', NotificationController.getAllNotifications);
@@ -30,7 +41,7 @@ router.get('/notification:notificationId', NotificationController.getNotificatio
 router.delete('/notification/:notificationId',NotificationController.deleteNotificationById);
 
 /**
- * Routes for  - Will be used by admin
+ * Routes for  - Admin Notifications
  */
 router.get('/notifications-list', NotificationController.listNotifications);
 router.get('/notifications/summary', NotificationController.getNotificationSummary);
