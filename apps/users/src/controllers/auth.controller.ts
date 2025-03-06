@@ -583,7 +583,6 @@ export class AuthController {
   public static createUser = asyncWrapper(
     async (req, res): Promise<void> => {
       const id = (req as any).user;
-      console.log("userId", id)
       const payload: NonMemberSignUpRequestDto = {
         ...req.body,
         id,
