@@ -1,5 +1,6 @@
 export interface SuccessResponse<T> {
-    statusCode: number;
-    message?: string;
-    data?: T;
-  }
+  success: boolean;
+  statusCode: number;
+  message?: string;
+  data?: T;
+}

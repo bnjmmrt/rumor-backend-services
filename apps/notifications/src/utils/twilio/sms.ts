@@ -44,7 +44,7 @@ class TwilioService {
         throw new BadRequestError("Failed to send verification code");
       }
 
-      return { status: "ok" };
+      return
     } catch (error) {
       throw new InternalServerError(error);
     }
@@ -74,7 +74,6 @@ class TwilioService {
         throw new ValidationError("Invalid verification code");
       }
 
-      return { verified: true };
     } catch (error) {
       throw new InternalServerError(error);
     }
@@ -101,7 +100,6 @@ class TwilioService {
         throw new BadRequestError("Failed to send text message");
       }
 
-      return true;
     } catch (error) {
       throw new InternalServerError(error);
     }
@@ -128,7 +126,6 @@ class TwilioService {
         })
       );
 
-      return { success: true };
     } catch (error) {
       throw new InternalServerError(error);
     }
