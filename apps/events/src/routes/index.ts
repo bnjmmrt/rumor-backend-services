@@ -119,7 +119,7 @@ router.get("/events/users-events-invitees/:id", GuestController.getUsersEventInv
 router.get('/events/vouch-requests', VouchRequestController.createVouchRequest);
 router.get('/events/vouch-requests', VouchRequestController.getAllVouchRequests);
 router.get('/events/vouch-requests/:id', VouchRequestController.updateVouchRequest);
-router.post('/events/user/:id/vouches', VouchRequestController.getUserVouches);
+router.get('/events/user/:id/vouches', VouchRequestController.getUserVouches);
 router.post('/events/event/:id', VouchRequestController.getUserVouchesByEvent);
 
 export default router;
