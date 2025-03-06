@@ -1,244 +1,207 @@
-import { Request, Response } from "express";
-import { Brackets } from "typeorm";
-import { Notification } from "rumor-utils/shared/notifications/entities/notification.entity";
-import {
-  NotificationSource,
-  NotificationStatus,
-  NotificationType,
-  RecipientsType,
-} from "rumor-utils/shared/notifications/interfaces/notification.interface";
-import {
-  notificationSourceToEntity,
-  notificationStatusToEntity,
-  notificationTypeToEntity,
-  recipientsTypeToEntity,
-  toNotificationData,
-} from "rumor-utils/shared/notifications/mappers/notification.mapper";
-import { parse } from "qs";
-import { hasPagination } from "rumor-utils/shared/users/dtos/shared.dto";
-// import { AuthClient } from '../../../../packages/rumor-utils/client/auth.client';
-// import { CommunicationClient } from '../../../../packages/rumor-utils/client/communication.client';
-// import { responses } from "../../../users/src/common/responses";
+import database from '../database';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { NotFoundError } from 'rumor-utils/errors';
+import { Event } from 'rumor-utils/shared/events/entities'
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
+import { In } from 'typeorm' 
 
-import {
-  CreateNotificationRequestDto,
-  UpdateNotificationRequestDto,
-  ListNotificationsRequestDto,
-  RequestByIdDto,
-  SendPushNotificationRequestDto,
-} from "rumor-utils/shared/notifications/dtos/notification.dto";
-import { EmailTemplate } from "@fusionauth/typescript-client";
-import database from "../database";
-import { NotFoundError, BadRequestError } from 'rumor-utils/errors'
-import * as serviceMesh from 'rumor-utils/service-mesh'
+class NotificationService {
+    public dbConnection = database;
 
-export class NotificationService {
-
-  public static dbConnection = database;
-  
-  public static async createNotification(req: Request, res: Response) {
-      const payload: CreateNotificationRequestDto = req.body;
-      const notification = new Notification();
-      notification.title = payload.title;
-      notification.message = payload.message;
-      notification.date = payload.date;
-      notification.time = payload.time;
-
-      let types: NotificationType[] = [];
-      if (payload.type)
-        types = payload.type.map((item) => {
-          return notificationTypeToEntity[item];
-        });
-      notification.type = types;
-      let recipients: RecipientsType[] = [];
-      if (payload.recipients)
-        recipients = payload.recipients.map((item) => {
-          return recipientsTypeToEntity[item];
-        });
-      notification.recipients = recipients;
-      notification.emails = payload.emails;
-      notification.userIds = payload.userIds;
-      notification.source = notificationSourceToEntity[payload.source];
-
-      // Changes below is needed for the following snippet
-      if (payload.templateId) {
-        const template = await serviceMesh.getTemplateById("",
-          payload.templateId
-        );
-        if (template) notification.relatedTemplate = template;
-      }
-
-      return this.dbConnection.getRepository(Notification).save(notification);
-  }
-
-
-  public static async updateNotification(req: Request, res: Response) {
-      const payload: UpdateNotificationRequestDto = req.body;
-      const notification = await this.dbConnection.getRepository(Notification).findOne({
-        where: { id: payload.id },
-      });
-      if (!notification)
-        throw new NotFoundError("Notification not found");
-
-      if (notification.status === NotificationStatus.SENT)
-        throw new BadRequestError("Cannot modify a sent notification");
-
-      notification.title = payload.title || notification.title;
-      notification.message = payload.message || notification.message;
-      notification.date = payload.date || notification.date;
-      notification.time = payload.time || notification.time;
-      notification.emails = payload.emails || notification.emails;
-      notification.userIds = payload.userIds || notification.userIds;
-
-      notification.source =
-        notificationSourceToEntity[payload.source] || notification.source;
-      notification.status =
-        notificationStatusToEntity[payload.status] || notification.status;
-
-      let types: NotificationType[] = [];
-      if (payload.type)
-        types = payload.type.map((item) => {
-          return notificationTypeToEntity[item];
-        });
-      notification.type = types;
-      let recipients: RecipientsType[] = [];
-      if (payload.recipients)
-        recipients = payload.recipients.map((item) => {
-          return recipientsTypeToEntity[item];
-        });
-      notification.recipients = recipients;
-
-      if (payload.templateId) {
-        const template: Partial<EmailTemplate> =
-          await serviceMesh.getTemplateById("",payload.id); // This line is changed
-        if (template) notification.relatedTemplate = template;
-      }
-
-      await this.dbConnection.getRepository(Notification).save(notification);
-      return 
-  }
-
-  public static async getNotification(req: Request, res: Response) {
-      const { id } = req.params;
-      const notification = await this.dbConnection.getRepository(Notification).findOne({
-        where: { id },
-        relations: ["relatedTemplate"],
-      });
-      if (!notification)
-        throw new Error("Notification not found");
-      return toNotificationData(notification);
-  }
-
-  public static async listNotifications(req: Request, res: Response) {
-      const parsedQuery = parse(req.query as unknown as string);
-      const pagination = hasPagination(parsedQuery)
-        ? { take: parseInt(parsedQuery.take), skip: parseInt(parsedQuery.skip) }
-        : {};
-      const queryBuilder =
-        this.dbConnection.getRepository(Notification).createQueryBuilder("notification");
-
-      if (parsedQuery.recipients) {
-        const recipients = String(parsedQuery.recipients)
-          .split(",")
-          .map((item) => item.trim());
-        queryBuilder.andWhere("notification.recipients @> :recipients", {
-          recipients: JSON.stringify(recipients),
-        });
-      }
-      if (parsedQuery.type) {
-        const types = String(parsedQuery.type)
-          .split(",")
-          .map((item) => item.trim());
-        queryBuilder.andWhere("notification.type @> :type", {
-          recipients: JSON.stringify(types),
-        });
-      }
-
-      if (parsedQuery.status) {
-        const statusList = String(parsedQuery.status)
-          .split(",")
-          .map((item) => item.trim() as NotificationStatus);
-        queryBuilder.andWhere("notification.status IN (:...statusList)", {
-          statusList,
-        });
-      }
-
-      if (parsedQuery.source) {
-        const sources = String(parsedQuery.source)
-          .split(",")
-          .map((item) => item.trim() as NotificationSource);
-        queryBuilder.andWhere("notification.source IN (:...sources)", {
-          sources,
-        });
-      }
-
-      if (parsedQuery.date) {
-        const date = new Date(String(parsedQuery.date));
-        queryBuilder.andWhere("notification.date = :date", { date });
-      }
-
-      if (parsedQuery.findByTitleOrMessage) {
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where("notification.title ILIKE :searchTerm", {
-              searchTerm: `%${parsedQuery.findByTitleOrMessage}%`,
-            }).orWhere("notification.message ILIKE :searchTerm", {
-              searchTerm: `%${parsedQuery.findByTitleOrMessage}%`,
+    async createNotification(
+        title: string,
+        message: string,
+        body: object,
+        notificationType: string,
+        notificationModule: string,
+        recipientIds: string[],
+        linkedUserId?: string,
+        linkedEventId?: string
+    ): Promise<Notification> {
+        return await this.dbConnection.connection.transaction(async (transactionalEntityManager) => {
+            const notificationRepository = transactionalEntityManager.getRepository(Notification);
+            const userRepository = transactionalEntityManager.getRepository(User);
+            const eventRepository = transactionalEntityManager.getRepository(Event);
+    
+            const newNotification = notificationRepository.create({
+                title,
+                message,
+                body,
+                notificationType,
+                notificationModule,
+                linkedUser: linkedUserId ? await userRepository.findOne({ where: { id: linkedUserId } }) : null,
+                linkedEvent: linkedEventId ? await eventRepository.findOne({ where: { id: linkedEventId } }) : null,
             });
-          })
-        );
-      }
+    
+            const savedNotification = await notificationRepository.save(newNotification);
+    
+            if (recipientIds.length > 0) {
+                const recipients = await userRepository.find({where:{id: In(recipientIds)}});
+                savedNotification.recipients = recipients;
+                await notificationRepository.save(savedNotification);
+            }
+    
+            return savedNotification;
+        });
+    }
 
-      if (parsedQuery.sortBy) {
-        const sortOrder = String(parsedQuery.order || "ASC").toUpperCase();
-        queryBuilder.orderBy(
-          `notification.${parsedQuery.sortBy}`,
-          sortOrder as "ASC" | "DESC"
-        );
-      }
+    async getAllNotifications(
+        recipientId: string, 
+        take = 10, 
+        skip = 0
+    ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', { recipientId })
+            .select([
+                'notification.id',
+                'notification.title AS description',
+                'notification.notificationType',
+                'notification.created_at',
+                'notification.message',
+                'notification.body'
+            ])
+            .orderBy('notification.created_at', 'DESC');
+    
+        // Get total count without pagination
+        const totalCount = await queryBuilder.getCount();
+    
+        // Apply pagination
+        const notifications = await queryBuilder
+            .take(take)
+            .skip(skip)
+            .getRawMany();
+    
+        return { totalCount, notifications };
+    }
 
-      if (pagination.take) queryBuilder.take(pagination.take);
-      if (pagination.skip) queryBuilder.skip(pagination.skip);
 
-      queryBuilder.relation("relatedTemplate");
+    async getNotificationDetail(notificationId: string): Promise<Notification> {
+        // Fetch the notification
+        const notification = await this.dbConnection.getRepository(Notification).findOne({
+            where: { id: notificationId },
+            relations: ['linkedUser', 'linkedEvent', 'recipients'], // Load relations if needed
+        });
 
-      const notifications = await queryBuilder.getMany();
-      return notifications.map(toNotificationData);
-  }
+        // If notification is not found, throw an error
+        if (!notification) {
+            throw new NotFoundError('Notification not found');
+        }
 
-  public static async deleteNotification(req: Request, res: Response) {
-      const { id } = req.params;
-      await this.dbConnection.getRepository(Notification).delete({ id });
-      return ;
-  }
+        // If isSeen is false, update it to true
+        if (!notification.isSeen) {
+            await this.dbConnection.getRepository(Notification).update(notificationId, { isSeen: true });
+        }
 
-  public static async sendPushNotification(req: Request, res: Response) {
-      const payload: SendPushNotificationRequestDto = req.body;
-      const userSettings = await serviceMesh.getUserSettings(
-        "",payload.userId
-      );
-      
-      if (!userSettings) throw new NotFoundError("user settings not found");
+        return notification;
+    }
 
-      const notificationSettings = userSettings.notificationsSettings;
-      if (!notificationSettings.allowPushNotifications) return //responses.ok;
-      if (!notificationSettings.enableAppNotifications) return //responses.ok;
+    async deleteNotification(notificationId: string): Promise<{ message: string }> {
+        const result = await this.dbConnection.getRepository(Notification).delete(notificationId);
 
-      if (notificationSettings.muteNotifications) return //responses.ok;
+        if (result.affected === 0) {
+            throw new NotFoundError('Notification not found');
+        }
 
-      const pushNotificationTokens =
-        await serviceMesh.getPushNotificationTokens("",payload.userId);
-      const notificationTokens = pushNotificationTokens.map(
-        (p) => p.notificationToken
-      );
-      if (notificationTokens.length === 0) return //responses.ok;
+        return { message: 'Notification deleted successfully' };
+    }
 
-      // await serviceMesh.sendPushNotification(
-      //   "",
-      //   notificationTokens,
-      //   payload.title,
-      //   payload.body
-      // );
-      return //res.json(responses.ok);
-  }
+
+    async findAllNotifications(
+        take = 10, 
+        skip = 0, 
+        notificationByModule?: string, 
+        notificationByType?: string
+    ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .select([
+                'notification.id',
+                'notification.title AS description',
+                'notification.notificationType',
+                'notification.notificationModule',
+                'notification.created_at',
+                'notification.message',
+                'notification.body'
+            ])
+            .orderBy('notification.created_at', 'DESC');
+    
+        // Apply filters if provided
+        if (notificationByModule) {
+            queryBuilder.andWhere('notification.notificationModule = :notificationByModule', { notificationByModule });
+        }
+    
+        if (notificationByType) {
+            queryBuilder.andWhere('notification.notificationType = :notificationByType', { notificationByType });
+        }
+    
+        // Get total count before pagination
+        const totalCount = await queryBuilder.getCount();
+    
+        // Apply pagination
+        const notifications = await queryBuilder
+            .take(take)
+            .skip(skip)
+            .getRawMany();
+    
+        return { totalCount, notifications };
+    }
+
+
+    async getNotificationSummary(recipientId: string): Promise<{
+        totalNotifications: number;
+        notificationsByModule: Record<string, number>;
+        notificationsByType: Record<string, number>;
+    }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', { recipientId });
+    
+        // Get total notifications count
+        const totalNotifications = await queryBuilder.getCount();
+    
+        // Get count grouped by notificationModule
+        const notificationsByModule = await queryBuilder
+            .select('notification.notificationModule, COUNT(*) AS count')
+            .groupBy('notification.notificationModule')
+            .getRawMany();
+    
+        // Get count grouped by notificationType
+        const notificationsByType = await queryBuilder
+            .select('notification.notificationType, COUNT(*) AS count')
+            .groupBy('notification.notificationType')
+            .getRawMany();
+    
+        // Format response
+        return {
+            totalNotifications,
+            notificationsByModule: notificationsByModule.reduce((acc, row) => {
+                acc[row.notificationModule] = Number(row.count);
+                return acc;
+            }, {} as Record<string, number>),
+            notificationsByType: notificationsByType.reduce((acc, row) => {
+                acc[row.notificationType] = Number(row.count);
+                return acc;
+            }, {} as Record<string, number>),
+        };
+    }
+
+    async deleteMultipleNotifications(recipientId: string, notificationIds: string[]): Promise<{ deletedCount: number }> {
+        if (!notificationIds || notificationIds.length === 0) {
+            throw new Error('No notification IDs provided.');
+        }
+    
+        const result = await this.dbConnection.getRepository(Notification)
+            .createQueryBuilder()
+            .delete()
+            .from(Notification)
+            .where('id IN (:...notificationIds)', { notificationIds })
+            .andWhere('id IN (SELECT nr.notification_id FROM notification_recipients nr WHERE nr.user_id = :recipientId)', { recipientId })
+            .execute();
+    
+        return { deletedCount: result.affected || 0 };
+    }
 }
+
+const notificationSerice = new NotificationService()
+export default notificationSerice;

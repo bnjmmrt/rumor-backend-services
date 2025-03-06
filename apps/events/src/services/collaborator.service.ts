@@ -57,8 +57,8 @@ export class CollaboratorService {
       collaborator.user = user;
 
       collaborator.limitInvitationsNumber = payload.limitInvitationsNumber;
-      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
-      if (ticketTypeExists) collaborator.ticketType = { id: payload.ticketTypeId };
+      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: '1' } });
+      if (ticketTypeExists) collaborator.ticketType = { id: "1" };
 
       collaborator.editEventDetailsSettings = payload.editEventDetailsSettings;
       collaborator.inviteGuestsToEvent = payload.inviteGuestsToEvent;
@@ -138,8 +138,8 @@ export class CollaboratorService {
       collaborator.generateEventReports = payload.generateEventReports;
 
       collaborator.limitInvitationsNumber = payload.limitInvitationsNumber;
-      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
-      if (ticketTypeExists) collaborator.ticketType = { id: payload.ticketTypeId };
+      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: '1' } });
+      if (ticketTypeExists) collaborator.ticketType = { id: '1' };
 
       const result = await this.dbConnection.getRepository(Collaborator).save(collaborator);
 

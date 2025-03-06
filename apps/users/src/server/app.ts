@@ -8,6 +8,7 @@ import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler
 import { NotFoundError } from "rumor-utils/errors/not-found.error";
 
 const app: Express = express();
+
 app.use(bodyParser.json());
 
 app.use(helmet());
@@ -26,6 +27,7 @@ app.get("/users/v1/health", (req: Request, res: Response) => {
 });
 
 app.use("/users/v1", router);
+
 app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundError(req.path)));
 app.use(globalErrorHandler);
 

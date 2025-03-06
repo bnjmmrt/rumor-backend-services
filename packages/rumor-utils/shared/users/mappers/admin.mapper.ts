@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import dayjs from 'dayjs';
 import { User } from "../entities/user.entity"
-import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile } from '../grpc/auth/auth.pb';
+import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
@@ -12,7 +12,7 @@ import { UserRole } from '../entities/roles/user-role.entity';
 export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
   const upcomingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -24,7 +24,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     });
   const pastEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PAST_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -36,7 +36,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     });
   const pendingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PENDING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -100,6 +100,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     lastName: user.lastName,
     category: focuses.map((focus) => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
+    placeId: user.address?.googlePlaceId,
     dateOfBirth: user.dateOfBirth,
     phoneNumber: user.phoneNumber,
     email: user.email,
@@ -121,5 +122,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     requestedEvents: [],
     status: entityToUserStatus[role.status],
     instagramUsername: instagramUsername,
+    customLists: [],
+    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
   };
 };
