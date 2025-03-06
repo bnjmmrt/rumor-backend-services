@@ -123,6 +123,7 @@ import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
 import { ParsedQs } from 'qs';
 import { GoogleAddressClient } from '../utils/google';
 import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
+import fusionAuthClientHandler from '../utils/fusion-auth/fusionauth';
 
 //-----------------Admin Imports
 
@@ -144,7 +145,7 @@ import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { responses } from '../common/responses.common';
 import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
-import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
+import { RegistrationRequest } from '@fusionauth/typescript-client';
 import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
@@ -191,8 +192,6 @@ export class AuthService {
 
   public static dbConnection = database;
 
-  public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));
-
   public static async login(payload: LoginRequestDto): Promise<LoginResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
@@ -207,7 +206,7 @@ export class AuthService {
         password: payload.password,
       };
 
-      const loginUser = await this.fusionAuthClient.login(loginUserRequest);
+      const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
         throw new ForbiddenError("User or password not valid.");
@@ -253,7 +252,7 @@ export class AuthService {
 
   public static async validate({ token }: ValidateRequestDto): Promise<ValidateResponse> {
     try {
-      const findUser = await this.fusionAuthClient.retrieveUserUsingJWT(token);
+      const findUser = await fusionAuthClientHandler.fusionAuthClient().retrieveUserUsingJWT(token);
       if (!findUser?.response?.user?.active) {
         throw new ForbiddenError("User is not active.");
       }
@@ -313,14 +312,14 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        const code = await this.fusionAuthClient.startPasswordlessLogin(request);
-        const authenticatedUser = await this.fusionAuthClient.passwordlessLogin({ code: code.response.code });
+        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
         fusionAuthToken = authenticatedUser.response.token;
 
         requiresFusionAuthRegistration = false;
       } else if (isNonMember) {
         try {
-          const fusionAuthResponse = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+          const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
           requiresFusionAuthRegistration = fusionAuthResponse.statusCode !== 200;
         } catch (error) {
           requiresFusionAuthRegistration = true;
@@ -380,7 +379,7 @@ export class AuthService {
         },
       };
 
-      fusionAuthUser = await this.fusionAuthClient.register(newUser.id, registrationRequest);
+      fusionAuthUser = await fusionAuthClientHandler.fusionAuthClient().register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
         return responses.conflict(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
       }
@@ -509,7 +508,7 @@ export class AuthService {
   }
 
   public static async logout(payload: TokenRequestDto): Promise<SignUpResponse> {
-    const response = await this.fusionAuthClient.logout(false, payload.token);
+    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError("Invalid session token.");
@@ -581,7 +580,7 @@ export class AuthService {
       password: payload.password,
     };
 
-    await this.fusionAuthClient.changePasswordByIdentity(request);
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
 
     // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
     // Nullify relationships
@@ -618,7 +617,7 @@ export class AuthService {
       password: payload.newPassword,
     };
 
-    await this.fusionAuthClient.changePasswordByIdentity(request);
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
     return responses.ok;
   }
 
@@ -639,7 +638,7 @@ export class AuthService {
       email: payload.email,
       sendForgotPasswordEmail: false,
     };
-    const forgotPasswordResponse = await this.fusionAuthClient.forgotPassword(passwordResetRequest);
+    const forgotPasswordResponse = await fusionAuthClientHandler.fusionAuthClient().forgotPassword(passwordResetRequest);
     const token = forgotPasswordResponse.response?.changePasswordId;
     if (!token) {
       throw new BadRequestError("token");
@@ -679,12 +678,12 @@ export class AuthService {
     const changePasswordRequest: ChangePasswordRequest = {
       password: payload.password,
     };
-    const fusionAuthResponse = await this.fusionAuthClient.retrieveUserByChangePasswordId(token);
+    const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByChangePasswordId(token);
     const email = fusionAuthResponse?.response?.user?.email;
     if (!email) {
       throw new BadRequestError("email");
     }
-    const changePasswordFusionAuthResponse = await this.fusionAuthClient.changePassword(token, changePasswordRequest);
+    const changePasswordFusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().changePassword(token, changePasswordRequest);
     if (changePasswordFusionAuthResponse?.statusCode !== 200) {
       throw new BadRequestError("Unable to reset password");
     }
@@ -697,7 +696,7 @@ export class AuthService {
   }
 
   public static async oAuthRedirect(payload: OAuthRequestDto): Promise<OAuthRedirectResponse> {
-    const accesToken = await this.fusionAuthClient.exchangeOAuthCodeForAccessToken(
+    const accesToken = await fusionAuthClientHandler.fusionAuthClient().exchangeOAuthCodeForAccessToken(
       payload.code,
       config.get('FUSIONAUTH_APP_ID'),
       config.get('FUSIONAUTH_CLIENT_SECRET'),
@@ -1009,7 +1008,7 @@ export class AuthService {
     }
 
     try {
-      await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
     } catch (error) {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: { user: { id: user.id }, status: GuestStatus.INVITED },
@@ -1026,7 +1025,7 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await this.fusionAuthClient.startPasswordlessLogin(request);
+    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -1156,7 +1155,7 @@ export class AuthService {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
 
-      const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: payload.code });
+      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
         throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
       }
@@ -1184,7 +1183,7 @@ export class AuthService {
         throw new NotFoundError('Unable to login.');
       };
 
-      const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: payload.code });
+      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
         throw new BadRequestError('Unable to login.');
       }
@@ -1227,19 +1226,19 @@ export class AuthService {
       loginId: user.email,
       password: payload.password,
     };
-    const authenticatedUser = await this.fusionAuthClient.login(request);
-    const additionalHostInformation = user.additionalHostInformation;
-    return responses.data({
-      token: authenticatedUser.response.token,
-      roles: user.roles.map((item) => {
-        return { roleName: item.role.name, roleId: item.role.id };
-      }),
-      hostDetails: {
-        companyLogo: additionalHostInformation?.companyLogo || '',
-        companyName: additionalHostInformation?.companyName || '',
-        id: user.id,
-      },
-    });
+      const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+      const additionalHostInformation = user.additionalHostInformation;
+      return responses.data({
+        token: authenticatedUser.response.token,
+        roles: user.roles.map((item) => {
+          return { roleName: item.role.name, roleId: item.role.id };
+        }),
+        hostDetails: {
+          companyLogo: additionalHostInformation?.companyLogo || '',
+          companyName: additionalHostInformation?.companyName || '',
+          id: user.id,
+        },
+      });
   }
 
   public static async getCurrentMember(payload: IdRequestDto): Promise<MemberResponse> {
@@ -3105,7 +3104,7 @@ export class AuthService {
       throw new ForbiddenError('Invalid credentials')
     }
 
-    const loginResponse = await this.fusionAuthClient.login({ loginId: payload.email, password: payload.password });
+    const loginResponse = await fusionAuthClientHandler.fusionAuthClient().login({ loginId: payload.email, password: payload.password });
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
       throw new ForbiddenError('Invalid credentials')
@@ -3126,7 +3125,7 @@ export class AuthService {
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpResponse> {
     let nonMember: UserRole | null;
     try {
-      const response = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+      const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
       if (response.statusCode == 200 && response?.response?.user) {
         throw new ConflictError('The user with provided email already exists.')
       }
@@ -3192,7 +3191,7 @@ export class AuthService {
       },
     };
 
-    const newUser = await this.fusionAuthClient.register(user.id, registrationRequest);
+    const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin')
     }
@@ -3374,7 +3373,7 @@ export class AuthService {
     await this.dbConnection.getRepository(UserRole).save(userRole);
 
     if (payload.status === NewUserStatus.APPROVE) {
-      const users = await this.fusionAuthClient.searchUsersByIds([user.id]);
+      const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
       if (users.response.total === 0) {
         await this.approveHost(user);
         const token = await this.generateToken(user);
@@ -3452,7 +3451,7 @@ export class AuthService {
       },
     };
 
-    await this.fusionAuthClient.register(user.id, registrationRequest);
+    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
   }
 
   public static async generateToken(user: User): Promise<string> {
@@ -4393,8 +4392,8 @@ export class AuthService {
       loginId: user.email,
     };
 
-    const code = await this.fusionAuthClient.startPasswordlessLogin(request);
-    const authenticatedUser = await this.fusionAuthClient.passwordlessLogin({ code: code.response.code });
+    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
 
     return responses.data({
       token: authenticatedUser.response.token,

@@ -49,7 +49,8 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GenericResponse = await GuestService.manageGuests(payload);
+      const token = (req as any).token;
+      const response: GenericResponse = await GuestService.manageGuests(payload, token);
       const successResponse = new UpdateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
