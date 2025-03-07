@@ -8,8 +8,11 @@ import {
     DeleteObjectCommandOutput,
     HeadObjectCommandOutput,
   } from '@aws-sdk/client-s3';
-  import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-  import config from '../../config';
+  
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import config from '../../config';
+import { AWSError } from 'rumor-utils/errors';
+
  
   interface FilePayload {
     file: Buffer;
@@ -56,8 +59,8 @@ class S3ServiceHandler {
       this.bucketName = config.get("BUCKET_DOCUMENTS_NAME");
     }
   
-    private handleError(error: unknown, action: string): never {
-      throw new Error(`Error ${action} file`);
+    private handleError(error: unknown) {
+      throw new AWSError(`${error}`);
     }
   
     public async uploadFile(payload: FilePayload): Promise<PutObjectCommandOutput> {
@@ -78,7 +81,7 @@ class S3ServiceHandler {
       try {
         return await this.s3Client.send(command);
       } catch (error) {
-        this.handleError(error, 'saving');
+        this.handleError(error);
       }
     }
   
@@ -91,7 +94,7 @@ class S3ServiceHandler {
       try {
         return await this.s3Client.send(command);
       } catch (error) {
-        this.handleError(error, 'deleting');
+        this.handleError(error);
       }
     }
   
@@ -104,7 +107,7 @@ class S3ServiceHandler {
       try {
         return await this.s3Client.send(command);
       } catch (error) {
-        this.handleError(error, 'getting');
+        this.handleError(error);
       }
     }
   
@@ -126,7 +129,7 @@ class S3ServiceHandler {
       try {
         return await this.s3Client.send(command);
       } catch (error) {
-        this.handleError(error, 'updating');
+        this.handleError(error);
       }
     }
   
@@ -138,7 +141,7 @@ class S3ServiceHandler {
       try {
         return await getSignedUrl(this.s3Client, getObjectCommand, urlOptions);
       } catch (error) {
-        this.handleError(error, 'getting signed URL');
+        this.handleError(error);
       }
     }
   
@@ -150,7 +153,7 @@ class S3ServiceHandler {
       try {
         return await getSignedUrl(this.s3Client, putObjectCommand, urlOptions);
       } catch (error) {
-        this.handleError(error, 'getting signed URL');
+        this.handleError(error);
       }
     }
   }
