@@ -25,7 +25,7 @@ export const buildSignupFormsResponse = (
 
   const result: SignupFormsResponse = {
     id: esf.id,
-    name: event.name,
+    name: esf.name,
     startDate: event.startDate ? event.startDate.toString() : null,
     endDate: event.endDate ? event.endDate.toString() : null,
     address: event.location,

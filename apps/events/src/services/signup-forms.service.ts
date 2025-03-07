@@ -276,12 +276,18 @@ export class SignupFormsServices {
             questionPromises.push(deleteQuestions);
             break;
         }
-      } else {
-        ids.push(q.id);
-        question.ordering = index;
-        question.value = q.value;
-        const updatesQuestion = SignupFormQuestions.update(q.id, question);
-        questionPromises.push(updatesQuestion);
+      }
+      if (!body.hasAccessForAdditionalGuests) {
+        if (q.name === "Request Access for Additional Guests") {
+          const deleteQuestions = SignupFormQuestions.delete(q.id);
+          questionPromises.push(deleteQuestions);
+        } else {
+          ids.push(q.id);
+          question.ordering = index;
+          question.value = q.value;
+          const updatesQuestion = SignupFormQuestions.update(q.id, question);
+          questionPromises.push(updatesQuestion);
+        }
       }
     }
     await Promise.all(questionPromises);
