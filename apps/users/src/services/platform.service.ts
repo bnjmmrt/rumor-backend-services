@@ -6,6 +6,7 @@ import {
   InterestResponse,
   InterestsResponse,
 } from "rumor-utils/shared/users/grpc/platform/platform.pb";
+import { FocusData } from "rumor-utils/shared/users/grpc/platform/general.pb";
 import {
   toFocus,
   toInterest,
@@ -27,20 +28,20 @@ import database from "../database";
 export class PlatformService {
   public static dbConnection = database;
 
-  public static async getFocuses(): Promise<FocusResponse> {
+  public static async getFocuses(): Promise<FocusData[]> {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { deletedAt: IsNull() } });
-    return responses.data(focuses.map((focus) => toFocus(focus)));
+    return focuses.map((focus) => toFocus(focus));
   }
 
   public static async getUserFocuses(
     payload: IdRequestDto
-  ): Promise<FocusResponse> {
+  ): Promise<FocusData[]> {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-    return responses.data(focuses.map((focus) => toFocus(focus)));
+    return focuses.map((focus) => toFocus(focus));
   }
 
   public static async addFocus(
