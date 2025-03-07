@@ -14,8 +14,7 @@ import { Event } from 'rumor-utils/shared/events//entities/event.entity';
 import { UserQuizAnswer } from 'rumor-utils/shared/events//entities/user-quiz-question-answer.entity';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import database from '../database';
-import * as serviceMesh from 'rumor-utils/service-mesh';
-import config from 'src/config';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class QuizQuestionService {
   public static dbConnection = database;
@@ -105,7 +104,7 @@ export class QuizQuestionService {
 
   public static async saveUserQuizAnswers(payload: SaveUserQuizAnswersRequestDto): Promise<SaveUserQuizAnswersResponse> {
     try {
-      const user = await serviceMesh.getCurrentMember(config.get('API_BASE_URL'),payload.userId);
+      const user: any = await serviceMesh.userService().getCurrentMember();
       if (!user) return { data: [], ...responses.notFound('User not found') };
 
       const partialUser: Partial<User> = { id: user.id };
