@@ -551,6 +551,8 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
+      const count = await SignupFormSubmissions.count();
+
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder("sfs")
@@ -565,7 +567,7 @@ export class SignupFormsServices {
         .addSelect("gst.status", "status")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
 
-      submissionsQuery.orderBy("sfs.id", "DESC").skip(skip).limit(take);
+      submissionsQuery.orderBy("sfs.id", "DESC").limit(count);
 
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -580,7 +582,6 @@ export class SignupFormsServices {
         );
       }
 
-      const count = await SignupFormSubmissions.count();
       const submissionList = await submissionsQuery.getRawMany();
       const result = { count, result: submissionList };
       return result;
