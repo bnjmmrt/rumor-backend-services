@@ -297,7 +297,6 @@ export class AuthService {
         roles: { role: true },
       },
     });
-console.log("user",user);
 
     if (user) {
       existingUser = user;
