@@ -80,6 +80,7 @@ import {
   ReportResponse,
   FeedbacksResponse,
   MemberSignUpResponse,
+  ConfirmedMember,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -296,6 +297,7 @@ export class AuthService {
         roles: { role: true },
       },
     });
+console.log("user",user);
 
     if (user) {
       existingUser = user;
@@ -1055,7 +1057,7 @@ export class AuthService {
       }
     }
 
-    return responses.data({ isValid: true });
+    return;
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
@@ -1610,7 +1612,7 @@ export class AuthService {
     );
 
 
-    return responses.ok;
+    return;
   }
 
   public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<ListUsersByTypeResponse> {
@@ -2340,7 +2342,7 @@ export class AuthService {
     return responses.data({ users, totalCount });
   }
 
-  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
+  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
     const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
     const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
 
@@ -2366,7 +2368,7 @@ export class AuthService {
       throw new NotFoundError('members')
     }
     const members = users.map(toConfirmedMember);
-    return responses.data(members);
+    return members;
   }
 
   public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<GetUserWithRolesByEmailResponse> {

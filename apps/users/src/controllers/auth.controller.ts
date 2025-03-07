@@ -35,6 +35,7 @@ import {
   ReportResponse,
   FeedbacksResponse,
   MemberSignUpResponse,
+  ConfirmedMember,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -387,7 +388,7 @@ export class AuthController {
     async (req, res): Promise<void> => {
       const payload: IdRequestDto = req.body;
       const response: GenericResponse = await AuthService.approveMember(payload);
-      const updateResponse = new UpdateResponse(response);
+      const updateResponse = new UpdateResponse(response, "Member has been aprroved");
       res.status(updateResponse.statusCode).json(updateResponse);
     }
   );
@@ -538,9 +539,9 @@ export class AuthController {
   public static getConfirmedMembers = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: ContactsListRequestDto = req.body;
-      const response: ConfirmedMembersResponse = await AuthService.getConfirmedMembers(payload);
-      const createResponse = new CreateResponse(response);
-     res.status(createResponse.statusCode).json(createResponse);
+      const response: ConfirmedMember[] = await AuthService.getConfirmedMembers(payload);
+      const successResponse = new GetResponse(response);
+     res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
