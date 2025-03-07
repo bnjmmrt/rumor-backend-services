@@ -526,6 +526,15 @@ export class UpdateUserStatusRequestDto implements UpdateUserStatusRequest {
   status: NewUserStatus;
 }
 
+export class UpdateHostsStatusRequestDto  {
+  @IsUUID()
+  @IsNotEmpty()
+  ids: string[];
+  @IsEnum(NewUserStatus)
+  @IsNotEmpty()
+  status: NewUserStatus;
+}
+
 export class ValidatePasswordTokenRequestDto implements ValidatePasswordTokenRequest {
   @IsString()
   @IsNotEmpty()
