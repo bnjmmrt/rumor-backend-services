@@ -62,7 +62,7 @@ router.patch(
 // );
 
 //events routes
-router.post("/event/:eventId/cancel", EventsController.cancelEventAndNotify);
+router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify);
 router.get("/event-status", EventsController.listEventStatus);
 
 

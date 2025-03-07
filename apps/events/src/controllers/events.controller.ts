@@ -44,10 +44,11 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
+import { EventData, EventTypeData } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 export class EventsController {
 
   public static listEventStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const eventStatuses: ListEventStatusResponse = await EventsService.listEventStatus();
+    const eventStatuses: string[] = await EventsService.listEventStatus();
     const successResponse = new GetResponse(eventStatuses);
     res.status(successResponse.statusCode).json(successResponse);
   }
@@ -55,7 +56,7 @@ export class EventsController {
 
   public static createEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: CreateEventTypeRequestDto = req.body;
-    const createdEventType: EventTypeResponse = await EventsService.createEventType(payload);
+    const createdEventType: EventTypeData = await EventsService.createEventType(payload);
     const successResponse = new CreateResponse(createdEventType);
     res.status(successResponse.statusCode).json(successResponse);
   }
@@ -93,7 +94,7 @@ export class EventsController {
   public static deleteEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const response: GenericResponse = await EventsService.deleteEventType(payload);
+    const response: string = await EventsService.deleteEventType(payload);
     const successResponse = new DeleteResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   }
@@ -156,7 +157,7 @@ export class EventsController {
     const { id } = req.params;
     const payload: UserAndIdRequestDto = { id, userId }
     // const id = req.params.id;
-    const event: GenericResponse = await EventsService.deleteEvent(
+    const event: string = await EventsService.deleteEvent(
       payload
     );
 
@@ -228,7 +229,7 @@ export class EventsController {
   public static deleteEventLocation = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const eventLocationResponse: GenericResponse = await EventsService.deleteEventLocation(
+    const eventLocationResponse: string = await EventsService.deleteEventLocation(
       payload
     );
     const successResponse = new DeleteResponse(eventLocationResponse);
@@ -306,7 +307,7 @@ export class EventsController {
   public static deleteEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const response: GenericResponse = await EventsService.deleteEventAgeLimit(
+    const response: string = await EventsService.deleteEventAgeLimit(
       payload
     );
     const successResponse = new DeleteResponse(response);
@@ -350,7 +351,7 @@ export class EventsController {
   public static publishEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const eventResponse: GenericResponse = await EventsService.publishEventById(
+    const eventResponse: string = await EventsService.publishEventById(
       payload
     );
     const successResponse = new UpdateResponse(eventResponse);
@@ -359,7 +360,7 @@ export class EventsController {
   )
 
   public static publishPendingEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const eventResponse: GenericResponse = await EventsService.publishPendingEvents(
+    const eventResponse: string = await EventsService.publishPendingEvents(
     );
     const successResponse = new UpdateResponse(eventResponse);
     res.status(successResponse.statusCode).json(successResponse);
@@ -380,7 +381,7 @@ export class EventsController {
 
   public static validateTicketForGuest = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: ValidateTicketForGuestRequestDto = req.body
-    const ticketResponse: GenericResponse = await EventsService.validateTicketForGuest(
+    const ticketResponse: string = await EventsService.validateTicketForGuest(
       payload
     );
     const successResponse = new CreateResponse(ticketResponse);
@@ -402,7 +403,7 @@ export class EventsController {
   public static updateTicket = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: UpdateTicketRequestDto = { id, ...req.body }
-    const ticketResponse: GenericResponse = await EventsService.updateTicket(
+    const ticketResponse: string = await EventsService.updateTicket(
       payload
     );
     const successResponse = new UpdateResponse(ticketResponse);
@@ -413,7 +414,7 @@ export class EventsController {
   public static addEventToFeaturedSection = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: AddEventToFeaturedSectionDto = { id, ...req.body }
-    const eventResponse: GenericResponse = await EventsService.addEventToFeaturedSection(
+    const eventResponse: string = await EventsService.addEventToFeaturedSection(
       payload
     );
     const successResponse = new CreateResponse(eventResponse);
@@ -423,7 +424,7 @@ export class EventsController {
 
   public static cancelEventAndNotify = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: CancelEventAndNotifyRequestDto = { ...req.params, ...req.body }
-    const response: GenericResponse = await EventsService.cancelEventAndNotify(
+    const response: string = await EventsService.cancelEventAndNotify(
       payload
     );
     const successResponse = new CreateResponse(response);
@@ -434,7 +435,7 @@ export class EventsController {
   public static getEventByInvitedUserId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { userId, id } = req.params
     const payload: UserAndIdRequestDto = { userId, id }
-    const response: EventResponse = await EventsService.getEventByInvitedUserId(
+    const response: EventData = await EventsService.getEventByInvitedUserId(
       payload
     );
     const successResponse = new GetResponse(response);
