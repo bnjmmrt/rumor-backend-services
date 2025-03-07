@@ -31,6 +31,7 @@ import {
   EventStatusEnum,
   GuestStatus,
 } from "rumor-utils/shared/events/interfaces/event.interface";
+import config from "../config";
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -73,11 +74,8 @@ export class SignupFormsServices {
       relations: { createdBy: true, questions: true },
     });
 
-    const data = buildSignupFormsResponse(
-      event,
-      signupForm,
-      "https://dev.therumor.com"
-    );
+    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+    const data = buildSignupFormsResponse(event, signupForm, baseUrl);
     return data;
   }
 
@@ -99,14 +97,10 @@ export class SignupFormsServices {
 
       const resultList: SignupFormsResponse[] = [];
 
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
       signupForms.forEach((sf) =>
         resultList.push(
-          buildSignupFormsResponse(
-            event,
-            sf,
-            "https://dev.therumor.com",
-            sf.submissions.length
-          )
+          buildSignupFormsResponse(event, sf, baseUrl, sf.submissions.length)
         )
       );
       return resultList;
@@ -144,11 +138,12 @@ export class SignupFormsServices {
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
         throw new NotFoundError("Event does not exists");
       }
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
 
       const data = buildSignupFormsResponse(
         eventSignupForm.event,
         eventSignupForm,
-        "https://dev.therumor.com"
+        baseUrl
       );
 
       return data;
@@ -177,7 +172,7 @@ export class SignupFormsServices {
           "You cannot create signup forms for private events."
         );
       }
-      let random = (Math.random() + 1).toString(6).substring(6);
+      let random = Math.floor(100000 + Math.random() * 900000).toString();
 
       const companyName = (
         event.owner?.additionalHostInformation?.companyName || ""
@@ -215,12 +210,8 @@ export class SignupFormsServices {
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map((q) => q.id);
       await signupForm.save();
-      const response = buildSignupFormsResponse(
-        event,
-        signupForm,
-        "https://dev.therumor.com",
-        0
-      );
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+      const response = buildSignupFormsResponse(event, signupForm, baseUrl, 0);
       return response;
     } catch (error) {
       throw error;
@@ -254,6 +245,7 @@ export class SignupFormsServices {
     signupForm.description = body.description;
     signupForm.styling = body.styling;
     signupForm.isPublished = true;
+    signupForm.isActive = true;
     signupForm.name = body.name;
 
     const ids = [];
@@ -297,11 +289,12 @@ export class SignupFormsServices {
     await SignupFormQuestions.insert(newQuestions);
     ids.push(...newQuestions.map((q) => q.id));
     signupForm.questionIds = ids;
+    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
     await signupForm.save();
     const response = buildSignupFormsResponse(
       signupForm.event,
       signupForm,
-      "https://dev.therumor.com",
+      baseUrl,
       0
     );
     return response;
@@ -474,7 +467,10 @@ export class SignupFormsServices {
    * Host profile pictures.
    */
 
-  public static async listSubmissions(id: string, payload: any) {
+  public static async listSubmissionsWithPerformanceOptimisations(
+    id: string,
+    payload: any
+  ) {
     try {
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take
@@ -490,7 +486,6 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      //const submissionsQuery = SignupFormSubmissions.createQueryBuilder("sfs")
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder("sfs")
@@ -511,6 +506,60 @@ export class SignupFormsServices {
         });
       }
       submissionsQuery.orderBy("sfs.id", "DESC").limit(take);
+
+      if (searchValue) {
+        const searchWords = searchValue.trim().split(/\s+/);
+        submissionsQuery.andWhere(
+          new Brackets((qb) => {
+            searchWords.forEach((word) => {
+              qb.orWhere("atd.firstName ILIKE :word", {
+                word: `%${word}%`,
+              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+            });
+          })
+        );
+      }
+
+      const count = await SignupFormSubmissions.count();
+      const submissionList = await submissionsQuery.getRawMany();
+      const result = { count, result: submissionList };
+      return result;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  public static async listSubmissions(id: string, payload: any) {
+    try {
+      const parsedQuery = parse(payload);
+      const take = parsedQuery?.take
+        ? parseInt(parsedQuery.take as string)
+        : undefined;
+
+      const skip = parsedQuery?.skip
+        ? parseInt(parsedQuery.skip as string)
+        : undefined;
+
+      const searchValue =
+        parsedQuery.findByName && typeof parsedQuery.findByName === "string"
+          ? parsedQuery.findByName.toLowerCase()
+          : "";
+
+      const submissionsQuery = database
+        .getRepository(SignupFormSubmissions)
+        .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
+        .innerJoin("sfs.guest", "gst")
+        .select([])
+        .addSelect("sfs.id", "id")
+        .addSelect("atd.firstName", "firstName")
+        .addSelect("atd.lastName", "lastName")
+        .addSelect("atd.email", "email")
+        .addSelect("atd.phone_number", "phone")
+        .addSelect("gst.status", "status")
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+
+      submissionsQuery.orderBy("sfs.id", "DESC").skip(skip).limit(take);
 
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
