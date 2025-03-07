@@ -45,6 +45,7 @@ import {
   sendSupportEmailRequestDto,
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
+  UpdateHostsStatusRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -80,6 +81,7 @@ import {
   ReportResponse,
   FeedbacksResponse,
   MemberSignUpResponse,
+  TokenResponseAndRoles,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -112,7 +114,7 @@ import {
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import { ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { NewUserStatus, ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -153,7 +155,7 @@ import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '..
 import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GenericResponse, NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 // import { CommunicationClient } from 'rumor-utils/clients/communication.client';
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { SocialProvider } from 'rumor-utils/shared/users/entities/social-provider.entity';
@@ -486,7 +488,7 @@ export class AuthService {
           key: 'first_name',
           value: payload?.firstName || '',
         },
-      ],
+      ],  
       'Host Application Submitted',
       [payload.email],
       null,
@@ -2937,7 +2939,7 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name = :roleName', { roleName: 'member' })
+      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
       .andWhere('user.deletedAt IS NULL')
       .groupBy('user.id')
       .addGroupBy('userRole.id')
@@ -3080,7 +3082,7 @@ export class AuthService {
 
   }
 
-  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse> {
+  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
@@ -3091,7 +3093,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new NotFoundError('User not found')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3114,92 +3116,94 @@ export class AuthService {
       throw new ForbiddenError('Password change is required')
     }
 
-    return responses.data({
+    return {
       token: loginResponse.response.token,
       roles: user.roles.map((item) => {
         return { roleName: item.role.name, roleId: item.role.id };
       }),
-    });
+    }
   }
 
-  public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpResponse> {
-    let nonMember: UserRole | null;
-    try {
-      const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
-      if (response.statusCode == 200 && response?.response?.user) {
-        throw new ConflictError('The user with provided email already exists.')
+  public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
+      let nonMember: UserRole | null;
+      try {
+        const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+        if (response.statusCode == 200 && response?.response?.user) {
+          throw new ConflictError('The user with provided email already exists.')
+        }
+      } catch (e) {
+        if (e.statusCode != 404) {
+          throw new ConflictError('Than error happens when trying register an user.')
+        }
       }
-    } catch (e) {
-      if (e.statusCode != 404) {
-        throw new ConflictError('Than error happens when trying register an user.')
-      }
-    }
 
-    let user = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: IsNull() },
-      relations: {
-        roles: { role: true },
-      },
-    });
-    if (user) {
-      nonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member') return item;
+      let user = await this.dbConnection.getRepository(User).findOne({
+        where: { email: payload.email, deletedAt: IsNull() },
+        relations: {
+          roles: { role: true },
+        },
       });
+      if (user) {
+        nonMember = user.roles.find((item) => {
+          if (item.role.name == 'non_member') return item;
+        });
 
-      if (!nonMember) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError('Phone number is already in use')
+        if (!nonMember) {
+          if (user.phoneNumber === payload.phoneNumber) {
+            throw new BadRequestError('Phone number is already in use')
+          }
+
+          if (user.email === payload.email) {
+            throw new BadRequestError('Email is already in use')
+          }
+        }
+      } else {
+        const newUser = new User();
+
+        if (nonMember) {
+          newUser.id = user.id;
+          await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
         }
 
-        if (user.email === payload.email) {
-          throw new BadRequestError('Email is already in use')
-        }
-      }
-    } else {
-      const newUser = new User();
-
-      if (nonMember) {
-        newUser.id = user.id;
-        await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
+        newUser.email = payload.email;
+        newUser.firstName = payload.firstName;
+        newUser.lastName = payload.lastName;
+        newUser.dateOfBirth = payload.dateOfBirth;
+        newUser.phoneNumber = payload.phoneNumber;
+        user = this.dbConnection.getRepository(User).create(newUser);
       }
 
-      newUser.email = payload.email;
-      newUser.firstName = payload.firstName;
-      newUser.lastName = payload.lastName;
-      newUser.dateOfBirth = payload.dateOfBirth;
-      newUser.phoneNumber = payload.phoneNumber;
-      user = this.dbConnection.getRepository(User).create(newUser);
-    }
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: payload.email.split('@')[0],
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: payload.email.split('@')[0],
+          // birthDate: payload.dateOfBirth,
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          mobilePhone: payload.phoneNumber,
+          password: payload.password,
+          verified: true,
+          active: true,
+        },
+      };
 
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: payload.email.split('@')[0],
-        birthDate: payload.dateOfBirth,
-        email: payload.email,
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        mobilePhone: payload.phoneNumber,
-        password: payload.password,
-        verified: true,
-        active: true,
-      },
-    };
+      const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+      if (newUser.statusCode !== 200) {
+        throw new ConflictError('There wass an issue creating an admin')
+      }
 
-    const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-    if (newUser.statusCode !== 200) {
-      throw new ConflictError('There wass an issue creating an admin')
-    }
-
-    user.id = newUser.response?.user?.id;
-    await this.dbConnection.getRepository(User).save(user);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
-    return responses.ok;
+      user.id = newUser.response?.user?.id;
+      await this.dbConnection.getRepository(User).save(user);
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
+      return {
+        user
+      }
   }
 
   public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
@@ -3292,6 +3296,7 @@ export class AuthService {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
+    console.log(user)
     if (!user) {
       throw new NotFoundError('Host')
     }
@@ -3350,108 +3355,126 @@ export class AuthService {
     return { error: false, response: '' };
   }
 
-  public static async updateHostStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id },
-      relations: {
-        roles: {
-          role: true,
-        },
+  public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
+    const users = await this.dbConnection.getRepository(User).find({
+      where: { id: In(payload.ids) }, 
+      relations: ['roles', 'roles.role'],
+    });
+
+
+    if (!users.length) {
+      throw new NotFoundError('Hosts not found')
+    }
+
+    const hostRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: {
+        id: In(users.flatMap((user) => user?.roles?.filter((role) => role.role.name === 'host' || role.role.name === 'co_host').map((role) => role.id))),
       },
     });
 
-    const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
+    if (!hostRoles.length) throw new NotFoundError('No valid hosts found');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: hostRole.id } });
+    const skippedUsers: string[] = [];
+    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
 
-    if (!hostRole) {
-      throw new NotFoundError('Host')
-    }
+    for (const user of users) {
+      const hostRole = hostRoles.find((role) => role.id === user.roles.find((r) => r.role.name === 'host' || r.role.name === 'co_host')?.id);
 
-    userRole.status = newUserStatusTosUserStatus[payload.status];
-    await this.dbConnection.getRepository(UserRole).save(userRole);
+      if (!hostRole) continue;
 
-    if (payload.status === NewUserStatus.APPROVE) {
-      const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
-      if (users.response.total === 0) {
-        await this.approveHost(user);
-        const token = await this.generateToken(user);
 
-        // Micro-service call
-        await serviceMesh.notificationService().sendEmailFromTemplate(
-          [
-            {
-              key: 'first_name',
-              value: user.firstName,
-            },
-            {
-              key: 'company_name',
-              value: user.additionalHostInformation?.companyName ?? user.firstName,
-            },
-            {
-              key: 'password_token',
-              value: config.get('RUMOR_WEBSITE') + `token/${token}`,
-            },
-          ],
-          'Host Application Approved',
-          [user.email],
-          null,
-        );
+      // If changing to WAITLIST, prevent already approved users from being waitlisted
+      if (
+        newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+        hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+      ) {
+        skippedUsers.push(user.email);
+        continue;
       }
-    } else if (payload.status === NewUserStatus.WAITLIST) {
-      // Micro-service call
-      await serviceMesh.notificationService().sendEmailFromTemplate([], 'Host Application Denied', [user.email], null);
-    } else if (payload.status === NewUserStatus.DEACTIVATE) {
-      const today = new Date();
-      const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-      const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-      // example December 31, 2024, at 11:59PM EST
-      const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-      // Micro-service call
-      await serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          { key: "first_name", value: user.firstName },
-          { key: "activate_before_datetime", value: reactivateBeforeTimestamp },
-        ],
-        "Account Deactivated",
-        [user.email],
-        null
-      );
-      // }
 
-      return responses.ok;
+      hostRole.status = newUserStatusTosUserStatus[payload.status];
+
+      if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.APPROVE]) {
+        const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
+        if (users.response.total === 0) {
+          await this.approveHost(user);
+          const token = await this.generateToken(user);
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Host Application Approved',
+            data: [
+              { key: 'first_name', value: user.firstName },
+              { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
+              { key: 'password_token', value: config.get('RUMOR_WEBSITE') + `token/${token}` },
+            ],
+          });
+        }
+      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST]) {
+        emailsToSend.push({ email: user.email, subject: 'Host Application Denied', data: [] });
+      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]) {
+        const today = new Date();
+        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+        emailsToSend.push({
+          email: user.email,
+          subject: 'Account Deactivated',
+          data: [
+            { key: 'first_name', value: user.firstName },
+            { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+          ],
+        });
+      }
     }
 
+    await this.dbConnection.getRepository(UserRole).save(hostRoles);
+
+    // Send all emails in parallel
+    await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
+
+    // if (skippedUsers.length > 0) {
+    //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
+    // }
+
+    return {
+      updatedUsers: users.map(user => ({
+        id: user.id,
+        status: hostRoles.find(role => role.id === user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id)?.status ?? null,
+      })),
+      skippedUsers,
+    }
   }
 
   public static async approveHost(user: User): Promise<void> {
-    const password = generateRandomPassword(12);
-    const temporaryPassword = new TemporaryPassword();
-    temporaryPassword.password = password;
-    user.temporaryPassword = temporaryPassword;
-    user = await this.dbConnection.getRepository(User).save(user);
+    try {
+      const password = generateRandomPassword(12);
+      const temporaryPassword = new TemporaryPassword();
+      temporaryPassword.password = password;
+      user.temporaryPassword = temporaryPassword;
+      user = await this.dbConnection.getRepository(User).save(user);
 
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: user.email.split('@')[0],
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobilePhone: user.phoneNumber,
-        password,
-        verified: true,
-        active: true,
-      },
-    };
-
-    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: user.email.split('@')[0],
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: user.email.split('@')[0],
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobilePhone: user.phoneNumber,
+          password,
+          verified: true,
+          active: true,
+        },
+      };
+      await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   public static async generateToken(user: User): Promise<string> {

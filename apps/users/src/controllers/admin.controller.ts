@@ -8,6 +8,7 @@ import {
   MemberProfileResponse,
   SignUpResponse,
   TokenResponse,
+  TokenResponseAndRoles,
 } from "rumor-utils/shared/users/grpc/auth/auth.pb";
 import {
   IdRequestDto,
@@ -18,17 +19,20 @@ import {
   LoginRequestDto,
   AdminSignUpRequestDto,
   UpdateUserStatusRequestDto,
+  UpdateHostsStatusRequestDto,
 } from "rumor-utils/shared/users/dtos/auth.dto";
 import { UpdateHostProfileRequestDto } from "rumor-utils/shared/users/dtos/admin.dto";
 import { GenericResponse } from "rumor-utils/shared/users/grpc/auth/shared.pb";
 import asyncWrapper from "../server/helpers/asyncWrapper";
+import { CreateResponse, GetResponse, UpdateResponse } from "rumor-utils/success";
 
 export class AdminController {
   public static getMembers = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: PaginatedRequestDto = req.body;
       const response: GetMembersResponse = await AuthService.getMembers(payload);
-      res.json(response);
+      const getResponse = new GetResponse(response.data);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
@@ -36,15 +40,17 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: PaginatedRequestDto = req.body;
       const response: GetHostsResponse = await AuthService.getHosts(payload);
-      res.json(response);
+      const getResponse = new GetResponse(response.data);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
   public static adminLogin = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: LoginRequestDto = req.body;
-      const response: TokenResponse = await AuthService.adminLogin(payload);
-      res.json(response);
+      const response: TokenResponseAndRoles = await AuthService.adminLogin(payload);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
@@ -53,7 +59,8 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: AdminSignUpRequestDto = req.body;
       const response: SignUpResponse = await AuthService.createAdmin(payload);
-      res.json(response);
+      const createResponse = new CreateResponse(response, 'Admin created succesfully');
+      res.status(createResponse.statusCode).json(createResponse);
     }
   );
 
@@ -62,6 +69,8 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: UserAndIdRequestDto = req.body;
       const response: HostProfileResponse = await AuthService.getHostProfile(payload);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
       res.json(response);
     }
   );
@@ -70,7 +79,10 @@ export class AdminController {
   public static getBasicHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: IdRequestDto = req.body;
+      console.log(payload)
       const response: BasicHostProfileResponse = await AuthService.getBasicHostProfile(payload);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
       res.json(response);
     }
   );
@@ -87,10 +99,18 @@ export class AdminController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostStatus')
   public static updateHostStatus = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateUserStatusRequestDto = req.body;
+      const payload: UpdateHostsStatusRequestDto = req.body;
       const response: GenericResponse = await AuthService.updateHostStatus(payload);
-      res.json(response);
+      const UpdatedResponse = new UpdateResponse(response, 'Status updated succesfully');
+      res.status(UpdatedResponse.statusCode).json(UpdatedResponse)
     }
+  );
+
+  public static approveHost = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateHostsStatusRequestDto = req.body;
+      const response: any = await AuthService.updateHostStatus(payload);
+      res.json(response)}
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateMemberStatus')
