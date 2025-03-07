@@ -1069,7 +1069,7 @@ export interface ReportRequest {
   reportedToRoleId: string;
 }
 
-export interface Report {
+export interface ReportData {
   reportId: string;
   blockId?: string | undefined;
   reportMessage: string;
@@ -1078,7 +1078,7 @@ export interface Report {
 export interface ReportResponse {
   status: number;
   error?: Error | undefined;
-  data?: Report | undefined;
+  data?: ReportData | undefined;
 }
 
 /** Block Host Request */

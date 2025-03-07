@@ -81,7 +81,28 @@ import {
   ReportResponse,
   FeedbacksResponse,
   MemberSignUpResponse,
+  ConfirmedMember,
   TokenResponseAndRoles,
+  Validity,
+  UsersData,
+  MemberProfile,
+  ReportData,
+  Feedback,
+  CustomUsersList,
+  CustomUsersListsData,
+  HostsProfile,
+  Member,
+  CurrentMember,
+  SimpleUser,
+  Data,
+  CurrentUser,
+  UserProfilePicture,
+  UserProfile,
+  Filter,
+  HostFeedbackData,
+  VerificationStatus,
+  UserDataSimple,
+  UserWithRoles,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -114,7 +135,8 @@ import {
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import { NewUserStatus, ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { NewUserStatus  } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { ProviderAuth, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -194,7 +216,7 @@ export class AuthService {
 
   public static dbConnection = database;
 
-  public static async login(payload: LoginRequestDto): Promise<LoginResponse> {
+  public static async login(payload: LoginRequestDto): Promise<Data> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: { email: payload.email, deletedAt: IsNull() },
@@ -226,7 +248,7 @@ export class AuthService {
         throw new ForbiddenError("User is not verified.");
       }
 
-      return responses.data({
+      return {
         token: loginUser.response.token,
         user: {
           username: loginUser?.response?.user?.username || '',
@@ -237,10 +259,9 @@ export class AuthService {
           birthDate: loginUser?.response?.user?.birthDate || '',
           mobilePhone: loginUser?.response?.user?.mobilePhone || '',
           verified: !!loginUser?.response?.user?.verified,
-          status: entityToUserStatus[UserStatus.UNRECOGNIZED],
           roles: [],
         },
-      });
+      };
     } catch (err) {
       if (err?.statusCode == 423) {
         throw new ForbiddenError("User is locked.");
@@ -444,7 +465,7 @@ export class AuthService {
 
   }
 
-  public static async hostSignUp(payload: HostSignUpRequestDto): Promise<SignUpResponse> {
+  public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
     let nonMember: UserRole | null;
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
@@ -505,31 +526,27 @@ export class AuthService {
       null,
     );
 
-    return responses.data('');
-
+    return '';
   }
 
-  public static async logout(payload: TokenRequestDto): Promise<SignUpResponse> {
+  public static async logout(payload: TokenRequestDto): Promise<string> {
     const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError("Invalid session token.");
     }
-    return responses.ok;
+    return '';
 
   }
 
-  public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<ValidityResponse> {
-    try {
+  public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<Validity> {
       const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
-      if (!temporaryPasswordToken) return responses.data({ isValid: false });
+      if (!temporaryPasswordToken) return { isValid: false }
       const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
       const currentTime = dayjs.utc(new Date()).tz('America/New_York');
       const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
-      return responses.data({ isValid });
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again later.');
-    }
+      return  { isValid }
+   
   }
 
   public static async checkService() {
@@ -540,7 +557,7 @@ export class AuthService {
   }
 
 
-  public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
+  public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<string> {
     if (payload.password !== payload.repeatedPassword) {
       throw new BadRequestError("Passwords do not match.");
     }
@@ -593,10 +610,10 @@ export class AuthService {
     // Delete entities successfully
     await this.dbConnection.getRepository(TemporaryPassword).delete(temporaryPassword.id);
     await this.dbConnection.getRepository(TemporaryPasswordToken).delete(temporaryPasswordToken.id);
-    return responses.ok;
+    return '';
   }
 
-  public static async updateHostPassword(payload: UpdateHostPasswordRequestDto): Promise<GenericResponse> {
+  public static async updateHostPassword(payload: UpdateHostPasswordRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: {
         id: payload.id,
@@ -620,10 +637,10 @@ export class AuthService {
     };
 
     await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
-    return responses.ok;
+    return '';
   }
 
-  public static async forgot(payload: ForgotPasswordRequestDto): Promise<ForgotPasswordResponse> {
+  public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: null },
       relations: {
@@ -666,13 +683,13 @@ export class AuthService {
       null,
     );
     if (!mailServiceResponse) {
-      return responses.badRequest('Unable to send mail, please try again later.');
+      throw new BadRequestError('Unable to send mail, please try again later.')
     }
-    return responses.ok;
+    return '';
 
   }
 
-  public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponse> {
+  public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponseAndRoles> {
     const { password, token, repeatedPassword } = payload;
     if (password !== repeatedPassword) {
       throw new BadRequestError("Passwords do not match.");
@@ -708,36 +725,36 @@ export class AuthService {
     return responses.data(accesToken.response.access_token);
   }
 
-  public static async checkPhoneNumber(payload: PhoneNumberRequestDto): Promise<ValidityResponse> {
+  public static async checkPhoneNumber(payload: PhoneNumberRequestDto): Promise<Validity> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: {
         phoneNumber: payload.phoneNumber,
         deletedAt: IsNull(),
       },
     });
-    if (user) return responses.data({ isValid: false });
+    if (user) return { isValid: false };
 
     //Micro-service call
     await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
-    return responses.data({ isValid: true });
+    return { isValid: true };
   }
 
-  public static async checkEmail(payload: CheckEmailRequestDto): Promise<ValidityResponse> {
+  public static async checkEmail(payload: CheckEmailRequestDto): Promise<Validity> {
     const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } });
     if (user) {
       throw new ConflictError("This email is already taken");
     }
-    return responses.data({ isValid: true });
+    return { isValid: true };
   }
 
-  public static async checkAge(payload: CheckAgeRequestDto): Promise<ValidityResponse> {
+  public static async checkAge(payload: CheckAgeRequestDto): Promise<Validity> {
     if (dayjs(new Date()).diff(payload.dateOfBirth, 'year') < 18) {
       throw new BadRequestError("Error. Age requirement not met.");
     }
-    return responses.data({ isValid: true });
+    return { isValid: true };
   }
 
-  public static async sendInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
+  public static async sendInvitations(payload: UserInvitationsRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
       throw new NotFoundError("user");
@@ -762,13 +779,15 @@ export class AuthService {
 
     // Micro-service call
     const success = await serviceMesh.notificationService().sendInvitationMessages(successfulInvitations, user.firstName);      
-    if (!success) return responses.badRequest('An error occured while sending invitations, please try again.');
+    if (!success) {
+      throw new BadRequestError('An error occured while sending invitations, please try again.')
+    }
 
-    return responses.ok;
+    return '';
 
   }
 
-  public static async saveInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
+  public static async saveInvitations(payload: UserInvitationsRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
       throw new NotFoundError('user')
@@ -789,10 +808,10 @@ export class AuthService {
         }
       }),
     );
-    return responses.ok;
+    return '';
   }
 
-  public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<GenericResponse> {
+  public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<string> {
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
       throw new NotFoundError('User')
@@ -828,7 +847,7 @@ export class AuthService {
       //Micro-service call
       const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
       if (!success) {
-        return responses.badRequest('An error occured while sending SMS invitation, please try again.');
+        throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
       }
     }
 
@@ -850,16 +869,18 @@ export class AuthService {
       //Micro-service call
       const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
       if (!success) {
-        return responses.badRequest('An error occured while sending Email invitation, please try again.');
+        throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
       }
     }
 
-    return responses.ok;
+    return '';
   }
 
-  public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<GenericResponse> {
+  public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<string> {
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-    if (!invitee) return responses.notFound('User not found!');
+    if (!invitee) {
+      throw new NotFoundError('User')
+    }
 
     const whereCondition: FindOptionsWhere<User>[] = [{ email: payload.email }];
     if (payload.phoneNumber) {
@@ -897,10 +918,10 @@ export class AuthService {
     // Micro-service call
     const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
     if (!success) {
-      return responses.badRequest('An error occured while sending Email invitation, please try again.');
+      throw new BadRequestError('An error occured while sending Email invitation, please try again.')
     }
 
-    return responses.ok;
+    return '';
 
   }
 
@@ -962,7 +983,7 @@ export class AuthService {
     return responses.data(resp);
   }
 
-  public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<ValidityResponse> {
+  public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -989,7 +1010,7 @@ export class AuthService {
       } else {
         await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
       }
-      return responses.data({ isValid: false });
+      return { isValid: false };
     }
 
     const request: PasswordlessStartRequest = {
@@ -1022,7 +1043,7 @@ export class AuthService {
         } else {
           serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
         }
-        return responses.data({ isValid: true, isGuest: true });
+        return { isValid: true, isGuest: true };
       }
     }
 
@@ -1057,7 +1078,7 @@ export class AuthService {
       }
     }
 
-    return responses.data({ isValid: true });
+    return { isValid: true };
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
@@ -1205,7 +1226,7 @@ export class AuthService {
     }
   }
 
-  public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponse> {
+  public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: {
         email: payload.email,
@@ -1230,7 +1251,7 @@ export class AuthService {
     };
       const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
       const additionalHostInformation = user.additionalHostInformation;
-      return responses.data({
+      const data = {
         token: authenticatedUser.response.token,
         roles: user.roles.map((item) => {
           return { roleName: item.role.name, roleId: item.role.id };
@@ -1240,10 +1261,11 @@ export class AuthService {
           companyName: additionalHostInformation?.companyName || '',
           id: user.id,
         },
-      });
+      }
+      return  data;
   }
 
-  public static async getCurrentMember(payload: IdRequestDto): Promise<MemberResponse> {
+  public static async getCurrentMember(payload: IdRequestDto): Promise<CurrentMember> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: { address: true, socialProviders: true, roles: { role: true } },
@@ -1272,10 +1294,10 @@ export class AuthService {
       relations: ['user'],
     });
 
-    return responses.data(toCurrentMember(user, focuses, memberRole, socialProvider?.username));
+    return (toCurrentMember(user, focuses, memberRole, socialProvider?.username));
   }
 
-  public static async getUser(payload: IdRequestDto): Promise<SimpleUserResponse> {
+  public static async getUser(payload: IdRequestDto): Promise<SimpleUser> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: { address: true, socialProviders: true, roles: { role: true } },
@@ -1291,10 +1313,10 @@ export class AuthService {
       throw new NotFoundError('user');
     }
 
-    return responses.data(toSimpleUser(user, memberRole));
+    return (toSimpleUser(user, memberRole));
   }
 
-  public static async getCurrentUser(payload: IdRequestDto): Promise<CurrentUserResponse> {
+  public static async getCurrentUser(payload: IdRequestDto): Promise<CurrentUser[]> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: { address: true, socialProviders: true, roles: { role: true } },
@@ -1308,10 +1330,10 @@ export class AuthService {
 
     //Micro-service call
     const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
-    return responses.data(user.roles.map((role) => toCurrentUser(user, focuses, role)));
+    return (user.roles.map((role) => toCurrentUser(user, focuses, role)));
   }
 
-  public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UpdateUserProfileResponse> {
+  public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UserProfile> {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     const actualUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
@@ -1461,30 +1483,29 @@ export class AuthService {
       userSource = hostRole.source ? entityToUserSource[hostRole.source] : null;
     }
 
-    return responses.data({
+    return {
       firstName: responseUser.firstName || null,
       email: responseUser.email || null,
       lastName: responseUser.lastName || null,
-      dateOfBirth: responseUser.dateOfBirth,
-      phoneNumber: responseUser.phoneNumber || null,
+      birthDate: responseUser.dateOfBirth,
+      mobilePhone: responseUser.phoneNumber || null,
       gender: entityToGender[responseUser.gender || 'NOT_APPLICABLE'],
       status: userStatus,
       source: userSource,
       address: responseUser.address
         ? {
-          id: responseUser.address.id,
           address: responseUser.address?.address,
-          googlePlaceId: responseUser.address.googlePlaceId,
+          placeId: responseUser.address.googlePlaceId,
           latitude: String(responseUser.address.latitude),
           longitude: String(responseUser.address.longitude),
           city: responseUser.address.city,
         }
         : null,
-    });
+    };
 
   }
 
-  public static async updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UpdateUserProfilePictureResponse> {
+  public static async updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UserProfilePicture> {
     let actualUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
       relations: ['address'],
@@ -1502,19 +1523,19 @@ export class AuthService {
       where: { id: payload.id, deletedAt: null },
       relations: ['address'],
     });
-    return responses.data({ profilePicture: actualUser.profilePicture });
+    return { profilePicture: actualUser.profilePicture };
   }
 
-  public static async getBioProfile(payload: IdRequestDto): Promise<BioProfileResponse> {
+  public static async getBioProfile(payload: IdRequestDto): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
     if (!user) {
       throw new NotFoundError('user')
     }
     const additionalInfo = user.additionalHostInformation;
-    return responses.data(additionalInfo);
+    return additionalInfo;
   }
 
-  public static async createBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
+  public static async createBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
       throw new NotFoundError('user')
@@ -1539,10 +1560,10 @@ export class AuthService {
       user.additionalHostInformation = additionalInfo;
     }
     await user.save();
-    return responses.data(additionalInfo);
+    return additionalInfo;
   }
 
-  public static async updateBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
+  public static async updateBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
       throw new NotFoundError('user')
@@ -1567,7 +1588,7 @@ export class AuthService {
       user.additionalHostInformation = additionalInfo;
     }
     await user.save();
-    return responses.data(additionalInfo);
+    return additionalInfo;
   }
 
   public static async approveMember(payload: IdRequestDto): Promise<GenericResponse> {
@@ -1612,10 +1633,10 @@ export class AuthService {
     );
 
 
-    return responses.ok;
+    return;
   }
 
-  public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<ListUsersByTypeResponse> {
+  public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
     const users = await this.dbConnection.getRepository(User).find({
       where: {
         deletedAt: null,
@@ -1629,21 +1650,23 @@ export class AuthService {
     const userList = users.map((user) => {
       return toUserDataSimple(user);
     });
-    return responses.data(userList);
+    return userList;
   }
 
-  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<GenericResponse> {
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<string> {
     const payloadStatus = userStatusToEntity[payload.status];
     const users = await this.dbConnection.getRepository(User).find({
       where: { id: In(payload.ids), deletedAt: null },
       relations: { roles: { role: true } },
     });
 
-    if (users.length === 0) return responses.notFound('Users not found!');
+    if (users.length === 0) {
+      throw new NotFoundError('User')
+    }
 
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
     if (!memberRole) {
-      return responses.badRequest('Error updating user status.');
+      throw new BadRequestError('Error updating user status.')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -1652,7 +1675,7 @@ export class AuthService {
     });
 
     if (userRoles.length === 0) {
-      return responses.badRequest('Error updating user status.');
+      throw new BadRequestError('Error updating user status.')
     }
 
     const failedUsers: string[] = [];
@@ -1700,11 +1723,11 @@ export class AuthService {
       }
     }
 
-    return responses.ok;
+    return '';
 
   }
 
-  public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<CreateNonMemberUserResponse> {
+  public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<UserIdData> {
     const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
     if (exists) {
       throw new BadRequestError('user exists')
@@ -1716,11 +1739,11 @@ export class AuthService {
     user.phoneNumber = payload.phoneNumber || '';
     user = await this.dbConnection.getRepository(User).save(user);
     await RoleService.assignRoleToUser({ userId: user.id, roleName: 'non_member' });
-    return responses.data({ userId: user.id });
+    return { userId: user.id };
   }
 
 
-  public static async createHostCollaborator(payload: CreateHostCollaboratorRequestDto): Promise<CreateHostCollaboratorResponse> {
+  public static async createHostCollaborator(payload: CreateHostCollaboratorRequestDto): Promise<UserIdData> {
     const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }] });
     if (exists) {
       throw new BadRequestError('user exists')
@@ -1738,10 +1761,10 @@ export class AuthService {
     if (!hasRole) {
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
     }
-    return responses.data({ userId: user.id });
+    return { userId: user.id };
   }
 
-  public static async getMembersOrNonMembers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
+  public static async getMembersOrNonMembers(payload: ListUsersInviteesDto): Promise<Member[]> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const hostId = payload.userId;
     const pagination = hasPagination(parsedQuery)
@@ -1824,10 +1847,10 @@ export class AuthService {
         return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
       }),
     );
-    return responses.data(members);
+    return members;
   }
 
-  public static async manageFollowHost(payload: ManageFollowHostRequestDto): Promise<GenericResponse> {
+  public static async manageFollowHost(payload: ManageFollowHostRequestDto): Promise<string> {
     const { userId, hostId, follow } = payload;
     const [follower, host] = await this.findUsers(userId, hostId);
     if (!follower) {
@@ -1864,7 +1887,7 @@ export class AuthService {
       }
       await this.dbConnection.getRepository(HostFollowing).delete({ follower, host });
     }
-    return responses.ok;
+    return '';
   }
 
   public static async findUsers(userId: string, hostId: string): Promise<[User, User]> {
@@ -1890,7 +1913,7 @@ export class AuthService {
     await this.dbConnection.getRepository(HostFavorite).save(favoriteHost);
   }
 
-  public static async getFollowedHosts(payload: PaginatedRequestDto): Promise<GetFollowedHostsResponse> {
+  public static async getFollowedHosts(payload: PaginatedRequestDto): Promise<HostsProfile> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -1925,14 +1948,14 @@ export class AuthService {
     });
 
     if (name) {
-      return responses.data({
+      return {
         hosts: transformedHosts.filter((host) => host.companyName.toLowerCase().includes(name)).slice(skip, skip + take),
-      });
+      };
     }
-    return responses.data({ hosts: transformedHosts });
+    return { hosts: transformedHosts };
   }
 
-  public static async getCustomUsersLists(payload: CustomUsersListRequestDto): Promise<CustomUsersListsResponse> {
+  public static async getCustomUsersLists(payload: CustomUsersListRequestDto): Promise<CustomUsersListsData> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
@@ -1950,7 +1973,7 @@ export class AuthService {
     });
 
     if (!user) {
-      return responses.data({ count: 0, list: [] });
+      return { count: 0, list: [] };
     }
 
     const allLists = [
@@ -1964,13 +1987,13 @@ export class AuthService {
       })),
     ];
 
-    return responses.data({
+    return {
       count: allLists.length,
       list: allLists.slice(skip, take ? skip + take : undefined),
-    });
+    };
   }
 
-  public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
+  public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersList> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const customListId = payload.id;
     const hostId = payload.userId;
@@ -2086,15 +2109,17 @@ export class AuthService {
       }),
     );
 
-    return responses.data({
+    const data = {
       name: customList.listName,
       id: customList.id,
       count: totalCount,
       users: users,
-    });
+    }
+
+    return data;
   }
 
-  public static async deleteCustomUsersList(payload: UserAndIdRequestDto): Promise<GenericResponse> {
+  public static async deleteCustomUsersList(payload: UserAndIdRequestDto): Promise<string> {
     const { userId, id } = payload;
 
     const user = await this.dbConnection.getRepository(User).findOne({
@@ -2115,10 +2140,10 @@ export class AuthService {
     }
     await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({ list: { id: customList.id } });
     await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
-    return responses.ok;
+    return '';
   }
 
-  public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
+  public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersList> {
     const { userId, customName, userIds } = payload;
     if (!customName) {
       throw new BadRequestError("Custom list name is required.");
@@ -2159,11 +2184,11 @@ export class AuthService {
       id: savedCustomList.id,
       query: 'take=10&skip=0',
     });
-    return responses.data(customListSaved.data);
+    return customListSaved;
 
   }
 
-  public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
+  public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersList> {
     const { hostId, name, userIds, customListId, mappingIds } = payload;
     if (!name) {
       throw new BadRequestError("Custom list name is required.");
@@ -2230,10 +2255,10 @@ export class AuthService {
       id: customList.id,
       query: 'take=10&skip=0',
     });
-    return responses.data(customListSaved.data);
+    return customListSaved;
   }
 
-  public static async manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<GenericResponse> {
+  public static async manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<string> {
     const { userId, targetUserId, favorite } = payload;
 
     const [targetUser, host] = await this.findUsers(targetUserId, userId);
@@ -2270,11 +2295,11 @@ export class AuthService {
       }
       await this.dbConnection.getRepository(HostFavorite).delete({ member: targetUser, host });
     }
-    return responses.ok;
+    return '';
 
   }
 
-  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<UsersData> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -2339,10 +2364,10 @@ export class AuthService {
         });
       }),
     );
-    return responses.data({ users, totalCount });
+    return { users, totalCount };
   }
 
-  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
+  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
     const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
     const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
 
@@ -2368,10 +2393,10 @@ export class AuthService {
       throw new NotFoundError('members')
     }
     const members = users.map(toConfirmedMember);
-    return responses.data(members);
+    return members;
   }
 
-  public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<GetUserWithRolesByEmailResponse> {
+  public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<UserWithRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: null },
       relations: {
@@ -2385,7 +2410,7 @@ export class AuthService {
       throw new NotFoundError('User')
     }
 
-    return responses.data({
+    const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
       id: user.id,
@@ -2397,11 +2422,13 @@ export class AuthService {
           id: item.role.id,
         };
       }),
-    });
+    }
+
+    return data;
   }
 
 
-  public static async getUserWithRolesById(payload: IdRequestDto): Promise<GetUserWithRolesByEmailResponse> {
+  public static async getUserWithRolesById(payload: IdRequestDto): Promise<UserWithRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
       relations: {
@@ -2415,7 +2442,7 @@ export class AuthService {
       throw new NotFoundError('User')
     }
 
-    return responses.data({
+    const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
       id: user.id,
@@ -2431,10 +2458,12 @@ export class AuthService {
           id: item.role.id,
         };
       }),
-    });
+    }
+
+    return data;
   }
 
-  public static async getUserWithRolesByPhone(payload: GetUserWithRolesByPhoneRequestDto): Promise<GetUserWithRolesByEmailResponse> {
+  public static async getUserWithRolesByPhone(payload: GetUserWithRolesByPhoneRequestDto): Promise<UserWithRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { phoneNumber: payload.phoneNumber, deletedAt: null },
       relations: {
@@ -2448,7 +2477,7 @@ export class AuthService {
       throw new NotFoundError('User')
     }
 
-    return responses.data({
+    const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
       id: user.id,
@@ -2460,7 +2489,9 @@ export class AuthService {
           id: item.role.id,
         };
       }),
-    });
+    }
+
+    return data;
   }
 
   /**
@@ -2472,7 +2503,7 @@ export class AuthService {
    * @param payload
    * @returns SimpleUserResponse
    */
-  public static async registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUserResponse> {
+  public static async registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUser> {
     let user: User | null = null;
     const userFindOptionWhere: FindOptionsWhere<User>[] = [];
     if (payload.email) {
@@ -2493,7 +2524,7 @@ export class AuthService {
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
     }
 
-    return responses.data(toSimpleUser(user));
+    return toSimpleUser(user);
   }
 
   public static async createUser(payload: NonMemberSignUpRequestDto): Promise<UserResponseData> {
@@ -2562,7 +2593,7 @@ export class AuthService {
     };
   }
 
-  public static async sendVerificationCodeByEmail(payload: SendVerificationCodeByEmailRequestDto): Promise<GenericResponse> {
+  public static async sendVerificationCodeByEmail(payload: SendVerificationCodeByEmailRequestDto): Promise<string> {
     // Remove all previous login attempts (both email and phone)
     const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { email: payload.email } });
     // const existingLoginAttempts = await this.temporaryLoginCodeRepository.find({ where: { phoneNumber: payload.phoneNumber } });
@@ -2626,10 +2657,10 @@ export class AuthService {
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.code = verificationCode;
     await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
-    return responses.ok;
+    return '';
   }
 
-  public static async verifyCodeByEmail(payload: VerifyCodeByEmailRequestDto): Promise<VerifyResponse> {
+  public static async verifyCodeByEmail(payload: VerifyCodeByEmailRequestDto): Promise<VerificationStatus> {
     // Retrieve the stored code from the database for the given email
     const storedCodeRecord = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
       where: { email: payload.email },
@@ -2645,10 +2676,10 @@ export class AuthService {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
     }
 
-    return responses.verification(isValid);
+    return { verified: isValid };
   }
 
-  public static async setLoginStatus(payload: IdRequestDto): Promise<GenericResponse> {
+  public static async setLoginStatus(payload: IdRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
     });
@@ -2665,10 +2696,10 @@ export class AuthService {
     await this.dbConnection.getRepository(User).save(user);
 
     await user.save();
-    return responses.ok;
+    return '';
   }
 
-  public static async getAllusers(payload: ListUsersInviteesDto): Promise<GetUsersResponse> {
+  public static async getAllusers(payload: ListUsersInviteesDto): Promise<UsersData> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -2903,7 +2934,7 @@ export class AuthService {
         return userData;
       }),
     );
-    return responses.data({ users, totalCount });
+    return { users, totalCount };
   }
 
   // ADMIN Sevice Code
@@ -3633,7 +3664,7 @@ export class AuthService {
     return queryBuilder;
   }
 
-  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<UserFilterOptionsResponse> {
+  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<Filter[]> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query) as ParsedQs;
     const eventId = parsedQuery?.eventId as string;
@@ -3756,8 +3787,9 @@ export class AuthService {
       options: mappedEvents,
       type: FilterTypeValues.pastEvents,
     };
-
-    const ticketTypes = [];
+    
+    const ticketTypes = []
+    // const ticketTypes = await serviceMesh.eventService().getTicketTypes({ id: eventId });
     const mappedticketTypes = ticketTypes?.map((ticketType) => ({
       name: ticketType.name,
       id: ticketType.id,
@@ -3862,7 +3894,7 @@ export class AuthService {
     // Arrange objects in the desired sequence
     const orderedObjects = filterOptionsSequence.map((id) => objectsMap[id]).filter((node) => node);
     //ends here
-    return responses.data(orderedObjects);
+    return orderedObjects;
   }
 
   /**
@@ -3872,7 +3904,7 @@ export class AuthService {
    * @param payload
    * @returns FeedbackResponse
    */
-  public static async hostFeedback(payload: HostFeedbackRequestDto): Promise<HostFeedbackResponse> {
+  public static async hostFeedback(payload: HostFeedbackRequestDto): Promise<HostFeedbackData> {
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.userId, deletedAt: IsNull() },
     });
@@ -3891,14 +3923,14 @@ export class AuthService {
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
 
-    return responses.data({
+    return {
       description: savedFeedback.description,
       tag: savedFeedback.tag,
       feedbackId: savedFeedback.id,
-    });
+    };
   }
 
-  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersListResponse> {
+  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersList> {
     const { customListId, customName, hostId, listType } = payload;
 
 
@@ -3938,7 +3970,7 @@ export class AuthService {
             });
             break;
           default:
-            return responses.badRequest('Invalid list type provided.');
+            throw new BadRequestError('Invalid list type provided.')
         }
 
         if (!existingList || existingList.length === 0) {
@@ -3977,22 +4009,22 @@ export class AuthService {
       id: savedCustomList.id,
       query: 'take=10&skip=0',
     });
-    return responses.data(customListSaved.data);
+    return customListSaved;
   }
 
-  public static async deleteHostUserMapping(payload: IdRequestDto): Promise<GenericResponse> {
+  public static async deleteHostUserMapping(payload: IdRequestDto): Promise<string> {
     const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
       where: { id: payload.id },
     });
 
     if (!hostUserMapping) {
-      throw new NotFoundError('Host is not associated with user!')
+      throw new NotFoundError('User')
     }
     await this.dbConnection.getRepository(HostUserMapping).remove(hostUserMapping);
-    return responses.ok;
+    return '';
   }
 
-  public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfileResponse> {
+  public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfile> {
 
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.userId },
@@ -4039,7 +4071,7 @@ export class AuthService {
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
 
-    return responses.data(userData);
+    return userData;
 
   }
 
@@ -4064,7 +4096,7 @@ export class AuthService {
     }));
   }
 
-  public static async getFollowedUsers(payload: PaginatedRequestDto): Promise<GetUsersResponse> {
+  public static async getFollowedUsers(payload: PaginatedRequestDto): Promise<UsersData> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -4131,11 +4163,11 @@ export class AuthService {
         });
       }),
     );
-    return responses.data({ users, totalCount });
+    return { users, totalCount };
 
   }
 
-  public static async manageUserSpam(payload: ManageUserRequestDto): Promise<GenericResponse> {
+  public static async manageUserSpam(payload: ManageUserRequestDto): Promise<string> {
 
     const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
     const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
@@ -4159,7 +4191,7 @@ export class AuthService {
       hostUserSettings.isSpam = payload.isSpam;
     }
     await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
-    return responses.ok;
+    return '';
   }
 
   /**
@@ -4167,7 +4199,7 @@ export class AuthService {
    * @param payload - The DTO containing report details.
    * @returns A response containing the report details or an error message.
    */
-  public static async reportUser(payload: ReportUserRequestDto): Promise<ReportResponse> {
+  public static async reportUser(payload: ReportUserRequestDto): Promise<ReportData> {
     const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
     const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
 
@@ -4195,15 +4227,17 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Report).save(report);
 
-    return responses.data({
+    const data = {
       reportId: report.id,
       reportMessage: report.reportMessage,
       reportedByRoleId: reportedByRole.id,
       reportedToRoleId: reportedToRole.id,
-    });
+    };
+
+    return data;
   }
 
-  public static async blockHost(payload: BlockHostRequestDto): Promise<ReportResponse> {
+  public static async blockHost(payload: BlockHostRequestDto): Promise<ReportData> {
     const blockedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedById } });
     const blockedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedToId } });
 
@@ -4229,15 +4263,17 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(Block).save(block);
-
-    return responses.data({
+    
+    const data = {
       reportId: '',
       blockId: block.id,
       reportMessage: 'Blocked succesfully',
-    });
+    }
+
+    return data;
   }
 
-  public static async unblockHost(payload: BlockHostRequestDto): Promise<GenericResponse> {
+  public static async unblockHost(payload: BlockHostRequestDto): Promise<string> {
     const block = await this.dbConnection.getRepository(Block).findOne({
       where: {
         blockedBy: { id: payload.blockedById },
@@ -4251,10 +4287,10 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Block).remove(block);
 
-    return responses.ok;
+    return '';
   }
 
-  public static async reportAndBlockHost(payload: ReportUserRequestDto): Promise<ReportResponse> {
+  public static async reportAndBlockHost(payload: ReportUserRequestDto): Promise<ReportData> {
     const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
     const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
 
@@ -4310,14 +4346,16 @@ export class AuthService {
       blockId = existingBlock.id;
     }
 
-    return responses.data({
+    const data = {
       reportId,
       blockId,
       reportMessage,
-    });
+    }
+
+    return data;
   }
 
-  public static async sendSupportEmail(payload: sendSupportEmailRequestDto): Promise<GenericResponse> {
+  public static async sendSupportEmail(payload: sendSupportEmailRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
     // TO DO: Change email and sms template
     await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -4332,11 +4370,11 @@ export class AuthService {
       null,
     );
 
-    return responses.ok;
+    return '';
 
   }
 
-  public static async getAllFeedbacks(payload: ReportAndFeedbackRequestDto): Promise<FeedbacksResponse> {
+  public static async getAllFeedbacks(payload: ReportAndFeedbackRequestDto): Promise<Feedback[]> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -4373,32 +4411,31 @@ export class AuthService {
       })),
     });
 
-    return {
-      status: response.status,
-      error: response.error,
-      feedbacks: response.data.feedbacks,
-    };
+    return response.data.feedbacks;
   }
 
-  public static async switchProfile(payload: SwitchProfileDto): Promise<TokenResponse> {
+  public static async switchProfile(payload: SwitchProfileDto): Promise<TokenResponseAndRoles> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.userId, deletedAt: IsNull() },
       relations: { roles: { role: true } },
     });
 
-    if (!user) return responses.notFound('User not found.');
+    if (!user) {
+      throw new NotFoundError('User')
+    };
 
     const targetProfile = user.roles.find((item) => item.role.name === payload.targetRole);
-    if (!targetProfile) return responses.forbidden('User does not have the requested role.');
-
+    if (!targetProfile) {
+      throw new ForbiddenError("User does not have the requested role.");
+    }
     if (payload.targetRole === 'host' || payload.targetRole === 'member') {
       if (targetProfile.status !== UserStatus.ACTIVE) {
         throw new ForbiddenError('User is not active.')
       }
     }
 
-    if (payload.targetRole === 'non_member') {
-      return responses.data({
+    if (payload.targetRole === "non_member") {
+      return {
         roles: [
           {
             roleName: targetProfile.role.name,
@@ -4406,8 +4443,8 @@ export class AuthService {
           },
         ],
         id: user.id,
-        token: '',
-      });
+        token: "",
+      };
     }
 
     const request: PasswordlessStartRequest = {
@@ -4418,7 +4455,7 @@ export class AuthService {
     const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
     const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
 
-    return responses.data({
+    return {
       token: authenticatedUser.response.token,
       roles: [
         {
@@ -4427,6 +4464,6 @@ export class AuthService {
         },
       ],
       id: user.id,
-    });
+    };
   }
 }

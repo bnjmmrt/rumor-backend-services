@@ -34,7 +34,6 @@ export class CommunicationController {
       const payload: SendVerificationCodeRequestDto = req.body;
       await TwilioService.sendVerificationCode(payload);
       const successResponse = new CreateResponse({}, "Code Sent Successfully")
-      console.log('hereeeee')
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
