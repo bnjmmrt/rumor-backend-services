@@ -1,12 +1,13 @@
 import * as _ from 'lodash';
-import dayjs from 'dayjs';
+// import dayjs from 'dayjs';
+import * as dayjs from 'dayjs'
 import { User } from "../entities/user.entity"
 import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
-import { entityToUserStatus } from './shared.mapper';
+import { entityToUserSource, entityToUserStatus, userSourceToEntity, userStatusToEntity } from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
 
 export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
@@ -56,9 +57,9 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     phoneNumber: user.phoneNumber,
     eventsPerYear: user?.additionalHostInformation?.eventsPerYear || 0,
     referredBy: user?.additionalHostInformation?.referredBy || '',
-    source,
-    status,
-    hostSince: dayjs(user.createdAt).format('MM/DD/YYYY'),
+    source: entityToUserSource[status],
+    status: entityToUserStatus[status],
+    hostSince: dayjs(user.createdAt).format('MM/DD/YYYY HH:mm') || '',
     bio: user?.additionalHostInformation?.bio || '',
     totalAttendees: 0,
     totalInfluencerSpend: 0,

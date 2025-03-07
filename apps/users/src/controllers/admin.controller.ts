@@ -69,7 +69,7 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: UserAndIdRequestDto = req.body;
       const response: HostProfileResponse = await AuthService.getHostProfile(payload);
-      const getResponse = new GetResponse(response);
+      const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
       res.json(response);
     }
@@ -81,7 +81,7 @@ export class AdminController {
       const payload: IdRequestDto = req.body;
       console.log(payload)
       const response: BasicHostProfileResponse = await AuthService.getBasicHostProfile(payload);
-      const getResponse = new GetResponse(response);
+      const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
       res.json(response);
     }
@@ -92,7 +92,8 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: UpdateHostProfileRequestDto = req.body;
       const response: BasicHostProfileResponse = await AuthService.updateHostProfile(payload);
-      res.json(response);
+      const UpdatedResponse = new UpdateResponse(response.data, 'Updated host details succesfully');
+      res.status(UpdatedResponse.statusCode).json(UpdatedResponse)
     }
   );
 

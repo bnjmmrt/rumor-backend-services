@@ -1661,7 +1661,7 @@ export class AuthService {
     });
 
     if (users.length === 0) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('Users not found')
     }
 
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
@@ -1681,19 +1681,20 @@ export class AuthService {
     const failedUsers: string[] = [];
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
-    for (const userRole of userRoles) {
-      if (payloadStatus === UserStatus.WAITLISTED && userRole.status === UserStatus.ACTIVE) {
-        failedUsers.push(userRole.user.id);
-        continue;
-      }
-      if (payloadStatus === UserStatus.ACTIVE) {
-        const user = users.find((u) => u.id === userRole.user.id);
-        if (user && user.roles.some((role) => role.role.name === 'non_member')) {
-          usersToUpdate.push({ userRole, newStatus: payloadStatus, newRole: memberRole });
+    for (const user of users) {
+      const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
+
+      if (payloadStatus === UserStatus.WAITLISTED) {
+        if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
+          console.error(`User ${user.id} is active and cannot be waitlisted`);
+          failedUsers.push(user.id);
           continue;
         }
       }
-      usersToUpdate.push({ userRole, newStatus: payloadStatus });
+
+      if (payloadStatus === UserStatus.ACTIVE && nonMemberUserRole) {
+        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payloadStatus, newRole: memberRole });
+      }
     }
 
     // Perform bulk updates only for valid users
@@ -3327,9 +3328,8 @@ export class AuthService {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
-    console.log(user)
     if (!user) {
-      throw new NotFoundError('Host')
+      throw new NotFoundError('Host not fond')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3341,9 +3341,8 @@ export class AuthService {
 
     const hostRole = userRoles.find((role) => role.role.name === 'host');
     if (hostRole === undefined) {
-      throw new NotFoundError('Host')
+      throw new NotFoundError('Host role not found')
     }
-
     return responses.data(toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
   }
 
