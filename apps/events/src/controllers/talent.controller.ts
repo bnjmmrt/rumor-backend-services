@@ -1,8 +1,8 @@
 import { TalentResponse, TalentsResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { TalentService } from '../services/talent.service';
 import { CreateTalentRequestDto, RequestByIdDto, UpdateTalentRequestDto } from 'rumor-utils/shared/events/dtos';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
-import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'packages/rumor-utils/success';
+import asyncWrapper from '../server/helpers/asyncWrapper';
+import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express'
 
 export class TalentController {

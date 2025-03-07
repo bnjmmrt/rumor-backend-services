@@ -1,8 +1,8 @@
 import { TicketTypeService } from '../services/ticket-type.service';
 import { TicketTypeResponse, TicketTypesResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { CreateTicketTypeRequestDto, RequestByIdDto, UpdateTicketTypeRequestDto } from 'rumor-utils/shared/events/dtos';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
-import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'packages/rumor-utils/success';
+import asyncWrapper from '../server/helpers/asyncWrapper';
+import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express'
 
 export class TicketTypeController {

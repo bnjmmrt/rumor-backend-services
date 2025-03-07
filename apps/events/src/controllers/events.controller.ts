@@ -165,7 +165,6 @@ export class EventsController {
   }
   );
 
-
   public static duplicateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }

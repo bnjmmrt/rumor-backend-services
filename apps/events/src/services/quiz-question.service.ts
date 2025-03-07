@@ -104,7 +104,7 @@ export class QuizQuestionService {
 
   public static async saveUserQuizAnswers(payload: SaveUserQuizAnswersRequestDto): Promise<SaveUserQuizAnswersResponse> {
     try {
-      const user: any = await serviceMesh.userService().getCurrentMember(payload.userId);
+      const user: any = await serviceMesh.userService().getCurrentMember();
       if (!user) return { data: [], ...responses.notFound('User not found') };
 
       const partialUser: Partial<User> = { id: user.id };
