@@ -80,6 +80,7 @@ import {
   ReportResponse,
   FeedbacksResponse,
   MemberSignUpResponse,
+  ConfirmedMember,
   TokenResponseAndRoles,
   Validity,
   UsersData,
@@ -1630,7 +1631,7 @@ export class AuthService {
     );
 
 
-    return responses.ok;
+    return;
   }
 
   public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
@@ -2364,7 +2365,7 @@ export class AuthService {
     return { users, totalCount };
   }
 
-  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
+  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
     const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
     const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
 
@@ -2390,7 +2391,7 @@ export class AuthService {
       throw new NotFoundError('members')
     }
     const members = users.map(toConfirmedMember);
-    return responses.data(members);
+    return members;
   }
 
   public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<UserWithRoles> {
