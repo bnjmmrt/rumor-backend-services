@@ -1,11 +1,12 @@
 import { SuccessResponse } from "./base.success.response";
 
 export class CreateResponse<T> implements SuccessResponse<T> {
+    success: boolean = true;
     statusCode: number = 201;
     message?: string;
-    data: T;
+    data?: T;
   
-    constructor(data: T, message?: string) {
+    constructor(data?: T, message?: string) {
       this.data = data;
       this.message = message;
     }

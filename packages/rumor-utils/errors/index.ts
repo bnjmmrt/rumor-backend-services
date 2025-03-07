@@ -15,3 +15,4 @@ export * from './jwt-expired-token.error';
 export * from './jwt-invalid-token.error';
 export * from './method-not-allow.error';
 export * from './forbidden.error';
+export * from './sendgrid.error';

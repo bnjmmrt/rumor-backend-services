@@ -786,9 +786,7 @@ export class GuestService {
               },
             });
             const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
-            const guestData = []
-            // TO DO: Add this functionality
-            toAdditionalGuestData(additionalGuest, plusOnesFocuses, plusOnesInterests);
+            const guestData = toAdditionalGuestData(additionalGuest, plusOnesFocuses, plusOnesInterests);
             return { ...guestData, isBanned };
           }),
         );
@@ -809,7 +807,7 @@ export class GuestService {
       }),
     );
     // TO DO: Fix this functionality
-    // return responses.data({ users: buildGuests, totalCount });
+    return responses.data({ users: buildGuests, totalCount });
   }
 
   public static async applyUserFilters(
