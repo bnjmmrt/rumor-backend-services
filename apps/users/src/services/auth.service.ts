@@ -1283,7 +1283,7 @@ export class AuthService {
     }
 
     // Mirco-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -1331,7 +1331,7 @@ export class AuthService {
     }
 
     //Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
     return (user.roles.map((role) => toCurrentUser(user, focuses, role)));
   }
 
@@ -1833,8 +1833,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -2087,8 +2087,8 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses =  (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses =  (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2913,8 +2913,8 @@ export class AuthService {
 
     const users = await Promise.all(
       allUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {
@@ -3023,8 +3023,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -3575,7 +3575,7 @@ export class AuthService {
     };
 
     // Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {

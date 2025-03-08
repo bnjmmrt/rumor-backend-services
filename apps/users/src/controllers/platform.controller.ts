@@ -5,6 +5,7 @@ import asyncWrapper from "../server/helpers/asyncWrapper";
 import { AuthService } from "../services/auth.service";
 import { PlatformService } from "../services/platform.service";
 import { AddFocusRequestDto, CreateInterestRequestDto, EditFocusNameRequestDto, IdRequestDto, SaveFocusesForUserRequestoDto, SaveInterestsForUserRequestDto, UpdateInterestRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
+import type { InterestData, FocusData } from 'rumor-utils/shared/users/grpc/platform/general.pb';
 
 export class PlatformController {
 
@@ -20,7 +21,7 @@ export class PlatformController {
         async (req, res): Promise<void> => {
             const {id} = req.params
             const payload: IdRequestDto = {id};
-            const response: FocusResponse = await PlatformService.getUserFocuses(payload);
+            const response: FocusData[] = await PlatformService.getUserFocuses(payload);
             const getResponse = new GetResponse(response);
             res.status(getResponse.statusCode).json(getResponse);
         }
@@ -75,7 +76,7 @@ export class PlatformController {
         async (req, res): Promise<void> => {
             const { id } = req.params
             const payload: IdRequestDto = { id };
-            const response: InterestsResponse = await PlatformService.getUserInterests(payload);
+            const response: InterestData[] = await PlatformService.getUserInterests(payload);
             const createResponse = new CreateResponse(response);
             res.status(createResponse.statusCode).json(createResponse);
         }
