@@ -177,4 +177,7 @@ router.get("/list-referral-requests",AuthMiddleware.fusionAuthRequired, Referral
 router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );
 router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings );
 
+//collaborator user routes
+router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
+
 export default router;
