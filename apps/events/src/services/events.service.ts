@@ -54,7 +54,7 @@ import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isVali
 import { EventLocationInterface, EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
-import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
+// import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import { EventStatus, EventTypeData, FeaturedEvent } from 'rumor-utils/shared/events/grpc/events/general.pb';
@@ -226,8 +226,9 @@ export class EventsService {
     if (!payload.eventLocation?.placeId) {
       throw new Error('Event Location is required');
     }
+    // const queryRunner = this.dataSource.createQueryRunner();
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
-    const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
@@ -253,7 +254,12 @@ export class EventsService {
       }
       // Fetch and return the created event with all relations
       //send email to admin for new event creation
-      await this.sendEmailToAdminOnCreateEvent(fullEvent.data);
+      try {
+        await this.sendEmailToAdminOnCreateEvent(fullEvent.data);
+      }
+      catch (e) {
+        //TODO: here if fails we can resend email to admin
+      }
       return fullEvent;
     } catch (error) {
       // Rollback transaction in case of an error
@@ -493,12 +499,12 @@ export class EventsService {
         throw new Error(`Event with ID ${eventId} does not exist.`);
       }
       // Fetch all required roles in a single call BEFORE the loop
-      const roleNames = collaboratorsDto.map((c) => collaboratorRoleToEntity[c.role]).filter(Boolean);
+      const roleNames = collaboratorsDto.map((c) => c.role);
       if (roleNames.length === 0) {
         throw new Error('No valid roles found for collaborators.');
       }
       const uniqueRoleNames = [...new Set(roleNames)]; // Remove duplicates
-      const roles = await Promise.all(uniqueRoleNames.map((role) => serviceMesh.userService().getRoleByName(role)));
+      const roles = await Promise.all(uniqueRoleNames.map(async (role) => (await serviceMesh.userService().getRoleByName(role))?.data));
       const validRoles = roles.filter((role) => role !== null);
       if (validRoles.length === 0) {
         throw new Error('Failed to fetch collaborator roles.');
@@ -518,15 +524,24 @@ export class EventsService {
       const collaboratorsToInsert = [];
       for (const collaboratorDto of collaboratorsDto) {
         // Ensure the user exists or create a user with the collaborator role.
-        let user: any = await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email);
-        const roleEntity = roleMap.get(collaboratorRoleToEntity[collaboratorDto.role]);
+        let user: any = null
+        try {
+          let response = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email));
+          user = response?.data;
+        } catch (e) {
+        }
+        const roleEntity = roleMap.get(collaboratorDto.role);
         if (!roleEntity) {
           throw new Error(`Failed to get collaborator role data for ${collaboratorDto.role}.`);
         }
         // Check if the role should be a collaborator's role only
         if (!user) {
-          await serviceMesh.userService().createHostCollaborator(collaboratorDto.email, undefined, undefined, undefined, roleEntity?.name);
-          user = await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email);
+          try {
+            await serviceMesh.userService().createHostCollaborator(collaboratorDto.email, undefined, undefined, undefined, roleEntity?.name);
+            user = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email))?.data;
+          } catch (e) {
+
+          }
         }
         // Assign role to user if not already assigned.
         const hasRole = user.roles.some((role) => role.name === roleEntity.name);
@@ -554,7 +569,7 @@ export class EventsService {
           });
 
           if (!ticketType) {
-            throw new Error(`Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`);
+            throw new NotFoundError(`Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`);
           }
 
           const key = `${user.id}-${eventId}-${ticketType.id}`;
@@ -581,7 +596,7 @@ export class EventsService {
       }
     } catch (error) {
       // this.logger.error(`Error inserting collaborators: `);
-      throw new Error(`Failed to insert collaborators. ${error.message}`);
+      throw new Error(`Failed to insert collaborators. ${error.message || ''}`);
     }
   }
 
@@ -959,26 +974,30 @@ export class EventsService {
     }
   }
 
-  public static async getEvent(payload: UserAndIdRequestDto): Promise<EventResponse> {
-    const event: Event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.id },
-      relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
-    });
-
-    // TODO: Change or update QR utilization when QR ready
-    const qrCodeUtilization = 0;
-
+  public static async getEvent(payload: UserAndIdRequestDto): Promise<EventData> {
+    const eventId = payload.id;
+    const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
 
-    const guest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: payload.id },
-        user: { id: payload.userId },
-      },
-      relations: { user: true },
-    });
+    const [totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+      // Count total confirmed guests for the event.
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: payload.id },
+          status: GuestStatus.CONFIRMED,
+        },
+      }),
 
-    return responses.data(toEvent(event, qrCodeUtilization, undefined, guest));
+      // Count total guests who have checked in.
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: payload.id },
+          checkIn: true,
+          status: GuestStatus.CONFIRMED,
+        },
+      }),
+    ]);
+    return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
   public static async deleteEvent(payload: RequestByIdDto): Promise<string> {
@@ -1123,11 +1142,15 @@ export class EventsService {
         event: { id: eventId },
       });
     }
-
+    let users = []
     // const rolesTofind = collaborators.map(c => roleMap.get(collaboratorRoleToEntity[c.role]).name);
-    const users = await (await Promise.all(collaborators.map((c) => serviceMesh.userService().getUserWithRolesByEmail(c.email)))).filter((node) => node);
+    try {
+      users = (await Promise.all(collaborators.map(async (c) => (await serviceMesh.userService().getUserWithRolesByEmail(c.email))?.data))).filter((node) => node);
+    }
+    catch (e) {
 
-    const roleNames = collaborators.map((c) => collaboratorRoleToEntity[c.role]).filter(Boolean);
+    }
+    const roleNames = collaborators.map((c) => c.role);
     if (roleNames.length === 0) {
       throw new Error('No valid roles found for collaborators.');
     }
@@ -1138,9 +1161,15 @@ export class EventsService {
     const userMap = new Map(users.map((user: any) => [user?.email, user]));
     // const roles = await Promise.all(uniqueRoleNames.map(role => this.authClient.getRoleByName(role)));
     // Fetch roles one by one from Auth Service
-    const roles = await Promise.all(uniqueRoleNames.map((role) => serviceMesh.userService().getRoleByName(role)));
-    const validRoles = roles.filter((role) => role !== null);
-    const roleMap: any = new Map(validRoles.map((role: any) => [role.name, role]));
+    let roles = null
+    try {
+      roles = await Promise.all(uniqueRoleNames.map(async (role: any) => (await serviceMesh.userService().getRoleByName(role))?.data));  //TODO: need to fix this getRoleByName(role)
+    }
+    catch (e) {
+
+    }
+    const validRoles = roles?.filter((role) => role !== null);
+    const roleMap: any = new Map(validRoles?.map((role: any) => [role.name, role]));
     // Fetch existing collaborators for the event (including roles)
     const existingCollaboratorsData = await queryRunner.manager.find(Collaborator, {
       where: { event: { id: eventId } },
@@ -1164,14 +1193,18 @@ export class EventsService {
       if (!user || isEmailUpdate) {
         // Remove old collaborator records and insert a new one
         await queryRunner.manager.delete(Collaborator, { user: { id: collaborator.id }, event: { id: eventId } });
-        const roleEntity: any = roleMap.get(collaboratorRoleToEntity[collaborator.role]);
+        const roleEntity: any = roleMap.get(collaborator.role);
         if (!roleEntity) {
           throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
         }
         if (!user) {
           await serviceMesh.userService().createHostCollaborator(collaborator.email, undefined, undefined, undefined, roleEntity?.name);
         }
-        user = await serviceMesh.userService().getUserWithRolesByEmail(collaborator.email);
+        try {
+          user = (await serviceMesh.userService().getUserWithRolesByEmail(collaborator.email))?.data;
+        }
+        catch (e) {
+        }
         userMap.set(collaborator.email, user);
 
         //update collaboartor
@@ -1199,7 +1232,7 @@ export class EventsService {
         }
         //TODO: if no tickets the also it should do entry with null tickettype id
       }
-      const roleEntity: any = roleMap.get(collaboratorRoleToEntity[collaborator.role]); //TODO: this is duplicate line
+      const roleEntity: any = roleMap.get(collaborator.role); //TODO: this is duplicate line
 
       if (!roleEntity) {
         throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
@@ -1374,7 +1407,7 @@ export class EventsService {
     // Convert existing collaborators to a Set for quick lookup
     const existingCollaboratorSet = new Set(existingCollaborators.map((collab) => `${collab.user?.id}-${eventId}-${collab.ticketType?.id || 'NULL'}`));
     for (const { user, collaborator } of collabWhichIsNotInExistingCollab) {
-      const roleEntity = roleMap.get(collaboratorRoleToEntity[collaborator.role]);
+      const roleEntity = roleMap.get(collaborator.role);
       if (!roleEntity) {
         throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
       }

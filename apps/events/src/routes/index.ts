@@ -61,9 +61,6 @@ router.patch(
 //   (req: Request, res: Response) => {}
 // );
 
-//events routes
-router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify);
-router.get("/event-status", EventsController.listEventStatus);
 
 
 //event types starts
@@ -123,17 +120,14 @@ router.get("/event-location/:id", EventsController.getEventLocation)
 router.get("/event-locations", EventsController.listEventLocations)
 router.delete("/event-location/:id", EventsController.deleteEventLocation)
 
-//Events
-router.post("/event", AuthMiddleware.fusionAuthRequired, EventsController.createEvent)
+//events routes
+router.post("/event", AuthMiddleware.fusionAuthRequired, EventsController.createEvent) /**TestStatus: working */
 router.delete("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.deleteEvent)
-router.put("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.updateEvent)
+router.put("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.updateEvent) /**TestStatus: working(need to check for signup form updates) */
 router.put("/event/:id/publish", AuthMiddleware.fusionAuthRequired, EventsController.publishEvent)
+router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify); /**TestStatus: working(need to check for signup form updates) */
+router.get("/event-status", EventsController.listEventStatus);
 
-// //Events
-// p.Delete("/event/:id", svc.DeleteEvent)
-// p.Put("/event/:id/publish", svc.PublishEvent)
-// p.Post("/event", svc.CreateEvent)
-// a.Put("/event/:id", svc.UpdateEvent)
 
 router.get("/events", EventsController.listEvents)
 router.get("/feed", EventsController.listEventsFeed)
@@ -144,7 +138,7 @@ router.post("/featured-events", EventsController.addEventToFeaturedSection)
 router.get("/public/:eventId", EventsController.getPublicEvent)
 router.get("/users/:userId/events/:eventId", EventsController.getEventByInvitedUserId)
 
-router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent)
+router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
 
 // Host
 router.get("/hosts/events", AuthMiddleware.fusionAuthRequired, EventsController.listHostEvents)

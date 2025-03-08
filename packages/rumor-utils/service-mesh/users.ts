@@ -44,6 +44,6 @@ export const getVouchRequests = (baseURL:string, id: string) => apiService.getAp
 
 export const syncSocialStats = (baseURL:string, userId: string) => apiService.getApi().post(`${baseURL}/users/${userId}/sync-social-stats`);
 
-export const createHostCollaborator = (email?: string, phoneNumber?: string, firstName?: string, lastName?: string, role?: string) => apiService.getApi().post(`/users/host-collaborator/create`, { email, phoneNumber, firstName, lastName, role });
+export const createHostCollaborator = (email?: string, phoneNumber?: string, firstName?: string, lastName?: string, role?: string) => apiService.getApi().post(`/auth/host-collaborator/create`, { email, phoneNumber, firstName, lastName, role });
 
 export const getAllusers = (query: string) => apiService.getApi().get(`/auth/users-list?${query}`);

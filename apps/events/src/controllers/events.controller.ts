@@ -131,7 +131,7 @@ export class EventsController {
     const { id } = req.params;
     const payload: UserAndIdRequestDto = { id, userId }
     // const id = req.params.id;
-    const event: EventResponse = await EventsService.getEvent(
+    const event: EventData = await EventsService.getEvent(
       payload
     );
     const successResponse = new GetResponse(event);
@@ -141,12 +141,13 @@ export class EventsController {
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
   public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params
+    req.body.id = id
     const payload: UpdateEventRequestDto = req.body
-    // const id = req.params.id;
     const event: EventResponse = await EventsService.updateEvent(
       payload
     );
-    const successResponse = new UpdateResponse();
+    const successResponse = new UpdateResponse(event);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -427,7 +428,7 @@ export class EventsController {
     const response: string = await EventsService.cancelEventAndNotify(
       payload
     );
-    const successResponse = new CreateResponse(response);
+    const successResponse = new UpdateResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
