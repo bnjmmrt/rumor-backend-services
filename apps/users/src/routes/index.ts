@@ -13,19 +13,19 @@ import { ReferralCodeController } from '../controllers/referral-code.controller'
 const router: Router = express.Router();
 
 // Admin routes
-router.get('/auth/admin/members', AdminController.getMembers);
-router.get('/auth/admin/hosts', AdminController.getHosts);
+router.get('/auth/admin/members', AuthMiddleware.fusionAuthRequired, AdminController.getMembers);
+router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
-router.get('/auth/admin/host/:id', AdminController.getHostProfile);                // get host profile for admin
+router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
 router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id
-router.get('/auth/admin/host/:id/profile', AdminController.getBasicHostProfile);   // get basic host profile for admin
+router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
 router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
-router.put('/auth/admin/host/:id/profile', AdminController.updateHostProfile);     // update host profile for admin
+router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
 router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
-router.post('/auth/admin/host/status', AdminController.updateHostStatus);
-router.post('/auth/admin/member/status', AdminController.updateMemberStatus);
-router.get('/auth/admin/member/:id', AdminController.getMemberProfile);
+router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
+router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
+router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
 
 // Auth routes
 router.post('/auth/forgot-password', AuthController.forgotPassword);
@@ -65,9 +65,9 @@ router.put('/auth/user-profile/:id', AuthController.updateUserProfile);
 router.get('/auth/bio-profile/:id', AuthController.getBioProfile);
 router.post('/auth/bio-profile', AuthController.createBioProfile);
 router.put('/auth/bio-profile/:id', AuthController.updateBioProfile);
-router.put('/auth/member-approve/:id', AuthController.approveMember);
+router.put('/auth/member-approve/:id', AuthMiddleware.fusionAuthRequired, AuthController.approveMember);
 router.get('/auth/users/{type}', AuthController.listUsersByType);
-router.get('/auth/admin/users/status', AuthController.updateUsersStatus);
+router.put('/auth/admin/users/status', AuthMiddleware.fusionAuthRequired, AuthController.updateUsersStatus);
 router.post('/auth/non-member', AuthController.createNonMemberUser);
 router.post('/auth/user/get-member-or-non-member', AuthController.getMembersOrNonMembers);
 router.post('/auth/host/:id/follow', AuthController.manageFollowHost);

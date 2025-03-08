@@ -1601,26 +1601,25 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError('user')
     }
+    const nonMemberUserRole = user.roles.find((userRole) => userRole.role.name === 'non_member');
+    if (!nonMemberUserRole) return responses.notFound('User not found!');
 
-    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
-    if (nonMemberRole === undefined) {
-      throw new NotFoundError('User')
-    }
-
-
+    // Find the member role
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
     if (!memberRole) {
       throw new NotFoundError('Member role not found');
     }
 
+    // Find the user's current role entry
     const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { user: { id: payload.id } } });
     if (!userRole) {
       throw new NotFoundError('User role entry not found');
     }
 
-    userRole.role = memberRole;
-    userRole.status = UserStatus.ACTIVE;
-    await this.dbConnection.getRepository(UserRole).save(userRole);
+    // Update role and status
+    nonMemberUserRole.role = memberRole;
+    nonMemberUserRole.status = UserStatus.ACTIVE;
+    await this.dbConnection.getRepository(UserRole).save(nonMemberUserRole);
 
     await serviceMesh.notificationService().sendEmailFromTemplate(
       [
@@ -1634,8 +1633,7 @@ export class AuthService {
       null,
     );
 
-
-    return;
+    return responses.ok;
   }
 
   public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
@@ -1655,20 +1653,19 @@ export class AuthService {
     return userList;
   }
 
-  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<string> {
-    const payloadStatus = userStatusToEntity[payload.status];
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<any> {
     const users = await this.dbConnection.getRepository(User).find({
       where: { id: In(payload.ids), deletedAt: null },
       relations: { roles: { role: true } },
     });
 
     if (users.length === 0) {
-      throw new NotFoundError('Users not found')
+      throw new NotFoundError('Users')
     }
 
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
     if (!memberRole) {
-      throw new BadRequestError('Error updating user status.')
+      throw new NotFoundError('Role')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -1677,7 +1674,7 @@ export class AuthService {
     });
 
     if (userRoles.length === 0) {
-      throw new BadRequestError('Error updating user status.')
+      throw new NotFoundError('UserRole')
     }
 
     const failedUsers: string[] = [];
@@ -1686,7 +1683,7 @@ export class AuthService {
     for (const user of users) {
       const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
 
-      if (payloadStatus === UserStatus.WAITLISTED) {
+      if (payload.status === UserStatus.WAITLISTED) {
         if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
           console.error(`User ${user.id} is active and cannot be waitlisted`);
           failedUsers.push(user.id);
@@ -1694,8 +1691,8 @@ export class AuthService {
         }
       }
 
-      if (payloadStatus === UserStatus.ACTIVE && nonMemberUserRole) {
-        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payloadStatus, newRole: memberRole });
+      if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
       }
     }
 
@@ -1726,7 +1723,7 @@ export class AuthService {
       }
     }
 
-    return '';
+    return { failedUsers, usersToUpdate };;
 
   }
 
@@ -2942,7 +2939,7 @@ export class AuthService {
 
   // ADMIN Sevice Code
 
-  public static async getMembers(payload: PaginatedRequestDto): Promise<any> { //GetMembersResponse
+  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -3406,7 +3403,7 @@ export class AuthService {
 
 
     if (!users.length) {
-      throw new NotFoundError('Hosts not found')
+      throw new NotFoundError('Host')
     }
 
     const hostRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3415,7 +3412,7 @@ export class AuthService {
       },
     });
 
-    if (!hostRoles.length) throw new NotFoundError('No valid hosts found');
+    if (!hostRoles.length) throw new NotFoundError('valid hosts');
 
     const skippedUsers: string[] = [];
     const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
@@ -3489,7 +3486,6 @@ export class AuthService {
   }
 
   public static async approveHost(user: User): Promise<void> {
-    try {
       const password = generateRandomPassword(12);
       const temporaryPassword = new TemporaryPassword();
       temporaryPassword.password = password;
@@ -3515,9 +3511,7 @@ export class AuthService {
         },
       };
       await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-    } catch (error) {
-      console.log(error)
-    }
+
   }
 
   public static async generateToken(user: User): Promise<string> {
