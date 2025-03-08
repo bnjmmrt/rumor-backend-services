@@ -9,7 +9,7 @@
 import { Observable } from "rxjs";
 import {
   FeaturedEventsSection,
-  Focus,
+  FocusData,
   InterestData,
   ReferralCode,
   ReferralRequest,
@@ -48,7 +48,7 @@ export interface GenericResponse {
 export interface FocusResponse {
   status: number;
   error?: Error | undefined;
-  data: Focus[];
+  data: FocusData[];
 }
 
 /** Add Focus */

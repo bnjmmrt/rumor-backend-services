@@ -8,7 +8,7 @@
 
 export const protobufPackage = "platform";
 
-export interface Focus {
+export interface FocusData {
   id: string;
   name: string;
 }

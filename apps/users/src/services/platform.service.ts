@@ -23,6 +23,7 @@ import { User } from "rumor-utils/shared/users/entities/user.entity";
 import { Interest } from "rumor-utils/shared/users/entities/interest.entity";
 import { responses } from "../common/responses.common";
 import database from "../database";
+import type { InterestData, FocusData } from 'rumor-utils/shared/users/grpc/platform/general.pb';
 
 export class PlatformService {
   public static dbConnection = database;
@@ -36,11 +37,12 @@ export class PlatformService {
 
   public static async getUserFocuses(
     payload: IdRequestDto
-  ): Promise<FocusResponse> {
+  ): Promise<FocusData[]> {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-    return responses.data(focuses.map((focus) => toFocus(focus)));
+    const data = focuses.map((focus) => toFocus(focus));
+    return data
   }
 
   public static async addFocus(
@@ -120,14 +122,15 @@ export class PlatformService {
 
   public static async getUserInterests(
     payload: IdRequestDto
-  ): Promise<InterestsResponse> {
+  ): Promise<InterestData[]> {
     const interests = await this.dbConnection.getRepository(Interest).find({
       where: {
         users: { id: payload.id },
         deletedAt: IsNull(),
       },
     });
-    return responses.data(interests.map((interest) => toInterest(interest)));
+    const data = interests.map((interest) => toInterest(interest));
+    return data
   }
 
   public static async saveInterestsForUser(
