@@ -65,6 +65,10 @@ export class ManageGuestsRequestDto implements ManageGuestsRequest {
 
   @IsString()
   @IsNotEmpty()
+  currentStatus: string;
+
+  @IsString()
+  @IsNotEmpty()
   action: string;
 
   @IsString()

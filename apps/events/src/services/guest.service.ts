@@ -83,7 +83,7 @@ export class GuestService {
  * - Calls appropriate functions to modify guest data.
  * - Returns success or error responses based on the operation.
  */
-  public static async manageGuests(payload: ManageGuestsRequestDto, token: string): Promise<GenericResponse> {
+  public static async manageGuests(payload: ManageGuestsRequestDto, token: string): Promise<{ message: string }> {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
@@ -91,11 +91,13 @@ export class GuestService {
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch the host profile
-    const host = await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)
+    const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data
     if (!host) throw new NotFoundError('Host not found');
 
     // Normalize and validate guest status (convert to uppercase and check if it exists in GuestStatus)
     const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+    const currentStatus = payload?.currentStatus ? payload.currentStatus.toString().trim().toUpperCase() : undefined;
+    if (currentStatus && !Object.keys(GuestStatus).includes(currentStatus)) throw new BadRequestError('Invalid current Guest status');
     if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) throw new BadRequestError('Invalid Guest status');
 
     // Normalize and validate action (convert to uppercase and check if it exists in ManageGuestsAction)
@@ -111,8 +113,7 @@ export class GuestService {
         // Only allow certain guest statuses for creation
         if (guestStatus && (guestStatus === GuestStatus.DRAFT || guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED)) {
           // Fetch guests based on the provided filters
-          const data = await this.getFilteredGuestIds(payload);
-
+          const data = await this.getFilteredGuestIds(payload, token);
           // Ensure data is valid and contains an array of users
           if (data && Array.isArray(data)) {
             // Prepare the payload for creating guests
@@ -127,12 +128,12 @@ export class GuestService {
               guestStatus,
               sendInvite: sendNotification,
             };
-
+            
             // Call the function to create guests
-            const createGuests = await this.addGuests(payloadCreateGuest);
+            const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.data.users.length > 0) return responses.data(`Guest created with status ${guestStatus}`);
+            if (createGuests.data.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -145,7 +146,7 @@ export class GuestService {
           (guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED || guestStatus === GuestStatus.DECLINED || guestStatus === GuestStatus.DRAFT)
         ) {
           // Fetch guests based on the provided filters
-          const data = await this.getFilteredGuestIds(payload);
+          const data = await this.getFilteredGuestIds(payload, token);
           // Ensure data is valid and contains an array of users
           if (data && Array.isArray(data)) {
             // Prepare the payload for creating guests
@@ -163,7 +164,7 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
-            if (updateGuests.data.length > 0) return responses.data(`Guest updated with status ${guestStatus}`);
+            if (updateGuests.data.length > 0) return { message: `Guest updated with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -173,7 +174,7 @@ export class GuestService {
       case ManageGuestsAction.DELETE:
         if (guestStatus && (guestStatus === GuestStatus.DRAFT || guestStatus === GuestStatus.INVITED)) {
           // Fetch guests based on the provided filters
-          const data = await this.getFilteredGuestIds(payload);
+          const data = await this.getFilteredGuestIds(payload, token);
           if (data && Array.isArray(data)) {
             const payloadRemoveGuests = {
               eventId,
@@ -182,7 +183,7 @@ export class GuestService {
             // Call the function to update guests
             const deleteGuests = await this.manageGuestsRemoval(payloadRemoveGuests);
             // Check if guests were successfully created
-            if (deleteGuests.data.length > 0) return responses.data(`Guest deleted with status ${guestStatus}`);
+            if (deleteGuests.data.length > 0) return { message: `Guest deleted with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -205,10 +206,10 @@ export class GuestService {
    * @param payload - Request data containing filters and selection criteria.
    * @returns Array of guest IDs or an error response.
    */
-  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto): Promise<string[] | GenericResponse> {
+  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[] | GenericResponse> {
     const parsedQuery = payload.query ? parse(payload.query) : undefined;
     const eventId = parsedQuery?.eventId as string;
-    const { isSelectedAll, inclusiveIds, exclusiveIds, hostId, filePath, bulkUploadStatus, guestStatus } = payload;
+    const { isSelectedAll, inclusiveIds, exclusiveIds, filePath, bulkUploadStatus, currentStatus } = payload;
 
     // Case 1: Select all guests based on a query
     if (isSelectedAll) {
@@ -223,14 +224,11 @@ export class GuestService {
           return userIds;
         }
         // Extract main guest IDs
-        const fetchData = { userId: hostId, query: payload.query };
-        // TO DO: ServiceMesh Changes
-        const usersData = await (await serviceMesh.userService('token').getAllusers(payload.hostId)).data
+        const usersData = (await serviceMesh.userService(token).getAllusers(payload.query)).data
         if (usersData.users.length === 0 || usersData.totalCount === 0) {
           throw new NotFoundError('Users data not found');
         }
-        let userIds: string[]
-        // = usersData.users.map((user) => user.id);
+        let userIds: string[] = usersData.users.map((user) => user.id);
         if (exclusiveIds.length > 0) {
           userIds = userIds.filter((id) => !exclusiveIds.includes(id));
         }
@@ -249,17 +247,17 @@ export class GuestService {
 
       // Extract main guest IDs
       let guestIds: string[] = getGuests.data.users
-        .filter(
-          (guest) => guest && guest.id && guest.status === entityToGuestStatus[guestStatus], // Convert string to enum
-        )
-        .map((guest) => guest.id);
-
+      .filter(
+        (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
+      )
+      .map((guest) => guest.id);
+      
       // Extract additional guest IDs (if any)
       const additionalGuestIds: string[] = getGuests.data.users
-        .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
-        .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
-        .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
-
+      .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
+      .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
+      .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
+      
       // Combine all guest IDs
       guestIds = [...guestIds, ...additionalGuestIds];
 
@@ -304,13 +302,13 @@ export class GuestService {
    * @param {AddGuestsRequestDto} payltoAdditionalGuestDataoad - The request payload containing event, host, and guest details.
    * @returns {Promise<GuestsResponse>} - A response containing the list of added guests or an error message.
    */
-  public static async addGuests(payload: AddGuestsRequestDto): Promise<GuestsResponse> {
+  public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<GuestsResponse> {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
-    const host = await serviceMesh.userService().getBasicHostProfile(payload.hostId);
+    const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
     if (!host) throw new NotFoundError('Host not found');
 
     let ticketType = undefined;
@@ -339,12 +337,11 @@ export class GuestService {
       payload.users.map(async (userId) => {
         try {
           // Fetch user details using the auth client
-          const user = (await serviceMesh.userService('token').getCurrentUser()).data;
+          const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
 
           // Extract user data and email
-          const userData = user.pop();
-          const email = userData.hostProfile?.email || userData.memberProfile?.email || userData.userProfile?.email;
+          const email = user?.email;
           if (email) emails.push(email);
 
           // Check if the guest already exists in the event
@@ -363,16 +360,16 @@ export class GuestService {
             guest.event = event;
             guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
             guest.user = { id: userId } as User;
-            guest.addedBy = { id: host.data.id } as User;
+            guest.addedBy = { id: host.id } as User;
             guest.privateGuestNote = payload.privateGuestNote;
             guest.invitationSource = UserSource.INVITED_BY_HOST;
             guest.inviteMessage = payload.inviteMessage;
             if (ticketType) {
               guest.ticketType = { id: ticketType.id } as TicketType;
             }
-            return await this.dbConnection.getRepository(Guest).save(guest);
+            const data = await this.dbConnection.getRepository(Guest).save(guest);
+            return data
           }
-
           return guest;
         } catch (err) {
           return null;
@@ -397,7 +394,6 @@ export class GuestService {
     // Transform guests into the expected response format, fetching user focus data
     const guestsTransform = await Promise.all(
       validGuests.map(async (guest) => {
-        length
         const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
         return toGuest(guest, focuses);
       }),
@@ -446,7 +442,7 @@ export class GuestService {
         payload.guests.map(async (guestId) => {
           try {
             // Fetch the guest details along with associated user information
-            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId } });
+            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId }, relations: ['user', 'addedBy', 'declinedBy'] });
 
             // If guest does not exist, log a warning and return null
             if (!guest) {
@@ -510,7 +506,8 @@ export class GuestService {
             }
 
             // Save the updated guest data
-            return await this.dbConnection.getRepository(Guest).save(guest);
+            const data =  await this.dbConnection.getRepository(Guest).save(guest);
+            return data;
           } catch (err) {
             // Log error and return null in case of failure
             return null;
@@ -1275,7 +1272,6 @@ export class GuestService {
   }
 
   public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GetGuestProfileResponse> {
-    console.log("🚀 ~ GuestService ~ getGuestProfile ~ payload:", payload)
     const guest = (
       await this.dbConnection.getRepository(Guest).find({
         where: {
@@ -1351,15 +1347,15 @@ export class GuestService {
       }),
     );
 
-    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data.data;
+    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
     const val = toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData);
     return responses.data(val);
   }
 
-  public static async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
+  public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<ListUsersEventInviteesResponse> {
       const { userId, query: initialQuery } = payload;
       const parsedQuery = parse(initialQuery) as ParsedQs;
-      const user = await serviceMesh.userService().getBasicHostProfile(userId);
+      const user = (await serviceMesh.userService(token).getBasicHostProfile(userId)).data;
       if (!user) throw new NotFoundError('User is not a host.');
       let usersQuery = initialQuery;
       if (parsedQuery.eventId) {
@@ -1802,7 +1798,7 @@ export class GuestService {
         throw new NotFoundError('Event not found');
       }
 
-      const user = await serviceMesh.userService().getUser(config.get('API_BASE_URL'), payload.id);
+      const user = (await serviceMesh.userService().getUser(payload.id)).data;
 
       if (!user) {
         throw new NotFoundError('User not found');
@@ -1888,7 +1884,7 @@ export class GuestService {
         throw new NotFoundError('Event not found');
       }
 
-      const user = await serviceMesh.userService().getUser(config.get('API_BASE_URL'), payload.id);
+      const user = (await serviceMesh.userService().getUser(payload.id)).data;
 
       if (!user) {
         throw new NotFoundError('User not found');
@@ -2154,13 +2150,17 @@ export class GuestService {
       throw new BadRequestError('Guest limit reached. Unable to invite additional guests');
     }
 
-    let checkUser;
     // Step 5: Check if the guest exists by email or phone number
+    let checkUser;
     if (payload.email) {
-      checkUser = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
+      try {
+        checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email)).data;
+      } catch (e) { }
     } else if (payload.phoneNumber) {
-      checkUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
-      checkUser = checkUser ? { ...checkUser, phoneNumber: payload.phoneNumber } : null;
+      try {
+        checkUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)).data;
+        checkUser = checkUser ? { ...checkUser, phoneNumber: payload.phoneNumber } : null;
+      } catch (e) { }
     } else {
       throw new ValidationError('Phone number or email is required');
     }
@@ -2319,10 +2319,14 @@ export class GuestService {
         // Step 5: Check if user exists by email or phone
         let checkUser = null;
         if (guestPayload.email) {
-          checkUser = await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email);
+          try {
+            checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email)).data;
+          } catch (e) { }
         } else if (guestPayload.phoneNumber) {
-          checkUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), guestPayload.phoneNumber);
-          if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
+          try {
+            checkUser = (await serviceMesh.userService().getUserWithRolesByPhone(guestPayload.phoneNumber)).data;
+            if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
+          } catch (e) { }
         } else {
           throw new ValidationError('Phone number or email is required');
         }
@@ -2445,8 +2449,10 @@ export class GuestService {
       // Step 4: Fetch existing users based on extracted emails
       const existingUsers = await Promise.all(
         emails.map(async (email) => {
-          const data = (await serviceMesh.userService().getUserWithRolesByEmail(email)).data;
-          return data;
+          try {
+            const data = (await serviceMesh.userService().getUserWithRolesByEmail(email)).data;
+            return data;
+          } catch (e) { }
         }),
       );
 
@@ -2506,13 +2512,13 @@ export class GuestService {
         await Promise.all(
           updatedValidData.map(async (row: User) => {
             if (row.email && row.firstName && row.lastName) {
-              const user = await serviceMesh.userService().registerInvitesAsNonMember(
+              const user = (await serviceMesh.userService().registerInvitesAsNonMember(
                 {
                   ...row,
                   eventId: payload.eventId,
                   userId: payload.hostId,
                 }
-              );
+              )).data;
               users.push(user.data);
             }
           }),
@@ -2633,13 +2639,13 @@ export class GuestService {
    * @param payload - Data required to invite a new guest.
    * @returns GetUserRequestsResponse - The transformed guest data response.
    */
-  public static async inviteNewUser(payload: InviteNewUserRequestDto): Promise<GetUserRequestsResponse> {
+  public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GetUserRequestsResponse> {
       // Step 1: Check if the event exists and is not deleted
       const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
       if (!event) throw new NotFoundError('Event not found');
 
       // Step 2: Verify the existence of the host
-      const host = (await serviceMesh.userService().getBasicHostProfile(payload.userId)).data;
+      const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
       if (!host) throw new NotFoundError('Host not found');
 
       if (!payload.email && !payload.phoneNumber) {
@@ -2667,11 +2673,15 @@ export class GuestService {
       let checkExistingUser;
       // Step 6: Check if the user already exists in the system
       if (payload.email && !payload.phoneNumber) {
-        checkExistingUser = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
-        if (checkExistingUser) throw new BadRequestError('User already exists');
+        try {
+          checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email)).data;
+          if (checkExistingUser) throw new BadRequestError('User already exists');
+        } catch (e) { }
       } else if (payload.phoneNumber && !payload.email) {
-        checkExistingUser = await serviceMesh.userService().getUserWithRolesByPhone(config.get('API_BASE_URL'), payload.phoneNumber);
-        if (checkExistingUser) throw new BadRequestError('User already exists');
+        try {
+          checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)).data;
+          if (checkExistingUser) throw new BadRequestError('User already exists');
+        } catch (e) { }
       }
 
       // Step 7: Register a new guest user
@@ -2687,9 +2697,9 @@ export class GuestService {
           phoneNumber: phoneNumber || '',
         }))(payload);
         const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
-
         // Step 8: Create and save the guest record
         guest = this.dbConnection.getRepository(Guest).create({
+          id: uuidv4(),
           status: guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS,
           event,
           maxAdditionalGuests: payload.maxAdditionalGuests || 1,
@@ -2735,7 +2745,7 @@ export class GuestService {
         .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
         .leftJoinAndSelect('guest.ticketType', 'ticketType')
         .where({ event: { id: event.id } })
-        .andWhere({ status: In([GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
+        .andWhere({ status: In([GuestStatus.DRAFT,GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
         .andWhere({ user: { id: guest.user.id } })
         .limit(1);
 
@@ -2752,9 +2762,8 @@ export class GuestService {
         },
       });
       const guestData = toGuest(checkGuest, focuses, undefined, vouches, answers, undefined);
-      const data = { ...guestData, category: focuses.map((focus) => focus.name) };
 
-      return responses.data(data);
+      return responses.data(guestData);
   }
 
   public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {

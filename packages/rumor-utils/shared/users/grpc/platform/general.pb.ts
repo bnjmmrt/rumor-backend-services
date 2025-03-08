@@ -20,7 +20,7 @@ export interface InterestData {
   enabled?: boolean | undefined;
 }
 
-export interface ReferralCode {
+export interface ReferralCodeData {
   id: string;
   code: string;
   description: string;

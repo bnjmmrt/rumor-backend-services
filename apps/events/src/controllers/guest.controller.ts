@@ -50,7 +50,7 @@ export class GuestController {
         ...req.body
       }
       const token = (req as any).token;
-      const response: GenericResponse = await GuestService.manageGuests(payload, token);
+      const response: {message: string} = await GuestService.manageGuests(payload, token);
       const successResponse = new UpdateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -63,7 +63,8 @@ export class GuestController {
         hostId: (req as any).user,
         ...req.body
       }
-      const response: GuestsResponse = await GuestService.addGuests(payload);
+      const token = (req as any).token;
+      const response: GuestsResponse = await GuestService.addGuests(payload, token);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -166,7 +167,8 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: ListUsersEventInviteesResponse = await GuestService.getUsersEventInvitees(payload);
+      const token = (req as any).token;
+      const response: ListUsersEventInviteesResponse = await GuestService.getUsersEventInvitees(payload, token);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -320,10 +322,11 @@ export class GuestController {
     async (req, res): Promise<void> => {
       const payload: InviteNewUserRequestDto = {
         eventId: req.params.eventId,
-        hostId: (req as any).user,
+        userId: (req as any).user,
         ...req.body
       }
-      const response: GetUserRequestsResponse = await GuestService.inviteNewUser(payload);
+      const token = (req as any).token;
+      const response: GetUserRequestsResponse = await GuestService.inviteNewUser(payload, token);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }

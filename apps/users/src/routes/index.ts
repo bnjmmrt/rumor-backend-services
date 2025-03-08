@@ -8,23 +8,24 @@ import { SocialController } from '../controllers/social.controller';
 import AuthMiddleware from '../server/middleware/auth';
 import { PlatformController } from '../controllers/platform.controller';
 import { ReferralRequestController } from '../controllers/referral-request.controller';
+import { ReferralCodeController } from '../controllers/referral-code.controller';
 
 const router: Router = express.Router();
 
 // Admin routes
-router.get('/auth/admin/members', AdminController.getMembers);
-router.get('/auth/admin/hosts', AdminController.getHosts);
+router.get('/auth/admin/members', AuthMiddleware.fusionAuthRequired, AdminController.getMembers);
+router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
-router.get('/auth/admin/host/:id', AdminController.getHostProfile);                // get host profile for admin
+router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
 router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id
-router.get('/auth/admin/host/:id/profile', AdminController.getBasicHostProfile);   // get basic host profile for admin
+router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
 router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
-router.put('/auth/admin/host/:id/profile', AdminController.updateHostProfile);     // update host profile for admin
+router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
 router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
-router.post('/auth/admin/host/status', AdminController.updateHostStatus);
-router.post('/auth/admin/member/status', AdminController.updateMemberStatus);
-router.get('/auth/admin/member/:id', AdminController.getMemberProfile);
+router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
+router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
+router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
 
 // Auth routes
 router.post('/auth/forgot-password', AuthController.forgotPassword);
@@ -52,7 +53,7 @@ router.post('/auth/check-member-login', AuthController.checkMemberLogin);
 router.post('/auth/member-login', AuthController.memberLogin);
 router.post('/auth/host-login', AuthController.hostLogin);
 router.get('/auth/get-current-member', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentMember);
-router.post('/auth/user/:id/get-user', AuthController.getUser);
+router.get('/auth/user/:id/get-user', AuthController.getUser);
 router.get('/auth/current-user', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentUser);
 router.post('/auth/save-or-update-provider', AuthController.saveOrUpdateProvider);
 router.post('/auth/send-invitations', AuthMiddleware.fusionAuthRequired, AuthController.sendInvitations);
@@ -64,9 +65,9 @@ router.put('/auth/user-profile/:id', AuthController.updateUserProfile);
 router.get('/auth/bio-profile/:id', AuthController.getBioProfile);
 router.post('/auth/bio-profile', AuthController.createBioProfile);
 router.put('/auth/bio-profile/:id', AuthController.updateBioProfile);
-router.put('/auth/member-approve/:id', AuthController.approveMember);
+router.put('/auth/member-approve/:id', AuthMiddleware.fusionAuthRequired, AuthController.approveMember);
 router.get('/auth/users/{type}', AuthController.listUsersByType);
-router.get('/auth/admin/users/status', AuthController.updateUsersStatus);
+router.put('/auth/admin/users/status', AuthMiddleware.fusionAuthRequired, AuthController.updateUsersStatus);
 router.post('/auth/non-member', AuthController.createNonMemberUser);
 router.post('/auth/user/get-member-or-non-member', AuthController.getMembersOrNonMembers);
 router.post('/auth/host/:id/follow', AuthController.manageFollowHost);
@@ -168,13 +169,25 @@ router.post('/platform/user-interests/:id', PlatformController.saveInterestsForU
 router.post('/platform/user/:userId/add-focus', PlatformController.saveFocusesForUser);
 
 //Referral Requests
-router.post("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
-router.put("/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
-router.get("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
-router.get("/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+router.post("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
+router.put("/auth/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
+router.get("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
+router.get("/auth/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+
+//Referral Codes
+router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
+router.get("/auth/referred-users", ReferralCodeController.getReferralCode)
+router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
+router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
+router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
+//Referrals
+router.post("/auth/referred-users", ReferralCodeController.saveReferredUser)
 
 
 router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );
 router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings );
+
+//collaborator user routes
+router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
 
 export default router;

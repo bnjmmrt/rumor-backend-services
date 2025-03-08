@@ -7,7 +7,7 @@
 /* eslint-disable */
 // import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
-import { UserRole } from "./role.pb";
+import {  UserRoleList } from "./role.pb";
 import {
   Error,
   GenericResponse,
@@ -288,7 +288,7 @@ export interface CurrentMember {
   referralCode: string;
   focuses: Focus[];
   socialProviders: SocialProvider[];
-  userRoles: UserRole[];
+  userRoles: UserRoleList[];
   status?: UserStatus | undefined;
   socialStats?: SocialMediaStats | undefined;
   imageUrl?: string | undefined;
@@ -648,6 +648,9 @@ export interface HostProfile {
   socialMedia: HostSocialMedia | undefined;
   isMemberFollowingHost: boolean;
   website?: string | undefined;
+  isMemberBlockedHost?: boolean | undefined;
+  roleId?: string | undefined;
+  roleName?: string | undefined;
 }
 
 export interface FollowHostProfile {

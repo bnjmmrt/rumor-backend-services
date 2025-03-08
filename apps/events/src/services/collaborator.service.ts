@@ -4,11 +4,10 @@ import { responses } from '../common/responses';
 import { IsNull, Repository } from 'typeorm';
 import { Collaborator, Event, TicketType, User, DefaultRoleSettings } from 'rumor-utils/shared/events/entities';
 import { collaboratorRoleToEntity, toCollaborator } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
-import * as serviceMesh from 'rumor-utils/service-mesh'
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { GetDefaultRoleConfigByRoleRequestDto } from 'rumor-utils/shared/events/dtos/collaborator.dto';
 import { Role } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database'
-import config from 'src/config';
 
 export class CollaboratorService {
   public static dbConnection = database;
@@ -34,19 +33,19 @@ export class CollaboratorService {
       });
       if (collaboratorExists) return responses.badRequest('Collaborator already exists');
 
-      let userExists = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+      let userExists: any = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
       if (!userExists) {
-        await serviceMesh.createNonMemberUser(config.get('API_BASE_URL'),payload.email);
-        userExists = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'),payload.email);
+        await serviceMesh.userService().createNonMemberUser({ email: payload.email });
+        userExists = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
       }
 
       let hasHostRole: boolean = false;
       for (const item of userExists.roles) {
         if (item.name == collaboratorRoleToEntity[payload.role]) hasHostRole = true;
       }
-      if (!hasHostRole) await serviceMesh.assignRoleToUser(config.get('API_BASE_URL'), userExists.id, collaboratorRoleToEntity[payload.role]);
+      if (!hasHostRole) await serviceMesh.userService().assignRoleToUser(userExists.id, collaboratorRoleToEntity[payload.role]);
 
-      const role: Partial<Role> = await serviceMesh.getRoleByName(config.get('API_BASE_URL'), collaboratorRoleToEntity[payload.role]);
+      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
       const user: Partial<User> = { id: userExists.id };
       const collaborator = new Collaborator();
       collaborator.displayName = payload.displayName;
@@ -108,15 +107,15 @@ export class CollaboratorService {
 
       let userExists;
       if (payload.email) {
-        userExists = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+        userExists = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
         if (!userExists) {
-          await serviceMesh.createNonMemberUser(config.get('API_BASE_URL'), payload.email);
-          userExists = await serviceMesh.getUserWithRolesByEmail(config.get('API_BASE_URL'), payload.email);
+          await serviceMesh.userService().createNonMemberUser({ email: payload.email });
+          userExists = await serviceMesh.userService().getUserWithRolesByEmail(payload.email);
         }
       }
 
       const user: Partial<User> = { id: userExists.id };
-      const role: Partial<Role> = await serviceMesh.getRoleByName(config.get('API_BASE_URL'), collaboratorRoleToEntity[payload.role]);
+      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
 
       collaborator.displayName = payload.displayName;
       collaborator.displayNameListEvent = payload.displayNameListEvent;

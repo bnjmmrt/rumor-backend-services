@@ -42,7 +42,8 @@ export class PlatformService {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-    return focuses.map((focus) => toFocus(focus));
+    const data = focuses.map((focus) => toFocus(focus));
+    return data
   }
 
   public static async addFocus(
@@ -129,7 +130,8 @@ export class PlatformService {
         deletedAt: IsNull(),
       },
     });
-    return interests.map((interest) => toInterest(interest));
+    const data = interests.map((interest) => toInterest(interest));
+    return data
   }
 
   public static async saveInterestsForUser(
