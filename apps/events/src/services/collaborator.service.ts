@@ -45,7 +45,7 @@ export class CollaboratorService {
       }
       if (!hasHostRole) await serviceMesh.userService().assignRoleToUser(userExists.id, collaboratorRoleToEntity[payload.role]);
 
-      const role: Partial<Role> = await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role]);
+      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
       const user: Partial<User> = { id: userExists.id };
       const collaborator = new Collaborator();
       collaborator.displayName = payload.displayName;
@@ -115,7 +115,7 @@ export class CollaboratorService {
       }
 
       const user: Partial<User> = { id: userExists.id };
-      const role: Partial<Role> = await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role]);
+      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
 
       collaborator.displayName = payload.displayName;
       collaborator.displayNameListEvent = payload.displayNameListEvent;
