@@ -3486,7 +3486,6 @@ export class AuthService {
   }
 
   public static async approveHost(user: User): Promise<void> {
-    try {
       const password = generateRandomPassword(12);
       const temporaryPassword = new TemporaryPassword();
       temporaryPassword.password = password;
@@ -3512,9 +3511,7 @@ export class AuthService {
         },
       };
       await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-    } catch (error) {
-      console.log(error)
-    }
+
   }
 
   public static async generateToken(user: User): Promise<string> {

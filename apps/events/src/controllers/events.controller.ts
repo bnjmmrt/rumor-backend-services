@@ -119,7 +119,7 @@ export class EventsController {
     const event: EventResponse | ListEventsFeedResponse = await EventsService.listEvents(
       payload
     );
-    const successResponse = new GetResponse(event);
+    const successResponse = new GetResponse(event.data);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -340,11 +340,12 @@ export class EventsController {
   )
 
   public static manualEventStatusUpdate = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const payload: ManualEventStatusUpdateRequestDto = req.body
+    const eventId = req.params.eventId
+    const payload: ManualEventStatusUpdateRequestDto = {...req.body, eventId}
     const eventResponse: EventResponse = await EventsService.manualEventStatusUpdate(
       payload
     );
-    const successResponse = new UpdateResponse(eventResponse);
+    const successResponse = new UpdateResponse(eventResponse.data);
     res.status(successResponse.statusCode).json(successResponse);
   }
   )
