@@ -685,7 +685,7 @@ export class EventsService {
     fromFeed: boolean,
     includeFeaturedEventSection: boolean,
   ): Promise<EventsResponse | ListEventsFeedResponse> {
-    const parsedQuery = parse(payload.query);
+    const parsedQuery = JSON.parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
         take: parseInt(parsedQuery.take),

@@ -30,7 +30,9 @@ import type { BasicHostProfile } from 'rumor-utils/shared/users/grpc/auth/auth.p
 export class AdminController {
   public static getMembers = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: PaginatedRequestDto = req.body;
+      const userId = (req as any).user;
+      const query = JSON.stringify(req.query);
+      const payload: PaginatedRequestDto = {userId, query};
       const response: GetMembersResponse = await AuthService.getMembers(payload);
       const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
@@ -39,7 +41,9 @@ export class AdminController {
 
   public static getHosts = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: PaginatedRequestDto = req.body;
+      const userId = (req as any).user;
+      const query = JSON.stringify(req.query);
+      const payload: PaginatedRequestDto = { userId, query };
       const response: GetHostsResponse = await AuthService.getHosts(payload);
       const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
