@@ -11,7 +11,7 @@ import {
   FeaturedEventsSection,
   FocusData,
   InterestData,
-  ReferralCode,
+  ReferralCodeData,
   ReferralRequest,
   ReferralRequestStatus,
   UserVouch,
@@ -123,13 +123,13 @@ export interface UpdateReferralCodeRequest {
 export interface ReferralCodeResponse {
   status: number;
   error?: Error | undefined;
-  data?: ReferralCode | undefined;
+  data?: ReferralCodeData | undefined;
 }
 
 export interface ReferralCodesResponse {
   status: number;
   error?: Error | undefined;
-  data: ReferralCode[];
+  data: ReferralCodeData[];
 }
 
 /** Create Referral Request */

@@ -8,6 +8,7 @@ import { SocialController } from '../controllers/social.controller';
 import AuthMiddleware from '../server/middleware/auth';
 import { PlatformController } from '../controllers/platform.controller';
 import { ReferralRequestController } from '../controllers/referral-request.controller';
+import { ReferralCodeController } from '../controllers/referral-code.controller';
 
 const router: Router = express.Router();
 
@@ -168,10 +169,19 @@ router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser)
 router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
 
 //Referral Requests
-router.post("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
-router.put("/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
-router.get("/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
-router.get("/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+router.post("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
+router.put("/auth/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
+router.get("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
+router.get("/auth/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+
+//Referral Codes
+router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
+router.get("/auth/referred-users", ReferralCodeController.getReferralCode)
+router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
+router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
+router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
+//Referrals
+router.post("/auth/referred-users", ReferralCodeController.saveReferredUser)
 
 
 router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );

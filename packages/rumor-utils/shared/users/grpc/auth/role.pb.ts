@@ -17,14 +17,14 @@ export interface SubRole {
   name: string;
 }
 
-export interface Role {
+export interface UserRoleData {
   id: string;
   name: string;
   subRoles: SubRole[];
 }
 
 /** UserRole */
-export interface UserRole {
+export interface UserRoleList {
   id: string;
   name: string;
   parentRoleId: string;
@@ -56,7 +56,7 @@ export interface RoleResponse {
 export interface ListRolesResponse {
   status: number;
   error?: Error | undefined;
-  data: Role[];
+  data: UserRoleData[];
 }
 
 /** SetUserPermission */
@@ -70,7 +70,7 @@ export interface PermissionRequest {
 export interface UserRoleResponse {
   status: number;
   error?: Error | undefined;
-  data: UserRole[];
+  data: UserRoleList[];
 }
 
 /** CheckRole */
