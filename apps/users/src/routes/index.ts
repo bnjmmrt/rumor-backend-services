@@ -13,18 +13,18 @@ const router: Router = express.Router();
 
 // Admin routes
 router.get('/auth/admin/members', AdminController.getMembers);
-router.get('/auth/admin/hosts', AdminController.getHosts);
+router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
-router.get('/auth/admin/host/:id', AdminController.getHostProfile);                // get host profile for admin
+router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
 router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id
-router.get('/auth/admin/host/:id/profile', AdminController.getBasicHostProfile);   // get basic host profile for admin
+router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
 router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
-router.put('/auth/admin/host/:id/profile', AdminController.updateHostProfile);     // update host profile for admin
+router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
 router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
 router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
-router.post('/auth/admin/member/status', AdminController.updateMemberStatus);
-router.get('/auth/admin/member/:id', AdminController.getMemberProfile);
+router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
+router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
 
 // Auth routes
 router.post('/auth/forgot-password', AuthController.forgotPassword);

@@ -6,7 +6,7 @@ import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
-import { entityToUserSource, entityToUserStatus, userSourceToEntity, userStatusToEntity } from './shared.mapper';
+import { entityToUserSource, entityToUserStatus} from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
 
 export const toHostProfile = (
