@@ -114,7 +114,8 @@ export class EventsController {
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
   public static listEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const payload: QueryRequestDto = req.query;
+    const queryParams = JSON.stringify(req.query)
+    const payload: QueryRequestDto = { query: queryParams };
     // const id = req.params.id;
     const event: EventResponse | ListEventsFeedResponse = await EventsService.listEvents(
       payload
