@@ -90,7 +90,8 @@ export class AdminController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostProfile')
   public static updateHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateHostProfileRequestDto = req.body;
+      const id  = req.params.id
+      const payload: UpdateHostProfileRequestDto = { ...req.body, id };
       const response: BasicHostProfileResponse = await AuthService.updateHostProfile(payload);
       const UpdatedResponse = new UpdateResponse(response.data, 'Updated host details succesfully');
       res.status(UpdatedResponse.statusCode).json(UpdatedResponse)

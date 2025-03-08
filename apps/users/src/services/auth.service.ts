@@ -2939,7 +2939,7 @@ export class AuthService {
 
   // ADMIN Sevice Code
 
-  public static async getMembers(payload: PaginatedRequestDto): Promise<any> { //GetMembersResponse
+  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
