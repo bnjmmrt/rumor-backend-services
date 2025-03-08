@@ -40,6 +40,7 @@ import {
   ListEventStatusResponse,
   ListEventUsedTicketsResponse,
   ListHostEventsResponse,
+  PaginatedEventsResponse,
   ToggleGuestCheckStatusResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
@@ -1449,7 +1450,7 @@ export class EventsService {
 
             // If the reassigned ticket is also being deleted but has no further reassignment, it's invalid
             if (!reassignedTicket?.reassignTo?.id && !reassignedTicket?.reassignTo?.name) {
-              throw new Error(
+              throw new BadRequestError(
                 `Invalid reassignment: Ticket "${ticket.name}" is being deleted and reassigned to "${ticket.reassignTo?.name || 'other ticket'}", which is also being deleted.`,
               );
             }
@@ -1471,7 +1472,7 @@ export class EventsService {
           });
         } else if (ticket.action === 'delete') {
           if (!ticket.id) {
-            throw new Error(`Ticket with name "${ticket.name}" is missing an ID for deletion.`);
+            throw new BadRequestError(`Ticket with name "${ticket.name}" is missing an ID for deletion.`);
           }
           if (ticket.reassignTo) {
             if (ticket.reassignTo.id) {
@@ -1491,7 +1492,7 @@ export class EventsService {
       //check if deleteIds contains the guest associated with it (it should not delete without reassigning)
       const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId);   //TODO: check this after taking pull from dev-temp
       if (hasAssignedGuests) {
-        throw new Error('Cannot delete ticket types as they are assigned to guests.');
+        throw new BadRequestError('Cannot delete ticket types as they are assigned to guests.');
       }
       //ends here
       //  STEP 2: Handle Reassignments Before Deleting Anything
@@ -1656,10 +1657,10 @@ export class EventsService {
   }
 
 
-  public static async updateEvent(payload: UpdateEventRequestDto): Promise<EventResponse> {
+  public static async updateEvent(payload: UpdateEventRequestDto): Promise<EventData> {
     const eventId = payload.id;
     if (!eventId) throw new BadRequestError('Event ID is required');
-    const queryRunner = this.dataSource.createQueryRunner();
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -1669,6 +1670,7 @@ export class EventsService {
         relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
       });
 
+      const eventCopy = JSON.parse(JSON.stringify(event));
       /**date validations */
       if (!payload.startDate) {
         payload.startDate = event.startDate.toISOString();
@@ -1795,7 +1797,12 @@ export class EventsService {
       // Detect changes before updating the event
       let eventDateOrLocationComparisionResponse = { changed: false };
       if (eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
-        eventDateOrLocationComparisionResponse = hasEventDateOrLocationChanged(payload, event);
+        let updatedDateAndLocation = {
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          eventLocation: payload.eventLocation
+        }
+        eventDateOrLocationComparisionResponse = await hasEventDateOrLocationChanged(updatedDateAndLocation, eventCopy);
       }
 
       //ends here
@@ -1803,12 +1810,12 @@ export class EventsService {
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
        * send email notification if date, time, location is updated
-       * end email only after successful commit & only if relevant details changed
+       * send email only after successful commit & only if relevant details changed
        */
       if (eventDateOrLocationComparisionResponse.changed && eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
         try {
           const guestStatuses: GuestStatus[] = [GuestStatus.APPLIED, GuestStatus.CONFIRMED, GuestStatus.REVIEW, GuestStatus.DECLINED, GuestStatus.INVITED];
-          await this.notifyGuestsOnDateOrLocationChange({ eventPayload: payload, eventId, guestStatuses });
+          await this.notifyGuestsOnDateOrLocationChange({ eventPayload: payload, eventId, guestStatuses, event, existingLocation });
         } catch (emailError) {
           // this.logger.warn(`Failed to send update email: ${emailError.message}`);
           // Email failure does NOT rollback the DB update
@@ -1819,7 +1826,7 @@ export class EventsService {
         where: { id: event.id },
         relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
       });
-      return responses.data(toEvent(updatedEvent, null));
+      return toEvent(updatedEvent, null)
     } catch (error) {
       // Rollback transaction in case of an error
       await queryRunner.rollbackTransaction();
@@ -1842,88 +1849,84 @@ export class EventsService {
     eventPayload,
     eventId,
     guestStatuses,
+    event,
+    existingLocation
   }: {
     eventPayload: UpdateEventRequestDto;
     eventId: string;
     guestStatuses: GuestStatus[];
+    event: Event;
+    existingLocation: EventLocation
   }): Promise<void> {
-    try {
-      if (!guestStatuses.length) {
-        // this.logger.warn('No statuses provided for guest filtering.');
-        return;
-      }
-      const guests: Guest[] = await GuestService.fetchGuestsByStatuses(eventId, guestStatuses);
-      if (!guests.length) {
-        // this.logger.warn(`No guests found for event ${eventId} with statuses ${guestStatuses.join(', ')}`);
-        return;
-      }
-
-      // Process notifications in parallel
-      const notificationPromises = guests.map(async (guest) => {
-        const guestName = guest.user?.firstName || 'Guest';
-        const eventName = eventPayload.name || guest.event?.name || 'Event';
-        const eventStartDate = eventPayload.startDate || guest.event?.startDate || 'TBD';
-        const eventLocation =
-          eventPayload?.eventLocation?.location && eventPayload?.eventLocation?.city
-            ? `${eventPayload.eventLocation.location}, ${eventPayload.eventLocation.city}`
-            : 'TBD';
-        const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
-
-        try {
-          if (guest.user?.email) {
-            // TO DO: Change email and sms template
-            const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
-              [
-                {
-                  key: 'custom_message',
-                  value: message,
-                },
-                {
-                  key: 'event_name',
-                  value: eventName,
-                },
-                {
-                  key: 'image_url',
-                  value: guest.event.imageFlyer,
-                },
-                {
-                  key: 'time',
-                  value: eventStartDate,
-                },
-                {
-                  key: 'location',
-                  value: eventLocation,
-                },
-              ],
-              'Event Info Updated',
-              [guest.user.email],
-              null,
-              // this.logger,
-            );
-
-            if (!mailServiceResponse) {
-              // this.logger.warn(`Failed to send mail for event date/location to ${guestName}`);
-            }
-          } else if (guest.user?.phoneNumber) {
-            // Send SMS notification
-            const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
-
-            if (!success) {
-              // this.logger.warn(`Failed to send SMS  for event date/location to guest ${guestName}`);
-            }
-          } else {
-            // Log if no contact details exist
-            // this.logger.warn(`No contact details available for ${guestName}, skipping notification for event date/location .`);
-          }
-        } catch (error) {
-          // this.logger.error(`Error sending notification to guest ${guest.id} for event date/location :`, error);
-        }
-      });
-      await Promise.allSettled(notificationPromises);
-      // this.logger.log(`Notifications sent for event ${eventId}`);
-    } catch (error) {
-      // this.logger.error('Error while notifying guests', error);
+    if (!guestStatuses.length) {
+      // this.logger.warn('No statuses provided for guest filtering.');
+      return;
     }
+    const guests: Guest[] = await GuestService.fetchGuestsByStatuses(eventId, guestStatuses);
+    if (!guests.length) {
+      // this.logger.warn(`No guests found for event ${eventId} with statuses ${guestStatuses.join(', ')}`);
+      return;
+    }
+
+    // Process notifications in parallel
+    const notificationPromises = guests.map(async (guest) => {
+      const guestName = guest.user?.firstName || 'Guest';
+      const eventName = event.name || event?.name || 'Event';
+      const eventStartDate = event.startDate || event?.startDate || 'TBD';
+      const eventLocation =
+        existingLocation?.location && existingLocation?.city
+          ? `${existingLocation.location}, ${existingLocation.city}`
+          : 'TBD';
+      const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
+
+      if (guest.user?.email) {
+        // TODO: Change email and sms template
+        const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'custom_message',
+              value: message,
+            },
+            {
+              key: 'event_name',
+              value: eventName,
+            },
+            {
+              key: 'image_url',
+              value: event.imageFlyer,
+            },
+            {
+              key: 'time',
+              value: eventStartDate,
+            },
+            {
+              key: 'location',
+              value: eventLocation,
+            },
+          ],
+          'Event Info Updated',
+          [guest.user.email],
+          null,
+          // this.logger,
+        );
+
+        if (!mailServiceResponse) {
+          // this.logger.warn(`Failed to send mail for event date/location to ${guestName}`);
+        }
+      } else if (guest.user?.phoneNumber) {
+        // Send SMS notification
+        const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
+
+        if (!success) {
+          // this.logger.warn(`Failed to send SMS  for event date/location to guest ${guestName}`);
+        }
+      } else {
+        // Log if no contact details exist
+        // this.logger.warn(`No contact details available for ${guestName}, skipping notification for event date/location .`);
+      }
+    });
+    await Promise.allSettled(notificationPromises);
+    // this.logger.log(`Notifications sent for event ${eventId}`);
   }
 
   public static async validateAddress(payload: AddressValidationRequest): Promise<AddressValidationResponse> {
@@ -2298,7 +2301,7 @@ export class EventsService {
     return responses.data(toEvent(updatedEvent, null));
   }
 
-  public static async getPublicEvent(payload: UserAndIdRequestDto): Promise<EventResponse> {
+  public static async getPublicEvent(payload: UserAndIdRequestDto): Promise<EventData> {
     const event: Event = await this.dbConnection.getRepository(Event).findOne({
       where: {
         id: payload.id,
@@ -2317,7 +2320,7 @@ export class EventsService {
       relations: { user: true },
     });
 
-    return responses.data(toEvent(event, undefined, undefined, guest));
+    return toEvent(event, undefined, undefined, guest)
   }
 
   public static async publishEventById(payload: RequestByIdDto): Promise<string> {
@@ -2646,89 +2649,84 @@ export class EventsService {
  * @param payload
  * @returns EventsResponse
  */
-  public static async listHostEvents(payload: ListHostEventsDto): Promise<ListHostEventsResponse> {
-    try {
-      const { userId } = payload;
-      const parsedQuery = parse(payload.query);
-      const currentTime = new Date().toISOString();
+  public static async listHostEvents(payload: ListHostEventsDto): Promise<PaginatedEventsResponse> {
+    const { userId } = payload;
+    const parsedQuery = JSON.parse(payload.query)
+    const currentTime = new Date().toISOString();
 
-      // Check and set pagination if available
-      const pagination: { take?: number; skip?: number } = hasPagination(parsedQuery)
-        ? {
-          take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
-          skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
-        }
-        : {};
-
-      // Create the base query
-      const query = this.dbConnection.getRepository(Event)
-        .createQueryBuilder('event')
-        .leftJoinAndSelect('event.owner', 'owner')
-        .leftJoinAndSelect('event.collaborators', 'collaborators')
-        .leftJoinAndSelect('collaborators.user', 'user')
-        .leftJoinAndSelect('collaborators.role', 'role')
-        .leftJoin('event.guests', 'guest') // Ensure guests are linked to event
-        .where('(owner.id = :userId OR collaborators.user.id = :userId)', { userId })
-        .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', (qb) =>
-          qb.where('confirmedGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
-        )
-        .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', (qb) =>
-          qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
-        );
-
-      let status: EventStatusEnum | undefined;
-      if (parsedQuery.status && typeof parsedQuery.status === 'string') {
-        status = parsedQuery.status as EventStatusEnum; // Casting to EventStatusEnum
+    // Check and set pagination if available
+    const pagination: { take?: number; skip?: number } = hasPagination(parsedQuery)
+      ? {
+        take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
+        skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
       }
-      // Check if status is one of the specified values (DRAFT_STATUS, PENDING_STATUS, DECLINED_STATUS, CANCELLED_STATUS)
-      const validStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+      : {};
 
-      if (status && validStatuses.includes(status)) {
-        // Apply the status filter directly for the specified status values
-        query.andWhere('event.status = :status', { status });
-      } else if (status === EventStatusEnum.UPCOMING_STATUS || status === EventStatusEnum.PAST_STATUS) {
-        // Filter for approved events first
-        query.andWhere('event.status = :approvedStatus', {
-          approvedStatus: EventStatusEnum.APPROVED_STATUS,
-        });
+    // Create the base query
+    const query = this.dbConnection.getRepository(Event)
+      .createQueryBuilder('event')
+      .leftJoinAndSelect('event.owner', 'owner')
+      .leftJoinAndSelect('event.collaborators', 'collaborators')
+      .leftJoinAndSelect('collaborators.user', 'user')
+      .leftJoinAndSelect('collaborators.role', 'role')
+      .leftJoin('event.guests', 'guest') // Ensure guests are linked to event
+      .where('(owner.id = :userId OR collaborators.user.id = :userId)', { userId })
+      .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', (qb) =>
+        qb.where('confirmedGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
+      )
+      .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', (qb) =>
+        qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
+      );
 
-        // Add specific date filtering based on the requested status
-        if (status === EventStatusEnum.UPCOMING_STATUS) {
-          query.andWhere('event.end_date > :currentTime', { currentTime });
-        } else if (status === EventStatusEnum.PAST_STATUS) {
-          query.andWhere('event.end_date < :currentTime', { currentTime });
-        }
-      }
+    let status: EventStatusEnum | undefined;
+    if (parsedQuery.status && typeof parsedQuery.status === 'string') {
+      status = parsedQuery.status as EventStatusEnum; // Casting to EventStatusEnum
+    }
+    // Check if status is one of the specified values (DRAFT_STATUS, PENDING_STATUS, DECLINED_STATUS, CANCELLED_STATUS)
+    const validStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
 
-      // Apply pagination if necessary
-      if (pagination.take > 0) query.take(pagination.take);
-      if (pagination.skip > 0) query.skip(pagination.skip);
-
-      // Add eventName filter if provided
-      if (parsedQuery.eventName) {
-        const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
-        const eventName = decodedEventName.replace(/\s+/g, ' ').trim(); // Normalize spaces
-        query.andWhere('event.name ILIKE :eventName', { eventName: `%${eventName}%` });
-      }
-
-      const totalCount = await query.getCount();
-      const events = await query.getMany();
-      type EventWithGuestCounts = Event & {
-        checkedInGuestCount: string;
-        confirmedGuestCount: string;
-      };
-      const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map((event: EventWithGuestCounts) => {
-        const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
-        const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
-        return toEvent(event as Event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+    if (status && validStatuses.includes(status)) {
+      // Apply the status filter directly for the specified status values
+      query.andWhere('event.status = :status', { status });
+    } else if (status === EventStatusEnum.UPCOMING_STATUS || status === EventStatusEnum.PAST_STATUS) {
+      // Filter for approved events first
+      query.andWhere('event.status = :approvedStatus', {
+        approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-      return responses.data({
-        eventsResponse: formattedEvents,
-        totalCount,
-      });
-    } catch (err) {
-      // this.logger.error(err);
-      throw new BadRequestError('Error while getting events');
+
+      // Add specific date filtering based on the requested status
+      if (status === EventStatusEnum.UPCOMING_STATUS) {
+        query.andWhere('event.end_date > :currentTime', { currentTime });
+      } else if (status === EventStatusEnum.PAST_STATUS) {
+        query.andWhere('event.end_date < :currentTime', { currentTime });
+      }
+    }
+
+    // Apply pagination if necessary
+    if (pagination.take > 0) query.take(pagination.take);
+    if (pagination.skip > 0) query.skip(pagination.skip);
+
+    // Add eventName filter if provided
+    if (parsedQuery.eventName) {
+      const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
+      const eventName = decodedEventName.replace(/\s+/g, ' ').trim(); // Normalize spaces
+      query.andWhere('event.name ILIKE :eventName', { eventName: `%${eventName}%` });
+    }
+
+    const totalCount = await query.getCount();
+    const events = await query.getMany();
+    type EventWithGuestCounts = Event & {
+      checkedInGuestCount: string;
+      confirmedGuestCount: string;
+    };
+    const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map((event: EventWithGuestCounts) => {
+      const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
+      const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
+      return toEvent(event as Event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+    });
+    return {
+      eventsResponse: formattedEvents,
+      totalCount,
     }
   }
 

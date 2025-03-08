@@ -6,8 +6,9 @@ import { Collaborator, Event, TicketType, User, DefaultRoleSettings } from 'rumo
 import { collaboratorRoleToEntity, toCollaborator } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { GetDefaultRoleConfigByRoleRequestDto } from 'rumor-utils/shared/events/dtos/collaborator.dto';
-import { Role } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { DataRoleDefault, Role } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database'
+import { BadRequestError } from 'rumor-utils/errors';
 
 export class CollaboratorService {
   public static dbConnection = database;
@@ -208,8 +209,8 @@ export class CollaboratorService {
     }
   }
 
-  public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<GetDefaultRoleConfigByRoleResponse> {
-    try {
+  public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<DataRoleDefault> {
+  
       let response;
       if (payload.roleId) {
         response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
@@ -227,10 +228,10 @@ export class CollaboratorService {
         });
       }
       if (!response) {
-        return responses.badRequest('Error at get default config');
+        throw new BadRequestError('Error at get default config');
       }
 
-      return responses.data({
+      return {
         editEventDetailsSettings: response.editEventDetailsSettings,
         inviteGuestsToEvent: response.inviteGuestsToEvent,
         addGuestsToDrafts: response.addGuestsToDrafts,
@@ -245,9 +246,6 @@ export class CollaboratorService {
         generateEventReports: response.generateEventReports,
         roleName: response?.role?.name || '',
         roleId: response?.role?.id || '',
-      });
-    } catch (error) {
-      return responses.badRequest('Error getting collaborators');
-    }
+      }
   }
 }

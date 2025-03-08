@@ -18,6 +18,7 @@ import {
   ListEventStatusResponse,
   ListEventUsedTicketsResponse,
   ListHostEventsResponse,
+  PaginatedEventsResponse,
   ToggleGuestCheckStatusResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
@@ -44,7 +45,7 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import { EventData, EventTypeData } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { EventData, EventTypeData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 export class EventsController {
 
   public static listEventStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
@@ -144,7 +145,7 @@ export class EventsController {
     const { id } = req.params
     req.body.id = id
     const payload: UpdateEventRequestDto = req.body
-    const event: EventResponse = await EventsService.updateEvent(
+    const event: EventData = await EventsService.updateEvent(
       payload
     );
     const successResponse = new UpdateResponse(event);
@@ -331,7 +332,7 @@ export class EventsController {
   public static getPublicEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const ageLimitResponse: EventResponse = await EventsService.getPublicEvent(
+    const ageLimitResponse: EventData = await EventsService.getPublicEvent(
       payload
     );
     const successResponse = new GetResponse(ageLimitResponse);
@@ -445,10 +446,10 @@ export class EventsController {
   );
 
   public static listHostEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const { userId, id } = req.params
-    const { query } = req.params
-    const payload: ListHostEventsDto = { userId, query }
-    const response: ListHostEventsResponse = await EventsService.listHostEvents(
+    const id = (req as any).user;
+    const queryParams = JSON.stringify(req.query)
+    const payload: ListHostEventsDto = { userId: id, query: queryParams }
+    const response: PaginatedEventsResponse = await EventsService.listHostEvents(
       payload
     );
     const successResponse = new GetResponse(response);
