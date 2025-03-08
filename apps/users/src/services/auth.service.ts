@@ -103,7 +103,8 @@ import {
   VerificationStatus,
   UserDataSimple,
   UserWithRoles,
-  BasicHostProfile
+  BasicHostProfile,
+  UserIdWithRolesAndToken,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -305,7 +306,7 @@ export class AuthService {
     }
   }
 
-  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<MemberSignUpResponse> {
+  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<UserIdWithRolesAndToken> {
     let existingUser: User | null = null;
     let fusionAuthUser = null;
     let requiresFusionAuthRegistration = false;
@@ -405,7 +406,7 @@ export class AuthService {
 
       fusionAuthUser = await fusionAuthClientHandler.fusionAuthClient().register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
-        return responses.conflict(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+        throw new ConflictError(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
       }
       newUser.id = fusionAuthUser.response?.user?.id;
       fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
@@ -452,17 +453,17 @@ export class AuthService {
     });
 
     if (!savedUser) {
-      return responses.badRequest('Error retrieving user after sign-up.');
+       throw new BadRequestError('Error retrieving user after sign-up.');
     }
 
-    return responses.data({
+    return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
         roleName: role.role.name,
         roleId: role.role.id,
       })),
       token: fusionAuthToken, // Now token is set correctly
-    });
+    };
 
   }
 
@@ -1082,7 +1083,7 @@ export class AuthService {
     return { isValid: true };
   }
 
-  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
+  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -1123,7 +1124,7 @@ export class AuthService {
 
       const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
-      return responses.data({
+      return {
         token: '',
         roles: [
           {
@@ -1134,7 +1135,7 @@ export class AuthService {
         id: user.id,
         user: user,
         isGuest: true,
-      });
+      };
     }
 
     if (!user && !payload.isExist) {
@@ -1158,7 +1159,7 @@ export class AuthService {
 
       const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
-      return responses.data({
+      return {
         id: '',
         token: '',
         roles: [
@@ -1171,13 +1172,13 @@ export class AuthService {
         isInvited,
         user: user,
         isGuest: false,
-      });
+      };
     }
 
     // Handle bypass verification logic for testing or review environment
     if (config.get('APP_REVIEW_LOGIN') === loginIdentifier || config.get('BYPASS_VERIFICATION_CODE')) {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
+      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
       const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
@@ -1186,7 +1187,7 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      return responses.data({
+      return {
         id: user.id,
         token: completedLogin.response.token,
         roles: user.roles.map((item) => ({
@@ -1195,7 +1196,7 @@ export class AuthService {
         })),
         user: user,
         isGuest: false,
-      });
+      };
     } else {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
         where: {
@@ -1214,7 +1215,7 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      return responses.data({
+      return {
         token: completedLogin.response.token,
         roles: user.roles.map((item) => ({
           roleName: item.role.name,
@@ -1223,7 +1224,7 @@ export class AuthService {
         id: user.id,
         user: user,
         isGuest: false,
-      });
+      };
     }
   }
 

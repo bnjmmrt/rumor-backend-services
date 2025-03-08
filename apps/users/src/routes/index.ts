@@ -156,17 +156,17 @@ router.get('/auth/x-auth-callback', SocialController.getXAuthData);
 // router.get('/auth/social/microsoft/callback', SocialController.syncSocialStats);
 
 //platform
-router.get('/auth/get-focuses', PlatformController.getFocuses);
-router.get('/auth/user/:id/focuses', PlatformController.getUserFocuses);
-router.post('/auth/add-focus', PlatformController.addFocus);
-router.post('/auth/edit-focus-name', PlatformController.editFocusName);
-router.post('/auth/interest', PlatformController.createInterest);
-router.put('/auth/interest/:id', PlatformController.updateInterest);
-router.get('/auth/interests', PlatformController.listInterests);
-router.get('/auth/interest/:id', PlatformController.deleteInterest);
-router.get('/auth/user-interests/:id', PlatformController.getUserInterests);
-router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser);
-router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
+router.get('/platform/get-focuses', PlatformController.getFocuses);
+router.get('/platform/user/:id/focuses', PlatformController.getUserFocuses);
+router.post('/platform/add-focus', PlatformController.addFocus);
+router.post('/platform/edit-focus-name', PlatformController.editFocusName);
+router.post('/platform/interest', PlatformController.createInterest);
+router.put('/platform/interest/:id', PlatformController.updateInterest);
+router.get('/platform/interests', PlatformController.listInterests);
+router.delete('/platform/interest/:id', PlatformController.deleteInterest);
+router.get('/platform/user-interests/:id', PlatformController.getUserInterests);
+router.post('/platform/user-interests/:id', PlatformController.saveInterestsForUser);
+router.post('/platform/user/:userId/add-focus', PlatformController.saveFocusesForUser);
 
 //Referral Requests
 router.post("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
