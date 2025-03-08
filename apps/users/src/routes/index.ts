@@ -52,7 +52,7 @@ router.post('/auth/check-member-login', AuthController.checkMemberLogin);
 router.post('/auth/member-login', AuthController.memberLogin);
 router.post('/auth/host-login', AuthController.hostLogin);
 router.get('/auth/get-current-member', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentMember);
-router.post('/auth/user/:id/get-user', AuthController.getUser);
+router.get('/auth/user/:id/get-user', AuthController.getUser);
 router.get('/auth/current-user', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentUser);
 router.post('/auth/save-or-update-provider', AuthController.saveOrUpdateProvider);
 router.post('/auth/send-invitations', AuthMiddleware.fusionAuthRequired, AuthController.sendInvitations);

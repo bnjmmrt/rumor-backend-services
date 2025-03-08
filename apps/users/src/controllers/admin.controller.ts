@@ -25,6 +25,7 @@ import { UpdateHostProfileRequestDto } from "rumor-utils/shared/users/dtos/admin
 import { GenericResponse } from "rumor-utils/shared/users/grpc/auth/shared.pb";
 import asyncWrapper from "../server/helpers/asyncWrapper";
 import { CreateResponse, GetResponse, UpdateResponse } from "rumor-utils/success";
+import type { BasicHostProfile } from 'rumor-utils/shared/users/grpc/auth/auth.pb.d.ts';
 
 export class AdminController {
   public static getMembers = asyncWrapper(
@@ -71,19 +72,16 @@ export class AdminController {
       const response: HostProfileResponse = await AuthService.getHostProfile(payload);
       const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
-      res.json(response);
     }
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'GetBasicHostProfile')
   public static getBasicHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
-      console.log(payload)
-      const response: BasicHostProfileResponse = await AuthService.getBasicHostProfile(payload);
-      const getResponse = new GetResponse(response.data);
-      res.status(getResponse.statusCode).json(getResponse);
-      res.json(response);
+      const payload: IdRequestDto = { id: req.params.id };
+      const response: BasicHostProfile = await AuthService.getBasicHostProfile(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 

@@ -648,6 +648,9 @@ export interface HostProfile {
   socialMedia: HostSocialMedia | undefined;
   isMemberFollowingHost: boolean;
   website?: string | undefined;
+  isMemberBlockedHost?: boolean | undefined;
+  roleId?: string | undefined;
+  roleName?: string | undefined;
 }
 
 export interface FollowHostProfile {

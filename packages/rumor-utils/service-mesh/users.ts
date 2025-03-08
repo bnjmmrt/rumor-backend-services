@@ -11,13 +11,13 @@ export const getBasicHostProfile = (id: string) => apiService.getApi().get(`/aut
 
 export const getMembersOrNonMembers = (userId: string, query: string) => apiService.getApi().post(`/auth/user/get-member-or-non-member/?query=${query}`, { userId });
 
-export const getUser = (baseURL:string, userId: string) => apiService.getApi().get(`/auth/user/${userId}/get-user`);
+export const getUser = (userId: string) => apiService.getApi().get(`/auth/user/${userId}/get-user`);
 
 export const getRoleByName = (name: string) => apiService.getApi().post(`/auth/roles/get-role-by-name`, { name });
 
 export const getUserWithRolesByEmail = (email: string) => apiService.getApi().post(`/auth/get-user-with-roles-by-email`, { email });
 
-export const getUserWithRolesByPhone = (baseURL:string, phoneNumber: string) => apiService.getApi().post(`/auth/get-user-with-roles-by-phone`, phoneNumber);
+export const getUserWithRolesByPhone = (phoneNumber: string) => apiService.getApi().post(`/auth/get-user-with-roles-by-phone`, { phoneNumber });
 
 export const createNonMemberUser = (payload: CreateNonMemberUserRequestDto) => apiService.getApi().post(`/auth/non-member`, { email: payload.email, phoneNumber: payload.phoneNumber, firstName: payload.firstName, lastName: payload.lastName });
 

@@ -103,6 +103,7 @@ import {
   VerificationStatus,
   UserDataSimple,
   UserWithRoles,
+  BasicHostProfile
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -1307,13 +1308,14 @@ export class AuthService {
       throw new NotFoundError('user');
     }
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member' || role.role.name === 'host');
+    const memberRole = user.roles.find((role) => role.role.name === 'member' || role.role.name === 'host' || role.role.name === 'non_member');
 
     if (memberRole === undefined) {
       throw new NotFoundError('user');
     }
 
-    return (toSimpleUser(user, memberRole));
+    const data = (toSimpleUser(user, memberRole));
+    return data;
   }
 
   public static async getCurrentUser(payload: IdRequestDto): Promise<CurrentUser[]> {
@@ -3241,16 +3243,15 @@ export class AuthService {
   public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
     const memberId = payload.userId; //Only valid if endpoint was called by a member
     let isMemberFollowingHost = false;
+    let isMemberBlockedHost = false;
 
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
       relations: {
-        hostedEvents: true,
+        hostedEvents: { location: true },
       },
     });
-    if (!host) {
-      throw new NotFoundError('host')
-    }
+    if (!host) return responses.notFound('Host not found.');
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: host.id } },
@@ -3260,12 +3261,13 @@ export class AuthService {
     });
 
     const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) {
-      throw new NotFoundError('host')
-    }
+    const roleId = hostRole.role.id;
+    const roleName = hostRole.role.name;
+
+    if (hostRole === undefined) return responses.notFound('Host not found');
 
     if (memberId !== host.id) {
-      const hostFollowing = await this.dbConnection.getRepository(HostFollowing).findOne({
+      const hostFollowing = this.dbConnection.getRepository(HostFollowing).findOne({
         where: {
           follower: { id: memberId },
           host: { id: host.id },
@@ -3273,9 +3275,18 @@ export class AuthService {
       });
 
       if (hostFollowing) isMemberFollowingHost = true;
+
+      const isBlocked = await this.dbConnection.getRepository(Block).findOne({
+        where: {
+          blockedBy: { id: memberId },
+          blockedTo: { id: host.id },
+        },
+      });
+
+      if (isBlocked) isMemberBlockedHost = true;
     }
 
-    return responses.data(toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost));
+    return toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost, isMemberBlockedHost, roleId, roleName)
   }
 
   public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
@@ -3324,7 +3335,7 @@ export class AuthService {
     return responses.data(toBasicHostProfile(updatedUser, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
   }
 
-  public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfileResponse> {
+  public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfile> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
@@ -3343,7 +3354,9 @@ export class AuthService {
     if (hostRole === undefined) {
       throw new NotFoundError('Host role not found')
     }
-    return responses.data(toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
+
+    const data = toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]);
+    return data
   }
 
   //TO do from here

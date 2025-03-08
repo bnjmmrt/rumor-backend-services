@@ -1,8 +1,7 @@
 import * as _ from 'lodash';
-// import dayjs from 'dayjs';
-import * as dayjs from 'dayjs'
-import { User } from "../entities/user.entity"
+import { User } from '../entities/user.entity';
 import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
+import * as dayjs from 'dayjs';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
@@ -10,7 +9,15 @@ import { entityToGender } from './auth.mapper';
 import { entityToUserSource, entityToUserStatus, userSourceToEntity, userStatusToEntity } from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
 
-export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
+export const toHostProfile = (
+  user: User,
+  status: UserStatus,
+  source: UserSource,
+  isMemberFollowingHost: boolean,
+  isMemberBlockedHost: boolean,
+  roleId: string,
+  roleName: string,
+): HostProfile => {
   const upcomingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
     .map((event) => {
@@ -21,6 +28,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
   const pastEvents = user.hostedEvents
@@ -33,6 +41,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
   const pendingEvents = user.hostedEvents
@@ -45,6 +54,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
 
@@ -73,6 +83,9 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     socialMedia: user?.additionalHostInformation?.socialMedia || {},
     isMemberFollowingHost,
     website: user?.additionalHostInformation?.website || '',
+    isMemberBlockedHost,
+    roleId: roleId,
+    roleName: roleName,
   };
 };
 
