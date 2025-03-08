@@ -145,7 +145,7 @@ router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.get
 // Host
 router.get("/hosts/events", AuthMiddleware.fusionAuthRequired, EventsController.listHostEvents) /**TestStatus: working */
 //admin status
-router.put("/v1/admin/events/:eventId/status", EventsController.manualEventStatusUpdate)
+router.put("/admin/events/:eventId/status", AuthMiddleware.fusionAuthRequired, EventsController.manualEventStatusUpdate)
 
 //ends here
 /**

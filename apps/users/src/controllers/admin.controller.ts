@@ -68,9 +68,11 @@ export class AdminController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'GetHostProfile')
   public static getHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UserAndIdRequestDto = req.body;
+      const userId = (req as any).user;
+      const { id } = req.params;
+      const payload: UserAndIdRequestDto = {userId, id};
       const response: HostProfileResponse = await AuthService.getHostProfile(payload);
-      const getResponse = new GetResponse(response.data);
+      const getResponse = new GetResponse(response);
       res.status(getResponse.statusCode).json(getResponse);
     }
   );
@@ -88,7 +90,8 @@ export class AdminController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostProfile')
   public static updateHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateHostProfileRequestDto = req.body;
+      const id  = req.params.id
+      const payload: UpdateHostProfileRequestDto = { ...req.body, id };
       const response: BasicHostProfileResponse = await AuthService.updateHostProfile(payload);
       const UpdatedResponse = new UpdateResponse(response.data, 'Updated host details succesfully');
       res.status(UpdatedResponse.statusCode).json(UpdatedResponse)

@@ -209,7 +209,7 @@ export class GuestService {
   private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[] | GenericResponse> {
     const parsedQuery = payload.query ? parse(payload.query) : undefined;
     const eventId = parsedQuery?.eventId as string;
-    const { isSelectedAll, inclusiveIds, exclusiveIds, filePath, bulkUploadStatus, guestStatus, currentStatus } = payload;
+    const { isSelectedAll, inclusiveIds, exclusiveIds, filePath, bulkUploadStatus, currentStatus } = payload;
 
     // Case 1: Select all guests based on a query
     if (isSelectedAll) {
@@ -247,17 +247,17 @@ export class GuestService {
 
       // Extract main guest IDs
       let guestIds: string[] = getGuests.data.users
-        .filter(
-          (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
-        )
-        .map((guest) => guest.id);
-
+      .filter(
+        (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
+      )
+      .map((guest) => guest.id);
+      
       // Extract additional guest IDs (if any)
       const additionalGuestIds: string[] = getGuests.data.users
-        .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
-        .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
-        .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
-
+      .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
+      .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
+      .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
+      
       // Combine all guest IDs
       guestIds = [...guestIds, ...additionalGuestIds];
 
@@ -442,7 +442,7 @@ export class GuestService {
         payload.guests.map(async (guestId) => {
           try {
             // Fetch the guest details along with associated user information
-            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId } });
+            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId }, relations: ['user', 'addedBy', 'declinedBy'] });
 
             // If guest does not exist, log a warning and return null
             if (!guest) {
@@ -506,7 +506,8 @@ export class GuestService {
             }
 
             // Save the updated guest data
-            return await this.dbConnection.getRepository(Guest).save(guest);
+            const data =  await this.dbConnection.getRepository(Guest).save(guest);
+            return data;
           } catch (err) {
             // Log error and return null in case of failure
             return null;

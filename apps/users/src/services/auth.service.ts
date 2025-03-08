@@ -103,7 +103,8 @@ import {
   VerificationStatus,
   UserDataSimple,
   UserWithRoles,
-  BasicHostProfile
+  BasicHostProfile,
+  UserIdWithRolesAndToken,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -305,7 +306,7 @@ export class AuthService {
     }
   }
 
-  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<MemberSignUpResponse> {
+  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<UserIdWithRolesAndToken> {
     let existingUser: User | null = null;
     let fusionAuthUser = null;
     let requiresFusionAuthRegistration = false;
@@ -405,7 +406,7 @@ export class AuthService {
 
       fusionAuthUser = await fusionAuthClientHandler.fusionAuthClient().register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
-        return responses.conflict(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+        throw new ConflictError(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
       }
       newUser.id = fusionAuthUser.response?.user?.id;
       fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
@@ -452,17 +453,17 @@ export class AuthService {
     });
 
     if (!savedUser) {
-      return responses.badRequest('Error retrieving user after sign-up.');
+       throw new BadRequestError('Error retrieving user after sign-up.');
     }
 
-    return responses.data({
+    return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
         roleName: role.role.name,
         roleId: role.role.id,
       })),
       token: fusionAuthToken, // Now token is set correctly
-    });
+    };
 
   }
 
@@ -1082,7 +1083,7 @@ export class AuthService {
     return { isValid: true };
   }
 
-  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
+  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -1123,7 +1124,7 @@ export class AuthService {
 
       const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
-      return responses.data({
+      return {
         token: '',
         roles: [
           {
@@ -1134,7 +1135,7 @@ export class AuthService {
         id: user.id,
         user: user,
         isGuest: true,
-      });
+      };
     }
 
     if (!user && !payload.isExist) {
@@ -1158,7 +1159,7 @@ export class AuthService {
 
       const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
-      return responses.data({
+      return {
         id: '',
         token: '',
         roles: [
@@ -1171,13 +1172,13 @@ export class AuthService {
         isInvited,
         user: user,
         isGuest: false,
-      });
+      };
     }
 
     // Handle bypass verification logic for testing or review environment
     if (config.get('APP_REVIEW_LOGIN') === loginIdentifier || config.get('BYPASS_VERIFICATION_CODE')) {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
+      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
       const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
@@ -1186,7 +1187,7 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      return responses.data({
+      return {
         id: user.id,
         token: completedLogin.response.token,
         roles: user.roles.map((item) => ({
@@ -1195,7 +1196,7 @@ export class AuthService {
         })),
         user: user,
         isGuest: false,
-      });
+      };
     } else {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
         where: {
@@ -1214,7 +1215,7 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      return responses.data({
+      return {
         token: completedLogin.response.token,
         roles: user.roles.map((item) => ({
           roleName: item.role.name,
@@ -1223,7 +1224,7 @@ export class AuthService {
         id: user.id,
         user: user,
         isGuest: false,
-      });
+      };
     }
   }
 
@@ -1283,7 +1284,7 @@ export class AuthService {
     }
 
     // Mirco-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -1331,7 +1332,7 @@ export class AuthService {
     }
 
     //Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
     return (user.roles.map((role) => toCurrentUser(user, focuses, role)));
   }
 
@@ -1601,26 +1602,25 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError('user')
     }
+    const nonMemberUserRole = user.roles.find((userRole) => userRole.role.name === 'non_member');
+    if (!nonMemberUserRole) return responses.notFound('User not found!');
 
-    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
-    if (nonMemberRole === undefined) {
-      throw new NotFoundError('User')
-    }
-
-
+    // Find the member role
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
     if (!memberRole) {
       throw new NotFoundError('Member role not found');
     }
 
+    // Find the user's current role entry
     const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { user: { id: payload.id } } });
     if (!userRole) {
       throw new NotFoundError('User role entry not found');
     }
 
-    userRole.role = memberRole;
-    userRole.status = UserStatus.ACTIVE;
-    await this.dbConnection.getRepository(UserRole).save(userRole);
+    // Update role and status
+    nonMemberUserRole.role = memberRole;
+    nonMemberUserRole.status = UserStatus.ACTIVE;
+    await this.dbConnection.getRepository(UserRole).save(nonMemberUserRole);
 
     await serviceMesh.notificationService().sendEmailFromTemplate(
       [
@@ -1634,8 +1634,7 @@ export class AuthService {
       null,
     );
 
-
-    return;
+    return responses.ok;
   }
 
   public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
@@ -1655,20 +1654,19 @@ export class AuthService {
     return userList;
   }
 
-  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<string> {
-    const payloadStatus = userStatusToEntity[payload.status];
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<any> {
     const users = await this.dbConnection.getRepository(User).find({
       where: { id: In(payload.ids), deletedAt: null },
       relations: { roles: { role: true } },
     });
 
     if (users.length === 0) {
-      throw new NotFoundError('Users not found')
+      throw new NotFoundError('Users')
     }
 
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
     if (!memberRole) {
-      throw new BadRequestError('Error updating user status.')
+      throw new NotFoundError('Role')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -1677,7 +1675,7 @@ export class AuthService {
     });
 
     if (userRoles.length === 0) {
-      throw new BadRequestError('Error updating user status.')
+      throw new NotFoundError('UserRole')
     }
 
     const failedUsers: string[] = [];
@@ -1686,7 +1684,7 @@ export class AuthService {
     for (const user of users) {
       const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
 
-      if (payloadStatus === UserStatus.WAITLISTED) {
+      if (payload.status === UserStatus.WAITLISTED) {
         if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
           console.error(`User ${user.id} is active and cannot be waitlisted`);
           failedUsers.push(user.id);
@@ -1694,8 +1692,8 @@ export class AuthService {
         }
       }
 
-      if (payloadStatus === UserStatus.ACTIVE && nonMemberUserRole) {
-        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payloadStatus, newRole: memberRole });
+      if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
       }
     }
 
@@ -1726,7 +1724,7 @@ export class AuthService {
       }
     }
 
-    return '';
+    return { failedUsers, usersToUpdate };;
 
   }
 
@@ -1833,8 +1831,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -2087,8 +2085,8 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses =  (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses =  (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2913,8 +2911,8 @@ export class AuthService {
 
     const users = await Promise.all(
       allUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
             user: {
@@ -2942,7 +2940,7 @@ export class AuthService {
 
   // ADMIN Sevice Code
 
-  public static async getMembers(payload: PaginatedRequestDto): Promise<any> { //GetMembersResponse
+  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -3023,8 +3021,8 @@ export class AuthService {
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id })).data;
-        const interests = (await PlatformService.getUserInterests({ id: user.id })).data;
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -3406,7 +3404,7 @@ export class AuthService {
 
 
     if (!users.length) {
-      throw new NotFoundError('Hosts not found')
+      throw new NotFoundError('Host')
     }
 
     const hostRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3415,7 +3413,7 @@ export class AuthService {
       },
     });
 
-    if (!hostRoles.length) throw new NotFoundError('No valid hosts found');
+    if (!hostRoles.length) throw new NotFoundError('valid hosts');
 
     const skippedUsers: string[] = [];
     const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
@@ -3489,7 +3487,6 @@ export class AuthService {
   }
 
   public static async approveHost(user: User): Promise<void> {
-    try {
       const password = generateRandomPassword(12);
       const temporaryPassword = new TemporaryPassword();
       temporaryPassword.password = password;
@@ -3515,9 +3512,7 @@ export class AuthService {
         },
       };
       await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-    } catch (error) {
-      console.log(error)
-    }
+
   }
 
   public static async generateToken(user: User): Promise<string> {
@@ -3575,7 +3570,7 @@ export class AuthService {
     };
 
     // Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id})).data;
+    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
