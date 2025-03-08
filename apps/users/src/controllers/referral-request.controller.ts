@@ -1,4 +1,4 @@
-import { CreateResponse } from "rumor-utils/success";
+import { CreateResponse, GetResponse, UpdateResponse } from "rumor-utils/success";
 import { GenericResponse } from "rumor-utils/shared/events/grpc/events/events.pb";
 import {
   CreateReferralRequestDto,
@@ -22,8 +22,8 @@ export class ReferralRequestController {
       };
       const response: GenericResponse =
         await ReferralRequestService.createReferralRequest(payload);
-      const updateResponse = new CreateResponse(response);
-      res.status(updateResponse.statusCode).json(updateResponse);
+      const createResponse = new CreateResponse(response);
+      res.status(createResponse.statusCode).json(createResponse);
     }
   );
 
@@ -33,8 +33,8 @@ export class ReferralRequestController {
       const payload: IdRequestDto = { id };
       const response: ReferralRequestsResponse =
         await ReferralRequestService.getReferralRequests(payload);
-      const updateResponse = new CreateResponse(response);
-      res.status(updateResponse.statusCode).json(updateResponse);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
@@ -49,7 +49,7 @@ export class ReferralRequestController {
       };
       const response: GenericResponse =
         await ReferralRequestService.updateReferralRequest(payload);
-      const updateResponse = new CreateResponse(response);
+      const updateResponse = new UpdateResponse(response);
       res.status(updateResponse.statusCode).json(updateResponse);
     }
   );
@@ -60,8 +60,8 @@ export class ReferralRequestController {
       const payload: IdRequestDto = { id };
       const response: GetSentReferralRequestsResponse =
         await ReferralRequestService.getSentReferralRequests(payload);
-      const updateResponse = new CreateResponse(response);
-      res.status(updateResponse.statusCode).json(updateResponse);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 }

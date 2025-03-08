@@ -1,7 +1,7 @@
 import connectionManager from '../database'
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
-import { CheckRoleResponse, ListRolesResponse, RoleResponse, UserRoleResponse } from 'rumor-utils/shared/users/grpc/auth/role.pb';
+import { CheckRoleResponse, ListRolesResponse, RoleData, UserRoleData, UserRoleList } from 'rumor-utils/shared/users/grpc/auth/role.pb';
 import { responses } from '../common/responses.common';
 import { RoleNameRequestDto, RoleRequestDto, UpdateUserRoleRequestDto } from 'rumor-utils/shared/users/dtos/role.dto';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -9,6 +9,7 @@ import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { userSourceToEntity, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
+import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
    
 export class RoleService {
   public static dbConnection = connectionManager;
@@ -17,19 +18,27 @@ export class RoleService {
     return responses.data([]);
   }
 
-  static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<GenericResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+  static async assignRoleToUser(
+    payload: RoleRequestDto,
+    source?: UserSource
+  ): Promise<string> {
+      const user = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: { id: payload.userId } });
 
       let role: Role | null;
       if (payload.roleName) {
-        role = await this.dbConnection.getRepository(Role).findOne({ where: { name: payload.roleName } });
+        role = await this.dbConnection
+          .getRepository(Role)
+          .findOne({ where: { name: payload.roleName } });
       } else {
-        role = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.roleId } });
+        role = await this.dbConnection
+          .getRepository(Role)
+          .findOne({ where: { id: payload.roleId } });
       }
 
       if (!user || !role) {
-        return responses.notFound('User or Role not found');
+        throw new NotFoundError('User or role')
       }
 
       const userRole = new UserRole();
@@ -38,17 +47,16 @@ export class RoleService {
       userRole.role = role;
 
       await this.dbConnection.getRepository(UserRole).save(userRole);
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest(`Unable to assign role to the user: ${err}`);
-    }
+      return '';
+    
   }
 
-  static async getUserRoleHierarchy(payload: IdRequestDto): Promise<UserRoleResponse> {
-    try {
+  static async getUserRoleHierarchy(
+    payload: IdRequestDto
+  ): Promise<UserRoleList[]> {
       const userRoles = await this.dbConnection.getRepository(UserRole).find({
         where: { user: { id: payload.id } },
-        relations: ['role', 'role.parentRole'],
+        relations: ["role", "role.parentRole"],
       });
 
       const roles = userRoles.map((userRole) => {
@@ -60,67 +68,88 @@ export class RoleService {
         };
       });
 
-      return responses.data(roles);
-    } catch (err) {
-      return responses.badRequest(`Unable to get user role hierarchy: ${err}`);
-    }
+      return roles;
   }
 
   static async checkRole(payload: RoleRequestDto): Promise<CheckRoleResponse> {
     try {
       const userRoles = await this.dbConnection.getRepository(UserRole).find({
         where: { user: { id: payload.userId } },
-        relations: ['role', 'role.parentRole'],
+        relations: ["role", "role.parentRole"],
       });
 
-      const isAllowed = userRoles.find((role) => role.role.name === payload.roleName || role.role.parentRole.name === payload.roleName);
+      const isAllowed = userRoles.find(
+        (role) =>
+          role.role.name === payload.roleName ||
+          role.role.parentRole.name === payload.roleName
+      );
       return { isAllowed: isAllowed !== undefined };
     } catch (err) {
       return { isAllowed: false };
     }
   }
 
-  static async updateUserStatus(roleId: string, status: UserStatus): Promise<void> {
+  static async updateUserStatus(
+    roleId: string,
+    status: UserStatus
+  ): Promise<void> {
     try {
-      const userRole = await this.dbConnection.getRepository(UserRole).findOneBy({ id: roleId });
+      const userRole = await this.dbConnection
+        .getRepository(UserRole)
+        .findOneBy({ id: roleId });
       if (!userRole) return;
 
       userRole.status = status;
       await userRole.save();
     } catch (err) {
-    console.log("🚀 ~ RoleService ~ updateUserStatus ~ err:", err)
+      console.log("🚀 ~ RoleService ~ updateUserStatus ~ err:", err);
     }
   }
 
-  static async revokeRoleFromUser(payload: RoleRequestDto): Promise<GenericResponse> {
+  static async revokeRoleFromUser(
+    payload: RoleRequestDto
+  ): Promise<GenericResponse> {
     try {
-      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+      const user = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: { id: payload.userId } });
 
       let role: Role | null;
       if (payload.roleName) {
-        role = await this.dbConnection.getRepository(Role).findOne({ where: { name: payload.roleName } });
+        role = await this.dbConnection
+          .getRepository(Role)
+          .findOne({ where: { name: payload.roleName } });
       } else {
-        role = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.roleId } });
+        role = await this.dbConnection
+          .getRepository(Role)
+          .findOne({ where: { id: payload.roleId } });
       }
 
       if (!user || !role) {
-        return responses.notFound('User or Role not found');
+        return responses.notFound("User or Role not found");
       }
 
-      await this.dbConnection.getRepository(UserRole).delete({ user: { id: user.id }, role: { id: role.id } });
+      await this.dbConnection
+        .getRepository(UserRole)
+        .delete({ user: { id: user.id }, role: { id: role.id } });
       return responses.ok;
     } catch (err) {
       return responses.badRequest(`Unable to revoke role to the user: ${err}`);
     }
   }
 
-  static async listUserRoles(payload: IdRequestDto): Promise<ListRolesResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+  static async listUserRoles(
+    payload: IdRequestDto
+  ): Promise<UserRoleData[]> {
+      const user = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: { id: payload.id } });
       if (!user) {
-        return { ...responses.notFound('User not found'), data: [] };
+        throw new NotFoundError('User')
       }
-      const userRoles = await this.dbConnection.getRepository(UserRole).find({ where: { user: { id: user.id } }, relations: ['role'] });
+      const userRoles = await this.dbConnection
+        .getRepository(UserRole)
+        .find({ where: { user: { id: user.id } }, relations: ["role"] });
       const roles = userRoles.map((item) => {
         return {
           id: item.role.id,
@@ -128,23 +157,24 @@ export class RoleService {
           subRoles: [],
         };
       });
-      return responses.data(roles);
-    } catch (err) {
-      return responses.badRequest(`Unable to list user roles: ${err}`);
-    }
+      return roles;
+    
   }
 
-  static async updateUserRole(payload: UpdateUserRoleRequestDto): Promise<GenericResponse> {
-    try {
+  static async updateUserRole(
+    payload: UpdateUserRoleRequestDto
+  ): Promise<string> {
       if (!payload.roleId && !payload.roleName) {
-        return responses.badRequest('RoleId or RoleName must exists in body params');
+        throw new BadRequestError('RoleId or RoleName must exists in body params')
       }
-      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+      const user = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: { id: payload.userId } });
       const role = await this.dbConnection.getRepository(Role).findOne({
         where: [{ id: payload.roleId }, { name: payload.roleName }],
       });
       if (!user || !role) {
-        return responses.notFound('User or role not found');
+        throw new NotFoundError('User or role')
       }
       const update: Partial<UserRole> = {};
       if (payload.status) {
@@ -153,48 +183,40 @@ export class RoleService {
       if (payload.source) {
         update.source = userSourceToEntity[payload.source];
       }
+      update.role = role;
       update.id = user.id;
-      await this.dbConnection.getRepository(UserRole).update({ user: { id: user.id }, role: { id: role.id } }, update);
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest(`Unable to list user roles: ${err}`);
-    }
+      await this.dbConnection
+        .getRepository(UserRole)
+        .update({ user: { id: user.id } }, update);
+      return '';
+    
   }
 
-  static async getRoleByName(payload: RoleNameRequestDto): Promise<RoleResponse> {
-    try {
-      const role = await this.dbConnection.getRepository(Role).findOne({
-        where: {
-          name: payload.name,
-        },
-      });
-      return responses.data({
-        id: role.id,
-        name: role.name,
-      });
-    } catch (err) {
-      return responses.badRequest(`Unable to get single roles: ${err}`);
-    }
+  static async getRoleByName(payload: RoleNameRequestDto): Promise<RoleData> {
+    const role = await this.dbConnection.getRepository(Role).findOne({
+      where: {
+        name: payload.name,
+      },
+    });
+    return {
+      id: role.id,
+      name: role.name,
+    };
   }
 
-  static async markUserAsSpam(payload: IdRequestDto): Promise<GenericResponse> {
-    try {
-      const roles = await this.dbConnection.getRepository(UserRole).find({
-        where: {
-          user: { id: payload.id },
-        },
-      });
+  static async markUserAsSpam(payload: IdRequestDto): Promise<string> {
+    const roles = await this.dbConnection.getRepository(UserRole).find({
+      where: {
+        user: { id: payload.id },
+      },
+    });
 
-      await Promise.all(
-        roles.map(async (item) => {
-          item.isBlacklisted = true;
-          await this.dbConnection.getRepository(UserRole).save(item);
-        }),
-      );
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest(`Unable to get single roles: ${err}`);
-    }
+    await Promise.all(
+      roles.map(async (item) => {
+        item.isBlacklisted = true;
+        await this.dbConnection.getRepository(UserRole).save(item);
+      })
+    );
+    return "";
   }
 }
