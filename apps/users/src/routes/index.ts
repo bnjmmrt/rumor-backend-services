@@ -22,7 +22,7 @@ router.get('/auth/admin/host/:id/profile', AdminController.getBasicHostProfile);
 router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
 router.put('/auth/admin/host/:id/profile', AdminController.updateHostProfile);     // update host profile for admin
 router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
-router.post('/auth/admin/host/status', AdminController.updateHostStatus);
+router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
 router.post('/auth/admin/member/status', AdminController.updateMemberStatus);
 router.get('/auth/admin/member/:id', AdminController.getMemberProfile);
 
@@ -66,7 +66,7 @@ router.post('/auth/bio-profile', AuthController.createBioProfile);
 router.put('/auth/bio-profile/:id', AuthController.updateBioProfile);
 router.put('/auth/member-approve/:id', AuthController.approveMember);
 router.get('/auth/users/{type}', AuthController.listUsersByType);
-router.get('/auth/admin/users/status', AuthController.updateUsersStatus);
+router.put('/auth/admin/users/status', AuthController.updateUsersStatus);
 router.post('/auth/non-member', AuthController.createNonMemberUser);
 router.post('/auth/user/get-member-or-non-member', AuthController.getMembersOrNonMembers);
 router.post('/auth/host/:id/follow', AuthController.manageFollowHost);
