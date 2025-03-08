@@ -58,6 +58,7 @@ import {
   VerificationStatus,
   UserDataSimple,
   UserWithRoles,
+  UserIdWithRolesAndToken,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -144,7 +145,7 @@ export class AuthController {
   public static memberSignUp = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: MemberSignUpRequestDto = req.body;
-      const response: MemberSignUpResponse = await AuthService.memberSignUp(payload);
+      const response: UserIdWithRolesAndToken = await AuthService.memberSignUp(payload);
       const createResponse = new CreateResponse(response);
      res.status(createResponse.statusCode).json(createResponse);
     }
@@ -266,7 +267,7 @@ export class AuthController {
   public static memberLogin = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: MemberLoginRequestDto = req.body;
-      const response: TokenResponse = await AuthService.memberLogin(payload);
+      const response: TokenResponseAndRoles = await AuthService.memberLogin(payload);
       const createResponse = new CreateResponse(response);
      res.status(createResponse.statusCode).json(createResponse);
     }
