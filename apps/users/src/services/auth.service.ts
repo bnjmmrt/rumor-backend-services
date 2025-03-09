@@ -2941,7 +2941,7 @@ export class AuthService {
   // ADMIN Sevice Code
 
   public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
-    const parsedQuery = parse(payload.query);
+    const parsedQuery = JSON.parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
@@ -3040,7 +3040,7 @@ export class AuthService {
   }
 
   public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
-    const parsedQuery = parse(payload.query);
+    const parsedQuery = JSON.parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
