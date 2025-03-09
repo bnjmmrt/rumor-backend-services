@@ -10,6 +10,7 @@ import {
   EVENTS_SERVICE_NAME,
   EventsResponse,
   EventTypeResponse,
+  EventTypesData,
   EventTypesResponse,
   GenerateTicketForGuestResponse,
   GenericResponse,
@@ -18,6 +19,7 @@ import {
   ListEventStatusResponse,
   ListEventUsedTicketsResponse,
   ListHostEventsResponse,
+  PaginatedEventsResponse,
   ToggleGuestCheckStatusResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
@@ -44,7 +46,8 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import { EventData, EventTypeData } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { EventData, EventTypeData } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 export class EventsController {
 
   public static listEventStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
@@ -62,26 +65,23 @@ export class EventsController {
   }
   );
 
-  //TODO: check where query is used
   public static listEventTypes = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: QueryRequestDto = req.query;
-    const eventTypeResponse: EventTypesResponse = await EventsService.listEventTypes(payload);
+    const eventTypeResponse: EventTypesData = await EventsService.listEventTypes(payload);
     const successResponse = new GetResponse(eventTypeResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
 
-  //TODO: check where query is used
   public static getEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const getEventTypeResponse: EventTypeResponse = await EventsService.getEventType(payload);
+    const getEventTypeResponse: EventTypeData = await EventsService.getEventType(payload);
     const successResponse = new GetResponse(getEventTypeResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
 
-  //TODO: check where query is used
   public static updateEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: UpdateEventTypeRequestDto = { ...req.body, ...req.params }
     const updatedEventTypesData: EventTypeResponse = await EventsService.updateEventType(payload);
@@ -90,12 +90,12 @@ export class EventsController {
   }
   );
 
-  //TODO: check where query is used
   public static deleteEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
     const response: string = await EventsService.deleteEventType(payload);
-    const successResponse = new DeleteResponse(response);
+    const message = "Event Type deleted successfully"
+    const successResponse = new DeleteResponse(response, message);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -145,7 +145,7 @@ export class EventsController {
     const { id } = req.params
     req.body.id = id
     const payload: UpdateEventRequestDto = req.body
-    const event: EventResponse = await EventsService.updateEvent(
+    const event: EventData = await EventsService.updateEvent(
       payload
     );
     const successResponse = new UpdateResponse(event);
@@ -273,7 +273,7 @@ export class EventsController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEventAgeLimit')
   public static createEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: EventAgeLimitDto = req.body
-    const ageLimitResponse: EventAgeLimitResponse = await EventsService.createEventAgeLimit(
+    const ageLimitResponse: EventAgeLimit = await EventsService.createEventAgeLimit(
       payload
     );
     const successResponse = new CreateResponse(ageLimitResponse);
@@ -285,7 +285,7 @@ export class EventsController {
   public static updateEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
-    const ageLimitResponse: EventAgeLimitResponse = await EventsService.createEventAgeLimit(
+    const ageLimitResponse: EventAgeLimit = await EventsService.createEventAgeLimit(
       { ...req.body, id }
     );
     const successResponse = new CreateResponse(ageLimitResponse);
@@ -298,7 +298,7 @@ export class EventsController {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
     // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
-    const ageLimitResponse: EventAgeLimitResponse = await EventsService.getEventAgeLimit(
+    const ageLimitResponse: EventAgeLimit = await EventsService.getEventAgeLimit(
       payload
     );
     const successResponse = new GetResponse(ageLimitResponse);
@@ -312,7 +312,8 @@ export class EventsController {
     const response: string = await EventsService.deleteEventAgeLimit(
       payload
     );
-    const successResponse = new DeleteResponse(response);
+    const message = "Event age limit deleted successfully"
+    const successResponse = new DeleteResponse(response, message);
     res.status(successResponse.statusCode).json(successResponse);
   }
   )
@@ -320,7 +321,7 @@ export class EventsController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
   public static listEventAgeLimits = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
-    const ageLimitResponse: EventAgeLimitsResponse = await EventsService.listEventAgeLimits(
+    const ageLimitResponse: EventAgeLimit[] = await EventsService.listEventAgeLimits(
 
     );
     const successResponse = new GetResponse(ageLimitResponse);
@@ -332,7 +333,7 @@ export class EventsController {
   public static getPublicEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const ageLimitResponse: EventResponse = await EventsService.getPublicEvent(
+    const ageLimitResponse: EventData = await EventsService.getPublicEvent(
       payload
     );
     const successResponse = new GetResponse(ageLimitResponse);
@@ -342,7 +343,7 @@ export class EventsController {
 
   public static manualEventStatusUpdate = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const eventId = req.params.eventId
-    const payload: ManualEventStatusUpdateRequestDto = {...req.body, eventId}
+    const payload: ManualEventStatusUpdateRequestDto = { ...req.body, eventId }
     const eventResponse: EventResponse = await EventsService.manualEventStatusUpdate(
       payload
     );
@@ -447,10 +448,10 @@ export class EventsController {
   );
 
   public static listHostEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const { userId, id } = req.params
-    const { query } = req.params
-    const payload: ListHostEventsDto = { userId, query }
-    const response: ListHostEventsResponse = await EventsService.listHostEvents(
+    const id = (req as any).user;
+    const queryParams = JSON.stringify(req.query)
+    const payload: ListHostEventsDto = { userId: id, query: queryParams }
+    const response: PaginatedEventsResponse = await EventsService.listHostEvents(
       payload
     );
     const successResponse = new GetResponse(response);

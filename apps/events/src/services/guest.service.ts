@@ -11,7 +11,8 @@ import {
   BulkUploadGuestsResponse,
   FetchBulkGuestsResponse,
   GetAttendeeCountRequest,
-  GetAttendeeCountResponse
+  GetAttendeeCountResponse,
+  PaginatedGuestEventsResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
 
@@ -1435,8 +1436,7 @@ export class GuestService {
     );
   }
 
-  public static async listEventGuests(payload: ListEventGuestsDto): Promise<ListEventGuestsResponse> {
-    try {
+  public static async listEventGuests(payload: ListEventGuestsDto): Promise<PaginatedGuestEventsResponse> {
       const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
       const eventResponse = { data: [], totalCount: 0 };
       if (!user) {
@@ -1779,10 +1779,7 @@ export class GuestService {
       });
       eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
       eventResponse.totalCount = totalCount;
-      return responses.data(eventResponse);
-    } catch (err) {
-      throw new BadRequestError('Error retrieving events');
-    }
+      return eventResponse
   }
 
   public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<GenericResponse> {
@@ -2909,7 +2906,7 @@ export class GuestService {
         const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
         const data = { ...guestData, category: focuses.map((focus) => focus.name) };
   
-        return responses.data(data);
+        return data
   }
 
   public static async manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {

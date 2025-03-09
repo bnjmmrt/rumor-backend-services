@@ -1,27 +1,18 @@
 import { CollaboratorService } from '../services/collaborator.service';
-import { CollaboratorResponse, EVENTS_SERVICE_NAME, CollaboratorsResponse, GetDefaultRoleConfigByRoleResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import { CollaboratorResponse, EVENTS_SERVICE_NAME, CollaboratorsResponse, GetDefaultRoleConfigByRoleResponse, CollaboratorRolesResponse, CollaboratorRoles } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { CreateCollaboratorDto, RequestByIdDto, UpdateCollaboratorDto } from 'rumor-utils/shared/events/dtos';
 import { GetDefaultRoleConfigByRoleRequestDto } from 'rumor-utils/shared/events/dtos/collaborator.dto';
-import { CreateResponse } from 'packages/rumor-utils/success';
-
+import { CreateResponse, GetResponse } from 'rumor-utils/success';
+import { DataRoleDefault } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import asyncWrapper from '../server/helpers/asyncWrapper';
+import { Request, Response } from 'express'
 export class CollaboratorController {
   // constructor(private readonly collaboratorService: CollaboratorService) {}
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateCollaborator')
+  // @GrpcMethod(EVENTS_SERVICE_NAME, 'CreateCollaborator')
   public async createCollaborator(payload: CreateCollaboratorDto): Promise<CollaboratorResponse> {
     return CollaboratorService.createCollaborator(payload);
   }
-
-  //  public static createCollaborator = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-  //     // const { id } = req.params;
-  //     const payload: CreateCollaboratorDto = req.body
-  //     const ageLimitResponse: CollaboratorResponse = await CollaboratorService.createCollaborator(
-  //       payload
-  //     );
-  //     const successResponse = new CreateResponse(ageLimitResponse);
-  //     res.status(successResponse.statusCode).json(successResponse);
-  //   }
-  //   )
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateCollaborator')
   public async updateCollaborator(payload: UpdateCollaboratorDto): Promise<CollaboratorResponse> {
@@ -33,7 +24,7 @@ export class CollaboratorController {
     return CollaboratorService.deleteCollaborator(payload);
   }
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetCollaborator')
+  // @GrpcMethod(EVENTS_SERVICE_NAME, 'GetCollaborator')
   public async getCollaborator(payload: RequestByIdDto): Promise<CollaboratorResponse> {
     return CollaboratorService.getCollaborator(payload);
   }
@@ -43,8 +34,21 @@ export class CollaboratorController {
     return CollaboratorService.getCollaborators(payload);
   }
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetDefaultRoleConfigByRole')
-  public async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<GetDefaultRoleConfigByRoleResponse> {
-    return CollaboratorService.getDefaultRoleConfigByRole(payload);
+  public static getCollaboratorRoles = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const response: CollaboratorRoles[] = await CollaboratorService.getCollaboratorRoles(
+    );
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
+
+  public static getDefaultRoleConfigByRole = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: GetDefaultRoleConfigByRoleRequestDto = req.query
+    const response: DataRoleDefault = await CollaboratorService.getDefaultRoleConfigByRole(
+      payload
+    );
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
 }

@@ -15,199 +15,198 @@ import { UserQuizAnswer } from 'rumor-utils/shared/events//entities/user-quiz-qu
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import database from '../database';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { QuizAnswer } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { NotFoundError } from 'rumor-utils/errors';
 
 export class QuizQuestionService {
   public static dbConnection = database;
 
   public static async createQuizQuestion(payload: CreateQuizQuestionRequestDto): Promise<QuizQuestionResponse> {
-    try {
-      const event: Event = await this.dbConnection.getRepository(Event).findOne({
-        where: {
-          id: payload.eventId,
-          deletedAt: IsNull(),
-        },
-      });
+    const event: Event = await this.dbConnection.getRepository(Event).findOne({
+      where: {
+        id: payload.eventId,
+        deletedAt: IsNull(),
+      },
+    });
 
-      if (!event) {
-        return responses.notFound('Event does not exists');
-      }
-
-      const quizQuestion = new QuizQuestion();
-      quizQuestion.question = payload.question;
-      quizQuestion.required = payload.required;
-      quizQuestion.order = payload.order;
-      quizQuestion.event = event;
-
-      const created = await this.dbConnection.getRepository(QuizQuestion).save(quizQuestion);
-
-      return responses.data(created);
-    } catch (err) {
-      return responses.badRequest('Error creating quiz question');
+    if (!event) {
+      throw new NotFoundError('Event does not exists');
     }
+
+    const quizQuestion = new QuizQuestion();
+    quizQuestion.question = payload.question;
+    quizQuestion.required = payload.required;
+    quizQuestion.order = payload.order;
+    quizQuestion.event = event;
+
+    const created = await this.dbConnection.getRepository(QuizQuestion).save(quizQuestion);
+
+    return responses.data(created);
+
   }
 
   public static async getEventQuizQuestions(payload: RequestByIdDto): Promise<QuizQuestionsResponse> {
-    try {
-      const quizQuestions = await this.dbConnection.getRepository(QuizQuestion).find({
-        where: {
-          event: { id: payload.id },
-          deletedAt: IsNull(),
-        },
-      });
-
-      return responses.data(quizQuestions);
-    } catch (err) {
-      return responses.badRequest('Error getting quiz questions');
-    }
+    const quizQuestions = await this.dbConnection.getRepository(QuizQuestion).find({
+      where: {
+        event: { id: payload.id },
+        deletedAt: IsNull(),
+      },
+    });
+    return responses.data(quizQuestions);
   }
 
   public static async updateQuizQuestion(payload: UpdateQuizQuestionRequestDto): Promise<QuizQuestionResponse> {
-    try {
-      const quizQuestion = await this.dbConnection.getRepository(QuizQuestion).findOne({
-        where: {
-          id: payload.id,
-          deletedAt: IsNull(),
-        },
-      });
+    const quizQuestion = await this.dbConnection.getRepository(QuizQuestion).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
 
-      if (!quizQuestion) return responses.badRequest('Quiz question not found');
+    if (!quizQuestion) return responses.badRequest('Quiz question not found');
 
-      delete payload.id;
-      const updatedQuizQuestion = this.dbConnection.getRepository(QuizQuestion).merge(quizQuestion, payload);
+    delete payload.id;
+    const updatedQuizQuestion = this.dbConnection.getRepository(QuizQuestion).merge(quizQuestion, payload);
 
-      await updatedQuizQuestion.save();
+    await updatedQuizQuestion.save();
 
-      return responses.data(updatedQuizQuestion);
-    } catch (err) {
-      return responses.badRequest('Error updating quiz question');
-    }
+    return responses.data(updatedQuizQuestion);
   }
 
   public static async deleteQuizQuestion(payload: RequestByIdDto): Promise<QuizQuestionResponse> {
-    try {
-      const quizQuestion = await this.dbConnection.getRepository(QuizQuestion).findOne({
-        where: {
-          id: payload.id,
-          deletedAt: IsNull(),
-        },
-      });
+    const quizQuestion = await this.dbConnection.getRepository(QuizQuestion).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
 
-      if (!quizQuestion) return responses.badRequest('Quiz question not found');
+    if (!quizQuestion) return responses.badRequest('Quiz question not found');
 
-      await quizQuestion.softRemove();
+    await quizQuestion.softRemove();
 
-      return responses.data(quizQuestion);
-    } catch (err) {
-      return responses.badRequest('Error deleting quiz question');
-    }
+    return responses.data(quizQuestion);
   }
 
-  public static async saveUserQuizAnswers(payload: SaveUserQuizAnswersRequestDto): Promise<SaveUserQuizAnswersResponse> {
-    try {
-      const user: any = await serviceMesh.userService().getCurrentMember();
-      if (!user) return { data: [], ...responses.notFound('User not found') };
+  public static async saveUserQuizAnswers(payload: SaveUserQuizAnswersRequestDto): Promise<QuizAnswer[]> {
+    /* TODO: commenting this since token is not there confirm with mobile team and update this function
+     const user: any = await serviceMesh.userService().getCurrentMember();
+     if (!user) throw new NotFoundError('User not found')
+ 
+     const partialUser: Partial<User> = { id: user.id };
+ 
+     const promises = payload.answers.map(async (item) => {
+       const [question, event] = await Promise.all([
+         this.dbConnection.getRepository(QuizQuestion).findOne({
+           where: { id: item.questionId },
+         }),
+         this.dbConnection.getRepository(Event).findOne({
+           where: { id: item.eventId },
+         }),
+       ]);
+ 
+       if (event && question) {
+         let userAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
+           where: {
+             user: { id: user.id },
+             question: { id: question.id },
+             event: { id: event.id },
+           },
+         });
+ 
+         if (userAnswer) {
+           userAnswer.answer = item.answer;
+         } else {
+           userAnswer = new UserQuizAnswer();
+           userAnswer.answer = item.answer;
+           userAnswer.user = partialUser;
+           userAnswer.question = question;
+           userAnswer.event = event;
+         }
+         return this.dbConnection.getRepository(UserQuizAnswer).save(userAnswer);
+       }
+     });  */
 
-      const partialUser: Partial<User> = { id: user.id };
+    const promises = payload.answers.map(async (item) => {
+      const [question, event] = await Promise.all([
+        this.dbConnection.getRepository(QuizQuestion).findOne({
+          where: { id: item.questionId },
+        }),
+        this.dbConnection.getRepository(Event).findOne({
+          where: { id: item.eventId },
+        }),
+      ]);
 
-      const promises = payload.answers.map(async (item) => {
-        const [question, event] = await Promise.all([
-          this.dbConnection.getRepository(QuizQuestion).findOne({
-            where: { id: item.questionId },
-          }),
-          this.dbConnection.getRepository(Event).findOne({
-            where: { id: item.eventId },
-          }),
-        ]);
+      if (event && question) {
+        let userAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
+          where: {
+            user: { id: payload.userId },
+            question: { id: question.id },
+            event: { id: event.id },
+          },
+        });
 
-        if (event && question) {
-          let userAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
-            where: {
-              user: { id: user.id },
-              question: { id: question.id },
-              event: { id: event.id },
-            },
-          });
-
-          if (userAnswer) {
-            userAnswer.answer = item.answer;
-          } else {
-            userAnswer = new UserQuizAnswer();
-            userAnswer.answer = item.answer;
-            userAnswer.user = partialUser;
-            userAnswer.question = question;
-            userAnswer.event = event;
-          }
-
-          return this.dbConnection.getRepository(UserQuizAnswer).save(userAnswer);
+        if (userAnswer) {
+          userAnswer.answer = item.answer;
+        } else {
+          userAnswer = new UserQuizAnswer();
+          userAnswer.answer = item.answer;
+          userAnswer.user = { id: payload.userId };
+          userAnswer.question = question;
+          userAnswer.event = event;
         }
-      });
+        return this.dbConnection.getRepository(UserQuizAnswer).save(userAnswer);
+      }
+    });
 
-      await Promise.all(promises);
+    await Promise.all(promises);
 
-      const response = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: { deletedAt: null },
-        relations: { question: true, event: true, user: true },
-      });
+    const response = await this.dbConnection.getRepository(UserQuizAnswer).find({
+      where: { deletedAt: null },
+      relations: { question: true, event: true, user: true },
+    });
 
-      return responses.data(
-        response.map((item) => ({
-          answer: item.answer,
-          questionId: item.question.id,
-          eventId: item.event.id,
-          id: item.id,
-        })),
-      );
-    } catch (err) {
-      return responses.badRequest('Error saving quiz answers');
-    }
+    return response.map((item) => ({
+      answer: item.answer,
+      questionId: item.question.id,
+      eventId: item.event.id,
+      id: item.id,
+    }))
   }
 
-  public static async updateUserQuizAnswer(payload: UpdateUserQuizAnswerRequestDto): Promise<GenericResponse> {
-    try {
-      const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { answer: payload.answer });
-      if (!update) return responses.notFound('Element not found');
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error updating quiz answers');
-    }
+  public static async updateUserQuizAnswer(payload: UpdateUserQuizAnswerRequestDto): Promise<string> {
+    const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { answer: payload.answer });
+    if (!update) throw new NotFoundError('Element not found');
+    return '';
   }
 
   public static async deleteUserQuizAnswer(payload: RequestByIdDto): Promise<GenericResponse> {
-    try {
-      const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { deletedAt: new Date() });
-      if (!update) return responses.notFound('Element not found');
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error deleting quiz answers');
-    }
+    const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { deletedAt: new Date() });
+    if (!update) throw new NotFoundError('Element not found');
+    return responses.ok
   }
 
-  public static async getUserQuizAnswers(payload: GetUserQuizAnswersRequestDto): Promise<GetUserQuizAnswersResponse> {
-    try {
-      const response = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: {
-          deletedAt: null,
-          event: {
-            id: payload.eventId,
-          },
-          user: {
-            id: payload.userId,
-          },
+  public static async getUserQuizAnswers(payload: GetUserQuizAnswersRequestDto): Promise<QuizAnswer[]> {
+
+    const response = await this.dbConnection.getRepository(UserQuizAnswer).find({
+      where: {
+        deletedAt: null,
+        event: {
+          id: payload.eventId,
         },
-        relations: { question: true, event: true, user: true },
-      });
-      return responses.data(
-        response.map((item) => {
-          return {
-            answer: item.answer,
-            questionId: item.question.id,
-            eventId: item.event.id,
-            id: item.id,
-          };
-        }),
-      );
-    } catch (err) {
-      return responses.badRequest('Error saving quiz answers');
-    }
+        user: {
+          id: payload.userId,
+        },
+      },
+      relations: { question: true, event: true, user: true },
+    });
+    return response.map((item) => {
+      return {
+        answer: item.answer,
+        questionId: item.question.id,
+        eventId: item.event.id,
+        id: item.id,
+      };
+    })
   }
 }

@@ -12,7 +12,8 @@ import {
   BulkUploadGuestsResponse,
   FetchBulkGuestsResponse,
   GetAttendeeCountRequest,
-  GetAttendeeCountResponse
+  GetAttendeeCountResponse,
+  PaginatedGuestEventsResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {
   GuestsRequestDto,
@@ -181,7 +182,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: ListEventGuestsResponse = await GuestService.listEventGuests(payload);
+      const response: PaginatedGuestEventsResponse = await GuestService.listEventGuests(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -353,7 +354,7 @@ export class GuestController {
         ...req.body
       }
       const response: GetUserRequestsResponse = await GuestService.getUserRequests(payload);
-      const successResponse = new GetResponse(response);
+      const successResponse = new GetResponse(response.data);
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
