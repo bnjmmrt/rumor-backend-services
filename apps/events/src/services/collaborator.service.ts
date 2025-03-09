@@ -1,5 +1,5 @@
 import { CreateCollaboratorDto, RequestByIdDto, UpdateCollaboratorDto } from 'rumor-utils/shared/events/dtos';
-import { CollaboratorResponse, CollaboratorsResponse, GetDefaultRoleConfigByRoleResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import { CollaboratorResponse, CollaboratorRoles, CollaboratorRolesResponse, CollaboratorsResponse, GetDefaultRoleConfigByRoleResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { responses } from '../common/responses';
 import { IsNull, Repository } from 'typeorm';
 import { Collaborator, Event, TicketType, User, DefaultRoleSettings } from 'rumor-utils/shared/events/entities';
@@ -210,42 +210,68 @@ export class CollaboratorService {
   }
 
   public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<DataRoleDefault> {
-  
-      let response;
-      if (payload.roleId) {
-        response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
-          where: {
-            role: { id: payload.roleId },
-          },
-          relations: { role: true },
-        });
-      } else if (payload.roleName) {
-        response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
-          where: {
-            role: { name: payload.roleName },
-          },
-          relations: { role: true },
-        });
-      }
-      if (!response) {
-        throw new BadRequestError('Error at get default config');
-      }
 
-      return {
-        editEventDetailsSettings: response.editEventDetailsSettings,
-        inviteGuestsToEvent: response.inviteGuestsToEvent,
-        addGuestsToDrafts: response.addGuestsToDrafts,
-        chatWithAllGuests: response.chatWithAllGuests,
-        chatWithGuestsByCollaborator: response.chatWithGuestsByCollaborator,
-        viewFullGuestList: response.viewFullGuestList,
-        manageInAppRsvpRequests: response.manageInAppRsvpRequests,
-        manageDedicatedSignUpForm: response.manageDedicatedSignUpForm,
-        postAnnouncementsToAllGuests: response.postAnnouncementsToAllGuests,
-        postAnnouncementsByCollaborator: response.postAnnouncementsByCollaborator,
-        checkInGuests: response.checkInGuests,
-        generateEventReports: response.generateEventReports,
-        roleName: response?.role?.name || '',
-        roleId: response?.role?.id || '',
-      }
+    let response;
+    if (payload.roleId) {
+      response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
+        where: {
+          role: { id: payload.roleId },
+        },
+        relations: { role: true },
+      });
+    } else if (payload.roleName) {
+      response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
+        where: {
+          role: { name: payload.roleName },
+        },
+        relations: { role: true },
+      });
+    }
+    if (!response) {
+      throw new BadRequestError('Error at get default config');
+    }
+
+    return {
+      editEventDetailsSettings: response.editEventDetailsSettings,
+      inviteGuestsToEvent: response.inviteGuestsToEvent,
+      addGuestsToDrafts: response.addGuestsToDrafts,
+      chatWithAllGuests: response.chatWithAllGuests,
+      chatWithGuestsByCollaborator: response.chatWithGuestsByCollaborator,
+      viewFullGuestList: response.viewFullGuestList,
+      manageInAppRsvpRequests: response.manageInAppRsvpRequests,
+      manageDedicatedSignUpForm: response.manageDedicatedSignUpForm,
+      postAnnouncementsToAllGuests: response.postAnnouncementsToAllGuests,
+      postAnnouncementsByCollaborator: response.postAnnouncementsByCollaborator,
+      checkInGuests: response.checkInGuests,
+      generateEventReports: response.generateEventReports,
+      roleName: response?.role?.name || '',
+      roleId: response?.role?.id || '',
+    }
+  }
+
+  /**
+  * Fetches and returns default collaborator roles.
+  * - Queries the repository with `role` relations to get role settings.
+  * - Extracts and formats roles into an array of `{ id, name }`.
+  * - Returns a bad request if no roles are found or an error occurs.
+  *
+  * Error Handling:
+  * - Logs the error and returns a bad request if an exception occurs.
+  */
+  public static async getCollaboratorRoles(): Promise<CollaboratorRoles[]> {
+    const response = await this.dbConnection.getRepository(DefaultRoleSettings).find({
+      relations: ['role'],
+    });
+    if (!response || response.length === 0) {
+      throw new BadRequestError('Error at get default config');
+    }
+    const roles = response
+      .map((setting) => setting.role)
+      .filter((role) => !!role)
+      .map((role) => ({
+        id: role.id,
+        name: role.name,
+      }));
+    return roles
   }
 }

@@ -18,6 +18,7 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
+import { QuizAnswer } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class QuizQuestionController {
 
@@ -57,7 +58,7 @@ export class QuizQuestionController {
 
   public static saveUserQuizAnswers = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: SaveUserQuizAnswersRequestDto = req.body
-    const quizResponse: SaveUserQuizAnswersResponse = await QuizQuestionService.saveUserQuizAnswers(payload);
+    const quizResponse: QuizAnswer[] = await QuizQuestionService.saveUserQuizAnswers(payload);
     const successResponse = new CreateResponse(quizResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }
@@ -66,7 +67,7 @@ export class QuizQuestionController {
   public static updateUserQuizAnswer = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: UpdateUserQuizAnswerRequestDto = { ...req.body, id }
-    const quizResponse: GenericResponse = await QuizQuestionService.updateUserQuizAnswer(payload);
+    const quizResponse: string = await QuizQuestionService.updateUserQuizAnswer(payload);
     const successResponse = new UpdateResponse(quizResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }
@@ -77,7 +78,7 @@ export class QuizQuestionController {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
     const quizResponse: GenericResponse = await QuizQuestionService.deleteUserQuizAnswer(payload);
-    const successResponse = new DeleteResponse(quizResponse);
+    const successResponse = new DeleteResponse(quizResponse.data);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
@@ -85,7 +86,7 @@ export class QuizQuestionController {
   public static getUserQuizAnswers = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { eventId, userId } = req.params;
     const payload: GetUserQuizAnswersRequestDto = { eventId, userId }
-    const quizResponse: GetUserQuizAnswersResponse = await QuizQuestionService.getUserQuizAnswers(payload);
+    const quizResponse: QuizAnswer[] = await QuizQuestionService.getUserQuizAnswers(payload);
     const successResponse = new GetResponse(quizResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }

@@ -32,6 +32,7 @@ import {
   EventResponse,
   EventsResponse,
   EventTypeResponse,
+  EventTypesData,
   EventTypesResponse,
   GenerateTicketForGuestResponse,
   GenericResponse,
@@ -152,7 +153,7 @@ export class EventsService {
     }
   }
 
-  public static async listEventTypes(payload: QueryRequestDto): Promise<EventTypesResponse> {
+  public static async listEventTypes(payload: QueryRequestDto): Promise<EventTypesData> {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
@@ -160,19 +161,19 @@ export class EventsService {
         skip: parseInt(parsedQuery.skip),
       }
       : {};
-    const [eventTypes, total] = await this.dbConnection.getRepository(Event).findAndCount({ ...pagination });
-    return responses.data({
+    const [eventTypes, total] = await this.dbConnection.getRepository(EventTypes).findAndCount({ ...pagination });
+    return {
       items: eventTypes,
       total,
-    });
+    }
   }
 
-  public static async getEventType(payload: RequestByIdDto): Promise<EventTypeResponse> {
+  public static async getEventType(payload: RequestByIdDto): Promise<EventTypeData> {
     const eventTypes = await this.dbConnection.getRepository(EventTypes).findOne({ where: { id: payload.id } });
     if (!eventTypes) {
       throw new NotFoundError('Item EventTypes  not found');
     }
-    return responses.data(eventTypes);
+    return eventTypes
   }
 
   public static async deleteEventType(payload: RequestByIdDto): Promise<string> {
@@ -181,8 +182,7 @@ export class EventsService {
       // throw new NotFoundError('Item of EventTypes not found');
       throw new NotFoundError('Item of EventTypes not found')
     }
-    return
-
+    return ''
   }
 
   public static async updateEventType(payload: UpdateEventTypeRequestDto): Promise<EventTypeResponse> {
@@ -2096,7 +2096,7 @@ export class EventsService {
     return responses.data(eventsLocation);
   }
 
-  public static async createEventAgeLimit(payload: EventAgeLimitDto): Promise<EventAgeLimitResponse> {
+  public static async createEventAgeLimit(payload: EventAgeLimitDto): Promise<EventAgeLimit> {
     const savedAgeLimit = this.dbConnection.getRepository(EventAgeLimit).create({
       name: payload.name,
       description: payload.description,
@@ -2104,9 +2104,9 @@ export class EventsService {
       minAge: payload.minAge,
       enabled: true,
     });
-    const savedAgeLimitResp = await this.dbConnection.getRepository(EventLocation).save(savedAgeLimit);
+    const savedAgeLimitResp = await this.dbConnection.getRepository(EventAgeLimit).save(savedAgeLimit);
 
-    return responses.data(savedAgeLimitResp);
+    return savedAgeLimitResp
   }
 
   public static async updateEventAgeLimit(payload: UpdateEventAgeLimitRequestDto): Promise<EventAgeLimitResponse> {
@@ -2135,14 +2135,14 @@ export class EventsService {
     return response;
   }
 
-  public static async getEventAgeLimit(payload: RequestByIdDto): Promise<EventAgeLimitResponse> {
+  public static async getEventAgeLimit(payload: RequestByIdDto): Promise<EventAgeLimit> {
 
     const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
       where: { id: payload.id, deletedAt: null },
     });
     if (!eventAgeLimit) throw new NotFoundError('Age limit not found!');
 
-    return responses.data(eventAgeLimit);
+    return eventAgeLimit
 
   }
 
@@ -2152,12 +2152,12 @@ export class EventsService {
     });
     if (!eventAgeLimit) throw new NotFoundError('Age limit not found!');
     await this.dbConnection.getRepository(EventAgeLimit).update({ id: payload.id }, { deletedAt: new Date() });
-    return;
+    return ''
   }
 
-  public static async listEventAgeLimits(): Promise<EventAgeLimitsResponse> {
+  public static async listEventAgeLimits(): Promise<EventAgeLimit[]> {
     const eventAgeLimits = await this.dbConnection.getRepository(EventAgeLimit).find();
-    return responses.data(eventAgeLimits);
+    return eventAgeLimits
   }
 
   public static async publishEvent(eventId: string): Promise<EventResponse> {
