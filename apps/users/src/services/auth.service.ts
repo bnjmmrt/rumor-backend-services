@@ -1267,7 +1267,6 @@ export class AuthService {
       return  data;
   }
 
-  
   public static async getCurrentMember(payload: IdRequestDto): Promise<CurrentMember> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
