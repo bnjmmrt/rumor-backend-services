@@ -8,7 +8,7 @@ import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
-import { BadRequestError } from "packages/rumor-utils/errors";
+import { BadRequestError } from "rumor-utils/errors";
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
