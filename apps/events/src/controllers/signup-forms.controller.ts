@@ -8,6 +8,7 @@ import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
+import { BadRequestError } from "packages/rumor-utils/errors";
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -41,7 +42,11 @@ export class SignupFormsController {
   public static create = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const eventId = req.params.id;
-      const payload = req.body as any;
+      const payload = req.body as CreateSignupFormDto;
+      const hostId = (req as any).user;
+      if (payload.userId !== hostId) {
+        throw new BadRequestError("Invalid host id provided.");
+      }
       const data: SignupFormsResponse = await SignupFormsServices.create(
         eventId,
         payload
@@ -54,7 +59,10 @@ export class SignupFormsController {
       const eventId = req.params.eventId;
       const id = req.params.id;
       const payload = req.body as CreateSignupFormDto;
-      const data: SignupFormsResponse = await SignupFormsServices.update(
+      const hostId = (req as any).user;
+      if (payload.userId !== hostId) {
+        throw new BadRequestError("Invalid host id provided.");
+      }      const data: SignupFormsResponse = await SignupFormsServices.update(
         id,
         eventId,
         payload
