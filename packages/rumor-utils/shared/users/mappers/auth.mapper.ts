@@ -199,7 +199,6 @@ export const toMember = (
   }
 
   const followerCount = formatToUnits(totalFollowerCount) || 'N/A';
-  console.log(user)
 
   return {
     id: user.id,
