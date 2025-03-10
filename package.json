@@ -8,8 +8,7 @@
     "build": "node tools/build.js",
     "events": "nodemon apps/events/src/index.ts",
     "users": "nodemon apps/users/src/index.ts",
-    "notifications": "nodemon apps/notifications/src/index.ts",
-    "install": "cd apps/users/ && npm i && cd ../events && npm i && cd ../notifications && npm i && cd ../.. && npm run build"
+    "notifications": "nodemon apps/notifications/src/index.ts"
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",
