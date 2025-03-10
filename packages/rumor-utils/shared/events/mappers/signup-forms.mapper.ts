@@ -1,7 +1,10 @@
 import { Event } from "../entities";
 import { EventSignupForms } from "../entities/event-signup-forms.entity";
 import { SignupFormQuestions } from "../entities/signup-form-questions.entity";
-import { CollaboratorsEvent, SignupFormsResponse } from "../grpc/events/general.pb";
+import {
+  CollaboratorsEvent,
+  SignupFormsResponse,
+} from "../grpc/events/general.pb";
 import { groupCollaborators } from "./events.mapper";
 
 export const buildSignupFormsResponse = (
@@ -10,19 +13,21 @@ export const buildSignupFormsResponse = (
   baseUrl: string,
   submissions: number = 0
 ): SignupFormsResponse => {
-  const companyName = (
+  const companyName: string = (
     event.owner?.additionalHostInformation?.companyName || ""
   )
     .split(" ")
     .join("");
-  const eventName = event.name.split(" ").join("");
-  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators);
+  const eventName: string = event.name.split(" ").join("");
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(
+    event?.collaborators
+  );
 
   const result: SignupFormsResponse = {
     id: esf.id,
-    name: event.name,
-    startDate: event.startDate.toString() || new Date().toString(),
-    endDate: event.endDate.toString() || new Date().toString(),
+    name: esf.name,
+    startDate: event.startDate ? event.startDate.toString() : null,
+    endDate: event.endDate ? event.endDate.toString() : null,
     address: event.location,
     timeZone: event.timeZone,
     type: event.eventType?.name,
@@ -41,7 +46,7 @@ export const buildSignupFormsResponse = (
     questions:
       (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
-    eventStatus: event.status
+    eventStatus: event.status,
   };
   result.questions &&
     result.questions.sort((a, b) => {
@@ -57,6 +62,6 @@ const buildQuestion = (q: SignupFormQuestions) => {
     isDefault: q.isDefault,
     name: q.name,
     ordering: q.ordering,
-    value: q.value
+    value: q.value,
   };
 };
