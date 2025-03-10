@@ -14,10 +14,9 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: "*", 
-    methods: ["GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"], 
-    allowedHeaders: ["X-Requested-With", "Content-Type"], 
-    credentials: true,
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["*"]
   })
 );
 
