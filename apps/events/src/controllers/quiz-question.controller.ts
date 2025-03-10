@@ -19,6 +19,7 @@ import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/d
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { QuizAnswer } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { QuizQuestion } from 'packages/rumor-utils/shared/entities';
 
 export class QuizQuestionController {
 
@@ -50,7 +51,7 @@ export class QuizQuestionController {
   public static getEventQuizQuestions = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const quizResponse: QuizQuestionsResponse = await QuizQuestionService.getEventQuizQuestions(payload);
+    const quizResponse: QuizQuestion[] = await QuizQuestionService.getEventQuizQuestions(payload);
     const successResponse = new GetResponse(quizResponse);
     res.status(successResponse.statusCode).json(successResponse);
   }

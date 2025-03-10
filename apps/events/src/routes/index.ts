@@ -10,6 +10,7 @@ import { QuizQuestionController } from "../controllers/quiz-question.controller"
 import { TalentController } from "../controllers/talent.controller";
 import { TicketTypeController } from "../controllers/ticket-type.controller";
 import { CollaboratorController } from "../controllers/collaborator.controller";
+import { AdmissionTypeController } from "../controllers/admission-type.controller";
 
 const router: Router = express.Router();
 
@@ -82,7 +83,7 @@ router.delete("/event-age-limit/:id", EventsController.deleteEventAgeLimit) /**T
 //Event quiz questions
 router.post("/quiz-question", QuizQuestionController.createQuizQuestion)
 router.put("/quiz-question/:id", QuizQuestionController.updateQuizQuestion)
-router.get("/:id/quiz-question", QuizQuestionController.getEventQuizQuestions)
+router.get("/:id/quiz-question", QuizQuestionController.getEventQuizQuestions)   /**TestStatus: working */
 router.delete("/quiz-question/:id", QuizQuestionController.deleteQuizQuestion)
 
 //quiz
@@ -93,8 +94,8 @@ router.get("/quiz-answers/:userId/:eventId", QuizQuestionController.getUserQuizA
 
 //Talent  
 router.post("/talent", TalentController.createTalent)
-router.get("/talent", TalentController.getAllTalent)
-router.get("/talent/:id", TalentController.getTalent)
+router.get("/talent", TalentController.getAllTalent) /**TestStatus: working */
+router.get("/talent/:id", TalentController.getTalent) /**TestStatus: working */
 router.put("/talent/:id", TalentController.updateTalent)
 router.delete("/talent/:id", TalentController.deleteTalent)
 
@@ -102,8 +103,8 @@ router.delete("/talent/:id", TalentController.deleteTalent)
 router.post("/ticket-type", TicketTypeController.createTicketType)
 router.put("/ticket-type/:id", TicketTypeController.updateTicketType)
 router.delete("/ticket-type/:id", TicketTypeController.deleteTicketType)
-router.get("/ticket-type/:id", TicketTypeController.getTicketType)
-router.get("/ticket-types/:id", TicketTypeController.getTicketTypes)
+router.get("/ticket-type/:id", TicketTypeController.getTicketType)  /**TestStatus: working */
+router.get("/ticket-types/:id", TicketTypeController.getTicketTypes) /**TestStatus: working */
 
 // Collaborators
 router.get("/collaborators/roles", CollaboratorController.getCollaboratorRoles) /**TestStatus: working */
@@ -117,23 +118,26 @@ router.get("/default-config-role", CollaboratorController.getDefaultRoleConfigBy
 //Event location
 router.post("/event-location", EventsController.createEventLocation)
 router.put("/event-location/:id", EventsController.updateEventLocation)
-router.get("/event-location/:id", EventsController.getEventLocation)
+router.get("/event-location/:id", EventsController.getEventLocation)  
 router.get("/event-locations", EventsController.listEventLocations)
 router.delete("/event-location/:id", EventsController.deleteEventLocation)
 
 //events routes
 router.post("/event", AuthMiddleware.fusionAuthRequired, EventsController.createEvent) /**TestStatus: working */
-router.delete("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.deleteEvent)
+router.delete("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.deleteEvent) /**TestStatus: working */
 router.put("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.updateEvent) /**TestStatus: working (need to retest mails on update of location or date)*/
 router.put("/event/:id/publish", AuthMiddleware.fusionAuthRequired, EventsController.publishEvent) /**TestStatus: working */
 router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify); /**TestStatus: working(need to check for signup form updates) */
 router.get("/event-status", EventsController.listEventStatus); /**TestStatus: working */
 
 
-router.get("/events", EventsController.listEvents)
+router.get("/events", EventsController.listEvents)  /**TestStatus: working */
 router.get("/feed", EventsController.listEventsFeed)
-router.get("/feed/featured", EventsController.getFeaturedEvents)
-router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents)
+router.get("/feed/featured", EventsController.getFeaturedEvents) 
+router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents) /**TestStatus: working */
+router.get("/dashboard/top-users-attendees-events", GuestController.getTopUsersAttendees)  /**TestStatus: working */
+router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) //todo:
+
 router.put("/event/:id/duplicate", EventsController.duplicateEvent) /*this api is not used as we are using create event api to duplicate event*/
 router.post("/featured-events", EventsController.addEventToFeaturedSection)
 router.get("/public/:eventId", EventsController.getPublicEvent)  /**TestStatus: working */
@@ -144,9 +148,15 @@ router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.get
 // Host
 router.get("/hosts/events", AuthMiddleware.fusionAuthRequired, EventsController.listHostEvents) /**TestStatus: working */
 //admin status
-router.put("/admin/events/:eventId/status", AuthMiddleware.fusionAuthRequired, EventsController.manualEventStatusUpdate)
+router.put("/admin/events/:eventId/status", AuthMiddleware.fusionAuthRequired, EventsController.manualEventStatusUpdate) /** working */
 
 router.get("/users/:id/events", GuestController.listGuestEvents) /**TestStatus: working */
+// Admission types
+router.post("/admission-types", AdmissionTypeController.createAdmissionType) /**TestStatus: working */
+router.put("/admission-types/:id", AdmissionTypeController.updateAdmissionType) /**TestStatus: working */
+router.delete("/admission-types/:id", AdmissionTypeController.deleteAdmissionType) /**TestStatus: working */
+router.get("/admissions-types", AdmissionTypeController.getAdmissionsTypes) /**TestStatus: working */
+router.get("/admission-types/:id", AdmissionTypeController.getAdmissionTypeById) /**TestStatus: working */
 
 //ends here
 /**

@@ -4,6 +4,7 @@ import { CreateTalentRequestDto, RequestByIdDto, UpdateTalentRequestDto } from '
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express'
+import { Talent } from 'packages/rumor-utils/shared/entities';
 
 export class TalentController {
 
@@ -28,7 +29,7 @@ export class TalentController {
   public static getTalent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params
     const payload: RequestByIdDto = { id }
-    const talentResponse: TalentResponse = await TalentService.getTalent(
+    const talentResponse: Talent = await TalentService.getTalent(
       payload
     );
     const successResponse = new GetResponse(talentResponse);

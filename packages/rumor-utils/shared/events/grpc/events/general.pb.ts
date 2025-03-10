@@ -642,7 +642,7 @@ export interface QuizDataList {
 export interface GenerateTicketForGuestData {
   guestId?: string | undefined;
   ticketStatus?: TicketStatus | undefined;
-  b64QRCode?: string | undefined;
+  jwtToken?: string | undefined;
   eventQr: boolean;
   checkInStatus?: boolean | undefined;
 }

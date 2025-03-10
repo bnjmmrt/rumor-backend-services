@@ -13,7 +13,8 @@ import {
   FetchBulkGuestsResponse,
   GetAttendeeCountRequest,
   GetAttendeeCountResponse,
-  PaginatedGuestEventsResponse
+  PaginatedGuestEventsResponse,
+  Attendees
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {
   GuestsRequestDto,
@@ -41,6 +42,7 @@ import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
 import {RequestByUserAndEventDto, UserAndIdRequestDto} from 'rumor-utils/shared/users/dtos/shared.dto';
+import { UserAttendee } from 'rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestController {
   public static manageGuests = asyncWrapper(
@@ -222,7 +224,7 @@ export class GuestController {
 
   public static getTopUsersAttendees = asyncWrapper(
     async (req, res): Promise<void> => {
-      const response: UsersAttendeesResponse = await GuestService.getTopUsersAttendees();
+      const response: UserAttendee[] = await GuestService.getTopUsersAttendees();
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -415,7 +417,7 @@ export class GuestController {
         eventId: req.params.eventId,
         ...req.body
       }
-      const response: GetAttendeeCountResponse = await GuestService.getEventAttendeeCountByTicketType(payload);
+      const response: Attendees = await GuestService.getEventAttendeeCountByTicketType(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
