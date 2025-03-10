@@ -8,6 +8,7 @@ import {
   MemberProfileResponse,
   SignUpResponse,
   TokenResponse,
+  TokenResponseAndRoles,
 } from "rumor-utils/shared/users/grpc/auth/auth.pb";
 import {
   IdRequestDto,
@@ -18,33 +19,43 @@ import {
   LoginRequestDto,
   AdminSignUpRequestDto,
   UpdateUserStatusRequestDto,
+  UpdateHostsStatusRequestDto,
 } from "rumor-utils/shared/users/dtos/auth.dto";
 import { UpdateHostProfileRequestDto } from "rumor-utils/shared/users/dtos/admin.dto";
 import { GenericResponse } from "rumor-utils/shared/users/grpc/auth/shared.pb";
 import asyncWrapper from "../server/helpers/asyncWrapper";
+import { CreateResponse, GetResponse, UpdateResponse } from "rumor-utils/success";
+import type { BasicHostProfile } from 'rumor-utils/shared/users/grpc/auth/auth.pb.d.ts';
 
 export class AdminController {
   public static getMembers = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: PaginatedRequestDto = req.body;
+      const userId = (req as any).user;
+      const query = JSON.stringify(req.query);
+      const payload: PaginatedRequestDto = {userId, query};
       const response: GetMembersResponse = await AuthService.getMembers(payload);
-      res.json(response);
+      const getResponse = new GetResponse(response.data);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
   public static getHosts = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: PaginatedRequestDto = req.body;
+      const userId = (req as any).user;
+      const query = JSON.stringify(req.query);
+      const payload: PaginatedRequestDto = { userId, query };
       const response: GetHostsResponse = await AuthService.getHosts(payload);
-      res.json(response);
+      const getResponse = new GetResponse(response.data);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
   public static adminLogin = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: LoginRequestDto = req.body;
-      const response: TokenResponse = await AuthService.adminLogin(payload);
-      res.json(response);
+      const response: TokenResponseAndRoles = await AuthService.adminLogin(payload);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
@@ -53,44 +64,59 @@ export class AdminController {
     async (req, res): Promise<void> => {
       const payload: AdminSignUpRequestDto = req.body;
       const response: SignUpResponse = await AuthService.createAdmin(payload);
-      res.json(response);
+      const createResponse = new CreateResponse(response, 'Admin created succesfully');
+      res.status(createResponse.statusCode).json(createResponse);
     }
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'GetHostProfile')
   public static getHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UserAndIdRequestDto = req.body;
+      const userId = (req as any).user;
+      const { id } = req.params;
+      const payload: UserAndIdRequestDto = {userId, id};
       const response: HostProfileResponse = await AuthService.getHostProfile(payload);
-      res.json(response);
+      const getResponse = new GetResponse(response);
+      res.status(getResponse.statusCode).json(getResponse);
     }
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'GetBasicHostProfile')
   public static getBasicHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
-      const response: BasicHostProfileResponse = await AuthService.getBasicHostProfile(payload);
-      res.json(response);
+      const payload: IdRequestDto = { id: req.params.id };
+      const response: BasicHostProfile = await AuthService.getBasicHostProfile(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostProfile')
   public static updateHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateHostProfileRequestDto = req.body;
+      const id  = req.params.id
+      const payload: UpdateHostProfileRequestDto = { ...req.body, id };
       const response: BasicHostProfileResponse = await AuthService.updateHostProfile(payload);
-      res.json(response);
+      const UpdatedResponse = new UpdateResponse(response.data, 'Updated host details succesfully');
+      res.status(UpdatedResponse.statusCode).json(UpdatedResponse)
     }
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateHostStatus')
   public static updateHostStatus = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateUserStatusRequestDto = req.body;
+      const payload: UpdateHostsStatusRequestDto = req.body;
       const response: GenericResponse = await AuthService.updateHostStatus(payload);
-      res.json(response);
+      const UpdatedResponse = new UpdateResponse(response, 'Status updated succesfully');
+      res.status(UpdatedResponse.statusCode).json(UpdatedResponse)
     }
+  );
+
+  public static approveHost = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateHostsStatusRequestDto = req.body;
+      const response: any = await AuthService.updateHostStatus(payload);
+      res.json(response)}
   );
 
   //@GrpcMethod(AUTH_SERVICE_NAME, 'UpdateMemberStatus')

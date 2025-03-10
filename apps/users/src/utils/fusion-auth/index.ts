@@ -10,11 +10,13 @@ class AuthMiddleware {
         const authorization = req.header("Authorization");
         if (!authorization) {
             res.status(401).send("Unauthorized");
+            return;
         }
 
         const tokenParts = authorization.split("Bearer ");
         if (tokenParts.length < 2) {
             res.status(401).send("Unauthorized");
+            return;
         }
         const token = tokenParts[1];
 
@@ -22,6 +24,7 @@ class AuthMiddleware {
 
         if (!response || !response.userId) {
             res.status(401).send("Unauthorized");
+            return;
         }
 
         (req as any).user = response.userId;

@@ -6,6 +6,7 @@ import {
   InterestResponse,
   InterestsResponse,
 } from "rumor-utils/shared/users/grpc/platform/platform.pb";
+import { FocusData, InterestData } from "rumor-utils/shared/users/grpc/platform/general.pb";
 import {
   toFocus,
   toInterest,
@@ -23,41 +24,43 @@ import { User } from "rumor-utils/shared/users/entities/user.entity";
 import { Interest } from "rumor-utils/shared/users/entities/interest.entity";
 import { responses } from "../common/responses.common";
 import database from "../database";
+import { ConflictError, NotFoundError } from "rumor-utils/errors";
 
 export class PlatformService {
   public static dbConnection = database;
 
-  public static async getFocuses(): Promise<FocusResponse> {
+  public static async getFocuses(): Promise<FocusData[]> {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { deletedAt: IsNull() } });
-    return responses.data(focuses.map((focus) => toFocus(focus)));
+    return focuses.map((focus) => toFocus(focus));
   }
 
   public static async getUserFocuses(
     payload: IdRequestDto
-  ): Promise<FocusResponse> {
+  ): Promise<FocusData[]> {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-    return responses.data(focuses.map((focus) => toFocus(focus)));
+    const data = focuses.map((focus) => toFocus(focus));
+    return data
   }
 
   public static async addFocus(
     payload: AddFocusRequestDto
-  ): Promise<GenericResponse> {
+  ): Promise<String> {
     const focus = await this.dbConnection.getRepository(Focus).findOne({
       where: {
         name: payload.name.toLowerCase(),
         deletedAt: IsNull(),
       },
     });
-    if (focus) return responses.conflict("Focus with this name already exists");
+    if (focus) throw new ConflictError("Focus with this name already exists");
 
     const newFocus = new Focus();
     newFocus.name = payload.name.toLowerCase();
     await this.dbConnection.getRepository(Focus).save(newFocus);
-    return responses.ok;
+    return;
   }
 
   public static async editFocusName(
@@ -69,11 +72,11 @@ export class PlatformService {
         deletedAt: IsNull(),
       },
     });
-    if (!focus) return responses.notFound("Focus not found");
+    if (!focus) throw new NotFoundError("Focus");
 
     focus.name = payload.name.toLowerCase();
     await this.dbConnection.getRepository(Focus).save(focus);
-    return responses.ok;
+    return;
   }
 
   public static async saveFocusesForUser(
@@ -99,35 +102,36 @@ export class PlatformService {
         }
       })
     );
-    return responses.ok;
+    return;
   }
 
   public static async createInterest(
     payload: CreateInterestRequestDto
-  ): Promise<InterestResponse> {
+  ): Promise<InterestData> {
     const item = new Interest();
     item.name = payload.name;
     item.description = payload.description;
     item.enabled = payload.enabled;
     const created = await this.dbConnection.getRepository(Interest).save(item);
-    return responses.data(created);
+    return created;
   }
 
-  public static async listInterests(): Promise<InterestsResponse> {
+  public static async listInterests(): Promise<InterestData[]> {
     const interests = await this.dbConnection.getRepository(Interest).find();
-    return responses.data(interests);
+    return interests;
   }
 
   public static async getUserInterests(
     payload: IdRequestDto
-  ): Promise<InterestsResponse> {
+  ): Promise<InterestData[]> {
     const interests = await this.dbConnection.getRepository(Interest).find({
       where: {
         users: { id: payload.id },
         deletedAt: IsNull(),
       },
     });
-    return responses.data(interests.map((interest) => toInterest(interest)));
+    const data = interests.map((interest) => toInterest(interest));
+    return data
   }
 
   public static async saveInterestsForUser(
@@ -176,7 +180,7 @@ export class PlatformService {
       })
     );
 
-    return responses.ok;
+    return;
   }
 
   public static async deleteInterest(
@@ -186,14 +190,14 @@ export class PlatformService {
       .getRepository(Interest)
       .delete(payload.id);
     if (result.affected === 0) {
-      return responses.notFound("Item of Interest not found");
+      throw new NotFoundError("Item of Interest not found");
     }
-    return responses.ok;
+    return;
   }
 
   public static async updateInterest(
     payload: UpdateInterestRequestDto
-  ): Promise<InterestResponse> {
+  ): Promise<InterestData> {
     const updateItem = { ...payload };
     delete updateItem.id;
     await this.dbConnection.getRepository(Interest).update(
@@ -207,7 +211,7 @@ export class PlatformService {
         id: payload.id,
       },
     });
-    if (!interest) return responses.notFound("Item of Interest not found");
-    return responses.data(interest);
+    if (!interest) throw new NotFoundError("Item of Interest not found");
+    return interest;
   }
 }

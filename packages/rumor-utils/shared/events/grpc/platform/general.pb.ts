@@ -8,7 +8,7 @@
 
 export const protobufPackage = "platform";
 
-export interface Focus {
+export interface FocusData {
   id: string;
   name: string;
 }
@@ -20,7 +20,7 @@ export interface InterestData {
   enabled?: boolean | undefined;
 }
 
-export interface ReferralCode {
+export interface ReferralCodeData {
   id: string;
   code: string;
   description: string;

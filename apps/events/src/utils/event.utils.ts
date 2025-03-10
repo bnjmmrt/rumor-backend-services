@@ -170,7 +170,7 @@ export const isUtcDate = (dateString: string): boolean => {
  * @param existingEvent - The existing event details stored in the database.
  * @returns An object indicating whether changes exist and specifying which fields changed.
  */
-export function hasEventDateOrLocationChanged(newEvent: UpdateEventRequestDto, existingEvent: Event): { changed: boolean; changes: string[] } {
+export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, existingEvent: Event): { changed: boolean; changes: string[] } {
   const changes: string[] = [];
 
   /**
@@ -185,17 +185,21 @@ export function hasEventDateOrLocationChanged(newEvent: UpdateEventRequestDto, e
     return normalizeDate(date1)?.toISOString() === normalizeDate(date2)?.toISOString();
   };
   // Convert possible string dates to Date objects
-  const newEventStartDate = newEvent.startDate ? new Date(newEvent.startDate) : undefined;
-  const newEventEndDate = newEvent.endDate ? new Date(newEvent.endDate) : undefined;
+  const newEventStartDate = updatedDateAndLocation.startDate ? new Date(updatedDateAndLocation.startDate) : existingEvent.startDate;
+  const newEventEndDate = updatedDateAndLocation.endDate ? new Date(updatedDateAndLocation.endDate) : existingEvent.endDate;
 
   // Compare start date (ignoring seconds)
-  if (!areDatesEqual(newEventStartDate, existingEvent.startDate)) {
-    changes.push('startDate');
+  if (updatedDateAndLocation.startDate) {
+    if (!areDatesEqual(newEventStartDate, existingEvent.startDate)) {
+      changes.push('startDate');
+    }
   }
 
   // Compare end date (ignoring seconds)
-  if (!areDatesEqual(newEventEndDate, existingEvent.endDate)) {
-    changes.push('endDate');
+  if (updatedDateAndLocation.endDate) {
+    if (!areDatesEqual(newEventEndDate, existingEvent.endDate)) {
+      changes.push('endDate');
+    }
   }
 
   // Compare event location (Deep comparison without external libraries)
@@ -209,9 +213,10 @@ export function hasEventDateOrLocationChanged(newEvent: UpdateEventRequestDto, e
       loc1.longitude === loc2.longitude
     );
   };
-
-  if (!areLocationsEqual(newEvent.eventLocation, existingEvent.location)) {
-    changes.push('eventLocation');
+  if (updatedDateAndLocation.eventLocation?.googlePlaceId) {
+    if (!areLocationsEqual(updatedDateAndLocation.eventLocation, existingEvent.location)) {
+      changes.push('eventLocation');
+    }
   }
   return { changed: changes.length > 0, changes };
 }

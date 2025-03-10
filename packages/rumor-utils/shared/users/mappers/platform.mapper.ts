@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import { Focus } from '../entities/focus.entity';
 import { Interest } from '../entities/interest.entity';
-import { Focus as FocusProto, InterestData } from '../grpc/platform/general.pb';
+import { FocusData as FocusProto, InterestData } from '../grpc/platform/general.pb';
 
 export const toFocus = (focus: Focus): FocusProto => {
   return {

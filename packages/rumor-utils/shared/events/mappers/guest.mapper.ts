@@ -103,7 +103,7 @@ export const toGuest = (
     partySize: guest.maxAdditionalGuests + 1,
     numFollowers: formatToUnits(totalFollowerCount),
     baseCity: guest?.user?.address?.address || '',
-    category: focuses.map((focus) => focus.name),
+    category: focuses.length > 0 ? focuses.map((focus) => focus.name): [],
     maxAdditionalGuests: guest.maxAdditionalGuests,
     source: roles ? entityToUserSource[roles.source] : null,
     checkIn: guest.checkIn,

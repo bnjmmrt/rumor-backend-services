@@ -1,16 +1,17 @@
 import { FocusResponse, GenericResponse, InterestResponse, InterestsResponse } from "rumor-utils/shared/events/grpc/platform/platform.pb";
 import { ForgotPasswordRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
-import { CreateResponse, GetResponse } from "rumor-utils/success";
+import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from "rumor-utils/success";
 import asyncWrapper from "../server/helpers/asyncWrapper";
 import { AuthService } from "../services/auth.service";
 import { PlatformService } from "../services/platform.service";
 import { AddFocusRequestDto, CreateInterestRequestDto, EditFocusNameRequestDto, IdRequestDto, SaveFocusesForUserRequestoDto, SaveInterestsForUserRequestDto, UpdateInterestRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
+import { FocusData, InterestData } from "rumor-utils/shared/users/grpc/platform/general.pb";
 
 export class PlatformController {
 
     public static getFocuses = asyncWrapper(
         async (req, res): Promise<void> => {
-            const response: FocusResponse = await PlatformService.getFocuses();
+            const response: FocusData[] = await PlatformService.getFocuses();
             const getResponse = new GetResponse(response);
             res.status(getResponse.statusCode).json(getResponse);
         }
@@ -20,7 +21,7 @@ export class PlatformController {
         async (req, res): Promise<void> => {
             const {id} = req.params
             const payload: IdRequestDto = {id};
-            const response: FocusResponse = await PlatformService.getUserFocuses(payload);
+            const response: FocusData[] = await PlatformService.getUserFocuses(payload);
             const getResponse = new GetResponse(response);
             res.status(getResponse.statusCode).json(getResponse);
         }
@@ -29,7 +30,7 @@ export class PlatformController {
     public static addFocus = asyncWrapper(
         async (req, res): Promise<void> => {
             const payload: AddFocusRequestDto = req.body;
-            const response: GenericResponse = await PlatformService.addFocus(payload);
+            const response: String = await PlatformService.addFocus(payload);
             const createResponse = new CreateResponse(response);
             res.status(createResponse.statusCode).json(createResponse);
         }
@@ -39,8 +40,8 @@ export class PlatformController {
         async (req, res): Promise<void> => {
             const payload: EditFocusNameRequestDto = req.body;
             const response: GenericResponse = await PlatformService.editFocusName(payload);
-            const createResponse = new CreateResponse(response);
-            res.status(createResponse.statusCode).json(createResponse);
+            const updateResponse = new UpdateResponse(response, "Focus name updated");
+            res.status(updateResponse.statusCode).json(updateResponse);
         }
     );
 
@@ -57,7 +58,7 @@ export class PlatformController {
     public static createInterest = asyncWrapper(
         async (req, res): Promise<void> => {
             const payload: CreateInterestRequestDto = req.body;
-            const response: GenericResponse = await PlatformService.createInterest(payload);
+            const response: InterestData = await PlatformService.createInterest(payload);
             const createResponse = new CreateResponse(response);
             res.status(createResponse.statusCode).json(createResponse);
         }
@@ -65,26 +66,31 @@ export class PlatformController {
 
     public static listInterests = asyncWrapper(
         async (req, res): Promise<void> => {
-            const response: GenericResponse = await PlatformService.listInterests();
-            const createResponse = new CreateResponse(response);
-            res.status(createResponse.statusCode).json(createResponse);
+            const response: InterestData[] = await PlatformService.listInterests();
+            const getResponse = new GetResponse(response);
+            res.status(getResponse.statusCode).json(getResponse);
         }
     );
 
     public static getUserInterests = asyncWrapper(
         async (req, res): Promise<void> => {
-            const { id } = req.params
-            const payload: IdRequestDto = { id };
-            const response: InterestsResponse = await PlatformService.getUserInterests(payload);
-            const createResponse = new CreateResponse(response);
-            res.status(createResponse.statusCode).json(createResponse);
+            const payload: IdRequestDto =req.params;
+            const response: InterestData[] = await PlatformService.getUserInterests(payload);
+            const getResponse = new GetResponse(response);
+            res.status(getResponse.statusCode).json(getResponse);
         }
     );
 
     public static saveInterestsForUser = asyncWrapper(
-        async (req, res): Promise<void> => {
-            const payload: SaveInterestsForUserRequestDto = req.body;
-            const response: GenericResponse = await PlatformService.saveInterestsForUser(payload);
+        async (req, res): Promise<void> => { 
+            const { id } = req.params;
+            const userId = id;
+            const payload: SaveInterestsForUserRequestDto = {
+              ...req.body,
+              userId,
+            };
+            const response: GenericResponse =
+              await PlatformService.saveInterestsForUser(payload);
             const createResponse = new CreateResponse(response);
             res.status(createResponse.statusCode).json(createResponse);
         }
@@ -92,19 +98,20 @@ export class PlatformController {
 
     public static updateInterest = asyncWrapper(
         async (req, res): Promise<void> => {
-            const payload: UpdateInterestRequestDto = req.body;
-            const response: InterestResponse = await PlatformService.updateInterest(payload);
-            const createResponse = new CreateResponse(response);
-            res.status(createResponse.statusCode).json(createResponse);
+            const { id } = req.params;
+            const payload: UpdateInterestRequestDto = {...req.body, id};
+            const response: InterestData = await PlatformService.updateInterest(payload);
+            const updateResponse = new UpdateResponse(response);
+            res.status(updateResponse.statusCode).json(updateResponse);
         }
     );
 
     public static deleteInterest = asyncWrapper(
         async (req, res): Promise<void> => {
-            const payload: IdRequestDto = req.body;
+            const payload: IdRequestDto = req.params;
             const response: GenericResponse = await PlatformService.deleteInterest(payload);
-            const createResponse = new CreateResponse(response);
-            res.status(createResponse.statusCode).json(createResponse);
+            const deleteResponse = new DeleteResponse(response,"Delete Successful");
+            res.status(deleteResponse.statusCode).json(deleteResponse);
         }
     );
 }

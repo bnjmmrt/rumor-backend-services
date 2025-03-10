@@ -1,12 +1,15 @@
+import { Request, Response } from "express";
 import asyncWrapper from "../server/helpers/asyncWrapper";
 import { CommunicationService } from "../services/communication.service";
-import {
-  GenericResponse,
-  VerifyResponse,
-  StatusResponse,
-  ListEmailTemplatesResponse,
-  EmailTemplatesResponse,
-} from "rumor-utils/shared/notifications/grpc/communication/communication.pb";
+
+// import {
+//   GenericResponse,
+//   VerifyResponse,
+//   StatusResponse,
+//   ListEmailTemplatesResponse,
+//   EmailTemplatesResponse,
+// } from "rumor-utils/shared/notifications/grpc/communication/communication.pb";
+
 import {
   SendVerificationCodeRequestDto,
   VerifyCodeRequestDto,
@@ -25,69 +28,54 @@ import {
 } from "rumor-utils/success";
 
 export class CommunicationController {
-  // SendVerificationCode
+
   public static sendVerificationCode = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: SendVerificationCodeRequestDto = req.body;
-      const response: any = await TwilioService.sendVerificationCode(payload);
-      const successResponse = new CreateResponse(
-        response,
-        "Verification code sent successfully"
-      );
+      await TwilioService.sendVerificationCode(payload);
+      const successResponse = new CreateResponse({}, "Code Sent Successfully")
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
-  public static verifyCode = asyncWrapper(async (req, res): Promise<void> => {
+  public static verifyCode = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: VerifyCodeRequestDto = req.body;
-    const result = await TwilioService.verifyCode(payload);
-    const response: VerifyResponse = {
-      status: result.verified ? 200 : 400,
-      data: result,
-    };
-    const successResponse = new GetResponse(response, "Code verified");
+    await TwilioService.verifyCode(payload);
+    const successResponse = new GetResponse({}, "Code verified");
     res.status(successResponse.statusCode).json(successResponse);
   });
 
-  public static sendInvitationMessages = asyncWrapper(
-    async (req, res): Promise<void> => {
+  public static   sendInvitationMessages = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
       const payload: SendInvitationMessagesRequestDto = req.body;
-      TwilioService.sendInvitationMessages(payload);
-      const response: StatusResponse = {
-        success: true,
-      };
-      const successResponse = new GetResponse(response, "ok");
+      await TwilioService.sendInvitationMessages(payload);
+      const successResponse = new GetResponse({}, "ok");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static sendTextMessage = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: SendTextMessageRequestDto = req.body;
-      TwilioService.sendTextMessage(payload);
-      const response: StatusResponse = {
-        success: true,
-      };
-      const successResponse = new GetResponse(response, "ok");
+      await TwilioService.sendTextMessage(payload);
+      const successResponse = new GetResponse({}, "ok");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static sendEmailFromTemplate = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: SendEmailFromTemplateRequestDto = req.body;
-      const response: GenericResponse =
-        await CommunicationService.sendEmailFromTemplate(payload);
-      const successResponse = new GetResponse(response, "ok");
+      await CommunicationService.sendEmailFromTemplate(payload);
+      const successResponse = new GetResponse({}, "ok");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static createEmailTemplate = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: EmailTemplateDto = req.body;
-      const response: GenericResponse =
-        await CommunicationService.createEmailTemplate(payload);
+      const response = await CommunicationService.createEmailTemplate(payload);
       const successResponse = new CreateResponse(
         response,
         "Template created successfully"
@@ -97,31 +85,29 @@ export class CommunicationController {
   );
 
   public static listEmailTemplates = asyncWrapper(
-    async (req, res): Promise<void> => {
-      const response: ListEmailTemplatesResponse =
-        await CommunicationService.listEmailTemplates();
+    async (req: Request, res: Response): Promise<void> => {
+      const response = await CommunicationService.listEmailTemplates();
       const successResponse = new GetResponse(response, "Ok");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
   public static deleteEmailTemplate = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: DeleteEmailTemplateRequestDto = req.body;
-      const response: GenericResponse =
-        await CommunicationService.deleteEmailTemplate(payload);
-      const deleteResponse = new DeleteResponse("Template deleted");
+      const response = await CommunicationService.deleteEmailTemplate(payload);
+      const deleteResponse = new DeleteResponse({}, "Template Deleted Successfully");
       res.status(deleteResponse.statusCode).json(deleteResponse);
     }
   );
 
   public static getEmailTemplate = asyncWrapper(
-    async (req, res): Promise<void> => {
+    async (req: Request, res: Response): Promise<void> => {
       const payload: RequestByIdDto = req.body;
-      const response: EmailTemplatesResponse =
-        await CommunicationService.getEmailTemplate(payload);
+      const response = await CommunicationService.getEmailTemplate(payload);
       const successResponse = new GetResponse(response, "Ok");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
+
 }
