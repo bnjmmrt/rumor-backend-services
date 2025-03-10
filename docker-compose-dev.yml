@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  users:
+    container_name: rumour-users-service-dev
+    build:
+      context: .
+      dockerfile: apps/users/Dockerfile-dev
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/users/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+      - /app/node_modules
+    ports:
+      - "8000:8000"
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+    networks:
+      - rumor-network
+
+  events:
+    container_name: rumour-events-service-dev
+    build:
+      context: .
+      dockerfile: apps/events/Dockerfile-dev
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/events/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+      - /app/node_modules
+    ports:
+      - "8001:8001"
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+    networks:
+      - rumor-network
+
+  notifications:
+    container_name: rumour-notifications-service-dev
+    build:
+      context: .
+      dockerfile: apps/notifications/Dockerfile-dev
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/users/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+      - /app/node_modules
+    ports:
+      - "8002:8002"
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+    networks:
+      - rumor-network
+
+  rumor-db:
+    image: postgres:latest
+    container_name: rumor-backend-db-dev
+    restart: always
+    environment:
+      POSTGRES_USER: rumor
+      POSTGRES_PASSWORD: rumor
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rumor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rumor-network
+
+  nginx:
+    container_name: load-balancer-dev
+    image: nginx:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./tools/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - users
+      - events
+    networks:
+      - rumor-network
+
+networks:
+  rumor-network:
+    driver: bridge
+
+volumes:
+  postgres_data_dev:
