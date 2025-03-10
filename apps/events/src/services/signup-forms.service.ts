@@ -236,7 +236,7 @@ export class SignupFormsServices {
     body.questions.forEach((q) => q.id && oldQuestionids.push(q.id));
 
     const questonList = await SignupFormQuestions.find({
-     // where: { id: In(oldQuestionids) },
+      where: { id: In(oldQuestionids) },
     });
     const questionsMap = new Map<string, boolean>();
     questonList.forEach((q) => questionsMap.set(q.id.toString(), q.isDefault));
