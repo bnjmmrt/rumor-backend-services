@@ -4,6 +4,7 @@ import { CreateTicketTypeRequestDto, RequestByIdDto, UpdateTicketTypeRequestDto 
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express'
+import { TicketType } from 'packages/rumor-utils/shared/entities';
 
 export class TicketTypeController {
   constructor(private readonly ticketTypeService: TicketTypeService) { }
@@ -21,7 +22,7 @@ export class TicketTypeController {
   public static getTicketType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params
     const payload: RequestByIdDto = { id }
-    const ticketTypeResponse: TicketTypeResponse = await TicketTypeService.getTicketType(
+    const ticketTypeResponse: TicketType = await TicketTypeService.getTicketType(
       payload
     );
     const successResponse = new GetResponse(ticketTypeResponse);
@@ -33,7 +34,7 @@ export class TicketTypeController {
   public static getTicketTypes = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params
     const payload: RequestByIdDto = { id }
-    const ticketTypeResponse: TicketTypesResponse = await TicketTypeService.getTicketTypes(
+    const ticketTypeResponse: TicketType[] = await TicketTypeService.getTicketTypes(
       payload
     );
     const successResponse = new GetResponse(ticketTypeResponse);

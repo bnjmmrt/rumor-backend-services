@@ -45,14 +45,14 @@ export class QuizQuestionService {
 
   }
 
-  public static async getEventQuizQuestions(payload: RequestByIdDto): Promise<QuizQuestionsResponse> {
+  public static async getEventQuizQuestions(payload: RequestByIdDto): Promise<QuizQuestion[]> {
     const quizQuestions = await this.dbConnection.getRepository(QuizQuestion).find({
       where: {
         event: { id: payload.id },
         deletedAt: IsNull(),
       },
     });
-    return responses.data(quizQuestions);
+    return quizQuestions
   }
 
   public static async updateQuizQuestion(payload: UpdateQuizQuestionRequestDto): Promise<QuizQuestionResponse> {

@@ -59,7 +59,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
-import { EventStatus, EventTypeData, FeaturedEvent } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import database from '../database'
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
@@ -1484,7 +1484,9 @@ export class EventsService {
               continue; //  No need to delete; just rename
             }
           }
-          deleteIds.push(ticket.id);
+          else {
+            deleteIds.push(ticket.id);
+          }
         } else if (ticket.action === 'create') {
           createTickets.push(ticket); // Hold for later after handling reassignment
         }
@@ -2363,12 +2365,11 @@ export class EventsService {
       };
 
       const token = generateToken(tokenPayload)//this.jwtService.sign(tokenPayload);
-      const qrCode = await QRCode.toDataURL(token);
 
       return responses.data({
         guestId: guest.id,
         ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
-        b64QRCode: qrCode,
+        jwtToken: token,
         eventQr: guest?.event?.useQr || false,
       });
     }
@@ -2381,27 +2382,72 @@ export class EventsService {
     });
   }
 
-  public static async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<string> {
+  /**
+   * Validates a guest's ticket using a provided token.
+   *
+   * - Decodes the ticket token.
+   * - Checks if the ticket exists and is valid.
+   * - Updates the ticket status if necessary.
+   * - Fetches the associated guest and updates their check-in status.
+   * - Returns the updated ticket status, guest ID, and event QR status.
+   *
+   * @param {ValidateTicketForGuestRequestDto} payload - Contains the ticket token for validation.
+   * @returns {Promise<GenerateTicketForGuestData>} - Response with updated ticket and guest details.
+   */
+  public static async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<GenerateTicketForGuestData> {
+    // Step 1: Decode and verify the ticket token
     const decodedToken = await verifyToken(payload.ticketToken);
+
+    // If token is invalid, return an error response
     if (!decodedToken) {
       throw new BadRequestError('Invalid ticket token');
     }
 
+    // Step 2: Fetch the ticket details from the database
     const ticket = await this.dbConnection.getRepository(Ticket).findOne({
-      where: {
-        id: decodedToken.ticket,
-        status: TicketStatusEnum.TICKET_GENERATED,
-      },
-      relations: ['guest', 'event'],
+      where: { id: decodedToken.ticket },
+      relations: ['guest', 'event'], // Include guest and event details
     });
 
-    if (!ticket) {
-      throw new BadRequestError('Ticket not found or already used');
+    // Step 3: Validate ticket existence and status
+    if (!ticket || [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+      throw new BadRequestError('Ticket not found or is cancelled or expired');
     }
 
-    await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+    // Step 4: Fetch guest details associated with the ticket
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { id: decodedToken.guestId },
+      relations: ['user', 'event'], // Include user and event details
+    });
 
-    return;
+    // If guest is not found, return an error response
+    if (!guest) {
+      throw new BadRequestError('Guest not found');
+    }
+
+    // Step 5: Determine guest check-in status and update the status accordingly
+    if (guest.checkIn && ticket.status === TicketStatusEnum.TICKET_USED) throw new BadRequestError('Guest is already checked-in and ticket is already used');
+    // Step 6: If ticket is still in 'Generated' state, mark it as 'Used'
+    if (!guest.checkIn) {
+      if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
+        await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+      }
+      await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: true });
+    }
+
+    // Step 7: Fetch updated ticket status to return in the response
+    const updatedTicket = await this.dbConnection.getRepository(Ticket).findOne({
+      where: { id: ticket.id },
+      select: ['status'], // Fetch only the status field
+    });
+
+    // Step 8: Return the final response with updated details
+    return {
+      guestId: guest.id,
+      ticketStatus: entityToTicketStatus[updatedTicket?.status ?? TicketStatusEnum.TICKET_USED], // Fetch dynamically
+      eventQr: guest.event.useQr, // Return event QR usage flag
+      checkInStatus: true,
+    }
   }
 
   public static async listEventUsedTickets(payload: RequestByIdDto): Promise<ListEventUsedTicketsResponse> {

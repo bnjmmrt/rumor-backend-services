@@ -46,7 +46,7 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import { EventData, EventTypeData } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventData, EventTypeData, GenerateTicketForGuestData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 export class EventsController {
 
@@ -112,7 +112,6 @@ export class EventsController {
   }
   );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
   public static listEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const queryParams = JSON.stringify(req.query)
     const payload: QueryRequestDto = { query: queryParams };
@@ -385,7 +384,7 @@ export class EventsController {
 
   public static validateTicketForGuest = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: ValidateTicketForGuestRequestDto = req.body
-    const ticketResponse: string = await EventsService.validateTicketForGuest(
+    const ticketResponse: GenerateTicketForGuestData = await EventsService.validateTicketForGuest(
       payload
     );
     const successResponse = new CreateResponse(ticketResponse);
