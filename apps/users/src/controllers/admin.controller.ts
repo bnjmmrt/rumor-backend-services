@@ -131,8 +131,10 @@ export class AdminController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'GetMemberProfile')
   public static getMemberProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: IdRequestDto = req.body;
+      const payload: IdRequestDto = { id: req.params.id };
       const response: MemberProfileResponse = await AuthService.getMemberProfile(payload);
+      const successResponse = new GetResponse(response.data);
+      res.status(successResponse.statusCode).json(successResponse);
       res.json(response);
     }
   );
