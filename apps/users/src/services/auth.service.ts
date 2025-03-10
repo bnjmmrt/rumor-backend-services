@@ -3284,7 +3284,7 @@ export class AuthService {
       if (isBlocked) isMemberBlockedHost = true;
     }
 
-    return toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost, isMemberBlockedHost, roleId, roleName)
+    return toHostProfile(host, hostRole.status, hostRole.source, isMemberFollowingHost, isMemberBlockedHost, roleId, roleName)
   }
 
   public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
@@ -3329,8 +3329,10 @@ export class AuthService {
       throw new NotFoundError('Host')
     }
 
+    const roleStatus: any = hostRole.status
+    const roleSource: any = hostRole.source
     await this.dbConnection.getRepository(UserRole).update(hostRole.id, { profileSetupCompleted: true });
-    return responses.data(toBasicHostProfile(updatedUser, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
+    return responses.data(toBasicHostProfile(updatedUser, roleStatus, roleSource));
   }
 
   public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfile> {
@@ -3353,7 +3355,10 @@ export class AuthService {
       throw new NotFoundError('Host role not found')
     }
 
-    const data = toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]);
+    const roleStatus: any = hostRole.status
+    const roleSource: any = hostRole.source
+
+    const data = toBasicHostProfile(user, roleStatus, roleSource);
     return data
   }
 
@@ -3561,7 +3566,7 @@ export class AuthService {
       },
     });
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
+    const memberRole = user.roles.find((role) => role?.role?.name === 'member');
     if (memberRole === undefined) return responses.notFound('Member not found');
 
     const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });

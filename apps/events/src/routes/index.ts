@@ -224,7 +224,7 @@ router.put("/event/:id/publish", AuthMiddleware.fusionAuthRequired, EventsContro
 router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify); /**TestStatus: working(need to check for signup form updates) */
 router.get("/event-status", EventsController.listEventStatus); /**TestStatus: working */
 
-router.get("/events", EventsController.listEvents);
+router.get("/events",AuthMiddleware.fusionAuthRequired, EventsController.listEvents);
 router.get("/feed", EventsController.listEventsFeed);
 router.get("/feed/featured", EventsController.getFeaturedEvents);
 router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents);
@@ -241,20 +241,24 @@ router.get(
   "/users/:userId/events/:eventId",
   EventsController.getEventByInvitedUserId
 ); /**TestStatus: working */
-
-router.get("/events", EventsController.listEvents)  /**TestStatus: working */
-router.get("/feed", EventsController.listEventsFeed)
-router.get("/feed/featured", EventsController.getFeaturedEvents)
-router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents) /**TestStatus: working */
 router.get("/dashboard/top-users-attendees-events", GuestController.getTopUsersAttendees)  /**TestStatus: working */
 router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) //todo:
 
+// router.get("/events", AuthMiddleware.fusionAuthRequired, EventsController.listEvents)  /**TestStatus: working */
+// router.get("/feed", EventsController.listEventsFeed)
+// router.get("/feed/featured", EventsController.getFeaturedEvents)
+// router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents) /**TestStatus: working */
 router.put("/event/:id/duplicate", EventsController.duplicateEvent) /*this api is not used as we are using create event api to duplicate event*/
 router.post("/featured-events", EventsController.addEventToFeaturedSection)
 router.get("/public/:eventId", EventsController.getPublicEvent)  /**TestStatus: working */
 router.get("/users/:userId/events/:eventId", EventsController.getEventByInvitedUserId) /**TestStatus: working */
 
-router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
+// router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
+router.get(
+  "/event/:id",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getEvent
+); /**TestStatus: working */
 
 // Host
 router.get(

@@ -177,7 +177,7 @@ export interface EventData {
   ticketTypes: TicketTypesEvent[];
   talents: TalentEvent[];
   eventType?: EventTypeEvent | undefined;
-  status?: EventStatus | undefined;
+  status?: any | undefined;
   furtherInstructions?: string | undefined;
   showLocation?: boolean | undefined;
   admissionType?: AdmissionTypeEvent | undefined;
@@ -189,7 +189,7 @@ export interface EventData {
   capacity?: number | undefined;
   totalConfirmedGuests?: number | undefined;
   guestsCount?: number | undefined;
-  currentGuestStatus?: GuestStatus | undefined;
+  currentGuestStatus?: any | undefined;
   guestId?: string | undefined;
   userId?: string | undefined;
   featuredEventSection?: FeaturedEventSection | undefined;

@@ -15,13 +15,13 @@ import {
   PaginatedGuestEventsResponse,
   Attendees
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-import { VouchRequestService } from './vouch-request.service';
+import {VouchRequestService} from './vouch-request.service';
 
 import { responses } from '../common/responses';
 import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
+import { NotFoundError, BadRequestError, ValidationError  } from "rumor-utils/errors";
 import {
   AddGuestsRequestDto,
   CancelEventInvitationRequestDto,
@@ -47,14 +47,14 @@ import { entityToGuestStatus, toGuestData, guestStatusToEntity, toAdditionalGues
 import { parse, ParsedQs } from 'qs';
 import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
-import { Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import {  Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils/event.utils';
 import { ProviderType } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { UserQuizAnswer } from 'rumor-utils/shared/events/entities/user-quiz-question-answer.entity';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GuestDataSimple, UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestDataSimple,UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
@@ -62,6 +62,11 @@ import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-se
 import { v4 as uuidv4 } from 'uuid';
 import { toSimpleUser } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/shared/users/entities';
+import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
+import S3Service from '../utils/aws/s3';
+import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
+import {GuestData, GuestDetails, BulkUserData} from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestService {
   public static dbConnection = database;
@@ -130,12 +135,12 @@ export class GuestService {
               guestStatus,
               sendInvite: sendNotification,
             };
-
+            
             // Call the function to create guests
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.data.users.length > 0) return { message: `Guest created with status ${guestStatus}` };
+            if (createGuests.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -166,7 +171,7 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
-            if (updateGuests.data.length > 0) return { message: `Guest updated with status ${guestStatus}` };
+            if (updateGuests.length > 0) return { message: `Guest updated with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -185,7 +190,7 @@ export class GuestService {
             // Call the function to update guests
             const deleteGuests = await this.manageGuestsRemoval(payloadRemoveGuests);
             // Check if guests were successfully created
-            if (deleteGuests.data.length > 0) return { message: `Guest deleted with status ${guestStatus}` };
+            if (deleteGuests) return { message: `Guest deleted with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -208,7 +213,7 @@ export class GuestService {
    * @param payload - Request data containing filters and selection criteria.
    * @returns Array of guest IDs or an error response.
    */
-  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[] | GenericResponse> {
+  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[]> {
     const parsedQuery = payload.query ? parse(payload.query) : undefined;
     const eventId = parsedQuery?.eventId as string;
     const { isSelectedAll, inclusiveIds, exclusiveIds, filePath, bulkUploadStatus, currentStatus } = payload;
@@ -243,23 +248,23 @@ export class GuestService {
       };
       const getGuests = await this.getGuests(fetchData);
       // Validate if guest data exists
-      if (!getGuests.data.users || getGuests.data.totalCount === 0) {
+      if (!getGuests.users || getGuests.totalCount === 0) {
         throw new NotFoundError('Guest data not found');
       }
 
       // Extract main guest IDs
-      let guestIds: string[] = getGuests.data.users
-        .filter(
-          (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
-        )
-        .map((guest) => guest.id);
-
+      let guestIds: string[] = getGuests.users
+      .filter(
+        (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
+      )
+      .map((guest) => guest.id);
+      
       // Extract additional guest IDs (if any)
-      const additionalGuestIds: string[] = getGuests.data.users
-        .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
-        .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
-        .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
-
+      const additionalGuestIds: string[] = getGuests.users
+      .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
+      .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
+      .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
+      
       // Combine all guest IDs
       guestIds = [...guestIds, ...additionalGuestIds];
 
@@ -304,7 +309,7 @@ export class GuestService {
    * @param {AddGuestsRequestDto} payltoAdditionalGuestDataoad - The request payload containing event, host, and guest details.
    * @returns {Promise<GuestsResponse>} - A response containing the list of added guests or an error message.
    */
-  public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<GuestsResponse> {
+  public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<Guests> {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
     if (!event) throw new NotFoundError('Event not found');
@@ -402,7 +407,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return responses.data({ users: guestsTransform, totalCount: guestsTransform.length });
+    return { users: guestsTransform, totalCount: guestsTransform.length };
   }
 
   /**
@@ -416,9 +421,9 @@ export class GuestService {
    * - Fetches and transforms the updated guest data before returning it.
    *
    * @param {UpdateGuestsRequestDto} payload - The request payload containing guest updates.
-   * @returns {Promise<GuestsDataResponse>} - A response containing updated guest data.
+   * @returns {Promise<GuestDataSimple[]>} - A response containing updated guest data.
    */
-  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestsDataResponse> {
+  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestDataSimple[]> {
     try {
       let ticketType;
 
@@ -508,7 +513,7 @@ export class GuestService {
             }
 
             // Save the updated guest data
-            const data = await this.dbConnection.getRepository(Guest).save(guest);
+            const data =  await this.dbConnection.getRepository(Guest).save(guest);
             return data;
           } catch (err) {
             // Log error and return null in case of failure
@@ -587,7 +592,7 @@ export class GuestService {
       );
 
       // Return transformed guest data
-      return responses.data(guestsTransform);
+      return guestsTransform;
     } catch (err) {
       // Log and return error response in case of failure
       throw new BadRequestError('Error updating guests');
@@ -606,7 +611,7 @@ export class GuestService {
    * @param {GuestsRequestDto} payload - The request payload containing event ID and guest IDs.
    * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
    */
-  private static async manageGuestsRemoval(payload: GuestsRequestDto): Promise<GenericResponse> {
+  private static async manageGuestsRemoval(payload: GuestsRequestDto): Promise<string> {
     const { eventId, guests } = payload;
 
     // Validate event existence
@@ -620,33 +625,33 @@ export class GuestService {
       // Remove guests who match the provided guest IDs
       await this.dbConnection.getRepository(Guest).delete({ id: In(guests) });
 
-      return responses.data('Guests removed successfully');
+      return 'Guests removed successfully'
     } catch (err) {
       // Log error and return failure response
-      throw new BadRequestError('Error handling guests data');
+       throw new BadRequestError('Error handling guests data');
     }
   }
 
   public static async withdrawInvites(payload: GuestsRequestDto): Promise<GenericResponse> {
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-    if (!event) throw new NotFoundError('Event not found');
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+      if (!event) throw new NotFoundError('Event not found');
 
-    if (!payload.guests) throw new NotFoundError('No invites to withdraw');
+      if (!payload.guests) throw new NotFoundError('No invites to withdraw');
 
-    const guestsIds = payload.guests;
+      const guestsIds = payload.guests;
 
-    await this.dbConnection.getRepository(Guest)
-      .createQueryBuilder()
-      .update(Guest)
-      .set({ status: GuestStatus.NO_STATUS })
-      .where('event_id = :eventId', { eventId: event.id })
-      .andWhere('id IN (:...ids)', { ids: guestsIds })
-      .execute();
+      await this.dbConnection.getRepository(Guest)
+        .createQueryBuilder()
+        .update(Guest)
+        .set({ status: GuestStatus.NO_STATUS })
+        .where('event_id = :eventId', { eventId: event.id })
+        .andWhere('id IN (:...ids)', { ids: guestsIds })
+        .execute();
 
-    return responses.ok;
+      return responses.ok;
   }
 
-  public static async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public static async getGuests(payload: GuestsQueryRequestDto): Promise<Guests> {
     const { hostId, eventId } = payload;
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
@@ -683,7 +688,7 @@ export class GuestService {
     }
 
     const { error: validationError, response: validation } = validateFilters(payload.query);
-    if (validationError) throw new BadRequestError(validation);
+    if (validationError) throw new ValidationError(validation);
     const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
 
     let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
@@ -792,7 +797,7 @@ export class GuestService {
         const [focuses, interests, vouches] = await Promise.all([
           (await serviceMesh.userService().getUserFocuses(guest.user.id)).data,
           (await serviceMesh.userService().getUserInterests(guest.user.id)).data,
-          (await VouchRequestService.getUserVouches({ id: guest.user.id })),
+          (await VouchRequestService.getUserVouches({id:guest.user.id})),
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -806,7 +811,7 @@ export class GuestService {
       }),
     );
     // TO DO: Fix this functionality
-    return responses.data({ users: buildGuests, totalCount });
+    return { users: buildGuests, totalCount };
   }
 
   public static async applyUserFilters(
@@ -1037,243 +1042,243 @@ export class GuestService {
   }
 
   public static async deleteGuests(payload: GuestsRequestDto): Promise<GenericResponse> {
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-    if (!event) throw new NotFoundError('Event not found');
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+      if (!event) throw new NotFoundError ('Event not found');
 
-    if (!payload.guests) throw new BadRequestError('No guests to delete');
+      if (!payload.guests) throw new BadRequestError('No guests to delete');
 
-    const guestsIds = payload.guests;
+      const guestsIds = payload.guests;
 
-    await this.dbConnection.getRepository(Guest)
-      .createQueryBuilder()
-      .softDelete()
-      .from(Guest)
-      .where('event_id = :eventId', { eventId: event.id })
-      .andWhere('id IN (:...ids)', { ids: guestsIds })
-      .execute();
+      await this.dbConnection.getRepository(Guest)
+        .createQueryBuilder()
+        .softDelete()
+        .from(Guest)
+        .where('event_id = :eventId', { eventId: event.id })
+        .andWhere('id IN (:...ids)', { ids: guestsIds })
+        .execute();
 
-    return responses.ok;
+      return responses.ok;
   }
 
-  public static async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    const parsedQuery = parse(payload.query);
-    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+  public static async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestDataSimple[]> {
+      const parsedQuery = parse(payload.query);
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
 
-    const andConditions = [];
-    const addCondition = (condition: object) => {
-      if (condition && Object.keys(condition).length > 0) {
-        andConditions.push(condition);
-      }
-    };
-
-    if (parsedQuery.guestStatus) {
-      const guestStatusArray = (parsedQuery.guestStatus as string).split(',').map((status) => status.trim());
-      const invalidStatuses = guestStatusArray.filter((status) => !isValidGuestStatus(status));
-      if (invalidStatuses.length > 0) {
-        throw new ValidationError(`Invalid status values: ${invalidStatuses.join(', ')}`);
-      }
-      addCondition({ status: In(guestStatusArray) });
-    }
-    addCondition({ event: { id: payload.eventId } });
-
-    addCondition(
-      parsedQuery.guestName && {
-        user: [{ firstName: ILike(`${parsedQuery.guestName}%`) }, { lastName: ILike(`${parsedQuery.guestName}%`) }, { username: ILike(`${parsedQuery.guestName}%`) }],
-      },
-    );
-
-    if (parsedQuery.gender) {
-      const gender = String(parsedQuery.gender).trim().toUpperCase();
-      const validateGender = isValidUserGender(gender);
-      if (!validateGender) throw new ValidationError(`Invalid gender value ${parsedQuery.gender}`);
-      addCondition({ user: { gender } });
-    }
-
-    if (parsedQuery.ticketTypeIds) {
-      const ticketTypes = (parsedQuery.ticketTypeIds as string).split(',').map((ticketTypeId) => ticketTypeId.trim());
-      addCondition({ ticketType: { id: In(ticketTypes) } });
-    }
-
-    const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
-
-    const column = parsedQuery.sortBy ? String(parsedQuery.sortBy) : 'firstName';
-    const sortOrder = parsedQuery.order ? String(parsedQuery.order) : 'ASC';
-    let order = undefined;
-
-    if (['firstName', 'lastName', 'username'].includes(column)) {
-      order = {
-        user: {
-          [column]: sortOrder,
-        },
-      };
-    } else if (column == 'partySize') {
-      order = {
-        maxAdditionalGuests: 'DESC',
-      };
-    } else if (column == 'ticketType') {
-      order = {
-        ticketType: {
-          name: sortOrder,
-        },
-      };
-    }
-
-    const relations = {
-      user: true,
-      ticketType: true,
-    };
-
-    const guests = await this.dbConnection.getRepository(Guest).find({
-      where: whereClause,
-      order: order,
-      relations,
-      take,
-      skip,
-    });
-    const guestsTransform = await Promise.all(
-      guests.map(async (guest) => {
-        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-        return toGuestDataSimple(guest, focuses);
-      }),
-    );
-
-    let filteredGuests = guestsTransform;
-
-    if (parsedQuery.fromAge || parsedQuery.toAge) {
-      const fromAge = parsedQuery.fromAge ? parseInt(parsedQuery.fromAge as string) : 0;
-      const toAge = parsedQuery.toAge ? parseInt(parsedQuery.toAge as string) : null;
-
-      filteredGuests = filteredGuests.filter((guest) => guest.age >= fromAge && (toAge === null || guest.age <= toAge));
-    }
-
-    if (parsedQuery.categoryNames) {
-      const categories = (parsedQuery.categoryNames as string).split(',').map((category) => category.trim().toLowerCase());
-
-      filteredGuests = filteredGuests.filter((guest) => guest.category?.some((cat) => categories.includes(cat.toLowerCase())));
-    }
-
-    return responses.data(filteredGuests);
-  }
-
-  public static async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    const parsedQuery = parse(payload.query);
-    const pagination = hasPagination(parsedQuery)
-      ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
-      }
-      : {};
-
-    const andConditions = [];
-    const orConditions = [];
-    const addCondition = (condition: object, operator: 'AND' | 'OR' = 'AND') => {
-      if (condition && Object.keys(condition).length > 0) {
-        if (operator === 'AND') {
+      const andConditions = [];
+      const addCondition = (condition: object) => {
+        if (condition && Object.keys(condition).length > 0) {
           andConditions.push(condition);
-        } else {
-          orConditions.push(condition);
         }
-      }
-    };
+      };
 
-    //conditions
-    if (parsedQuery.nonMembers) {
+      if (parsedQuery.guestStatus) {
+        const guestStatusArray = (parsedQuery.guestStatus as string).split(',').map((status) => status.trim());
+        const invalidStatuses = guestStatusArray.filter((status) => !isValidGuestStatus(status));
+        if (invalidStatuses.length > 0) {
+          throw new ValidationError(`Invalid status values: ${invalidStatuses.join(', ')}`);
+        }
+        addCondition({ status: In(guestStatusArray) });
+      }
+      addCondition({ event: { id: payload.eventId } });
+
       addCondition(
-        {
+        parsedQuery.guestName && {
+          user: [{ firstName: ILike(`${parsedQuery.guestName}%`) }, { lastName: ILike(`${parsedQuery.guestName}%`) }, { username: ILike(`${parsedQuery.guestName}%`) }],
+        },
+      );
+
+      if (parsedQuery.gender) {
+        const gender = String(parsedQuery.gender).trim().toUpperCase();
+        const validateGender = isValidUserGender(gender);
+        if (!validateGender) throw new ValidationError(`Invalid gender value ${parsedQuery.gender}`);
+        addCondition({ user: { gender } });
+      }
+
+      if (parsedQuery.ticketTypeIds) {
+        const ticketTypes = (parsedQuery.ticketTypeIds as string).split(',').map((ticketTypeId) => ticketTypeId.trim());
+        addCondition({ ticketType: { id: In(ticketTypes) } });
+      }
+
+      const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
+
+      const column = parsedQuery.sortBy ? String(parsedQuery.sortBy) : 'firstName';
+      const sortOrder = parsedQuery.order ? String(parsedQuery.order) : 'ASC';
+      let order = undefined;
+
+      if (['firstName', 'lastName', 'username'].includes(column)) {
+        order = {
           user: {
-            roles: { role: { name: 'non_member' } },
+            [column]: sortOrder,
+          },
+        };
+      } else if (column == 'partySize') {
+        order = {
+          maxAdditionalGuests: 'DESC',
+        };
+      } else if (column == 'ticketType') {
+        order = {
+          ticketType: {
+            name: sortOrder,
+          },
+        };
+      }
+
+      const relations = {
+        user: true,
+        ticketType: true,
+      };
+
+      const guests = await this.dbConnection.getRepository(Guest).find({
+        where: whereClause,
+        order: order,
+        relations,
+        take,
+        skip,
+      });
+      const guestsTransform = await Promise.all(
+        guests.map(async (guest) => {
+          const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+          return toGuestDataSimple(guest, focuses);
+        }),
+      );
+
+      let filteredGuests = guestsTransform;
+
+      if (parsedQuery.fromAge || parsedQuery.toAge) {
+        const fromAge = parsedQuery.fromAge ? parseInt(parsedQuery.fromAge as string) : 0;
+        const toAge = parsedQuery.toAge ? parseInt(parsedQuery.toAge as string) : null;
+
+        filteredGuests = filteredGuests.filter((guest) => guest.age >= fromAge && (toAge === null || guest.age <= toAge));
+      }
+
+      if (parsedQuery.categoryNames) {
+        const categories = (parsedQuery.categoryNames as string).split(',').map((category) => category.trim().toLowerCase());
+
+        filteredGuests = filteredGuests.filter((guest) => guest.category?.some((cat) => categories.includes(cat.toLowerCase())));
+      }
+
+      return filteredGuests;
+  }
+
+  public static async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestDataSimple[]> {
+      const parsedQuery = parse(payload.query);
+      const pagination = hasPagination(parsedQuery)
+        ? {
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
+        : {};
+
+      const andConditions = [];
+      const orConditions = [];
+      const addCondition = (condition: object, operator: 'AND' | 'OR' = 'AND') => {
+        if (condition && Object.keys(condition).length > 0) {
+          if (operator === 'AND') {
+            andConditions.push(condition);
+          } else {
+            orConditions.push(condition);
+          }
+        }
+      };
+
+      //conditions
+      if (parsedQuery.nonMembers) {
+        addCondition(
+          {
+            user: {
+              roles: { role: { name: 'non_member' } },
+            },
+          },
+          'AND',
+        );
+      } else {
+        addCondition(
+          {
+            user: {
+              roles: {
+                role: {
+                  name: 'member',
+                },
+              },
+            },
+          },
+          'AND',
+        );
+      }
+
+      addCondition(
+        parsedQuery.findByName && {
+          user: {
+            firstName: ILike(`%${parsedQuery.findByName}%`),
           },
         },
         'AND',
       );
-    } else {
       addCondition(
-        {
+        parsedQuery.findByEmail && {
+          user: {
+            email: ILike(`%${parsedQuery.findByEmail}%`),
+          },
+        },
+        'AND',
+      );
+
+      addCondition(
+        parsedQuery.roleStatus && {
           user: {
             roles: {
-              role: {
-                name: 'member',
-              },
+              status: parsedQuery.roleStatus,
             },
           },
         },
         'AND',
       );
-    }
 
-    addCondition(
-      parsedQuery.findByName && {
-        user: {
-          firstName: ILike(`%${parsedQuery.findByName}%`),
-        },
-      },
-      'AND',
-    );
-    addCondition(
-      parsedQuery.findByEmail && {
-        user: {
-          email: ILike(`%${parsedQuery.findByEmail}%`),
-        },
-      },
-      'AND',
-    );
+      addCondition(parsedQuery.guestStatus && { status: parsedQuery.guestStatus }, 'AND');
+      addCondition(parsedQuery.partySize && { partySize: parsedQuery.partySize }, 'AND');
+      addCondition(parsedQuery.maxAdditionalGuests && { maxAdditionalGuests: parsedQuery.maxAdditionalGuests }, 'AND');
+      addCondition(parsedQuery.maxAdditionalGuests && { maxAdditionalGuests: parsedQuery.maxAdditionalGuests }, 'AND');
+      addCondition(parsedQuery.addedById && { addedBy: { id: parsedQuery.addedById } }, 'AND');
+      addCondition(parsedQuery.declinedById && { declinedBy: { id: parsedQuery.declinedById } }, 'AND');
+      addCondition({ event: { id: payload.eventId } }, 'AND');
 
-    addCondition(
-      parsedQuery.roleStatus && {
+      const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
+      const orClause = orConditions.length > 0 ? orConditions : undefined;
+      const order = parsedQuery.sortBy
+        ? {
+          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+        }
+        : undefined;
+      const relations = {
         user: {
+          address: true,
+          hostedEvents: true,
+          socialStats: true,
+          interests: true,
           roles: {
-            status: parsedQuery.roleStatus,
+            role: true,
           },
         },
-      },
-      'AND',
-    );
+      };
+      const guests = await this.dbConnection.getRepository(Guest).find({
+        where: orClause ? [whereClause, ...orClause] : whereClause,
+        order: order,
+        ...pagination,
+        relations,
+      });
 
-    addCondition(parsedQuery.guestStatus && { status: parsedQuery.guestStatus }, 'AND');
-    addCondition(parsedQuery.partySize && { partySize: parsedQuery.partySize }, 'AND');
-    addCondition(parsedQuery.maxAdditionalGuests && { maxAdditionalGuests: parsedQuery.maxAdditionalGuests }, 'AND');
-    addCondition(parsedQuery.maxAdditionalGuests && { maxAdditionalGuests: parsedQuery.maxAdditionalGuests }, 'AND');
-    addCondition(parsedQuery.addedById && { addedBy: { id: parsedQuery.addedById } }, 'AND');
-    addCondition(parsedQuery.declinedById && { declinedBy: { id: parsedQuery.declinedById } }, 'AND');
-    addCondition({ event: { id: payload.eventId } }, 'AND');
+      const guestsTransform = await Promise.all(
+        guests.map(async (guest) => {
+          const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+          return toGuestDataSimple(guest, focuses);
+        }),
+      );
 
-    const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
-    const orClause = orConditions.length > 0 ? orConditions : undefined;
-    const order = parsedQuery.sortBy
-      ? {
-        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-      }
-      : undefined;
-    const relations = {
-      user: {
-        address: true,
-        hostedEvents: true,
-        socialStats: true,
-        interests: true,
-        roles: {
-          role: true,
-        },
-      },
-    };
-    const guests = await this.dbConnection.getRepository(Guest).find({
-      where: orClause ? [whereClause, ...orClause] : whereClause,
-      order: order,
-      ...pagination,
-      relations,
-    });
-
-    const guestsTransform = await Promise.all(
-      guests.map(async (guest) => {
-        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-        return toGuestDataSimple(guest, focuses);
-      }),
-    );
-
-    return responses.data(guestsTransform);
+      return guestsTransform;
   }
 
-  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GetGuestProfileResponse> {
+  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GuestData> {
     const guest = (
       await this.dbConnection.getRepository(Guest).find({
         where: {
@@ -1351,32 +1356,44 @@ export class GuestService {
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
     const val = toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData);
-    return responses.data(val);
+    return val;
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<ListUsersEventInviteesResponse> {
-    const { userId, query: initialQuery } = payload;
-    const parsedQuery = parse(initialQuery) as ParsedQs;
-    const user = (await serviceMesh.userService(token).getBasicHostProfile(userId)).data;
-    if (!user) throw new NotFoundError('User is not a host.');
-    let usersQuery = initialQuery;
-    if (parsedQuery.eventId) {
-      const eventId = Array.isArray(parsedQuery.eventId) ? parsedQuery.eventId[0] : parsedQuery.eventId;
+      const { userId, query: initialQuery } = payload;
+      const parsedQuery = parse(initialQuery) as ParsedQs;
+      const user = (await serviceMesh.userService(token).getBasicHostProfile(userId)).data;
+      if (!user) throw new NotFoundError('User is not a host.');
+      let usersQuery = initialQuery;
+      if (parsedQuery.eventId) {
+        const eventId = Array.isArray(parsedQuery.eventId) ? parsedQuery.eventId[0] : parsedQuery.eventId;
 
-      const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: eventId as string },
-        relations: { guests: { user: true } },
-      });
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: eventId as string },
+          relations: { guests: { user: true } },
+        });
 
-      if (event) {
-        let guests = event.guests;
-        if (parsedQuery.guestStatus) {
-          guests = guests.filter((guest) => guest.status === GuestStatus[parsedQuery.guestStatus as string]);
+        if (event) {
+          let guests = event.guests;
+          if (parsedQuery.guestStatus) {
+            guests = guests.filter((guest) => guest.status === GuestStatus[parsedQuery.guestStatus as string]);
+          }
+
+          if (parsedQuery.myGuests && parsedQuery.myGuests === 'true') {
+            guests = guests.filter((guest) => guest.addedBy?.id === userId);
+          }
+
+          const userIds = guests.map((guest) => guest.user.id);
+          if (userIds.length > 0) {
+            const userIdsParam = userIds.join(',');
+            usersQuery += `&usersIds=${userIdsParam}`;
+          }
         }
-
-        if (parsedQuery.myGuests && parsedQuery.myGuests === 'true') {
-          guests = guests.filter((guest) => guest.addedBy?.id === userId);
-        }
+      } else if (parsedQuery.myGuests && parsedQuery.myGuests === 'true') {
+        const guests = await this.dbConnection.getRepository(Guest).find({
+          where: { addedBy: { id: userId } },
+          relations: { user: true },
+        });
 
         const userIds = guests.map((guest) => guest.user.id);
         if (userIds.length > 0) {
@@ -1384,25 +1401,13 @@ export class GuestService {
           usersQuery += `&usersIds=${userIdsParam}`;
         }
       }
-    } else if (parsedQuery.myGuests && parsedQuery.myGuests === 'true') {
-      const guests = await this.dbConnection.getRepository(Guest).find({
-        where: { addedBy: { id: userId } },
-        relations: { user: true },
-      });
 
-      const userIds = guests.map((guest) => guest.user.id);
-      if (userIds.length > 0) {
-        const userIdsParam = userIds.join(',');
-        usersQuery += `&usersIds=${userIdsParam}`;
-      }
-    }
+      const users = (await serviceMesh.userService().getMembersOrNonMembers(userId, usersQuery)).data;
+      const inviteesDataList = {
+        data: await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus)),
+      };
 
-    const users = (await serviceMesh.userService().getMembersOrNonMembers(userId, usersQuery)).data;
-    const inviteesDataList = {
-      data: await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus)),
-    };
-
-    return responses.data(inviteesDataList);
+      return responses.data(inviteesDataList);
   }
 
   // Helper function to map users to invitees
@@ -1438,594 +1443,594 @@ export class GuestService {
   }
 
   public static async listEventGuests(payload: ListEventGuestsDto): Promise<PaginatedGuestEventsResponse> {
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
-    const eventResponse = { data: [], totalCount: 0 };
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
-
-    const parsedQuery = parse(payload.query);
-    const pagination = hasPagination(parsedQuery)
-      ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
+      const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+      const eventResponse = { data: [], totalCount: 0 };
+      if (!user) {
+        throw new NotFoundError('User not found');
       }
-      : {};
 
-    const andConditions = [];
-    const orConditions = [];
-    const addCondition = (condition: object, operator: 'AND' | 'OR' = 'AND') => {
-      if (condition && Object.keys(condition).length > 0) {
-        if (operator === 'AND') {
-          andConditions.push(condition);
-        } else {
-          orConditions.push(condition);
+      const parsedQuery = parse(payload.query);
+      const pagination = hasPagination(parsedQuery)
+        ? {
+            take: parseInt(parsedQuery.take),
+            skip: parseInt(parsedQuery.skip),
+          }
+        : {};
+
+      const andConditions = [];
+      const orConditions = [];
+      const addCondition = (condition: object, operator: 'AND' | 'OR' = 'AND') => {
+        if (condition && Object.keys(condition).length > 0) {
+          if (operator === 'AND') {
+            andConditions.push(condition);
+          } else {
+            orConditions.push(condition);
+          }
         }
-      }
-    };
+      };
 
-    const addLocationCondition = async (longitude: number, latitude: number) => {
-      if (longitude && latitude) {
-        const eventsNear = await this.dbConnection.getRepository(Event).find({
-          where: {
-            deletedAt: null,
-            enabled: true,
+      const addLocationCondition = async (longitude: number, latitude: number) => {
+        if (longitude && latitude) {
+          const eventsNear = await this.dbConnection.getRepository(Event).find({
+            where: {
+              deletedAt: null,
+              enabled: true,
+            },
+            relations: ['location'],
+          });
+
+          const locationsToFind: EventLocationInterface[] = eventsNear.map((item) => {
+            return {
+              lat: Number(item?.location?.latitude || 0),
+              long: Number(item?.location?.longitude || 0),
+              id_event: String(item.id || ''),
+              id_location: String(item?.location?.id || ''),
+            };
+          });
+
+          const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
+          const locationsWhere = locations.map((item) => item.id_event);
+
+          if (locationsWhere.length > 0) {
+            return { id: In(locationsWhere) };
+          }
+        }
+        return null;
+      };
+
+      const locationCondition = await addLocationCondition(Number(parsedQuery.longitude), Number(parsedQuery.latitude));
+      addCondition(locationCondition, 'AND');
+
+      let status: EventStatusEnum[];
+      if (parsedQuery.statusName) {
+        status = String(parsedQuery.statusName)
+          .split(',')
+          .map((item) => {
+            return item as EventStatusEnum;
+          });
+      }
+
+      addCondition(parsedQuery.ownerId && { owner: { id: parsedQuery.ownerId } }, 'AND');
+      addCondition(parsedQuery.eventTypeId && { eventType: { id: parsedQuery.eventTypeId } }, 'AND');
+      addCondition(parsedQuery.eventTypeName && { eventType: { name: parsedQuery.eventTypeName } }, 'AND');
+      addCondition(
+        parsedQuery.eventTypeIds && {
+          eventType: {
+            id: In(
+              String(parsedQuery.eventTypeIds)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
           },
-          relations: ['location'],
-        });
+        },
+        'AND',
+      );
+      addCondition(
+        parsedQuery.eventTypeNames && {
+          eventType: {
+            name: In(
+              String(parsedQuery.eventTypeNames)
+                .split(',')
+                .map((name) => name.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
+      addCondition(
+        parsedQuery.ticketTypeNames && {
+          eventType: {
+            name: In(
+              String(parsedQuery.ticketTypeNames)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
 
-        const locationsToFind: EventLocationInterface[] = eventsNear.map((item) => {
-          return {
-            lat: Number(item?.location?.latitude || 0),
-            long: Number(item?.location?.longitude || 0),
-            id_event: String(item.id || ''),
-            id_location: String(item?.location?.id || ''),
-          };
-        });
+      addCondition(parsedQuery.maxStartDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.maxStartDate))) }, 'AND');
+      addCondition(parsedQuery.minStartDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.minStartDate))) }, 'AND');
+      addCondition(parsedQuery.minEndDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.minEndDate))) }, 'AND');
+      addCondition(parsedQuery.maxEndDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.maxEndDate))) }, 'AND');
+      addCondition(parsedQuery.startDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
+      addCondition(parsedQuery.startDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
+      addCondition(parsedQuery.endDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.endDate))) }, 'AND');
+      addCondition(parsedQuery.endDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.endDate))) }, 'AND');
+      addCondition(parsedQuery.minAgeLimit && { ageLimit: { minAge: MoreThanOrEqual(parsedQuery.minAgeLimit) } }, 'AND');
+      addCondition(parsedQuery.maxAgeLimit && { ageLimit: { maxAge: LessThanOrEqual(parsedQuery.maxAgeLimit) } }, 'AND');
+      addCondition(parsedQuery.ageLimitName && { ageLimit: { name: ILike(parsedQuery.ageLimitName) } }, 'AND');
+      addCondition(parsedQuery.ageLimitDescription && { ageLimit: { description: ILike(parsedQuery.ageLimitDescription) } }, 'AND');
+      addCondition(parsedQuery.ageLimitId && { ageLimit: { id: parsedQuery.ageLimitId } }, 'AND');
+      addCondition(
+        parsedQuery.collaboratorIds && {
+          collaborators: {
+            id: In(
+              String(parsedQuery.collaboratorIds)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
+      addCondition(parsedQuery.findByOwnerEmail && { owner: { email: ILike(`%${parsedQuery.findByOwnerEmail}%`) } }, 'AND');
+      addCondition(parsedQuery.findByOwnerName && { owner: { firstName: ILike(`%${parsedQuery.findByOwnerName}%`) } }, 'AND');
+      addCondition(
+        parsedQuery.ticketTypeIds && {
+          ticketTypes: {
+            id: In(
+              String(parsedQuery.ticketTypeIds)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
+      addCondition(
+        parsedQuery.ticketTypeNames && {
+          ticketTypes: {
+            name: In(
+              String(parsedQuery.ticketTypeNames)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
+      addCondition(
+        parsedQuery.talentIds && {
+          talents: {
+            id: In(
+              String(parsedQuery.talentIds)
+                .split(',')
+                .map((id) => id.trim()),
+            ),
+          },
+        },
+        'AND',
+      );
 
-        const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
-        const locationsWhere = locations.map((item) => item.id_event);
+      const userFilter = {
+        guests: {
+          user: { id: payload.userId },
+          status: In(
+            Object.values(GuestStatus).map((item) => {
+              return item;
+            }),
+          ),
+        },
+      };
 
-        if (locationsWhere.length > 0) {
-          return { id: In(locationsWhere) };
+      const dateNow = new Date();
+      let guestStatusFilter = [];
+      if (parsedQuery.guestEventStatus) {
+        switch (parsedQuery.guestEventStatus) {
+          case 'UPCOMING':
+            addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
+            guestStatusFilter = [GuestStatus.CONFIRMED];
+            break;
+          case 'PAST':
+            addCondition({ endDate: LessThan(dateNow) });
+            guestStatusFilter = [GuestStatus.CONFIRMED];
+            break;
+          case 'INVITED':
+            guestStatusFilter = [GuestStatus.INVITED];
+            break;
+          case 'APPLIED':
+            guestStatusFilter = [GuestStatus.APPLIED];
+            break;
         }
+        userFilter.guests.status = In(guestStatusFilter);
       }
-      return null;
-    };
 
-    const locationCondition = await addLocationCondition(Number(parsedQuery.longitude), Number(parsedQuery.latitude));
-    addCondition(locationCondition, 'AND');
-
-    let status: EventStatusEnum[];
-    if (parsedQuery.statusName) {
-      status = String(parsedQuery.statusName)
-        .split(',')
-        .map((item) => {
-          return item as EventStatusEnum;
-        });
-    }
-
-    addCondition(parsedQuery.ownerId && { owner: { id: parsedQuery.ownerId } }, 'AND');
-    addCondition(parsedQuery.eventTypeId && { eventType: { id: parsedQuery.eventTypeId } }, 'AND');
-    addCondition(parsedQuery.eventTypeName && { eventType: { name: parsedQuery.eventTypeName } }, 'AND');
-    addCondition(
-      parsedQuery.eventTypeIds && {
-        eventType: {
-          id: In(
-            String(parsedQuery.eventTypeIds)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-    addCondition(
-      parsedQuery.eventTypeNames && {
-        eventType: {
-          name: In(
-            String(parsedQuery.eventTypeNames)
-              .split(',')
-              .map((name) => name.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-    addCondition(
-      parsedQuery.ticketTypeNames && {
-        eventType: {
-          name: In(
-            String(parsedQuery.ticketTypeNames)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-
-    addCondition(parsedQuery.maxStartDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.maxStartDate))) }, 'AND');
-    addCondition(parsedQuery.minStartDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.minStartDate))) }, 'AND');
-    addCondition(parsedQuery.minEndDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.minEndDate))) }, 'AND');
-    addCondition(parsedQuery.maxEndDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.maxEndDate))) }, 'AND');
-    addCondition(parsedQuery.startDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
-    addCondition(parsedQuery.startDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.startDate))) }, 'AND');
-    addCondition(parsedQuery.endDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.endDate))) }, 'AND');
-    addCondition(parsedQuery.endDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.endDate))) }, 'AND');
-    addCondition(parsedQuery.minAgeLimit && { ageLimit: { minAge: MoreThanOrEqual(parsedQuery.minAgeLimit) } }, 'AND');
-    addCondition(parsedQuery.maxAgeLimit && { ageLimit: { maxAge: LessThanOrEqual(parsedQuery.maxAgeLimit) } }, 'AND');
-    addCondition(parsedQuery.ageLimitName && { ageLimit: { name: ILike(parsedQuery.ageLimitName) } }, 'AND');
-    addCondition(parsedQuery.ageLimitDescription && { ageLimit: { description: ILike(parsedQuery.ageLimitDescription) } }, 'AND');
-    addCondition(parsedQuery.ageLimitId && { ageLimit: { id: parsedQuery.ageLimitId } }, 'AND');
-    addCondition(
-      parsedQuery.collaboratorIds && {
-        collaborators: {
-          id: In(
-            String(parsedQuery.collaboratorIds)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-    addCondition(parsedQuery.findByOwnerEmail && { owner: { email: ILike(`%${parsedQuery.findByOwnerEmail}%`) } }, 'AND');
-    addCondition(parsedQuery.findByOwnerName && { owner: { firstName: ILike(`%${parsedQuery.findByOwnerName}%`) } }, 'AND');
-    addCondition(
-      parsedQuery.ticketTypeIds && {
-        ticketTypes: {
-          id: In(
-            String(parsedQuery.ticketTypeIds)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-    addCondition(
-      parsedQuery.ticketTypeNames && {
-        ticketTypes: {
-          name: In(
-            String(parsedQuery.ticketTypeNames)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-    addCondition(
-      parsedQuery.talentIds && {
-        talents: {
-          id: In(
-            String(parsedQuery.talentIds)
-              .split(',')
-              .map((id) => id.trim()),
-          ),
-        },
-      },
-      'AND',
-    );
-
-    const userFilter = {
-      guests: {
-        user: { id: payload.userId },
-        status: In(
-          Object.values(GuestStatus).map((item) => {
-            return item;
-          }),
-        ),
-      },
-    };
-
-    const dateNow = new Date();
-    let guestStatusFilter = [];
-    if (parsedQuery.guestEventStatus) {
-      switch (parsedQuery.guestEventStatus) {
-        case 'UPCOMING':
-          addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
-          guestStatusFilter = [GuestStatus.CONFIRMED];
-          break;
-        case 'PAST':
-          addCondition({ endDate: LessThan(dateNow) });
-          guestStatusFilter = [GuestStatus.CONFIRMED];
-          break;
-        case 'INVITED':
-          guestStatusFilter = [GuestStatus.INVITED];
-          break;
-        case 'APPLIED':
-          guestStatusFilter = [GuestStatus.APPLIED];
-          break;
+      if (parsedQuery.feed) {
+        addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events
+        addCondition(
+          {
+            status: EventStatusEnum.APPROVED_STATUS,
+            isPublished: true,
+          },
+          'AND',
+        );
+      } else {
+        addCondition(
+          parsedQuery.statusName && {
+            status: In(status),
+          },
+          'AND',
+        );
       }
-      userFilter.guests.status = In(guestStatusFilter);
-    }
 
-    if (parsedQuery.feed) {
-      addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events
-      addCondition(
-        {
-          status: EventStatusEnum.APPROVED_STATUS,
-          isPublished: true,
-        },
-        'AND',
-      );
-    } else {
-      addCondition(
-        parsedQuery.statusName && {
-          status: In(status),
-        },
-        'AND',
-      );
-    }
+      const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
 
-    const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
-
-    const [userEvents, publicEvents] = await Promise.all([
-      !parsedQuery.feed //if it is not for feed then only filter by userstatuses
-        ? await this.dbConnection.getRepository(Event).find({
+      const [userEvents, publicEvents] = await Promise.all([
+        !parsedQuery.feed //if it is not for feed then only filter by userstatuses
+          ? await this.dbConnection.getRepository(Event).find({
+              where: {
+                ...whereClause,
+                ...userFilter, //to get the events based on provided status of guest
+              },
+              relations: {
+                guests: { user: true },
+              },
+            })
+          : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
+          this.dbConnection.getRepository(Event).find({
           where: {
             ...whereClause,
-            ...userFilter, //to get the events based on provided status of guest
+            isPrivate: false,
           },
           relations: {
             guests: { user: true },
           },
-        })
-        : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
-      this.dbConnection.getRepository(Event).find({
-        where: {
-          ...whereClause,
-          isPrivate: false,
-        },
+        }),
+      ]);
+
+      const filteredPublicEvents = parsedQuery.guestEventStatus
+        ? publicEvents.filter((event) => event.guests.some((guest) => guest.user.id === payload.userId && guest.status === guestStatusFilter[0]))
+        : publicEvents;
+
+      const eventsPrefiltered = [...userEvents];
+      filteredPublicEvents.forEach((publicEvent) => {
+        if (!eventsPrefiltered.find((event) => event.id === publicEvent.id)) {
+          eventsPrefiltered.push(publicEvent);
+        }
+      });
+
+      const eventsPrefilteredIds = eventsPrefiltered.map((item) => item.id);
+      const filter = { id: In(eventsPrefilteredIds) };
+
+      if (parsedQuery.findByCollaboratorLikeNameOrEmail) {
+        orConditions.push(
+          {
+            ...filter,
+            collaborators: { name: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
+          },
+          {
+            ...filter,
+            collaborators: { email: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
+          },
+        );
+      }
+
+      if (parsedQuery.findByTalentsLikeNameOrEmail) {
+        orConditions.push(
+          { ...filter, talents: { name: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
+          { ...filter, talents: { email: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
+        );
+      }
+
+      if (parsedQuery.findInNameAndDescription) {
+        orConditions.push(
+          { ...filter, name: ILike(`%${parsedQuery.findInNameAndDescription}%`) },
+          {
+            ...filter,
+            description: ILike(`%${parsedQuery.findInNameAndDescription}%`),
+          },
+        );
+      }
+
+      const order = parsedQuery.sortBy
+        ? {
+            [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+          }
+        : undefined;
+
+      const finalWhereClause = orConditions.length > 0 ? orConditions : filter;
+
+      const [events, totalCount]: [Event[], number] = await this.dbConnection.getRepository(Event).findAndCount({
+        where: finalWhereClause,
         relations: {
-          guests: { user: true },
+          owner: true,
+          location: true,
+          eventType: true,
+          ageLimit: true,
+          admissionType: true,
+          quizQuestions: true,
+          collaborators: true,
+          ticketTypes: true,
+          talents: true,
+          tickets: true,
+          featuredEventSection: true,
         },
-      }),
-    ]);
-
-    const filteredPublicEvents = parsedQuery.guestEventStatus
-      ? publicEvents.filter((event) => event.guests.some((guest) => guest.user.id === payload.userId && guest.status === guestStatusFilter[0]))
-      : publicEvents;
-
-    const eventsPrefiltered = [...userEvents];
-    filteredPublicEvents.forEach((publicEvent) => {
-      if (!eventsPrefiltered.find((event) => event.id === publicEvent.id)) {
-        eventsPrefiltered.push(publicEvent);
-      }
-    });
-
-    const eventsPrefilteredIds = eventsPrefiltered.map((item) => item.id);
-    const filter = { id: In(eventsPrefilteredIds) };
-
-    if (parsedQuery.findByCollaboratorLikeNameOrEmail) {
-      orConditions.push(
-        {
-          ...filter,
-          collaborators: { name: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
+        order: order,
+        ...pagination,
+      });
+      // Step 2: Get all event IDs from fetched events
+      const eventIds = events.map((event) => event.id);
+      const userId = payload.userId;
+      // Step 3: Fetch guests separately for only the needed events
+      const guests = await this.dbConnection.getRepository(Guest).find({
+        where: {
+          event: In(eventIds),
+          ...(userId ? { user: { id: userId } } : {}),
         },
-        {
-          ...filter,
-          collaborators: { email: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
-        },
-      );
-    }
-
-    if (parsedQuery.findByTalentsLikeNameOrEmail) {
-      orConditions.push(
-        { ...filter, talents: { name: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
-        { ...filter, talents: { email: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
-      );
-    }
-
-    if (parsedQuery.findInNameAndDescription) {
-      orConditions.push(
-        { ...filter, name: ILike(`%${parsedQuery.findInNameAndDescription}%`) },
-        {
-          ...filter,
-          description: ILike(`%${parsedQuery.findInNameAndDescription}%`),
-        },
-      );
-    }
-
-    const order = parsedQuery.sortBy
-      ? {
-        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-      }
-      : undefined;
-
-    const finalWhereClause = orConditions.length > 0 ? orConditions : filter;
-
-    const [events, totalCount]: [Event[], number] = await this.dbConnection.getRepository(Event).findAndCount({
-      where: finalWhereClause,
-      relations: {
-        owner: true,
-        location: true,
-        eventType: true,
-        ageLimit: true,
-        admissionType: true,
-        quizQuestions: true,
-        collaborators: true,
-        ticketTypes: true,
-        talents: true,
-        tickets: true,
-        featuredEventSection: true,
-      },
-      order: order,
-      ...pagination,
-    });
-    // Step 2: Get all event IDs from fetched events
-    const eventIds = events.map((event) => event.id);
-    const userId = payload.userId;
-    // Step 3: Fetch guests separately for only the needed events
-    const guests = await this.dbConnection.getRepository(Guest).find({
-      where: {
-        event: In(eventIds),
-        ...(userId ? { user: { id: userId } } : {}),
-      },
-      relations: ['user', 'event'],
-    });
-    // Step 4: Map guests to their respective events
-    const eventGuestMap = new Map<string, Guest[]>();
-    guests.forEach((guest: Guest) => {
-      if (!eventGuestMap.has(guest.event.id)) {
-        eventGuestMap.set(guest.event.id, []);
-      }
-      eventGuestMap.get(guest.event.id)?.push(guest);
-    });
-    // Step 5: Attach guests back to their events
-    events.forEach((event) => {
-      event.guests = eventGuestMap.get(event.id) || [];
-    });
-    eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
-    eventResponse.totalCount = totalCount;
-    return eventResponse
+        relations: ['user', 'event'],
+      });
+      // Step 4: Map guests to their respective events
+      const eventGuestMap = new Map<string, Guest[]>();
+      guests.forEach((guest: Guest) => {
+        if (!eventGuestMap.has(guest.event.id)) {
+          eventGuestMap.set(guest.event.id, []);
+        }
+        eventGuestMap.get(guest.event.id)?.push(guest);
+      });
+      // Step 5: Attach guests back to their events
+      events.forEach((event) => {
+        event.guests = eventGuestMap.get(event.id) || [];
+      });
+      eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
+      eventResponse.totalCount = totalCount;
+      return eventResponse
   }
 
   public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: {
-        id: payload.eventId,
-        deletedAt: null,
-        status: EventStatusEnum.APPROVED_STATUS,
-      },
-    });
+      const event = await this.dbConnection.getRepository(Event).findOne({
+        where: {
+          id: payload.eventId,
+          deletedAt: null,
+          status: EventStatusEnum.APPROVED_STATUS,
+        },
+      });
 
-    if (!event) {
-      throw new NotFoundError('Event not found');
-    }
+      if (!event) {
+        throw new NotFoundError('Event not found');
+      }
 
-    const user = (await serviceMesh.userService().getUser(payload.id)).data;
+      const user = (await serviceMesh.userService().getUser(payload.id)).data;
 
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
 
-    const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        user: { id: user.data.id },
-        event: { id: payload.eventId },
-      },
-    });
-    if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
+      const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          user: { id: user.data.id },
+          event: { id: payload.eventId },
+        },
+      });
+      if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
 
-    const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
-      where: {
-        event: { id: payload.eventId },
-        required: true,
-        enabled: true,
-      },
-    });
+      const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
+        where: {
+          event: { id: payload.eventId },
+          required: true,
+          enabled: true,
+        },
+      });
 
-    await Promise.all(
-      payload.answers.map(async (item) => {
-        let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
-          where: {
-            user: { id: user.data.id },
-            event: { id: payload.eventId },
-            question: { id: item.questionId },
-            deletedAt: null,
-          },
-        });
-
-        if (!actualAnswer) {
-          actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-            user: { id: user.data.id },
-            event: { id: payload.eventId },
-            question: { id: item.questionId },
-            answer: item?.answer || '',
+      await Promise.all(
+        payload.answers.map(async (item) => {
+          let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
+            where: {
+              user: { id: user.data.id },
+              event: { id: payload.eventId },
+              question: { id: item.questionId },
+              deletedAt: null,
+            },
           });
-        } else actualAnswer.answer = item?.answer || '';
 
-        await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
-      }),
-    );
+          if (!actualAnswer) {
+            actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
+              user: { id: user.data.id },
+              event: { id: payload.eventId },
+              question: { id: item.questionId },
+              answer: item?.answer || '',
+            });
+          } else actualAnswer.answer = item?.answer || '';
 
-    const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-      where: {
-        user: { id: user.data.id },
-        event: { id: payload.eventId },
-      },
-      relations: { question: true },
-    });
+          await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
+        }),
+      );
 
-    const countMandatoryAlready = usersQuizAnswer.filter((item) => {
-      if (item?.question?.required) return item;
-    }).length;
+      const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+        where: {
+          user: { id: user.data.id },
+          event: { id: payload.eventId },
+        },
+        relations: { question: true },
+      });
 
-    if (quiz) {
-      if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
-    }
+      const countMandatoryAlready = usersQuizAnswer.filter((item) => {
+        if (item?.question?.required) return item;
+      }).length;
 
-    const guest = new Guest();
-    guest.event = event;
-    guest.user = { id: user.data.id };
-    guest.status = GuestStatus.APPLIED;
-    guest.additionalRequestedGuests = payload.additionalGuests;
-    guest.invitationSource = UserSource.REQUEST_IN_APP;
-    await this.dbConnection.getRepository(Guest).save(guest);
+      if (quiz) {
+        if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
+      }
 
-    return responses.ok;
+      const guest = new Guest();
+      guest.event = event;
+      guest.user = { id: user.data.id };
+      guest.status = GuestStatus.APPLIED;
+      guest.additionalRequestedGuests = payload.additionalGuests;
+      guest.invitationSource = UserSource.REQUEST_IN_APP;
+      await this.dbConnection.getRepository(Guest).save(guest);
+
+      return responses.ok;
   }
 
   public static async updateRequestBecomeGuest(payload: UpdateRequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: {
-        id: payload.eventId,
-        deletedAt: null,
-        status: EventStatusEnum.APPROVED_STATUS,
-      },
-    });
+      const event = await this.dbConnection.getRepository(Event).findOne({
+        where: {
+          id: payload.eventId,
+          deletedAt: null,
+          status: EventStatusEnum.APPROVED_STATUS,
+        },
+      });
 
-    if (!event) {
-      throw new NotFoundError('Event not found');
-    }
+      if (!event) {
+        throw new NotFoundError('Event not found');
+      }
 
-    const user = (await serviceMesh.userService().getUser(payload.id)).data;
+      const user = (await serviceMesh.userService().getUser(payload.id)).data;
 
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
 
-    const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        user: { id: user.data.id },
-        event: { id: payload.eventId },
-      },
-    });
+      const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          user: { id: user.data.id },
+          event: { id: payload.eventId },
+        },
+      });
 
-    if (!alreadyGuest) throw new NotFoundError('Guest not found');
+      if (!alreadyGuest) throw new NotFoundError('Guest not found');
 
-    if (alreadyGuest.status != GuestStatus.APPLIED) throw new BadRequestError('Guest has  incorrect status :' + alreadyGuest.status);
+      if (alreadyGuest.status != GuestStatus.APPLIED) throw new BadRequestError('Guest has  incorrect status :' + alreadyGuest.status);
 
-    alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
-    await this.dbConnection.getRepository(Guest).save(alreadyGuest);
+      alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+      await this.dbConnection.getRepository(Guest).save(alreadyGuest);
 
-    const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
-      where: {
-        event: { id: payload.eventId },
-        required: true,
-        enabled: true,
-      },
-    });
+      const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
+        where: {
+          event: { id: payload.eventId },
+          required: true,
+          enabled: true,
+        },
+      });
 
-    await Promise.all(
-      payload.answers.map(async (item) => {
-        let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
-          where: {
-            user: { id: user.data.id },
-            event: { id: payload.eventId },
-            question: { id: item.questionId },
-            deletedAt: null,
-          },
-        });
-
-        if (!actualAnswer) {
-          actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-            user: { id: user.data.id },
-            event: { id: payload.eventId },
-            question: { id: item.questionId },
-            answer: item?.answer || '',
+      await Promise.all(
+        payload.answers.map(async (item) => {
+          let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
+            where: {
+              user: { id: user.data.id },
+              event: { id: payload.eventId },
+              question: { id: item.questionId },
+              deletedAt: null,
+            },
           });
-        } else actualAnswer.answer = item?.answer || '';
 
-        await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
-      }),
-    );
+          if (!actualAnswer) {
+            actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
+              user: { id: user.data.id },
+              event: { id: payload.eventId },
+              question: { id: item.questionId },
+              answer: item?.answer || '',
+            });
+          } else actualAnswer.answer = item?.answer || '';
 
-    const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-      where: {
-        user: { id: user.data.id },
-        event: { id: payload.eventId },
-      },
-      relations: { question: true },
-    });
+          await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
+        }),
+      );
 
-    const countMandatoryAlready = usersQuizAnswer.filter((item) => {
-      if (item?.question?.required) return item;
-    }).length;
+      const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+        where: {
+          user: { id: user.data.id },
+          event: { id: payload.eventId },
+        },
+        relations: { question: true },
+      });
 
-    if (quiz) {
-      if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
-    }
+      const countMandatoryAlready = usersQuizAnswer.filter((item) => {
+        if (item?.question?.required) return item;
+      }).length;
 
-    return responses.ok;
+      if (quiz) {
+        if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
+      }
+
+      return responses.ok;
   }
 
   public static async syncUserTopAttendee(): Promise<GenericResponse> {
-    const LIMIT_FOR_USER_ATTENDEE = parseInt(process.env.LIMIT_FOR_USER_ATTENDEE || '50', 10);
-    const users = await this.dbConnection.getRepository(Guest)
-      .createQueryBuilder('guest')
-      .innerJoinAndSelect('guest.user', 'user')
-      .innerJoin('guest.event', 'event')
-      .where('guest.status = :guestStatus', { guestStatus: GuestStatus.CONFIRMED })
-      .andWhere('event.status = :eventStatus', { eventStatus: EventStatusEnum.APPROVED_STATUS })
-      .groupBy('user.id')
-      .orderBy('COUNT(event.id)', 'DESC')
-      .select(['user.id', 'user.first_name', 'user.last_name', 'user.email', 'user.phone_number', 'user.profile_picture', 'COUNT(event.id) AS eventCount'])
-      .limit(LIMIT_FOR_USER_ATTENDEE)
-      .getRawMany();
+      const LIMIT_FOR_USER_ATTENDEE = parseInt(process.env.LIMIT_FOR_USER_ATTENDEE || '50', 10);
+      const users = await this.dbConnection.getRepository(Guest)
+        .createQueryBuilder('guest')
+        .innerJoinAndSelect('guest.user', 'user')
+        .innerJoin('guest.event', 'event')
+        .where('guest.status = :guestStatus', { guestStatus: GuestStatus.CONFIRMED })
+        .andWhere('event.status = :eventStatus', { eventStatus: EventStatusEnum.APPROVED_STATUS })
+        .groupBy('user.id')
+        .orderBy('COUNT(event.id)', 'DESC')
+        .select(['user.id', 'user.first_name', 'user.last_name', 'user.email', 'user.phone_number', 'user.profile_picture', 'COUNT(event.id) AS eventCount'])
+        .limit(LIMIT_FOR_USER_ATTENDEE)
+        .getRawMany();
 
-    const topAttendees = await Promise.all(
-      users.map(async (user) => {
-        const socialStats = await serviceMesh.userService().syncSocialStats(config.get('API_BASE_URL'), user.user_id);
-        return {
-          id: user.user_id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.user_email,
-          phoneNumber: user.phone_number,
-          profilePicture: user.profile_picture || '',
-          socialStats,
-          eventCount: user.eventcount,
-        };
-      }),
-    );
-    await this.dbConnection.getRepository(UserAttendeeStats).delete({});
-    await this.dbConnection.getRepository(UserAttendeeStats).save(
-      topAttendees.map((attendee) => {
-        const userAttendeeStats = new UserAttendeeStats();
-        userAttendeeStats.user = User.create({ id: attendee.id });
-        userAttendeeStats.totalEventsAttended = attendee.eventCount;
-        userAttendeeStats.facebookFollowersCount = 0;
-        userAttendeeStats.instagramFollowersCount = 0;
-        userAttendeeStats.youtubeFollowersCount = 0;
-        userAttendeeStats.tiktokFollowersCount = 0;
-        userAttendeeStats.linkedinFollowersCount = 0;
-        userAttendeeStats.xFollowersCount = 0;
-        userAttendeeStats.snapchatFollowersCount = 0;
-        attendee.socialStats.data.forEach((stat) => {
-          switch (stat.socialProviderType) {
-            case ProviderType.FACEBOOK:
-              userAttendeeStats.facebookFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.INSTAGRAM:
-              userAttendeeStats.instagramFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.GOOGLE:
-              userAttendeeStats.youtubeFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.TIKTOK:
-              userAttendeeStats.tiktokFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.LINKEDIN:
-              userAttendeeStats.linkedinFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.X:
-              userAttendeeStats.xFollowersCount = stat.followersCount;
-              break;
-            case ProviderType.SNAPCHAT:
-              userAttendeeStats.snapchatFollowersCount = stat.followersCount;
-              break;
-            default:
-              break;
-          }
-        });
-        return userAttendeeStats;
-      }),
-    );
-    return responses.ok;
+      const topAttendees = await Promise.all(
+        users.map(async (user) => {
+          const socialStats = await serviceMesh.userService().syncSocialStats(config.get('API_BASE_URL'), user.user_id);
+          return {
+            id: user.user_id,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            email: user.user_email,
+            phoneNumber: user.phone_number,
+            profilePicture: user.profile_picture || '',
+            socialStats,
+            eventCount: user.eventcount,
+          };
+        }),
+      );
+      await this.dbConnection.getRepository(UserAttendeeStats).delete({});
+      await this.dbConnection.getRepository(UserAttendeeStats).save(
+        topAttendees.map((attendee) => {
+          const userAttendeeStats = new UserAttendeeStats();
+          userAttendeeStats.user = User.create({ id: attendee.id });
+          userAttendeeStats.totalEventsAttended = attendee.eventCount;
+          userAttendeeStats.facebookFollowersCount = 0;
+          userAttendeeStats.instagramFollowersCount = 0;
+          userAttendeeStats.youtubeFollowersCount = 0;
+          userAttendeeStats.tiktokFollowersCount = 0;
+          userAttendeeStats.linkedinFollowersCount = 0;
+          userAttendeeStats.xFollowersCount = 0;
+          userAttendeeStats.snapchatFollowersCount = 0;
+          attendee.socialStats.data.forEach((stat) => {
+            switch (stat.socialProviderType) {
+              case ProviderType.FACEBOOK:
+                userAttendeeStats.facebookFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.INSTAGRAM:
+                userAttendeeStats.instagramFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.GOOGLE:
+                userAttendeeStats.youtubeFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.TIKTOK:
+                userAttendeeStats.tiktokFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.LINKEDIN:
+                userAttendeeStats.linkedinFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.X:
+                userAttendeeStats.xFollowersCount = stat.followersCount;
+                break;
+              case ProviderType.SNAPCHAT:
+                userAttendeeStats.snapchatFollowersCount = stat.followersCount;
+                break;
+              default:
+                break;
+            }
+          });
+          return userAttendeeStats;
+        }),
+      );
+      return responses.ok;
   }
 
   public static async getTopUsersAttendees(): Promise<UserAttendee[]> {
@@ -2049,55 +2054,55 @@ export class GuestService {
   }
 
   public static async cancelEventInvitation(payload: CancelEventInvitationRequestDto): Promise<GenericResponse> {
-    const guest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: payload.eventId },
-        user: { id: payload.userId },
-      },
-    });
-    if (!guest) throw new NotFoundError('Guest not found');
-    if (guest.status !== GuestStatus.APPLIED) throw new BadRequestError('Guest is not cancelled');
-    await this.dbConnection.getRepository(Guest).delete(guest.id);
-    return responses.ok;
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          event: { id: payload.eventId },
+          user: { id: payload.userId },
+        },
+      });
+      if (!guest) throw new NotFoundError('Guest not found');
+      if (guest.status !== GuestStatus.APPLIED) throw new BadRequestError('Guest is not cancelled');
+      await this.dbConnection.getRepository(Guest).delete(guest.id);
+      return responses.ok;
   }
 
   public static async declineEventInvitation(payload: DeclineEventInvitationRequestDto): Promise<GenericResponse> {
-    const guest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: payload.eventId },
-        user: { id: payload.userId },
-      },
-    });
-    if (!guest) throw new NotFoundError('Guest not found');
-    if (guest.status === GuestStatus.DECLINED) throw new BadRequestError('Guest is already declined');
-    guest.status = GuestStatus.DECLINED;
-    guest.rejectedReason = payload.reason;
-    guest.declinedBy = { id: payload.userId } as User;
-    await this.dbConnection.getRepository(Guest).save(guest);
-    return responses.ok;
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          event: { id: payload.eventId },
+          user: { id: payload.userId },
+        },
+      });
+      if (!guest) throw new NotFoundError('Guest not found');
+      if (guest.status === GuestStatus.DECLINED) throw new BadRequestError('Guest is already declined');
+      guest.status = GuestStatus.DECLINED;
+      guest.rejectedReason = payload.reason;
+      guest.declinedBy = { id: payload.userId } as User;
+      await this.dbConnection.getRepository(Guest).save(guest);
+      return responses.ok;
   }
 
-  /**
- * Accepts an event invitation for a guest by updating their status to CONFIRMED.
- *
- * @param {AcceptEventInvitationRequestDto} payload - The request data containing the event ID and user ID.
- * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
- *
- * @throws {Error} Logs an error and returns a bad request response if an exception occurs.
- */
-  public static async acceptEventInvitation(payload: AcceptEventInvitationRequestDto): Promise<GenericResponse> {
-    const guest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: payload.eventId },
-        user: { id: payload.userId },
-      },
-    });
-    if (!guest) throw new NotFoundError('Guest not found');
-    if (guest.status === GuestStatus.CONFIRMED) throw new BadRequestError('Guest is already confirmed');
-    guest.status = GuestStatus.CONFIRMED;
-    await this.dbConnection.getRepository(Guest).save(guest);
-    return responses.ok;
-  }
+    /**
+   * Accepts an event invitation for a guest by updating their status to CONFIRMED.
+   *
+   * @param {AcceptEventInvitationRequestDto} payload - The request data containing the event ID and user ID.
+   * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
+   *
+   * @throws {Error} Logs an error and returns a bad request response if an exception occurs.
+   */
+    public static async acceptEventInvitation(payload: AcceptEventInvitationRequestDto): Promise<GenericResponse> {
+        const guest = await this.dbConnection.getRepository(Guest).findOne({
+          where: {
+            event: { id: payload.eventId },
+            user: { id: payload.userId },
+          },
+        });
+        if (!guest) throw new NotFoundError('Guest not found');
+        if (guest.status === GuestStatus.CONFIRMED) throw new BadRequestError('Guest is already confirmed');
+        guest.status = GuestStatus.CONFIRMED;
+        await this.dbConnection.getRepository(Guest).save(guest);
+        return responses.ok;
+    }
 
   /**
  * Added functionality to invite guest
@@ -2118,7 +2123,7 @@ export class GuestService {
  * @param payload - Contains guest details such as email, phone number, and event ID.
  * @returns GuestsDataResponse - Response containing the invited guest data or error message.
  */
-  public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestsDataResponse> {
+  public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestDataSimple[]> {
     // Step 1: Check if the event exists
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
     if (!event) throw new NotFoundError('Event not found');
@@ -2189,12 +2194,12 @@ export class GuestService {
           // }
 
           isInvitedGuest.status = status;
-          return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+          return [isInvitedGuest].map((guest) => toGuestDataSimple(guest, []));
         } else {
           if (isInvitedGuest.status === GuestStatus.NO_STATUS || isInvitedGuest.status === GuestStatus.DRAFT) {
             isInvitedGuest.status = GuestStatus.CONFIRMED;
             await this.dbConnection.getRepository(Guest).save(isInvitedGuest);
-            return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+            return [isInvitedGuest].map((guest) => toGuestDataSimple(guest, []));
           }
         }
       }
@@ -2250,7 +2255,7 @@ export class GuestService {
       }
     }
 
-    return responses.data([guest].map((guest) => toGuestDataSimple(guest, [])));
+    return [guest].map((guest) => toGuestDataSimple(guest, []));
   }
 
   /**
@@ -2280,121 +2285,121 @@ export class GuestService {
  * @returns
  */
   public static async inviteGuests(payload: InvitedGuestsRequestDto): Promise<GuestsDataResponse> {
-    const guests = payload.guests;
+      const guests = payload.guests;
 
-    const invites = guests.map(async (guestPayload) => {
-      // Step 1: Fetch event and validate
-      const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: guestPayload.eventId, deletedAt: IsNull() },
-      });
-      if (!event) throw new NotFoundError('Event not found');
+      const invites = guests.map(async (guestPayload) => {
+        // Step 1: Fetch event and validate
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: guestPayload.eventId, deletedAt: IsNull() },
+        });
+        if (!event) throw new NotFoundError('Event not found');
 
-      // Step 2: Check lead guest presence and confirmation
-      const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: {
-          event: { id: event.id },
-          user: { id: guestPayload.userId },
-          status: GuestStatus.CONFIRMED,
-          deletedAt: IsNull(),
-        },
-      });
-      if (!leadGuest) throw new NotFoundError('Lead Guest not found');
+        // Step 2: Check lead guest presence and confirmation
+        const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
+          where: {
+            event: { id: event.id },
+            user: { id: guestPayload.userId },
+            status: GuestStatus.CONFIRMED,
+            deletedAt: IsNull(),
+          },
+        });
+        if (!leadGuest) throw new NotFoundError('Lead Guest not found');
 
-      // Step 3: Fetch all existing guests for the event
-      const guestList = await this.dbConnection.getRepository(Guest).find({
-        where: { event: { id: event.id }, deletedAt: IsNull() },
-        relations: { user: true, addedBy: true },
-      });
+        // Step 3: Fetch all existing guests for the event
+        const guestList = await this.dbConnection.getRepository(Guest).find({
+          where: { event: { id: event.id }, deletedAt: IsNull() },
+          relations: { user: true, addedBy: true },
+        });
 
-      // Step 4: Check additional guest limit
-      const invitedGuestList = guestList.filter((g) => g.addedBy?.id === guestPayload.userId);
-      if (leadGuest.maxAdditionalGuests === invitedGuestList.length) {
-        throw new BadRequestError('Guest limit reached. Unable to invite additional guests');
-      }
-
-      // Step 5: Check if user exists by email or phone
-      let checkUser = null;
-      if (guestPayload.email) {
-        try {
-          checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email)).data;
-        } catch (e) { }
-      } else if (guestPayload.phoneNumber) {
-        try {
-          checkUser = (await serviceMesh.userService().getUserWithRolesByPhone(guestPayload.phoneNumber)).data;
-          if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
-        } catch (e) { }
-      } else {
-        throw new ValidationError('Phone number or email is required');
-      }
-
-      let guest: Guest;
-      let status = GuestStatus.CONFIRMED;
-
-      if (checkUser) {
-        // Step 6: Check if user is already invited
-        const existingGuest = guestList.find((g) => g.user.id === checkUser.id);
-        if (existingGuest) {
-          if (existingGuest.status !== GuestStatus.NO_STATUS && existingGuest.status !== GuestStatus.DRAFT) {
-            status = GuestStatus.DECLINED;
-            const restrictedGuest = new RestrictedInvites();
-            restrictedGuest.event = { id: guestPayload.eventId } as Event;
-            restrictedGuest.guest = { id: existingGuest.id } as Guest;
-            restrictedGuest.restrictedBy = { id: guestPayload.userId } as User;
-
-            await this.dbConnection.getRepository(RestrictedInvites).save(restrictedGuest);
-            existingGuest.status = status;
-            return toGuestDataSimple(existingGuest, []);
-          } else {
-            existingGuest.status = GuestStatus.CONFIRMED;
-            await this.dbConnection.getRepository(Guest).save(existingGuest);
-            return toGuestDataSimple(existingGuest, []);
-          }
+        // Step 4: Check additional guest limit
+        const invitedGuestList = guestList.filter((g) => g.addedBy?.id === guestPayload.userId);
+        if (leadGuest.maxAdditionalGuests === invitedGuestList.length) {
+          throw new BadRequestError('Guest limit reached. Unable to invite additional guests');
         }
 
-        guest = await this.dbConnection.getRepository(Guest).create({
-          event: { id: guestPayload.eventId } as Event,
-          user: checkUser,
-          status,
-          addedBy: { id: guestPayload.userId } as User,
-        });
-      } else {
-        // Step 7: Register non-member guest
-        const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(guestPayload)).data;
-        guest = this.dbConnection.getRepository(Guest).create({
-          event: { id: guestPayload.eventId } as Event,
-          user: newUser,
-          status,
-          addedBy: { id: guestPayload.userId } as User,
-        });
-      }
+        // Step 5: Check if user exists by email or phone
+        let checkUser = null;
+        if (guestPayload.email) {
+          try {
+            checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email)).data;
+          } catch (e) { }
+        } else if (guestPayload.phoneNumber) {
+          try {
+            checkUser = (await serviceMesh.userService().getUserWithRolesByPhone(guestPayload.phoneNumber)).data;
+            if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
+          } catch (e) { }
+        } else {
+          throw new ValidationError('Phone number or email is required');
+        }
 
-      guest = await this.dbConnection.getRepository(Guest).save(guest);
+        let guest: Guest;
+        let status = GuestStatus.CONFIRMED;
 
-      // Step 8: Send invitation (email or SMS)
-      // TO DO: Change email and sms template
-      if (guestPayload.email) {
-        await serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            [{ key: "first_name", value: guestPayload?.firstName || "" }],
-            "Host Application Submitted",
-            [guestPayload.email],
-            null
-          );
-      } else if (guestPayload.phoneNumber) {
-        const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-        const success = await serviceMesh.notificationService().sendTextMessage(guestPayload.phoneNumber, message);
-        if (!success) throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
-      }
+        if (checkUser) {
+          // Step 6: Check if user is already invited
+          const existingGuest = guestList.find((g) => g.user.id === checkUser.id);
+          if (existingGuest) {
+            if (existingGuest.status !== GuestStatus.NO_STATUS && existingGuest.status !== GuestStatus.DRAFT) {
+              status = GuestStatus.DECLINED;
+              const restrictedGuest = new RestrictedInvites();
+              restrictedGuest.event = { id: guestPayload.eventId } as Event;
+              restrictedGuest.guest = { id: existingGuest.id } as Guest;
+              restrictedGuest.restrictedBy = { id: guestPayload.userId } as User;
 
-      return toGuestDataSimple(guest, []);
-    });
+              await this.dbConnection.getRepository(RestrictedInvites).save(restrictedGuest);
+              existingGuest.status = status;
+              return toGuestDataSimple(existingGuest, []);
+            } else {
+              existingGuest.status = GuestStatus.CONFIRMED;
+              await this.dbConnection.getRepository(Guest).save(existingGuest);
+              return toGuestDataSimple(existingGuest, []);
+            }
+          }
 
-    // Execute all guest invites concurrently
-    const invitedGuestsResults = await Promise.all(invites);
-    const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
+          guest = await this.dbConnection.getRepository(Guest).create({
+            event: { id: guestPayload.eventId } as Event,
+            user: checkUser,
+            status,
+            addedBy: { id: guestPayload.userId } as User,
+          });
+        } else {
+          // Step 7: Register non-member guest
+          const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(guestPayload)).data;
+          guest = this.dbConnection.getRepository(Guest).create({
+            event: { id: guestPayload.eventId } as Event,
+            user: newUser,
+            status,
+            addedBy: { id: guestPayload.userId } as User,
+          });
+        }
 
-    return responses.data(invitedGuests);
+        guest = await this.dbConnection.getRepository(Guest).save(guest);
+
+        // Step 8: Send invitation (email or SMS)
+        // TO DO: Change email and sms template
+        if (guestPayload.email) {
+          await serviceMesh
+            .notificationService()
+            .sendEmailFromTemplate(
+              [{ key: "first_name", value: guestPayload?.firstName || "" }],
+              "Host Application Submitted",
+              [guestPayload.email],
+              null
+            );
+        } else if (guestPayload.phoneNumber) {
+          const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+          const success = await serviceMesh.notificationService().sendTextMessage(guestPayload.phoneNumber, message);
+          if (!success) throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+        }
+
+        return toGuestDataSimple(guest, []);
+      });
+
+      // Execute all guest invites concurrently
+      const invitedGuestsResults = await Promise.all(invites);
+      const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
+
+      return responses.data(invitedGuests);
   }
 
   /**
@@ -2414,159 +2419,178 @@ export class GuestService {
    * @param payload - Contains event details, file path, and host ID.
    * @returns BulkUploadGuestsResponse - Response containing processed guest details.
    */
-  public static async bulkUploadGuests(payload: BulkUploadGuestsRequestDto): Promise<BulkUploadGuestsResponse> {
-    // Step 1: Verify event existence and ownership
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.eventId, deletedAt: IsNull() },
-      relations: { owner: true },
-    });
+  public static async bulkUploadGuests(payload: BulkUploadGuestsRequestDto): Promise<BulkUserData> {
+      // Step 1: Verify event existence and ownership
+      
+      const event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.eventId, deletedAt: IsNull() },
+        relations: { owner: true },
+      });
 
-    // If the event does not exist, return a bad request response
-    if (!event) throw new NotFoundError('Event not found');
+      // If the event does not exist, return a bad request response
+      if (!event && !payload.isUploadUser) throw new NotFoundError('Event not found');
 
-    // Ensure that the provided hostId is the owner of the event
-    if (event.owner.id !== payload.hostId) throw new BadRequestError('Host is not the owner of the event');
+      // Ensure that the provided hostId is the owner of the event
+      if (!payload.isUploadUser && event.owner.id !== payload.hostId) throw new BadRequestError('Host is not the owner of the event');
 
-    // TO DO: ServiceMesh Changes
-    // Step 2: Fetch the CSV file from S3 storage
-    // const fileUrl = await serviceMesh.getFileUrl(config.get('API_BASE_URL'), payload.filePath);
+      // Step 2: Fetch the CSV file from S3 storage
+      const fileUrl = await S3Service.getFileUrl(payload.filePath);
 
-    // Step 3: Parse the CSV file to extract guest data
-    const validData = [];
-    const garbageData = [];
-    // TO DO: Add this functionality
-    // const { validData, garbageData } = await processCsvFile(fileUrl, true);
+      // Step 3: Parse the CSV file to extract guest data
+      const { validData, garbageData } = await processCsvFile(fileUrl, payload.isUploadUser ?? false);
 
-    // Extract email addresses from valid data
-    const emails = []
-    // TO DO: Add this functionality
-    // validData.map((row) => row.email).filter((email) => email);
+      // Extract email addresses from valid data
+      const emails = validData.map((row) => row.email).filter((email) => email);
+      let phoneNumbers = []
+      if (payload.isUploadUser)
+      phoneNumbers = validData.map((row) => row.phoneNumber).filter((phone) => phone);
 
     // Step 4: Fetch existing users based on extracted emails
-    const existingUsers = await Promise.all(
-      emails.map(async (email) => {
-        try {
-          const data = (await serviceMesh.userService().getUserWithRolesByEmail(email)).data;
-          return data;
-        } catch (e) { }
-      }),
-    );
-
+    const existingUsers =  await this.dbConnection.getRepository(User).find({
+      where: [
+        { email: In(emails), deletedAt: IsNull() },
+        { phoneNumber: In(phoneNumbers), deletedAt: IsNull() },
+      ],
+    });
+    
     // Create a map of email to user ID for quick lookup
     const userMap = new Map<string, string>();
+    const removedEmails = new Set<string>();
+    const newMappings = [];
     let updatedValidData;
     if (existingUsers.length > 0) {
       existingUsers.forEach((user) => {
-        if (user) userMap.set(user.email, user.id);
-      });
-
-      // Step 5: Retrieve guests already associated with the event
-      const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
-        where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
-        relations: { user: true, addedBy: true },
-      });
-
-      const removedEmails = new Set<string>();
-      if (existingGuestList.length > 0) {
-        existingGuestList.map((guest) => {
-          if (userMap.has(guest.user.email)) {
-            const user: CsvRecord = {
-              firstName: guest.user.firstName,
-              lastName: guest.user.lastName,
-              email: guest.user.email,
-              phoneNumber: guest.user.phoneNumber,
-              reason: `User already exists in the event with status ${guest.status}`,
-            };
-            garbageData.push(user);
-            userMap.delete(guest.user.email);
-            removedEmails.add(guest.user.email);
-          }
+        if (user.email) userMap.set(user.email, user.id);
+        if (user.phoneNumber) userMap.set(user.phoneNumber, user.id);
         });
+
+        // Step 5: Retrieve guests already associated with the event
+        if(!payload.isUploadUser) {
+        const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
+          where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
+          relations: { user: true, addedBy: true },
+        });
+
+        if (existingGuestList.length > 0) {
+          existingGuestList.map((guest) => {
+            if (userMap.has(guest.user.email)) {
+              const user: CsvRecord = {
+                firstName: guest.user.firstName,
+                lastName: guest.user.lastName,
+                email: guest.user.email,
+                phoneNumber: guest.user.phoneNumber,
+                reason: `User already exists in the event with status ${guest.status}`,
+              };
+              garbageData.push(user);
+              userMap.delete(guest.user.email);
+              removedEmails.add(guest.user.email);
+            }
+          });
+        }
       }
 
+      const existingMappings = await this.dbConnection.getRepository(HostUserMapping).find({
+        where: {
+          host: { id: payload.hostId },
+          user: In(existingUsers.map((user) => user.id)),
+        },
+        relations: ['user'],
+      });
+      const mappingSet = new Set(existingMappings.map((mapping) => mapping.user.id));
       // Step 6: Remove users from validData who were moved to garbageData
       updatedValidData = validData.filter((row) => {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        if (userMap.has(row.email)) {
-          const user = {
-            firstName: row.firstName,
-            lastName: row.lastName,
-            email: row.email,
-            reason: 'User already exists',
-          };
-          garbageData.push(user);
-          userMap.delete(row.email);
-          return false; // Remove from validData
-        }
-        return true; // Keep row in validData
+        existingUsers.forEach((user) => {
+          if (userMap.has(row.email) || userMap.has(row.phoneNumber)) {
+            if (mappingSet.has(user.id)) {
+              const user = {
+                firstName: row.firstName,
+                lastName: row.lastName,
+                email: row.email ? row.email : '',
+                phoneNumbers: row.phoneNumber ? row.phoneNumber : '',
+                reason: 'User already exists',
+              };
+              garbageData.push(user);
+              if (row.email) userMap.delete(row.email);
+              if (row.phoneNumber) userMap.delete(row.phoneNumber);
+              return false; // Remove from validData
+            }
+            newMappings.push({ user, host: { id: payload.hostId } });
+            if (row.email) userMap.delete(row.email);
+            if (row.phoneNumber) userMap.delete(row.phoneNumber);
+            return false; 
+          }
+          return true; // Keep row in validData 
+        });
       });
     }
-    const users: SimpleUser[] = [];
-    if (updatedValidData.length > 0) {
-      await Promise.all(
-        updatedValidData.map(async (row: User) => {
-          if (row.email && row.firstName && row.lastName) {
-            const user = (await serviceMesh.userService().registerInvitesAsNonMember(
-              {
-                ...row,
-                eventId: payload.eventId,
-                userId: payload.hostId,
-              }
-            )).data;
-            users.push(user.data);
-          }
-        }),
-      );
-    }
+      const users: SimpleUser[] = [];
+      if (updatedValidData.length > 0) {
+        await Promise.all(
+          updatedValidData.map(async (row: User) => {
+            if (row.email && row.firstName && row.lastName && row.phoneNumber) {
+              const user = (await serviceMesh.userService().registerInvitesAsNonMember(
+                {
+                  ...row,
+                  eventId: payload.eventId,
+                  userId: payload.hostId,
+                }
+              )).data;
+              users.push(user.data);
+            }
+          }),
+        );
+      }
 
-    // Step 7: Generate an error CSV file for invalid or duplicate data
-    // TO DO: Add this functionality
-    // const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
-    const errorCsvContent = null;
-    let errFileUrl: string | null = null;
-    let errFilePath: string | null = null;
-    const fileName = `${uuidv4()}.csv`;
+      // Step 7: Generate an error CSV file for invalid or duplicate data
+      const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
+      let errFileUrl: string | null = null;
+      let errFilePath: string | null = null;
+      const fileName = `${uuidv4()}.csv`;
 
-    if (errorCsvContent) {
-      errFilePath = `error_csv/${fileName}`;
-      // TO DO: ServiceMesh Changes
-      // await this.s3Service.uploadFile({
-      //   file: errorCsvContent,
-      //   filename: fileName,
-      //   size: errorCsvContent.length,
-      //   type: 'text/csv',
-      //   contentType: 'text/csv',
-      //   fileKeyId: errFilePath,
-      // });
-      // errFileUrl = await this.s3Service.getFileUrl(errFilePath);
-    }
+      if (errorCsvContent) {
+        errFilePath = `error_csv/${fileName}`;
+        await S3Service.uploadFile({
+          file: errorCsvContent,
+          filename: fileName,
+          size: errorCsvContent.length,
+          type: 'text/csv',
+          contentType: 'text/csv',
+          fileKeyId: errFilePath,
+        });
+        errFileUrl = await S3Service.getFileUrl(errFilePath);
+      }
 
-    // Step 8: Record CSV upload details in the database
-    let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
-      event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
-      host: { id: payload.hostId }, // Reference the User entity correctly
-      uploadType: UploadType.EVENT_UPLOAD,
-      originalCsvPath: payload.filePath,
-      errorCsvPath: errFilePath || null, // Ensure it's null if no error file
-    });
-    // Save the entity
-    csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).save(csvUploadRecord);
-    users.map(async (user) => {
-      await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
-    });
-    // Step 9: Return the response with success and failure counts
-    return responses.data({
-      message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length,
-      failedUserCount: garbageData.length,
-      hostId: payload.hostId,
-      users,
-      eventId: payload.eventId,
-      errFileUrl: errFileUrl,
-      errFilepath: errFilePath,
-    });
+      // Step 8: Record CSV upload details in the database
+      let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
+        event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
+        host: { id: payload.hostId }, // Reference the User entity correctly
+        uploadType: payload.isUploadUser ? UploadType.USER_UPLOAD : UploadType.EVENT_UPLOAD,
+        originalCsvPath: payload.filePath,
+        errorCsvPath: errFilePath || null, // Ensure it's null if no error file
+      });
+      // Save the entity
+      csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).save(csvUploadRecord);
+      users.map(async (user) => {
+        await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+
+      newMappings.push(...users.map((user) => ({ user, host: { id: payload.hostId } })));
+      await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+
+      // Step 9: Return the response with success and failure counts
+      return {
+        message: 'Bulk user creation completed.',
+        SuccessUserCount: users.length,
+        failedUserCount: garbageData.length,
+        hostId: payload.hostId,
+        users,
+        eventId: payload.eventId,
+        errFileUrl: errFileUrl,
+        errFilepath: errFilePath,
+      };
   }
 
   /**
@@ -2581,41 +2605,41 @@ export class GuestService {
    * @param payload - The request payload containing pagination and filter options.
    * @returns A paginated response containing filtered users.
    */
-  public static async fetchBulkGuests(payload: FetchBulkGuestsRequestDto): Promise<FetchBulkGuestsResponse> {
-    const parsedQuery = parse(payload.query) as ParsedQs;
-    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : 10; // Number of users per page
-    const page = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : 0; // Page number (starting from 0)
-    const filePath = parsedQuery.filePath as string;
-    const eventId = parsedQuery.eventId as string;
+  public static async fetchBulkGuests(payload: FetchBulkGuestsRequestDto): Promise<FetchBulkGuestsData> {
+      const parsedQuery = parse(payload.query) as ParsedQs;
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : 10; // Number of users per page
+      const page = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : 0; // Page number (starting from 0)
+      const filePath = parsedQuery.filePath as string;
+      const eventId = parsedQuery.eventId as string;
 
-    if (!filePath && !eventId) throw new BadRequestError('filePath and eventId should be present to fetch bulk users');
+      if (!filePath && !eventId) throw new BadRequestError('filePath and eventId should be present to fetch bulk users');
 
-    const csvData = await this.dbConnection.getRepository(CsvUploadRecords).findOne({ where: { originalCsvPath: filePath, event: { id: eventId } } });
-    // Step 1: Fetch the latest `maxUsers` users (ordered by creation date, excluding deleted users)
-    const usersQuery = this.dbConnection.getRepository(User)
-      .createQueryBuilder('user')
-      .where('user.csv_upload_id = :csvUploadId', { csvUploadId: csvData.id }) // Filter by csv_upload_id
-      .andWhere('user.deletedAt IS NULL') // Exclude soft-deleted users
-      .orderBy('user.createdAt', 'DESC') // Fetch the most recent users first
-      .skip(page)
-      .take(take); // Limit the number of users fetched
+      const csvData = await this.dbConnection.getRepository(CsvUploadRecords).findOne({ where: { originalCsvPath: filePath, event: { id: eventId } } });
+      // Step 1: Fetch the latest `maxUsers` users (ordered by creation date, excluding deleted users)
+      const usersQuery = this.dbConnection.getRepository(User)
+        .createQueryBuilder('user')
+        .where('user.csv_upload_id = :csvUploadId', { csvUploadId: csvData.id }) // Filter by csv_upload_id
+        .andWhere('user.deletedAt IS NULL') // Exclude soft-deleted users
+        .orderBy('user.createdAt', 'DESC') // Fetch the most recent users first
+        .skip(page)
+        .take(take); // Limit the number of users fetched
 
-    if (parsedQuery.findByName) {
-      const searchValue = typeof parsedQuery.findByName === 'string' ? parsedQuery.findByName.toLowerCase() : '';
-      usersQuery.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` }).orWhere('user.lastName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
-          });
-        }),
-      );
-    }
-    const [allUsers, totalCount] = await usersQuery.getManyAndCount();
+      if (parsedQuery.findByName) {
+        const searchValue = typeof parsedQuery.findByName === 'string' ? parsedQuery.findByName.toLowerCase() : '';
+        usersQuery.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` }).orWhere('user.lastName ILIKE :searchValue', {
+              searchValue: `%${searchValue}%`,
+            });
+          }),
+        );
+      }
+      const [allUsers, totalCount] = await usersQuery.getManyAndCount();
 
-    return responses.data({
-      users: allUsers.map((user) => toSimpleUser(user)),
-      totalCount,
-    });
+      return {
+        users: allUsers.map((user) => toSimpleUser(user)),
+        totalCount,
+      };
   }
 
   /**
@@ -2635,131 +2659,121 @@ export class GuestService {
    * @param payload - Data required to invite a new guest.
    * @returns GetUserRequestsResponse - The transformed guest data response.
    */
-  public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GetUserRequestsResponse> {
-    // Step 1: Check if the event exists and is not deleted
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
-    if (!event) throw new NotFoundError('Event not found');
+  public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GuestDataSimple> {
+      // Step 1: Check if the event exists and is not deleted
+      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+      if (!event) throw new NotFoundError('Event not found');
 
-    // Step 2: Verify the existence of the host
-    const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
-    if (!host) throw new NotFoundError('Host not found');
+      // Step 2: Verify the existence of the host
+      const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
+      if (!host) throw new NotFoundError('Host not found');
 
-    if (!payload.email && !payload.phoneNumber) {
-      throw new ValidationError('Atleast phoneNumber or email should be there');
-    }
-
-    // Step 3: Validate the ticket type if provided
-    let ticketType = undefined;
-    if (payload.ticketTypeId) {
-      ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
-    }
-
-    // Step 4: Normalize and validate guest status
-    const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
-    if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
-      throw new BadRequestError('Invalid guest status');
-    }
-
-    // Step 5: Ensure invites can only be sent for approved events
-    if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
-      throw new BadRequestError('You cannot send invites until the event has been approved by the Rumor admin');
-    }
-
-    let checkExistingUser;
-    // Step 6: Check if the user already exists in the system
-    if (payload.email && !payload.phoneNumber) {
-      try {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email)).data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) { }
-    } else if (payload.phoneNumber && !payload.email) {
-      try {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)).data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) { }
-    }
-
-    // Step 7: Register a new guest user
-    let guest = new Guest();
-    try {
-      // Extract relevant fields for non-member registration
-      const memberPayload = (({ eventId, userId, firstName, lastName, email, phoneNumber }) => ({
-        eventId,
-        userId,
-        firstName,
-        lastName,
-        email: email || '',
-        phoneNumber: phoneNumber || '',
-      }))(payload);
-      const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
-      // Step 8: Create and save the guest record
-      guest = this.dbConnection.getRepository(Guest).create({
-        id: uuidv4(),
-        status: guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS,
-        event,
-        maxAdditionalGuests: payload.maxAdditionalGuests || 1,
-        user: { id: member.id } as User,
-        addedBy: { id: host.id } as User,
-        privateGuestNote: payload.privateGuestNote,
-        invitationSource: UserSource.INVITED_BY_HOST,
-        ticketType: ticketType ? ({ id: ticketType.id } as TicketType) : undefined,
-      });
-      guest = await this.dbConnection.getRepository(Guest).save(guest);
-    } catch (err) {
-      return null;
-    }
-
-    // Step 9: Send invite email or sms if required
-    // TO DO: Change email and sms template
-    if (payload.email) {
-      await serviceMesh
-        .notificationService()
-        .sendEmailFromTemplate(
-          [{ key: "first_name", value: payload?.firstName || "" }],
-          "Host Application Submitted",
-          [payload.email],
-          null
-        );
-    } else if (payload.phoneNumber) {
-      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-      if (!success) {
-        throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+      if (!payload.email && !payload.phoneNumber) {
+        throw new ValidationError('Atleast phoneNumber or email should be there');
       }
-    }
 
-    // Step 10: Fetch user and transform guest data
-    const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+      // Step 3: Validate the ticket type if provided
+      let ticketType = undefined;
+      if (payload.ticketTypeId) {
+        ticketType = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: payload.ticketTypeId } });
+        if (!ticketType) throw new NotFoundError('Ticket type not found');
+      }
 
-    queryBuilder
-      .leftJoinAndSelect('guest.user', 'user')
-      .leftJoinAndSelect('user.roles', 'roles')
-      .leftJoinAndSelect('user.address', 'address')
-      .leftJoinAndSelect('roles.role', 'role')
-      .leftJoinAndSelect('guest.addedBy', 'addedBy')
-      .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-      .leftJoinAndSelect('guest.ticketType', 'ticketType')
-      .where({ event: { id: event.id } })
-      .andWhere({ status: In([GuestStatus.DRAFT, GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
-      .andWhere({ user: { id: guest.user.id } })
-      .limit(1);
+      // Step 4: Normalize and validate guest status
+      const guestStatus = payload?.guestStatus ? payload.guestStatus.toString().trim().toUpperCase() : undefined;
+      if (guestStatus && !Object.keys(GuestStatus).includes(guestStatus)) {
+        throw new BadRequestError('Invalid guest status');
+      }
 
-    const checkGuest = await queryBuilder.getOne();
-    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data
-    const vouches = (await VouchRequestService.getUserVouches({ id: guest.user.id }));
-    const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-      where: {
-        user: { id: guest.user.id },
-        event: { id: event.id },
-      },
-      relations: {
-        question: true,
-      },
-    });
-    const guestData = toGuest(checkGuest, focuses, undefined, vouches, answers, undefined);
+      // Step 5: Ensure invites can only be sent for approved events
+      if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
+        throw new BadRequestError('You cannot send invites until the event has been approved by the Rumor admin');
+      }
 
-    return responses.data(guestData);
+      let checkExistingUser;
+      // Step 6: Check if the user already exists in the system
+      if (payload.email && !payload.phoneNumber) {
+        try {
+          checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email)).data;
+          if (checkExistingUser) throw new BadRequestError('User already exists');
+        } catch (e) { }
+      } else if (payload.phoneNumber && !payload.email) {
+        try {
+          checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)).data;
+          if (checkExistingUser) throw new BadRequestError('User already exists');
+        } catch (e) { }
+      }
+
+      // Step 7: Register a new guest user
+      let guest = new Guest();
+      try {
+        // Extract relevant fields for non-member registration
+        const memberPayload = (({ eventId, userId, firstName, lastName, email, phoneNumber }) => ({
+          eventId,
+          userId,
+          firstName,
+          lastName,
+          email: email || '',
+          phoneNumber: phoneNumber || '',
+        }))(payload);
+        const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
+        // Step 8: Create and save the guest record
+        guest = this.dbConnection.getRepository(Guest).create({
+          id: uuidv4(),
+          status: guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS,
+          event,
+          maxAdditionalGuests: payload.maxAdditionalGuests || 1,
+          user: { id: member.id } as User,
+          addedBy: { id: host.id } as User,
+          privateGuestNote: payload.privateGuestNote,
+          invitationSource: UserSource.INVITED_BY_HOST,
+          ticketType: ticketType ? ({ id: ticketType.id } as TicketType) : undefined,
+        });
+        guest = await this.dbConnection.getRepository(Guest).save(guest);
+      } catch (err) {
+        return null;
+      }
+
+      // Step 9: Send invite email or sms if required
+      // TO DO: Change email and sms template
+      if (payload.email) {
+        await serviceMesh
+          .notificationService()
+          .sendEmailFromTemplate(
+            [{ key: "first_name", value: payload?.firstName || "" }],
+            "Host Application Submitted",
+            [payload.email],
+            null
+          );
+      } else if (payload.phoneNumber) {
+        const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+        const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        if (!success) {
+          throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+        }
+      }
+
+      // Step 10: Fetch user and transform guest data
+      const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+
+      queryBuilder
+        .leftJoinAndSelect('guest.user', 'user')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('user.address', 'address')
+        .leftJoinAndSelect('roles.role', 'role')
+        .leftJoinAndSelect('guest.addedBy', 'addedBy')
+        .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+        .leftJoinAndSelect('guest.ticketType', 'ticketType')
+        .where({ event: { id: event.id } })
+        .andWhere({ status: In([GuestStatus.DRAFT,GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
+        .andWhere({ user: { id: guest.user.id } })
+        .limit(1);
+
+      const checkGuest = await queryBuilder.getOne();
+      const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data
+      const guestData = toGuestDataSimple(checkGuest, focuses);
+
+      return guestData;
   }
 
   public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
@@ -2840,7 +2854,7 @@ export class GuestService {
     const buildGuests = await Promise.all(
       guests.map(async (guest) => {
         const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-        const vouches = (await VouchRequestService.getUserVouches({ id: guest.user.id }));
+        const vouches = (await VouchRequestService.getUserVouches({id: guest.user.id}));
         const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
           where: {
             user: { id: guest.user.id },
@@ -2858,184 +2872,180 @@ export class GuestService {
   }
 
   public static async getUserRequests(payload: RequestByUserAndEventDto): Promise<GetUserRequestsResponse> {
-      // Find guest by userId and eventId
-      const guestExists = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: payload.userId }, event: { id: payload.eventId } },
-        relations: { event: true, user: true },
-      });
-      const guestUserId = payload.userId;
-      if (!guestExists) throw new NotFoundError('Guest not found');
+    // Find guest by userId and eventId
+    const guestExists = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: payload.userId }, event: { id: payload.eventId } },
+      relations: { event: true, user: true },
+    });
+    const guestUserId = payload.userId;
+    if (!guestExists) throw new NotFoundError('Guest not found');
 
-      // Ensure event exists and is not deleted
-      const event = await await this.dbConnection.getRepository(Event).findOne({
-        where: { id: payload.eventId, deletedAt: null },
-      });
-      if (!event) throw new BadRequestError('Event not found');
+    // Ensure event exists and is not deleted
+    const event = await await this.dbConnection.getRepository(Event).findOne({
+      where: { id: payload.eventId, deletedAt: null },
+    });
+    if (!event) throw new BadRequestError('Event not found');
 
-      const queryBuilder = await this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+    const queryBuilder = await this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
 
-      queryBuilder
-        .leftJoinAndSelect('guest.user', 'user')
-        .leftJoinAndSelect('user.roles', 'roles')
-        .leftJoinAndSelect('user.socialStats', 'socialStats')
-        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-        .leftJoinAndSelect('user.address', 'address')
-        .leftJoinAndSelect('roles.role', 'role')
-        .leftJoinAndSelect('guest.addedBy', 'addedBy')
-        .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-        .leftJoinAndSelect('guest.ticketType', 'ticketType')
-        .where({ event: { id: event.id } })
-        .andWhere({ status: GuestStatus.APPLIED })
-        .andWhere({ user: { id: guestUserId } })
-        .limit(1);
+    queryBuilder
+      .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('guest.addedBy', 'addedBy')
+      .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+      .leftJoinAndSelect('guest.ticketType', 'ticketType')
+      .where({ event: { id: event.id } })
+      .andWhere({ status: GuestStatus.APPLIED })
+      .andWhere({ user: { id: guestUserId } })
+      .limit(1);
 
-      const guest = await queryBuilder.getOne();
+    const guest = await queryBuilder.getOne();
 
-      const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-      const vouches = await VouchRequestService.getUserVouchesByEvent({requesterId: guest.user.id, eventId:event.id});
-      const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: {
-          user: { id: guest.user.id },
-          event: { id: event.id },
-        },
-        relations: {
-          question: true,
-        },
-      });
-      const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
-      const data = { ...guestData, category: focuses.map((focus) => focus.name) };
-
-      return responses.data(data);
-    }
-
-  public static async manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {
-    const validateManageBulkGuests = this.validateManageBulkGuests(payload);
-    if (!validateManageBulkGuests.validate) throw new ValidationError(validateManageBulkGuests.message);
-    let ticketType;
-    if (guestStatusToEntity[payload.status] === GuestStatus.CONFIRMED) {
-      ticketType = await this.dbConnection.getRepository(TicketType).findOne({
-        where: { id: payload.ticketTypeId },
-      });
-      delete payload.reason;
-      if (!ticketType) {
-        throw new BadRequestError('Invalid ticket type id');
-      }
-    }
-    const guestIds = payload.guestIds.map((guest) => guest.guestId);
-
-    const guests = await this.dbConnection.getRepository(Guest).find({
+    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+    const vouches = await VouchRequestService.getUserVouchesByEvent({requesterId: guest.user.id, eventId:event.id});
+    const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
       where: {
-        id: In(guestIds),
-        deletedAt: IsNull(),
+        user: { id: guest.user.id },
+        event: { id: event.id },
+      },
+      relations: {
+        question: true,
       },
     });
+    const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
+    const data = { ...guestData, category: focuses.map((focus) => focus.name) };
 
-    const results = await Promise.all(
-      payload.guestIds.map(async (guestInfo) => {
-        const guest = guests.find((g) => g.id === guestInfo.guestId);
-        if (!guest) {
-          return false;
-        }
-
-        guest.privateGuestNote = guestInfo.privateNotes || guest.privateGuestNote;
-        guest.ticketType = ticketType || guest.ticketType;
-        guest.status = guestStatusToEntity[payload.status];
-        guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
-        guest.rejectedReason = payload.reason;
-        guest.inviteMessage = payload.inviteMessage;
-
-        await this.dbConnection.getRepository(Guest).save(guest);
-
-        if (payload.isSpam && guest.user) {
-          await serviceMesh.userService().markUserAsSpam(guest.user.id);
-        }
-
-        return true;
-      }),
-    );
-
-    const successCount = results.filter((result) => result).length;
-    if (successCount === 0) {
-      throw new BadRequestError('No guests were successfully updated');
-    }
-    return responses.ok;
+    return responses.data(data);
   }
 
-  public static async getGuestDetails(payload: UserAndIdRequestDto): Promise<GuestDetailsResponse> {
-    if (!payload.id) throw new BadRequestError('Invalid guest ID provided');
-    const guestProfileResponse = await this.getGuestProfile(payload);
-    const { error, data: guestProfile } = guestProfileResponse;
-    if (error) {
-      throw new BadRequestError(error.message);
-    }
-    const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
-      where: { id: payload.id },
-      relations: { ticketType: true, user: true, event: true },
-    });
-    if (!guestDetail) {
-      throw new NotFoundError('Guest not found');
-    }
+  public static async manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {
+      const validateManageBulkGuests = this.validateManageBulkGuests(payload);
+      if (!validateManageBulkGuests.validate) throw new ValidationError(validateManageBulkGuests.message);
+      let ticketType;
+      if (guestStatusToEntity[payload.status] === GuestStatus.CONFIRMED) {
+        ticketType = await this.dbConnection.getRepository(TicketType).findOne({
+          where: { id: payload.ticketTypeId },
+        });
+        delete payload.reason;
+        if (!ticketType) {
+          throw new BadRequestError('Invalid ticket type id');
+        }
+      }
+      const guestIds = payload.guestIds.map((guest) => guest.guestId);
 
-    const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
+      const guests = await this.dbConnection.getRepository(Guest).find({
+        where: {
+          id: In(guestIds),
+          deletedAt: IsNull(),
+        },
+      });
 
-    const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
+      const results = await Promise.all(
+        payload.guestIds.map(async (guestInfo) => {
+          const guest = guests.find((g) => g.id === guestInfo.guestId);
+          if (!guest) {
+            return false;
+          }
 
-    const vouches = (await VouchRequestService.getUserVouches({ id: guestDetail.user.id }));
+          guest.privateGuestNote = guestInfo.privateNotes || guest.privateGuestNote;
+          guest.ticketType = ticketType || guest.ticketType;
+          guest.status = guestStatusToEntity[payload.status];
+          guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
+          guest.rejectedReason = payload.reason;
+          guest.inviteMessage = payload.inviteMessage;
 
-    const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-      where: {
-        user: { id: guestDetail.user.id },
-        event: { id: guestDetail.event.id },
-      },
-    });
+          await this.dbConnection.getRepository(Guest).save(guest);
 
-    return responses.data({
-      guestDetail: {
-        guestId,
-        userId: user?.id || null,
-        ticketType: ticketType?.name || null,
-        maxAdditionalGuests,
-        privateGuestNote,
-        guestStatus,
-      },
-      guestProfile,
-      quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
-      vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
-    });
+          if (payload.isSpam && guest.user) {
+            await serviceMesh.userService().markUserAsSpam(guest.user.id);
+          }
+
+          return true;
+        }),
+      );
+
+      const successCount = results.filter((result) => result).length;
+      if (successCount === 0) {
+        throw new BadRequestError('No guests were successfully updated');
+      }
+      return responses.ok;
+  }
+
+  public static async getGuestDetails(payload: UserAndIdRequestDto): Promise<GuestDetails> {
+      if (!payload.id) throw new BadRequestError('Invalid guest ID provided');
+      const guestProfileResponse = await this.getGuestProfile(payload);
+      const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
+        where: { id: payload.id },
+        relations: { ticketType: true, user: true, event: true },
+      });
+      if (!guestDetail) {
+        throw new NotFoundError('Guest not found');
+      }
+
+      const { id: guestId, user, ticketType, maxAdditionalGuests = 0, privateGuestNote = '', status } = guestDetail;
+
+      const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
+      
+      const vouches = (await VouchRequestService.getUserVouches({id: guestDetail.user.id}));
+
+      const quizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+        where: {
+          user: { id: guestDetail.user.id },
+          event: { id: guestDetail.event.id },
+        },
+      });
+
+      return {
+        guestDetail: {
+          guestId,
+          userId: user?.id || null,
+          ticketType: ticketType?.name || null,
+          maxAdditionalGuests,
+          privateGuestNote,
+          guestStatus,
+        },
+        guestProfile: guestProfileResponse,
+        quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
+        vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
+      };
   }
 
   public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
-    if (!event) throw new NotFoundError('Event not found');
-    const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: event.id },
-        user: { id: payload.userId },
-        deletedAt: IsNull(),
-      },
-    });
-    if (!leadGuest) throw new NotFoundError('Lead Guest not found');
-    leadGuest.user = { id: payload.userId } as User;
+      if (!event) throw new NotFoundError('Event not found');
+      const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
+        where: {
+          event: { id: event.id },
+          user: { id: payload.userId },
+          deletedAt: IsNull(),
+        },
+      });
+      if (!leadGuest) throw new NotFoundError('Lead Guest not found');
+      leadGuest.user = { id: payload.userId } as User;
 
-    const invitedGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
-      where: { event: { id: event.id }, addedBy: { id: payload.userId }, deletedAt: IsNull() },
-      relations: {
-        user: true,
-      },
-    });
+      const invitedGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
+        where: { event: { id: event.id }, addedBy: { id: payload.userId }, deletedAt: IsNull() },
+        relations: {
+          user: true,
+        },
+      });
 
-    const restrictedGuests: RestrictedInvites[] = await this.dbConnection.getRepository(RestrictedInvites).find({
-      where: { event: { id: event.id }, restrictedBy: { id: payload.userId } },
-      relations: ['guest', 'guest.user'],
-    });
+      const restrictedGuests: RestrictedInvites[] = await this.dbConnection.getRepository(RestrictedInvites).find({
+        where: { event: { id: event.id }, restrictedBy: { id: payload.userId } },
+        relations: ['guest', 'guest.user'],
+      });
 
-    // Merge both lists
-    const allGuests: GuestDataSimple[] = [
-      ...invitedGuestList.map((guest) => toGuestDataSimple(guest, [], false)),
-      ...restrictedGuests.map((restricted) => toGuestDataSimple(restricted.guest, [], true, restricted.id)),
-    ];
+      // Merge both lists
+      const allGuests: GuestDataSimple[] = [
+        ...invitedGuestList.map((guest) => toGuestDataSimple(guest, [], false)),
+        ...restrictedGuests.map((restricted) => toGuestDataSimple(restricted.guest, [], true, restricted.id)),
+      ];
 
-    return responses.data([leadGuest].map((guest) => toGuestDataSimple(guest, [], false, undefined, allGuests)));
+      return responses.data([leadGuest].map((guest) => toGuestDataSimple(guest, [], false, undefined, allGuests)));  
   }
 
   public static validateManageBulkGuests(payload: ManageBulkGuestsRequestDto): {
@@ -3081,48 +3091,48 @@ export class GuestService {
     return validations[status]?.() ?? null;
   }
 
-  /**
- * Fetch guests for a given event and filter by status.
- * @param eventId - The event ID.
- * @param statuses - List of guest statuses to filter.
- * @returns List of guests with required event details.
- */
-  public static async fetchGuestsByStatuses(eventId: string, statuses: GuestStatus[]): Promise<Guest[]> {
-    return await this.dbConnection.getRepository(Guest)
-      .createQueryBuilder('guest')
-      .leftJoinAndSelect('guest.user', 'user')
-      .leftJoinAndSelect('guest.event', 'event')
-      .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
-      .where({ event: { id: eventId } })
-      .andWhere('guest.status IN (:...statuses)', { statuses })
-      .getMany();
-  }
+    /**
+   * Fetch guests for a given event and filter by status.
+   * @param eventId - The event ID.
+   * @param statuses - List of guest statuses to filter.
+   * @returns List of guests with required event details.
+   */
+    public static async fetchGuestsByStatuses(eventId: string, statuses: GuestStatus[]): Promise<Guest[]> {
+      return await this.dbConnection.getRepository(Guest)
+        .createQueryBuilder('guest')
+        .leftJoinAndSelect('guest.user', 'user')
+        .leftJoinAndSelect('guest.event', 'event')
+        .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+        .where({ event: { id: eventId } })
+        .andWhere('guest.status IN (:...statuses)', { statuses })
+        .getMany();
+    }
 
-  /* Deletes a guest or a restricted invite based on the provided ID.
-*
-* This function first checks if the ID exists in the `RestrictedInvites` table.
-* If found, it deletes the entry from that table.
-* If not found, it then checks the `Guest` table and deletes the entry if present.
-* If the ID is not found in either table, it returns an error response.
-*
-* @param {string} id - The ID of the guest or restricted invite to be deleted.
-* @returns {Promise<BaseResponse>} - Response indicating success or failure of the deletion process.
-*/
+      /* Deletes a guest or a restricted invite based on the provided ID.
+   *
+   * This function first checks if the ID exists in the `RestrictedInvites` table.
+   * If found, it deletes the entry from that table.
+   * If not found, it then checks the `Guest` table and deletes the entry if present.
+   * If the ID is not found in either table, it returns an error response.
+   *
+   * @param {string} id - The ID of the guest or restricted invite to be deleted.
+   * @returns {Promise<BaseResponse>} - Response indicating success or failure of the deletion process.
+   */
   public static async deleteInvitedGuest(payload: IdRequestDto): Promise<GenericResponse> {
-    const restrictedInvite = await this.dbConnection.getRepository(RestrictedInvites).findOne({ where: { id: payload.id } });
-    if (restrictedInvite) {
-      await this.dbConnection.getRepository(RestrictedInvites).delete(payload.id);
-      return responses.ok;
-    }
+      const restrictedInvite = await this.dbConnection.getRepository(RestrictedInvites).findOne({ where: { id: payload.id } });
+      if (restrictedInvite) {
+        await this.dbConnection.getRepository(RestrictedInvites).delete(payload.id);
+        return responses.ok;
+      }
 
-    const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id } });
-    if (guest) {
-      await this.dbConnection.getRepository(RestrictedInvites).delete({ guest: { id: payload.id } });
-      await this.dbConnection.getRepository(Guest).delete(payload.id);
-      return responses.ok;
-    }
+      const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id } });
+      if (guest) {
+        await this.dbConnection.getRepository(RestrictedInvites).delete({ guest: { id: payload.id } });
+        await this.dbConnection.getRepository(Guest).delete(payload.id);
+        return responses.ok;
+      }
 
-    throw new BadRequestError('Guest or restricted entry not found');
+     throw new BadRequestError('Guest or restricted entry not found');
   }
 
   public static async getEventAttendeeCountByTicketType(payload: GetAttendeeCountRequest): Promise<Attendees> {

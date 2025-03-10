@@ -3,14 +3,10 @@ import {
   GenericResponse,
   GetGuestProfileResponse,
   GuestsResponse,
-  ListEventGuestsResponse,
   GuestsDataResponse,
   ListUsersEventInviteesResponse,
   UsersAttendeesResponse,
   GetUserRequestsResponse,
-  GuestDetailsResponse,
-  BulkUploadGuestsResponse,
-  FetchBulkGuestsResponse,
   GetAttendeeCountRequest,
   GetAttendeeCountResponse,
   PaginatedGuestEventsResponse,
@@ -37,11 +33,12 @@ import {
   AddGuestsRequestDto,
   AcceptEventInvitationRequestDto
 } from 'rumor-utils/shared/events/dtos/guest.dto';
-import { RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
-import {RequestByUserAndEventDto, UserAndIdRequestDto} from 'rumor-utils/shared/users/dtos/shared.dto';
+import { RequestByUserAndEventDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
+import { GuestDataSimple, GuestData, BulkUserData, GuestDetails } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { UserAttendee } from 'rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestController {
@@ -67,7 +64,7 @@ export class GuestController {
         ...req.body
       }
       const token = (req as any).token;
-      const response: GuestsResponse = await GuestService.addGuests(payload, token);
+      const response: Guests = await GuestService.addGuests(payload, token);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -93,7 +90,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GuestsResponse = await GuestService.getGuests(payload);
+      const response: Guests = await GuestService.getGuests(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -106,7 +103,7 @@ export class GuestController {
         hostId: (req as any).user,
         ...req.body
       }
-      const response: GuestsDataResponse = await GuestService.updateGuests(payload);
+      const response: GuestDataSimple[] = await GuestService.updateGuests(payload);
       const successResponse = new UpdateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -131,7 +128,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GuestsDataResponse = await GuestService.listGuestsOverview(payload);
+      const response: GuestDataSimple[] = await GuestService.listGuestsOverview(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -144,7 +141,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GuestsDataResponse = await GuestService.listGuestProfiles(payload);
+      const response: GuestDataSimple[] = await GuestService.listGuestProfiles(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -157,7 +154,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GetGuestProfileResponse = await GuestService.getGuestProfile(payload);
+      const response: GuestData = await GuestService.getGuestProfile(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -237,7 +234,7 @@ export class GuestController {
         eventId: req.params.id,
         ...req.body
       }
-      const response: BulkUploadGuestsResponse = await GuestService.bulkUploadGuests(payload);
+      const response: BulkUserData = await GuestService.bulkUploadGuests(payload);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -250,7 +247,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: FetchBulkGuestsResponse = await GuestService.fetchBulkGuests(payload);
+      const response: FetchBulkGuestsData = await GuestService.fetchBulkGuests(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -302,7 +299,7 @@ export class GuestController {
         eventId: req.params.eventId,
         ...req.body
       }
-      const response: GuestsDataResponse = await GuestService.inviteGuest(payload);
+      const response: GuestDataSimple[] = await GuestService.inviteGuest(payload);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -329,7 +326,7 @@ export class GuestController {
         ...req.body
       }
       const token = (req as any).token;
-      const response: GetUserRequestsResponse = await GuestService.inviteNewUser(payload, token);
+      const response: GuestDataSimple = await GuestService.inviteNewUser(payload, token);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -368,7 +365,7 @@ export class GuestController {
         userid: (req as any).user,
         ...req.body
       }
-      const response: GuestDetailsResponse = await GuestService.getGuestDetails(payload);
+      const response: GuestDetails = await GuestService.getGuestDetails(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }

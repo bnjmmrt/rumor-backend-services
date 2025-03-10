@@ -42,7 +42,7 @@ export class PlatformService {
     const focuses = await this.dbConnection
       .getRepository(Focus)
       .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-    const data = focuses.map((focus) => toFocus(focus));
+    const data = focuses.length > 0 ? focuses.map((focus) => toFocus(focus)) : [];
     return data
   }
 
