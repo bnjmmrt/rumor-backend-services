@@ -683,7 +683,7 @@ export class GuestService {
     }
 
     const { error: validationError, response: validation } = validateFilters(payload.query);
-    if (validationError) return responses.badRequest(validation);
+    if (validationError) throw new BadRequestError(validation);
     const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
 
     let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
@@ -2858,55 +2858,55 @@ export class GuestService {
   }
 
   public static async getUserRequests(payload: RequestByUserAndEventDto): Promise<GetUserRequestsResponse> {
-    // Find guest by userId and eventId
-    const guestExists = await this.dbConnection.getRepository(Guest).findOne({
-      where: { user: { id: payload.userId }, event: { id: payload.eventId } },
-      relations: { event: true, user: true },
-    });
-    const guestUserId = payload.userId;
-    if (!guestExists) throw new NotFoundError('Guest not found');
+      // Find guest by userId and eventId
+      const guestExists = await this.dbConnection.getRepository(Guest).findOne({
+        where: { user: { id: payload.userId }, event: { id: payload.eventId } },
+        relations: { event: true, user: true },
+      });
+      const guestUserId = payload.userId;
+      if (!guestExists) throw new NotFoundError('Guest not found');
 
-    // Ensure event exists and is not deleted
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.eventId, deletedAt: null },
-    });
-    if (!event) throw new NotFoundError('Event not found');
+      // Ensure event exists and is not deleted
+      const event = await await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.eventId, deletedAt: null },
+      });
+      if (!event) throw new BadRequestError('Event not found');
 
-    const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+      const queryBuilder = await this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
 
-    queryBuilder
-      .leftJoinAndSelect('guest.user', 'user')
-      .leftJoinAndSelect('user.roles', 'roles')
-      .leftJoinAndSelect('user.socialStats', 'socialStats')
-      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-      .leftJoinAndSelect('user.address', 'address')
-      .leftJoinAndSelect('roles.role', 'role')
-      .leftJoinAndSelect('guest.addedBy', 'addedBy')
-      .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
-      .leftJoinAndSelect('guest.ticketType', 'ticketType')
-      .where({ event: { id: event.id } })
-      .andWhere({ status: GuestStatus.APPLIED })
-      .andWhere({ user: { id: guestUserId } })
-      .limit(1);
+      queryBuilder
+        .leftJoinAndSelect('guest.user', 'user')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('user.socialStats', 'socialStats')
+        .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+        .leftJoinAndSelect('user.address', 'address')
+        .leftJoinAndSelect('roles.role', 'role')
+        .leftJoinAndSelect('guest.addedBy', 'addedBy')
+        .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+        .leftJoinAndSelect('guest.ticketType', 'ticketType')
+        .where({ event: { id: event.id } })
+        .andWhere({ status: GuestStatus.APPLIED })
+        .andWhere({ user: { id: guestUserId } })
+        .limit(1);
 
-    const guest = await queryBuilder.getOne();
+      const guest = await queryBuilder.getOne();
 
-    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-    const vouches = (await VouchRequestService.getUserVouches({ id: guest.user.id }));
-    const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-      where: {
-        user: { id: guest.user.id },
-        event: { id: event.id },
-      },
-      relations: {
-        question: true,
-      },
-    });
-    const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
-    const data = { ...guestData, category: focuses.map((focus) => focus.name) };
+      const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+      const vouches = await VouchRequestService.getUserVouchesByEvent({requesterId: guest.user.id, eventId:event.id});
+      const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
+        where: {
+          user: { id: guest.user.id },
+          event: { id: event.id },
+        },
+        relations: {
+          question: true,
+        },
+      });
+      const guestData = toGuest(guest, focuses, undefined, vouches, answers, undefined);
+      const data = { ...guestData, category: focuses.map((focus) => focus.name) };
 
-    return data
-  }
+      return responses.data(data);
+    }
 
   public static async manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {
     const validateManageBulkGuests = this.validateManageBulkGuests(payload);

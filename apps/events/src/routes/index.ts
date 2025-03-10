@@ -212,7 +212,7 @@ router.get(
 //Event location
 router.post("/event-location", EventsController.createEventLocation)
 router.put("/event-location/:id", EventsController.updateEventLocation)
-router.get("/event-location/:id", EventsController.getEventLocation)  
+router.get("/event-location/:id", EventsController.getEventLocation)
 router.get("/event-locations", EventsController.listEventLocations)
 router.delete("/event-location/:id", EventsController.deleteEventLocation)
 
@@ -244,7 +244,7 @@ router.get(
 
 router.get("/events", EventsController.listEvents)  /**TestStatus: working */
 router.get("/feed", EventsController.listEventsFeed)
-router.get("/feed/featured", EventsController.getFeaturedEvents) 
+router.get("/feed/featured", EventsController.getFeaturedEvents)
 router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents) /**TestStatus: working */
 router.get("/dashboard/top-users-attendees-events", GuestController.getTopUsersAttendees)  /**TestStatus: working */
 router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) //todo:
@@ -355,9 +355,9 @@ router.put(
 );
 //Users
 router.get(
-  "/v1/users/:userId/events/:eventId/request",
+  "/users/:userId/events/:eventId/request",
   GuestController.getUserRequests
-); /**TestStatus: TODO: */
+); /**TestStatus: working */
 router.delete(
   "/v1/users/:userId/events/:eventId/guest/:id",
   GuestController.deleteInvitedGuest
@@ -401,17 +401,17 @@ router.get(
 );
 
 //Vouches
-router.get("/events/vouch-requests", VouchRequestController.createVouchRequest);
+router.post("/events/vouch-requests", VouchRequestController.createVouchRequest); /**TestStatus: working */
 router.get(
   "/events/vouch-requests",
   VouchRequestController.getAllVouchRequests
 );
-router.get(
+router.put(
   "/events/vouch-requests/:id",
   VouchRequestController.updateVouchRequest
-);
-router.get("/events/user/:id/vouches", VouchRequestController.getUserVouches);
-router.post("/events/event/:id", VouchRequestController.getUserVouchesByEvent);
+); /**TestStatus: working */
+router.get("/events/user/:id/vouches", VouchRequestController.getUserVouches); /**TestStatus: working */
+router.get("/events/event/:eventId/request/:requesterId", VouchRequestController.getUserVouchesByEvent);
 
 //ticket validation QR generation and validation
 router.post(
