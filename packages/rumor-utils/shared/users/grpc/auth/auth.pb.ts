@@ -423,12 +423,12 @@ export interface InviteNewHostRequest {
 export interface Member {
   id: string;
   name: string;
-  gender: Gender;
+  gender: any;
   city: string;
   followerCount: string;
   categories: string[];
   types: string[];
-  status: UserStatus;
+  status: any;
   profilePicture?: string | undefined;
   email: string;
   instagramUsername?: string | undefined;
@@ -457,7 +457,7 @@ export interface Host {
   appliedOn: string;
   referralCode: string;
   hostedEvents: HostedEvent[];
-  status: UserStatus;
+  status: string;
   profilePicture?: string | undefined;
   website?: string | undefined;
   phoneNumber?: string | undefined;

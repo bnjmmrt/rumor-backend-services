@@ -15,7 +15,7 @@ const config = {
         USERS_SERVICE_BASE_URL:'http://users:8000/users/v1',
         EVENTS_SERVICE_BASE_URL:'http://events:8001/events/v1/v2',
         NOTIFICATIONS_SERVICE_BASE_URL:'http://notifications:8002/notifications/v1',
-        SIGNUP_FORM_BASE_URL: process.env.SIGNUP_FORM_BASE_URL
+        // SIGNUP_FORM_BASE_URL: process.env.SIGNUP_FORM_BASE_URL
     }
 };
 

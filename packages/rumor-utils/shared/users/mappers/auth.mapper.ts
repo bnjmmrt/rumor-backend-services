@@ -199,16 +199,17 @@ export const toMember = (
   }
 
   const followerCount = formatToUnits(totalFollowerCount) || 'N/A';
+  console.log(user)
 
   return {
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
-    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    gender: user.gender,
     types: focuses.map((focus) => focus.name),
     categories: interests.map((interest) => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
-    status: entityToUserStatus[role.status] ?? entityToUserStatus.UNRECOGNIZED,
+    status: role.status ?? 'unrecognized',
     profilePicture: user.profilePicture,
     email: user.email,
     instagramUsername,
@@ -277,7 +278,7 @@ export const toHost = (user: RawHost): Host => {
     contactName: `${_.startCase(user.user_first_name)} ${_.startCase(user.user_last_name)}`,
     email: user.user_email,
     appliedOn: dayjs(user.user_created_at).format('DD/MM/YYYY'),
-    status: entityToUserStatus[user.user_role_status],
+    status: user.user_role_status,
     referralCode: '',
     hostedEvents,
   };
