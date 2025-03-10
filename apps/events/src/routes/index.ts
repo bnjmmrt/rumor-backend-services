@@ -246,7 +246,7 @@ router.get(
   EventsController.listEventStatus
 ); /**TestStatus: working */
 
-router.get("/events", EventsController.listEvents);
+router.get("/events",AuthMiddleware.fusionAuthRequired, EventsController.listEvents);
 router.get("/feed", EventsController.listEventsFeed);
 router.get("/feed/featured", EventsController.getFeaturedEvents);
 router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents);

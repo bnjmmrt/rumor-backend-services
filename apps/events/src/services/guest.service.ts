@@ -61,6 +61,11 @@ import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-se
 import { v4 as uuidv4 } from 'uuid';
 import { toSimpleUser } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/shared/users/entities';
+import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
+import S3Service from '../utils/aws/s3';
+import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
+import {GuestData, GuestDetails, BulkUserData} from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestService {
   public static dbConnection = database;
@@ -134,7 +139,7 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.data.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
+            if (createGuests.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -165,7 +170,7 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
-            if (updateGuests.data.length > 0) return { message: `Guest updated with status ${guestStatus}`};
+            if (updateGuests.length > 0) return { message: `Guest updated with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -184,7 +189,7 @@ export class GuestService {
             // Call the function to update guests
             const deleteGuests = await this.manageGuestsRemoval(payloadRemoveGuests);
             // Check if guests were successfully created
-            if (deleteGuests.data.length > 0) return { message: `Guest deleted with status ${guestStatus}`};
+            if (deleteGuests) return { message: `Guest deleted with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -207,7 +212,7 @@ export class GuestService {
    * @param payload - Request data containing filters and selection criteria.
    * @returns Array of guest IDs or an error response.
    */
-  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[] | GenericResponse> {
+  private static async getFilteredGuestIds(payload: ManageGuestsRequestDto, token: string): Promise<string[]> {
     const parsedQuery = payload.query ? parse(payload.query) : undefined;
     const eventId = parsedQuery?.eventId as string;
     const { isSelectedAll, inclusiveIds, exclusiveIds, filePath, bulkUploadStatus, currentStatus } = payload;
@@ -242,19 +247,19 @@ export class GuestService {
       };
       const getGuests = await this.getGuests(fetchData);
       // Validate if guest data exists
-      if (!getGuests.data.users || getGuests.data.totalCount === 0) {
+      if (!getGuests.users || getGuests.totalCount === 0) {
         throw new NotFoundError('Guest data not found');
       }
 
       // Extract main guest IDs
-      let guestIds: string[] = getGuests.data.users
+      let guestIds: string[] = getGuests.users
       .filter(
         (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
       )
       .map((guest) => guest.id);
       
       // Extract additional guest IDs (if any)
-      const additionalGuestIds: string[] = getGuests.data.users
+      const additionalGuestIds: string[] = getGuests.users
       .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
       .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
       .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
@@ -303,7 +308,7 @@ export class GuestService {
    * @param {AddGuestsRequestDto} payltoAdditionalGuestDataoad - The request payload containing event, host, and guest details.
    * @returns {Promise<GuestsResponse>} - A response containing the list of added guests or an error message.
    */
-  public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<GuestsResponse> {
+  public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<Guests> {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
     if (!event) throw new NotFoundError('Event not found');
@@ -401,7 +406,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return responses.data({ users: guestsTransform, totalCount: guestsTransform.length });
+    return { users: guestsTransform, totalCount: guestsTransform.length };
   }
 
   /**
@@ -415,9 +420,9 @@ export class GuestService {
    * - Fetches and transforms the updated guest data before returning it.
    *
    * @param {UpdateGuestsRequestDto} payload - The request payload containing guest updates.
-   * @returns {Promise<GuestsDataResponse>} - A response containing updated guest data.
+   * @returns {Promise<GuestDataSimple[]>} - A response containing updated guest data.
    */
-  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestsDataResponse> {
+  public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestDataSimple[]> {
     try {
       let ticketType;
 
@@ -586,7 +591,7 @@ export class GuestService {
       );
 
       // Return transformed guest data
-      return responses.data(guestsTransform);
+      return guestsTransform;
     } catch (err) {
       // Log and return error response in case of failure
       throw new BadRequestError('Error updating guests');
@@ -605,7 +610,7 @@ export class GuestService {
    * @param {GuestsRequestDto} payload - The request payload containing event ID and guest IDs.
    * @returns {Promise<GenericResponse>} - A response indicating the success or failure of the operation.
    */
-  private static async manageGuestsRemoval(payload: GuestsRequestDto): Promise<GenericResponse> {
+  private static async manageGuestsRemoval(payload: GuestsRequestDto): Promise<string> {
     const { eventId, guests } = payload;
 
     // Validate event existence
@@ -619,7 +624,7 @@ export class GuestService {
       // Remove guests who match the provided guest IDs
       await this.dbConnection.getRepository(Guest).delete({ id: In(guests) });
 
-      return responses.data('Guests removed successfully');
+      return 'Guests removed successfully'
     } catch (err) {
       // Log error and return failure response
        throw new BadRequestError('Error handling guests data');
@@ -645,7 +650,7 @@ export class GuestService {
       return responses.ok;
   }
 
-  public static async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public static async getGuests(payload: GuestsQueryRequestDto): Promise<Guests> {
     const { hostId, eventId } = payload;
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
@@ -682,7 +687,7 @@ export class GuestService {
     }
 
     const { error: validationError, response: validation } = validateFilters(payload.query);
-    if (validationError) return responses.badRequest(validation);
+    if (validationError) throw new ValidationError(validation);
     const guestStatus = parsedQuery?.status ? parsedQuery.status.toString().toUpperCase() : undefined;
 
     let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
@@ -805,7 +810,7 @@ export class GuestService {
       }),
     );
     // TO DO: Fix this functionality
-    return responses.data({ users: buildGuests, totalCount });
+    return { users: buildGuests, totalCount };
   }
 
   public static async applyUserFilters(
@@ -1054,7 +1059,7 @@ export class GuestService {
       return responses.ok;
   }
 
-  public static async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
+  public static async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestDataSimple[]> {
       const parsedQuery = parse(payload.query);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -1152,10 +1157,10 @@ export class GuestService {
         filteredGuests = filteredGuests.filter((guest) => guest.category?.some((cat) => categories.includes(cat.toLowerCase())));
       }
 
-      return responses.data(filteredGuests);
+      return filteredGuests;
   }
 
-  public static async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
+  public static async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestDataSimple[]> {
       const parsedQuery = parse(payload.query);
       const pagination = hasPagination(parsedQuery)
         ? {
@@ -1269,10 +1274,10 @@ export class GuestService {
         }),
       );
 
-      return responses.data(guestsTransform);
+      return guestsTransform;
   }
 
-  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GetGuestProfileResponse> {
+  public static async getGuestProfile(payload: UserAndIdRequestDto): Promise<GuestData> {
     const guest = (
       await this.dbConnection.getRepository(Guest).find({
         where: {
@@ -1350,7 +1355,7 @@ export class GuestService {
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
     const val = toGuestData(guest.user, guest, focuses, followsYou, favorite, additionalGuestData);
-    return responses.data(val);
+    return val;
   }
 
   public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<ListUsersEventInviteesResponse> {
@@ -2119,7 +2124,7 @@ export class GuestService {
  * @param payload - Contains guest details such as email, phone number, and event ID.
  * @returns GuestsDataResponse - Response containing the invited guest data or error message.
  */
-  public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestsDataResponse> {
+  public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestDataSimple[]> {
     // Step 1: Check if the event exists
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
     if (!event) throw new NotFoundError('Event not found');
@@ -2190,12 +2195,12 @@ export class GuestService {
           // }
 
           isInvitedGuest.status = status;
-          return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+          return [isInvitedGuest].map((guest) => toGuestDataSimple(guest, []));
         } else {
           if (isInvitedGuest.status === GuestStatus.NO_STATUS || isInvitedGuest.status === GuestStatus.DRAFT) {
             isInvitedGuest.status = GuestStatus.CONFIRMED;
             await this.dbConnection.getRepository(Guest).save(isInvitedGuest);
-            return responses.data([isInvitedGuest].map((guest) => toGuestDataSimple(guest, [])));
+            return [isInvitedGuest].map((guest) => toGuestDataSimple(guest, []));
           }
         }
       }
@@ -2251,7 +2256,7 @@ export class GuestService {
       }
     }
 
-    return responses.data([guest].map((guest) => toGuestDataSimple(guest, [])));
+    return [guest].map((guest) => toGuestDataSimple(guest, []));
   }
 
   /**
@@ -2415,59 +2420,58 @@ export class GuestService {
    * @param payload - Contains event details, file path, and host ID.
    * @returns BulkUploadGuestsResponse - Response containing processed guest details.
    */
-  public static async bulkUploadGuests(payload: BulkUploadGuestsRequestDto): Promise<BulkUploadGuestsResponse> {
+  public static async bulkUploadGuests(payload: BulkUploadGuestsRequestDto): Promise<BulkUserData> {
       // Step 1: Verify event existence and ownership
+      
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.eventId, deletedAt: IsNull() },
         relations: { owner: true },
       });
 
       // If the event does not exist, return a bad request response
-      if (!event) throw new NotFoundError('Event not found');
+      if (!event && !payload.isUploadUser) throw new NotFoundError('Event not found');
 
       // Ensure that the provided hostId is the owner of the event
-      if (event.owner.id !== payload.hostId) throw new BadRequestError('Host is not the owner of the event');
+      if (!payload.isUploadUser && event.owner.id !== payload.hostId) throw new BadRequestError('Host is not the owner of the event');
 
-      // TO DO: ServiceMesh Changes
       // Step 2: Fetch the CSV file from S3 storage
-      // const fileUrl = await serviceMesh.getFileUrl(config.get('API_BASE_URL'), payload.filePath);
+      const fileUrl = await S3Service.getFileUrl(payload.filePath);
 
       // Step 3: Parse the CSV file to extract guest data
-      const validData = [];
-      const garbageData = [];
-      // TO DO: Add this functionality
-      // const { validData, garbageData } = await processCsvFile(fileUrl, true);
+      const { validData, garbageData } = await processCsvFile(fileUrl, payload.isUploadUser ?? false);
 
       // Extract email addresses from valid data
-      const emails = []
-      // TO DO: Add this functionality
-      // validData.map((row) => row.email).filter((email) => email);
+      const emails = validData.map((row) => row.email).filter((email) => email);
+      let phoneNumbers = []
+      if (payload.isUploadUser)
+      phoneNumbers = validData.map((row) => row.phoneNumber).filter((phone) => phone);
 
-      // Step 4: Fetch existing users based on extracted emails
-      const existingUsers = await Promise.all(
-        emails.map(async (email) => {
-          try {
-            const data = (await serviceMesh.userService().getUserWithRolesByEmail(email)).data;
-            return data;
-          } catch (e) { }
-        }),
-      );
-
-      // Create a map of email to user ID for quick lookup
-      const userMap = new Map<string, string>();
-      let updatedValidData;
-      if (existingUsers.length > 0) {
-        existingUsers.forEach((user) => {
-          if (user) userMap.set(user.email, user.id);
+    // Step 4: Fetch existing users based on extracted emails
+    const existingUsers =  await this.dbConnection.getRepository(User).find({
+      where: [
+        { email: In(emails), deletedAt: IsNull() },
+        { phoneNumber: In(phoneNumbers), deletedAt: IsNull() },
+      ],
+    });
+    
+    // Create a map of email to user ID for quick lookup
+    const userMap = new Map<string, string>();
+    const removedEmails = new Set<string>();
+    const newMappings = [];
+    let updatedValidData;
+    if (existingUsers.length > 0) {
+      existingUsers.forEach((user) => {
+        if (user.email) userMap.set(user.email, user.id);
+        if (user.phoneNumber) userMap.set(user.phoneNumber, user.id);
         });
 
         // Step 5: Retrieve guests already associated with the event
+        if(!payload.isUploadUser) {
         const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
           where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
           relations: { user: true, addedBy: true },
         });
 
-        const removedEmails = new Set<string>();
         if (existingGuestList.length > 0) {
           existingGuestList.map((guest) => {
             if (userMap.has(guest.user.email)) {
@@ -2484,31 +2488,50 @@ export class GuestService {
             }
           });
         }
-
-        // Step 6: Remove users from validData who were moved to garbageData
-        updatedValidData = validData.filter((row) => {
-          if (removedEmails.has(row.email)) {
-            return false; // Remove from validData
-          }
-          if (userMap.has(row.email)) {
-            const user = {
-              firstName: row.firstName,
-              lastName: row.lastName,
-              email: row.email,
-              reason: 'User already exists',
-            };
-            garbageData.push(user);
-            userMap.delete(row.email);
-            return false; // Remove from validData
-          }
-          return true; // Keep row in validData
-        });
       }
+
+      const existingMappings = await this.dbConnection.getRepository(HostUserMapping).find({
+        where: {
+          host: { id: payload.hostId },
+          user: In(existingUsers.map((user) => user.id)),
+        },
+        relations: ['user'],
+      });
+      const mappingSet = new Set(existingMappings.map((mapping) => mapping.user.id));
+      // Step 6: Remove users from validData who were moved to garbageData
+      updatedValidData = validData.filter((row) => {
+        if (removedEmails.has(row.email)) {
+          return false; // Remove from validData
+        }
+        existingUsers.forEach((user) => {
+          if (userMap.has(row.email) || userMap.has(row.phoneNumber)) {
+            if (mappingSet.has(user.id)) {
+              const user = {
+                firstName: row.firstName,
+                lastName: row.lastName,
+                email: row.email ? row.email : '',
+                phoneNumbers: row.phoneNumber ? row.phoneNumber : '',
+                reason: 'User already exists',
+              };
+              garbageData.push(user);
+              if (row.email) userMap.delete(row.email);
+              if (row.phoneNumber) userMap.delete(row.phoneNumber);
+              return false; // Remove from validData
+            }
+            newMappings.push({ user, host: { id: payload.hostId } });
+            if (row.email) userMap.delete(row.email);
+            if (row.phoneNumber) userMap.delete(row.phoneNumber);
+            return false; 
+          }
+          return true; // Keep row in validData 
+        });
+      });
+    }
       const users: SimpleUser[] = [];
       if (updatedValidData.length > 0) {
         await Promise.all(
           updatedValidData.map(async (row: User) => {
-            if (row.email && row.firstName && row.lastName) {
+            if (row.email && row.firstName && row.lastName && row.phoneNumber) {
               const user = (await serviceMesh.userService().registerInvitesAsNonMember(
                 {
                   ...row,
@@ -2523,32 +2546,29 @@ export class GuestService {
       }
 
       // Step 7: Generate an error CSV file for invalid or duplicate data
-      // TO DO: Add this functionality
-      // const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
-      const errorCsvContent = null;
+      const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
       let errFileUrl: string | null = null;
       let errFilePath: string | null = null;
       const fileName = `${uuidv4()}.csv`;
 
       if (errorCsvContent) {
         errFilePath = `error_csv/${fileName}`;
-        // TO DO: ServiceMesh Changes
-        // await this.s3Service.uploadFile({
-        //   file: errorCsvContent,
-        //   filename: fileName,
-        //   size: errorCsvContent.length,
-        //   type: 'text/csv',
-        //   contentType: 'text/csv',
-        //   fileKeyId: errFilePath,
-        // });
-        // errFileUrl = await this.s3Service.getFileUrl(errFilePath);
+        await S3Service.uploadFile({
+          file: errorCsvContent,
+          filename: fileName,
+          size: errorCsvContent.length,
+          type: 'text/csv',
+          contentType: 'text/csv',
+          fileKeyId: errFilePath,
+        });
+        errFileUrl = await S3Service.getFileUrl(errFilePath);
       }
 
       // Step 8: Record CSV upload details in the database
       let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
         event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
         host: { id: payload.hostId }, // Reference the User entity correctly
-        uploadType: UploadType.EVENT_UPLOAD,
+        uploadType: payload.isUploadUser ? UploadType.USER_UPLOAD : UploadType.EVENT_UPLOAD,
         originalCsvPath: payload.filePath,
         errorCsvPath: errFilePath || null, // Ensure it's null if no error file
       });
@@ -2557,8 +2577,12 @@ export class GuestService {
       users.map(async (user) => {
         await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
       });
+
+      newMappings.push(...users.map((user) => ({ user, host: { id: payload.hostId } })));
+      await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+
       // Step 9: Return the response with success and failure counts
-      return responses.data({
+      return {
         message: 'Bulk user creation completed.',
         SuccessUserCount: users.length,
         failedUserCount: garbageData.length,
@@ -2567,7 +2591,7 @@ export class GuestService {
         eventId: payload.eventId,
         errFileUrl: errFileUrl,
         errFilepath: errFilePath,
-      });
+      };
   }
 
   /**
@@ -2582,7 +2606,7 @@ export class GuestService {
    * @param payload - The request payload containing pagination and filter options.
    * @returns A paginated response containing filtered users.
    */
-  public static async fetchBulkGuests(payload: FetchBulkGuestsRequestDto): Promise<FetchBulkGuestsResponse> {
+  public static async fetchBulkGuests(payload: FetchBulkGuestsRequestDto): Promise<FetchBulkGuestsData> {
       const parsedQuery = parse(payload.query) as ParsedQs;
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : 10; // Number of users per page
       const page = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : 0; // Page number (starting from 0)
@@ -2613,10 +2637,10 @@ export class GuestService {
       }
       const [allUsers, totalCount] = await usersQuery.getManyAndCount();
 
-      return responses.data({
+      return {
         users: allUsers.map((user) => toSimpleUser(user)),
         totalCount,
-      });
+      };
   }
 
   /**
@@ -2636,7 +2660,7 @@ export class GuestService {
    * @param payload - Data required to invite a new guest.
    * @returns GetUserRequestsResponse - The transformed guest data response.
    */
-  public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GetUserRequestsResponse> {
+  public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GuestDataSimple> {
       // Step 1: Check if the event exists and is not deleted
       const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
       if (!event) throw new NotFoundError('Event not found');
@@ -2748,19 +2772,9 @@ export class GuestService {
 
       const checkGuest = await queryBuilder.getOne();
       const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data
-      const vouches = (await VouchRequestService.getUserVouches({id: guest.user.id}));
-      const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: {
-          user: { id: guest.user.id },
-          event: { id: event.id },
-        },
-        relations: {
-          question: true,
-        },
-      });
-      const guestData = toGuest(checkGuest, focuses, undefined, vouches, answers, undefined);
+      const guestData = toGuestDataSimple(checkGuest, focuses);
 
-      return responses.data(guestData);
+      return guestData;
   }
 
   public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
@@ -2962,13 +2976,9 @@ export class GuestService {
       return responses.ok;
   }
 
-  public static async getGuestDetails(payload: UserAndIdRequestDto): Promise<GuestDetailsResponse> {
+  public static async getGuestDetails(payload: UserAndIdRequestDto): Promise<GuestDetails> {
       if (!payload.id) throw new BadRequestError('Invalid guest ID provided');
       const guestProfileResponse = await this.getGuestProfile(payload);
-      const { error, data: guestProfile } = guestProfileResponse;
-      if (error) {
-        throw new BadRequestError(error.message);
-      }
       const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
         where: { id: payload.id },
         relations: { ticketType: true, user: true, event: true },
@@ -2990,7 +3000,7 @@ export class GuestService {
         },
       });
 
-      return responses.data({
+      return {
         guestDetail: {
           guestId,
           userId: user?.id || null,
@@ -2999,10 +3009,10 @@ export class GuestService {
           privateGuestNote,
           guestStatus,
         },
-        guestProfile,
+        guestProfile: guestProfileResponse,
         quizDataList: { questions: quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [] },
         vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
-      });
+      };
   }
 
   public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {

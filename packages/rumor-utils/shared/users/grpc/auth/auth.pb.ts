@@ -1021,8 +1021,8 @@ export interface BulkUserResponse {
 export interface CsvRecord {
   firstName: string;
   lastName: string;
-  email: string;
-  phoneNumber: string;
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
   reason?: string | undefined;
 }
 
