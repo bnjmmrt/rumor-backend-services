@@ -10,7 +10,7 @@ export class ConnectionManager {
     try {
       if (!this.connection) {
         const appDataSource = new DataSource({
-          type: 'postgres',
+          type: "postgres",
           host: config.get("POSTGRES_HOST"),
           port: config.get("POSTGRES_PORT"),
           username: config.get("POSTGRES_USERNAME"),
@@ -24,7 +24,10 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/events/entities/*.ts",
             "packages/rumor-utils/shared/notifications/entities/*.ts",
           ],
-          ...(["development", "staging", "production", "uat"].includes(config.get('NODE_ENV')) && { ssl: { rejectUnauthorized: false } }),
+          ...(["development", "staging", "production", "uat"].includes(
+            config.get("NODE_ENV")
+          ) && { ssl: { rejectUnauthorized: false } }),
+          synchronize: true,
           logging: false,
           migrationsTableName: "users-migrations",
           migrations: ["src/database/migrations/*.ts"],
