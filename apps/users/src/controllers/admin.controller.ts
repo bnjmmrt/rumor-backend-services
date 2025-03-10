@@ -63,8 +63,8 @@ export class AdminController {
   public static createAdmin = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: AdminSignUpRequestDto = req.body;
-      const response: SignUpResponse = await AuthService.createAdmin(payload);
-      const createResponse = new CreateResponse(response, 'Admin created succesfully');
+      const response:any = await AuthService.createAdmin(payload);
+      const createResponse = new CreateResponse(response?.user, 'Admin created succesfully');
       res.status(createResponse.statusCode).json(createResponse);
     }
   );

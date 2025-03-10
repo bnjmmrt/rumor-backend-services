@@ -107,7 +107,7 @@ export class EventsController {
     const event: EventResponse = await EventsService.createEvent(
       payload
     );
-    const successResponse = new CreateResponse(event);
+    const successResponse = new CreateResponse(event.data);
     res.status(successResponse.statusCode).json(successResponse);
   }
   );
