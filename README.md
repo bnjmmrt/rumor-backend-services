@@ -17,6 +17,3 @@ Steps to start the projects
 
 5. For Users - localhost:8080/users/v1/...
 
-#run in dev mode
-
-docker-compose -f docker-compose-dev.yml up --build
