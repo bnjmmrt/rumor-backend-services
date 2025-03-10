@@ -246,7 +246,7 @@ router.get(
   EventsController.listEventStatus
 ); /**TestStatus: working */
 
-router.get("/events", EventsController.listEvents);
+router.get("/events",AuthMiddleware.fusionAuthRequired, EventsController.listEvents);
 router.get("/feed", EventsController.listEventsFeed);
 router.get("/feed/featured", EventsController.getFeaturedEvents);
 router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents);
@@ -264,6 +264,16 @@ router.get(
   EventsController.getEventByInvitedUserId
 ); /**TestStatus: working */
 
+router.get("/events", AuthMiddleware.fusionAuthRequired, EventsController.listEvents)
+router.get("/feed", EventsController.listEventsFeed)
+router.get("/feed/featured", EventsController.getFeaturedEvents)
+router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents)
+router.put("/event/:id/duplicate", EventsController.duplicateEvent) /*this api is not used as we are using create event api to duplicate event*/
+router.post("/featured-events", EventsController.addEventToFeaturedSection)
+router.get("/public/:eventId", EventsController.getPublicEvent)  /**TestStatus: working */
+router.get("/users/:userId/events/:eventId", EventsController.getEventByInvitedUserId) /**TestStatus: working */
+
+router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
 router.get(
   "/event/:id",
   AuthMiddleware.fusionAuthRequired,

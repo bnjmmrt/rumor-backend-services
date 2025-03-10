@@ -1,7 +1,7 @@
 import { EventData, EventStatus, GuestEventData, GuestStatus as GuesStatusGRPC, CollaboratorsEvent } from '../grpc/events/general.pb';
 import { Event } from '../entities/event.entity';
 import * as dayjs from 'dayjs';
-import { EventStatusEnum, HostsFollowedByGuestInterface } from '../interfaces/event.interface';
+import { EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface } from '../interfaces/event.interface';
 import { Collaborator, Guest } from '../entities';
 import { entityToGuestStatus } from './guest.mapper';
 import { formatDateFromDB } from '../utils/event.utils';
@@ -44,7 +44,7 @@ export const toEvent = (
     rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || '' : '',
     showLocation: event.showLocation || false,
     startDate: formatDateFromDB(event.startDate),
-    status: eventStatus,
+    status: event.status,
     talents: event.talents || [],
     ticketTypes: event.ticketTypes || [],
     useQr: event.useQr || false,
@@ -56,7 +56,7 @@ export const toEvent = (
     isPrivate: event.isPrivate || false,
     capacity: event.capacity || 0,
     guestsCount: guestCount || 0,
-    currentGuestStatus: currentGuestStatus ? entityToGuestStatus[currentGuestStatus] : GuesStatusGRPC.NO_STATUS,
+    currentGuestStatus: currentGuestStatus ? currentGuestStatus : GuestStatus.NO_STATUS,
     guestId: guest?.id,
     userId: guest?.user?.id,
     timeZone: event?.timeZone,

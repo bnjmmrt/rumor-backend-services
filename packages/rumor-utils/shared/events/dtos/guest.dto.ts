@@ -321,6 +321,10 @@ export class BulkUploadGuestsRequestDto implements BulkUploadGuestsRequest {
   @IsString()
   @IsNotEmpty()
   filePath: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isUploadUser?: boolean
 }
 
 export class FetchBulkGuestsRequestDto implements FetchBulkGuestsRequest {

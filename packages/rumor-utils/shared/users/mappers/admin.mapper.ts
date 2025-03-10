@@ -11,8 +11,8 @@ import { UserRole } from '../entities/roles/user-role.entity';
 
 export const toHostProfile = (
   user: User,
-  status: UserStatus,
-  source: UserSource,
+  status: any,
+  source: any,
   isMemberFollowingHost: boolean,
   isMemberBlockedHost: boolean,
   roleId: string,
@@ -67,8 +67,8 @@ export const toHostProfile = (
     phoneNumber: user.phoneNumber,
     eventsPerYear: user?.additionalHostInformation?.eventsPerYear || 0,
     referredBy: user?.additionalHostInformation?.referredBy || '',
-    source: entityToUserSource[status],
-    status: entityToUserStatus[status],
+    source: source,
+    status: status,
     hostSince: dayjs(user.createdAt).format('MM/DD/YYYY HH:mm') || '',
     bio: user?.additionalHostInformation?.bio || '',
     totalAttendees: 0,
@@ -89,7 +89,7 @@ export const toHostProfile = (
   };
 };
 
-export const toBasicHostProfile = (user: User, status: UserStatus, source: UserSource): BasicHostProfile => {
+export const toBasicHostProfile = (user: User, status: any, source: any): BasicHostProfile => {
   return {
     id: user.id,
     firstName: user.firstName,

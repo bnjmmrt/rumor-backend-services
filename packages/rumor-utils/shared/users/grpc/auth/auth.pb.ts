@@ -423,12 +423,12 @@ export interface InviteNewHostRequest {
 export interface Member {
   id: string;
   name: string;
-  gender: Gender;
+  gender: any;
   city: string;
   followerCount: string;
   categories: string[];
   types: string[];
-  status: UserStatus;
+  status: any;
   profilePicture?: string | undefined;
   email: string;
   instagramUsername?: string | undefined;
@@ -457,7 +457,7 @@ export interface Host {
   appliedOn: string;
   referralCode: string;
   hostedEvents: HostedEvent[];
-  status: UserStatus;
+  status: string;
   profilePicture?: string | undefined;
   website?: string | undefined;
   phoneNumber?: string | undefined;
@@ -501,7 +501,7 @@ export interface MemberProfile {
   dateOfBirth: string;
   phoneNumber: string;
   email: string;
-  gender: Gender;
+  gender: any;
   referralCode?: string | undefined;
   socialStats?: SocialMediaStats | undefined;
   referredBy: ReferrerMembers[];
@@ -509,7 +509,7 @@ export interface MemberProfile {
   pastEvents: MemberEvent[];
   invitedEvents: MemberEvent[];
   requestedEvents: MemberEvent[];
-  status: UserStatus;
+  status: any;
   instagramUsername?: string | undefined;
   role?: string | undefined;
   interest?: string | undefined;
@@ -604,8 +604,8 @@ export interface UpdateHostPasswordRequest {
 export interface BasicHostProfile {
   id: string;
   email: string;
-  source: UserSource;
-  status: UserStatus;
+  source: any;
+  status: any;
   hostSince: string;
   firstName: string;
   lastName: string;
@@ -630,8 +630,8 @@ export interface HostProfile {
   phoneNumber: string;
   eventsPerYear: number;
   referredBy?: string | undefined;
-  source: UserSource;
-  status: UserStatus;
+  source: any;
+  status: any;
   hostSince: string;
   bio: string;
   totalAttendees: number;
@@ -1021,8 +1021,8 @@ export interface BulkUserResponse {
 export interface CsvRecord {
   firstName: string;
   lastName: string;
-  email: string;
-  phoneNumber: string;
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
   reason?: string | undefined;
 }
 
