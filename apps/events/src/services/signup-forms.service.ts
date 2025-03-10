@@ -566,9 +566,6 @@ export class SignupFormsServices {
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
-
-      submissionsQuery.orderBy("sfs.id", "DESC").limit(count);
-
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
         submissionsQuery.andWhere(
@@ -581,6 +578,8 @@ export class SignupFormsServices {
           })
         );
       }
+
+      submissionsQuery.orderBy("sfs.id", "DESC").offset(skip).limit(take);
 
       const submissionList = await submissionsQuery.getRawMany();
       const result = { count, result: submissionList };
