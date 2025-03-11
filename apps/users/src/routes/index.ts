@@ -87,6 +87,7 @@ router.post('/auth/get-user-with-roles-by-id ', AuthController.getUserWithRolesB
 router.post('/auth/get-user-with-roles-by-phone', AuthController.getUserWithRolesByPhone);
 router.post('/auth/user/invite-as-non-member', AuthController.registerInvitesAsNonMember);
 router.post('/auth/create-user', AuthMiddleware.fusionAuthRequired, AuthController.createUser);
+// router.post('/auth/bulk-users', AuthMiddleware.fusionAuthRequired, AuthController.bulkUploadUser);
 router.get('/auth/users-list', AuthMiddleware.fusionAuthRequired, AuthController.getAllUsers);
 router.get('/auth/host/:id/filters', AuthMiddleware.fusionAuthRequired, AuthController.getUserFiltersOptions);
 router.post('/auth/host-feedback', AuthMiddleware.fusionAuthRequired, AuthController.hostFeedback);

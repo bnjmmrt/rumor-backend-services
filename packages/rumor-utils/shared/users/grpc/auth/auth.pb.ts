@@ -845,8 +845,8 @@ export interface CustomUsersList {
 }
 
 export interface CustomUsersListsData {
-  count: number;
-  list: CustomUsersList[];
+  totalCount: number;
+  result: CustomUsersList[];
 }
 
 export interface CustomUsersListResponse {
@@ -986,7 +986,7 @@ export interface UsersList {
 }
 
 export interface UsersData {
-  users: UsersList[];
+  result: UsersList[];
   totalCount: number;
 }
 
