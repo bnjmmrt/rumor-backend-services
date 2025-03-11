@@ -24,15 +24,14 @@ import {
 import {
   AddressValidationRequest,
   AddressValidationResponse,
-  EventAgeLimitResponse, EventGuestCountResponse, EventLocationResponse,
+  EventAgeLimitResponse, EventLocationResponse,
   EventLocationsResponse,
   EventResponse,
   EventsResponse,
   EventTypeResponse,
-  EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  EventTypesData, GetFeaturedEventsResponse,
   GuestCountByStatuses,
-  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
-  ToggleGuestCheckStatusResponse
+  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { parse } from 'qs';
@@ -49,7 +48,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
-import { EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData, ToggleGuestCheckStatusData} from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import database from '../database';
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
@@ -2815,7 +2814,7 @@ export class EventsService {
    * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
    * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
    */
-  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusResponse> {
+  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
     try {
       // Step 1: Fetch guest details along with associated event.
       const guest = await this.dbConnection.getRepository(Guest).findOne({
@@ -2876,13 +2875,13 @@ export class EventsService {
       ]);
 
       // Step 6: Return the updated guest details, ticket status, and guest counts.
-      return responses.data({
+      return {
         guestId: guest.id,
         ticketStatus: entityToTicketStatus[updatedTicket?.status ?? TicketStatusEnum.TICKET_GENERATED], // Fetch dynamically.
         checkInStatus: updatedGuest?.checkIn ?? false, // Fetch dynamically.
         totalConfirmedGuests,
         totalCheckedInGuests,
-      });
+      };
     } catch (err) {
       // Log any errors encountered and return an error response.
       // this.logger.error(err);
