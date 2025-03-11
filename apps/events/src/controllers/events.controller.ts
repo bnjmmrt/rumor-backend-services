@@ -1,10 +1,11 @@
 import { EventsService } from '../services/events.service';
 import { Request, Response } from 'express';
 import {
-  AddressValidationResponse, EventLocationResponse,
+  AddressValidationResponse, EventGuestCountResponse, EventLocationResponse,
   EventLocationsResponse,
   EventResponse, EventTypeResponse,
   EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  GuestCountByStatuses,
   ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
   ToggleGuestCheckStatusResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
@@ -420,8 +421,8 @@ export class EventsController {
   );
 
   public static getEventByInvitedUserId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const { userId, id } = req.params
-    const payload: UserAndIdRequestDto = { userId, id }
+    const { userId, eventId } = req.params
+    const payload: UserAndIdRequestDto = { userId, id: eventId }
     const response: EventData = await EventsService.getEventByInvitedUserId(
       payload
     );
@@ -452,5 +453,19 @@ export class EventsController {
     const successResponse = new GetResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   }
+  );
+
+
+  public static GetGuestCountForGuestStatuses = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UserAndIdRequestDto = {
+        userId: id,
+        id: req.params.eventId
+      }
+      const response: GuestCountByStatuses = await EventsService.getGuestCountForGuestStatuses(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
   );
 }
