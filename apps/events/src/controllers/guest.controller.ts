@@ -1,16 +1,10 @@
 import { GuestService } from '../services/guest.service';
 import {
   GenericResponse,
-  GetGuestProfileResponse,
-  GuestsResponse,
-  GuestsDataResponse,
-  ListUsersEventInviteesResponse,
-  UsersAttendeesResponse,
   GetUserRequestsResponse,
   GetAttendeeCountRequest,
-  GetAttendeeCountResponse,
   PaginatedGuestEventsResponse,
-  Attendees
+  Attendees, Guests, FetchBulkGuestsData
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {
   GuestsRequestDto,
@@ -37,9 +31,7 @@ import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
 import { RequestByUserAndEventDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
-import { GuestDataSimple, GuestData, BulkUserData, GuestDetails } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import { UserAttendee } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestDataSimple, GuestData, BulkUserData, GuestDetails, UserAttendee, UserEventInviteesData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestController {
   public static manageGuests = asyncWrapper(
@@ -168,7 +160,7 @@ export class GuestController {
         ...req.body
       }
       const token = (req as any).token;
-      const response: ListUsersEventInviteesResponse = await GuestService.getUsersEventInvitees(payload, token);
+      const response: UserEventInviteesData[] = await GuestService.getUsersEventInvitees(payload, token);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -342,7 +334,7 @@ export class GuestController {
         query: req.query as string,
         ...req.body
       }
-      const response: GuestsResponse = await GuestService.listUserRequests(payload);
+      const response: Guests = await GuestService.listUserRequests(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }

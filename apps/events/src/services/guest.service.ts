@@ -1,10 +1,11 @@
 import {
-  GenericResponse, GetUserRequestsResponse, GuestsDataResponse,
-  GuestsResponse, ListUsersEventInviteesResponse, GetAttendeeCountRequest, PaginatedGuestEventsResponse,
-  Attendees
+  GenericResponse,
+  GetUserRequestsResponse,
+  GetAttendeeCountRequest,
+  PaginatedGuestEventsResponse,
+  Attendees, Guests, FetchBulkGuestsData
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-import { VouchRequestService } from './vouch-request.service';
-
+import {VouchRequestService} from './vouch-request.service';
 import { responses } from '../common/responses';
 import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
@@ -42,7 +43,7 @@ import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils
 import { ProviderType } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { UserQuizAnswer } from 'rumor-utils/shared/events/entities/user-quiz-question-answer.entity';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GuestDataSimple, UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestDataSimple,UserAttendee, UserSource, GuestData, GuestDetails, BulkUserData, UserEventInviteesData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
@@ -53,8 +54,6 @@ import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/s
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
-import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
-import { GuestData, GuestDetails, BulkUserData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestService {
   public static dbConnection = database;
@@ -128,7 +127,7 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
+            if (createGuests.result.length > 0) return {message: `Guest created with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -236,19 +235,19 @@ export class GuestService {
       };
       const getGuests = await this.getGuests(fetchData);
       // Validate if guest data exists
-      if (!getGuests.users || getGuests.totalCount === 0) {
+      if (!getGuests.result || getGuests.totalCount === 0) {
         throw new NotFoundError('Guest data not found');
       }
 
       // Extract main guest IDs
-      let guestIds: string[] = getGuests.users
+      let guestIds: string[] = getGuests.result
       .filter(
         (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
       )
       .map((guest) => guest.id);
       
       // Extract additional guest IDs (if any)
-      const additionalGuestIds: string[] = getGuests.users
+      const additionalGuestIds: string[] = getGuests.result
       .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
       .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
       .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
@@ -395,7 +394,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return { users: guestsTransform, totalCount: guestsTransform.length };
+    return { result: guestsTransform, totalCount: guestsTransform.length };
   }
 
   /**
@@ -799,7 +798,7 @@ export class GuestService {
       }),
     );
     // TO DO: Fix this functionality
-    return { users: buildGuests, totalCount };
+    return { result: buildGuests, totalCount };
   }
 
   public static async applyUserFilters(
@@ -1347,7 +1346,7 @@ export class GuestService {
     return val;
   }
 
-  public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<ListUsersEventInviteesResponse> {
+  public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<UserEventInviteesData[]> {
       const { userId, query: initialQuery } = payload;
       const parsedQuery = parse(initialQuery) as ParsedQs;
       const user = (await serviceMesh.userService(token).getBasicHostProfile(userId)).data;
@@ -1391,11 +1390,9 @@ export class GuestService {
       }
 
       const users = (await serviceMesh.userService().getMembersOrNonMembers(userId, usersQuery)).data;
-      const inviteesDataList = {
-        data: await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus)),
-      };
+      const inviteesDataList =  await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus))
 
-      return responses.data(inviteesDataList);
+      return inviteesDataList;
   }
 
   // Helper function to map users to invitees
@@ -1773,7 +1770,7 @@ export class GuestService {
       });
       eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
       eventResponse.totalCount = totalCount;
-      return eventResponse
+      return { result: eventResponse.data, totalCount: eventResponse.totalCount };
   }
 
   public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<string> {
@@ -2588,7 +2585,7 @@ export class GuestService {
         failedUserCount: garbageData.length,
         hostId: payload.hostId,
         users,
-        eventId: payload.eventId,
+        eventId: payload.eventId ? payload.eventId : '',
         errFileUrl: errFileUrl,
         errFilepath: errFilePath,
       };
@@ -2638,7 +2635,7 @@ export class GuestService {
       const [allUsers, totalCount] = await usersQuery.getManyAndCount();
 
       return {
-        users: allUsers.map((user) => toSimpleUser(user)),
+        result: allUsers.map((user) => toSimpleUser(user)),
         totalCount,
       };
   }
@@ -2777,7 +2774,7 @@ export class GuestService {
       return guestData;
   }
 
-  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<Guests> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -2869,7 +2866,7 @@ export class GuestService {
         return { ...guestData, category: focuses.map((focus) => focus.name) };
       }),
     );
-    return responses.data({ users: buildGuests, totalCount });
+    return { result: buildGuests, totalCount };
   }
 
   public static async getUserRequests(payload: RequestByUserAndEventDto): Promise<GetUserRequestsResponse> {
