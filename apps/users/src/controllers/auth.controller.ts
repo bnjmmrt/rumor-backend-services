@@ -331,7 +331,7 @@ export class AuthController {
 
   public static updateUserProfilePicture = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: UpdateUserProfilePictureRequestDto = req.body;
+      const payload: UpdateUserProfilePictureRequestDto = { id: req.params.id, profilePicture: req.body.profilePicture};
       const response: UserProfilePicture = await AuthService.updateUserProfilePicture(payload);
       const updateResponse = new UpdateResponse(response, 'User profile picture updated');
       res.status(updateResponse.statusCode).json(updateResponse);
