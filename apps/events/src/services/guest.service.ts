@@ -1,27 +1,15 @@
 import {
-  GenericResponse,
-  GetGuestProfileResponse,
-  GetUserRequestsResponse,
-  GuestDetailsResponse,
-  GuestsDataResponse,
-  GuestsResponse,
-  ListEventGuestsResponse,
-  ListUsersEventInviteesResponse,
-  UsersAttendeesResponse,
-  BulkUploadGuestsResponse,
-  FetchBulkGuestsResponse,
-  GetAttendeeCountRequest,
-  GetAttendeeCountResponse,
-  PaginatedGuestEventsResponse,
+  GenericResponse, GetUserRequestsResponse, GuestsDataResponse,
+  GuestsResponse, ListUsersEventInviteesResponse, GetAttendeeCountRequest, PaginatedGuestEventsResponse,
   Attendees
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-import {VouchRequestService} from './vouch-request.service';
+import { VouchRequestService } from './vouch-request.service';
 
 import { responses } from '../common/responses';
 import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { NotFoundError, BadRequestError, ValidationError  } from "rumor-utils/errors";
+import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
 import {
   AddGuestsRequestDto,
   CancelEventInvitationRequestDto,
@@ -47,14 +35,14 @@ import { entityToGuestStatus, toGuestData, guestStatusToEntity, toAdditionalGues
 import { parse, ParsedQs } from 'qs';
 import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
-import {  Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils/event.utils';
 import { ProviderType } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { UserQuizAnswer } from 'rumor-utils/shared/events/entities/user-quiz-question-answer.entity';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GuestDataSimple,UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestDataSimple, UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
@@ -66,7 +54,7 @@ import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-map
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
 import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
-import {GuestData, GuestDetails, BulkUserData} from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestData, GuestDetails, BulkUserData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestService {
   public static dbConnection = database;

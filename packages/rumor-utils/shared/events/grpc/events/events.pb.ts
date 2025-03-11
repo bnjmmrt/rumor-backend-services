@@ -776,7 +776,7 @@ export interface CollaboratorRoles {
 }
 
 export interface PaginatedEventsResponse {
-  eventsResponse: EventData[];
+  result: EventData[];
   totalCount: number;
 }
 
