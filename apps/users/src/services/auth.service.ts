@@ -46,6 +46,7 @@ import {
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
+  AddUserNoteRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -79,6 +80,7 @@ import {
   UserWithRoles,
   BasicHostProfile,
   UserIdWithRolesAndToken,
+  AddUserNote,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -485,23 +487,23 @@ export class AuthService {
         [
           {
             key: 'first_name',
-          value: payload?.firstName || '',
+            value: payload?.firstName || '',
           },
         ],
-      'Host Application Submitted',
+        'Host Application Submitted',
         [payload.email],
-      null,
+        null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
         [
           {
-          key: 'link_to_application',
-          value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
           },
         ],
-      'Super Admin - New Host Application',
-      ['admin@therumor.com'],
-      null,
+        'Super Admin - New Host Application',
+        ['admin@therumor.com'],
+        null,
       );
     } catch (error) { }
 
@@ -2353,7 +2355,7 @@ export class AuthService {
     const users = await Promise.all(
       favoriteUsers.map(async (user) => {
         const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests =  (await PlatformService.getUserInterests({ id: user.id }));;
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));;
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -4489,6 +4491,34 @@ export class AuthService {
         },
       ],
       id: user.id,
+    };
+  }
+
+  public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    if (!user || !host) {
+      throw new NotFoundError('User or Host')
+    }
+    let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+      where: {
+        user: { id: payload.userId },
+        host: { id: payload.id },
+      },
+    });
+    if (!hostUserSettings) {
+      hostUserSettings = new HostUserSettings();
+      hostUserSettings.user = user;
+      hostUserSettings.host = host;
+      hostUserSettings.note = payload.note;
+    } else {
+      hostUserSettings.note = payload.note;
+    }
+    const userHostSettings = await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+
+    return {
+      note: userHostSettings.note,
+      hostUserSettingsId: userHostSettings.id,
     };
   }
 }

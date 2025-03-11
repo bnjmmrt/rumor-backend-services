@@ -114,6 +114,7 @@ router.post('/auth/users/:id/hosts/:hostId/report-and-block', AuthMiddleware.fus
 router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthController.sendSupportEmail);
 router.get('/auth/admin/reports', AuthController.getAllReports);
 router.get('/auth/switch-profile/:id', AuthController.switchProfile);
+router.get('/auth/user/:id/note', AuthController.addUserNote);
 
 //Role routes
 router.get('/auth/roles', RoleController.listRoles);
