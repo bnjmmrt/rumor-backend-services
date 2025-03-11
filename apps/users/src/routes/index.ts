@@ -83,7 +83,7 @@ router.delete('/auth/user/:id/favorite', AuthController.manageFavoriteUser);
 router.get('/auth/hosts/favorites', AuthController.getFavoriteUsers);
 router.post('/auth/get-confirmed-members', AuthController.getConfirmedMembers);
 router.post('/auth/get-user-with-roles-by-email', AuthController.getUserWithRolesByEmail);
-router.post('/auth/get-user-with-roles-by-id ', AuthController.getUserWithRolesById);
+router.post('/auth/get-user-with-roles-by-id', AuthController.getUserWithRolesById);
 router.post('/auth/get-user-with-roles-by-phone', AuthController.getUserWithRolesByPhone);
 router.post('/auth/user/invite-as-non-member', AuthController.registerInvitesAsNonMember);
 router.post('/auth/create-user', AuthMiddleware.fusionAuthRequired, AuthController.createUser);
