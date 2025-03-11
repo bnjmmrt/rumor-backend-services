@@ -1,5 +1,4 @@
-
-import { EventStatusEnum } from '../../interfaces/event.interface';
+import { EventStatusEnum } from "../../interfaces/event.interface";
 
 export const protobufPackage = "events";
 
@@ -692,6 +691,7 @@ export interface SignupFormsResponse {
   ageLimit?: EventAgeLimit;
   timeZone: string;
   eventStatus: EventStatusEnum;
+  eventName: string;
 }
 
 export interface ISignupFormQuestionsRequest {

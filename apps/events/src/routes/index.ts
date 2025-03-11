@@ -424,12 +424,17 @@ router.put(
 router.get("/events/user/:id/vouches", VouchRequestController.getUserVouches); /**TestStatus: working */
 router.get("/events/event/:eventId/request/:requesterId", VouchRequestController.getUserVouchesByEvent);
 
+router.get(
+  "/guest/ticket/:id",
+  EventsController.generateTicketForGuest
+); /**TestStatus: Working; */
+
 //ticket validation QR generation and validation
 router.post(
   "/guest/ticket/validate",
   AuthMiddleware.fusionAuthRequired,
   EventsController.validateTicketForGuest
-);
+); /**TestStatus: Working; */
 router.post(
   "/guest/ticket/:id/validate",
   AuthMiddleware.fusionAuthRequired,

@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
 // Generate a JWT
 function generateToken(payload: any, secret?: string | null, options?: any): string {

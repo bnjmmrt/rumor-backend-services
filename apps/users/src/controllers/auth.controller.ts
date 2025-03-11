@@ -341,6 +341,7 @@ export class AuthController {
   public static updateUserProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: UpdateUserProfileRequestDto = req.body;
+      payload.id = req.params.id;
       const response: UserProfile = await AuthService.updateUserProfile(payload);
       const updateResponse = new UpdateResponse(response, 'User profile updated');
       res.status(updateResponse.statusCode).json(updateResponse);
@@ -350,6 +351,7 @@ export class AuthController {
   public static getBioProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: IdRequestDto = req.body;
+      payload.id = req.params.id;
       const response: AdditionalHostInformation = await AuthService.getBioProfile(payload);
       const successResponse = new GetResponse(response, 'Retrieved bio profile successfully');
       res.status(successResponse.statusCode).json(successResponse);
@@ -368,6 +370,7 @@ export class AuthController {
   public static updateBioProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: BioProfileRequestDto = req.body;
+      payload.userId = req.params.id;
       const response: AdditionalHostInformation = await AuthService.updateBioProfile(payload);
       const updateResponse = new UpdateResponse(response, 'Updated bio profile');
       res.status(updateResponse.statusCode).json(updateResponse);

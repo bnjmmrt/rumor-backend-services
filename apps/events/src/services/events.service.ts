@@ -2324,7 +2324,7 @@ export class EventsService {
     return;
   }
 
-  public static async generateTicketForGuest(payload: RequestByIdDto): Promise<GenerateTicketForGuestResponse> {
+  public static async generateTicketForGuest(payload: RequestByIdDto): Promise<GenerateTicketForGuestData> {
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id, status: GuestStatus.CONFIRMED },
       relations: { event: true, user: true, ticketType: true },
@@ -2351,23 +2351,24 @@ export class EventsService {
         eventId: guest.event.id,
         ticket: hasTicket.id,
       };
+      const secret = config.get('JWT_SECRET');
 
-      const token = generateToken(tokenPayload)//this.jwtService.sign(tokenPayload);
+      const token = generateToken(tokenPayload, secret)//this.jwtService.sign(tokenPayload);
 
-      return responses.data({
+      return {
         guestId: guest.id,
         ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
-      });
+      }
     }
 
-    return responses.data({
+    return {
       guestId: guest.id,
       ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
-      b64QRCode: 'N/A',
+      jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
-    });
+    }
   }
 
   /**
@@ -2384,7 +2385,8 @@ export class EventsService {
    */
   public static async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<GenerateTicketForGuestData> {
     // Step 1: Decode and verify the ticket token
-    const decodedToken = await verifyToken(payload.ticketToken);
+    const secret = config.get('JWT_SECRET');
+    const decodedToken = await verifyToken(payload.ticketToken, secret);
 
     // If token is invalid, return an error response
     if (!decodedToken) {
@@ -2958,39 +2960,39 @@ export class EventsService {
   // }
 
   public static async getGuestCountForGuestStatuses(payload: UserAndIdRequestDto): Promise<GuestCountByStatuses> {
-      const { id: eventId, userId } = payload;
-      const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: eventId, owner: { id: userId } },
-      });
-      if (!event) throw new NotFoundError('Event not found');
-      const guestCounts = await this.dbConnection.getRepository(Event)
-        .createQueryBuilder('guest')
-        .select([
-          `COUNT(CASE WHEN guest.status = :invited THEN 1 END) AS invitedCount`,
-          `COUNT(CASE WHEN guest.status = :requested THEN 1 END) AS requestedCount`,
-          `COUNT(CASE WHEN guest.status = :confirmed THEN 1 END) AS confirmedCount`,
-          `COUNT(CASE WHEN guest.status = :declined OR guest.status = :refused THEN 1 END) AS declinedCount`,
-          `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
-          `COUNT(guest.id) AS totalCount`,
-        ])
-        .where('guest.event_id = :eventId', {
-          eventId,
-          invited: GuestStatus.INVITED,
-          requested: GuestStatus.APPLIED,
-          confirmed: GuestStatus.CONFIRMED,
-          declined: GuestStatus.DECLINED,
-          refused: GuestStatus.REFUSED,
-          draft: GuestStatus.DRAFT,
-        })
-        .getRawOne();
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection.getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `COUNT(CASE WHEN guest.status = :invited THEN 1 END) AS invitedCount`,
+        `COUNT(CASE WHEN guest.status = :requested THEN 1 END) AS requestedCount`,
+        `COUNT(CASE WHEN guest.status = :confirmed THEN 1 END) AS confirmedCount`,
+        `COUNT(CASE WHEN guest.status = :declined OR guest.status = :refused THEN 1 END) AS declinedCount`,
+        `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
+        `COUNT(guest.id) AS totalCount`,
+      ])
+      .where('guest.event_id = :eventId', {
+        eventId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
 
-      return {
-        invitedCount: parseInt(guestCounts.invitedcount) || 0,
-        confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
-        requestedCount: parseInt(guestCounts.requestedcount) || 0,
-        declinedCount: parseInt(guestCounts.declinedcount) || 0,
-        draftedCount: parseInt(guestCounts.draftedcount) || 0,
-        totalCount: parseInt(guestCounts.totalcount) || 0,
-      }
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
+    }
   }
 }

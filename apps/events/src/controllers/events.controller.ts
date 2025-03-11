@@ -359,7 +359,7 @@ export class EventsController {
   public static generateTicketForGuest = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const payload: RequestByIdDto = { id }
-    const ticketResponse: GenerateTicketForGuestResponse = await EventsService.generateTicketForGuest(
+    const ticketResponse: GenerateTicketForGuestData = await EventsService.generateTicketForGuest(
       payload
     );
     const successResponse = new CreateResponse(ticketResponse);

@@ -25,7 +25,7 @@ import {
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource, In, QueryRunner } from "typeorm";
+import { Brackets, DataSource, QueryRunner } from "typeorm";
 import { isUUID } from "class-validator";
 import {
   EventStatusEnum,
@@ -164,9 +164,6 @@ export class SignupFormsServices {
       if (!event) {
         throw new NotFoundError("Event");
       }
-      if (!event.isPublished) {
-        throw new ForbiddenError("This event is not published.");
-      }
       if (event.isPrivate) {
         throw new ForbiddenError(
           "You cannot create signup forms for private events."
@@ -232,14 +229,20 @@ export class SignupFormsServices {
       throw new ForbiddenError("Signup Forms does not exists.");
     }
 
-    const oldQuestionids = [];
-    body.questions.forEach((q) => q.id && oldQuestionids.push(q.id));
+    const oldQuestionIds: string[] = [];
+    body.questions.forEach((q) => q.id && oldQuestionIds.push(q.id));
+    // const oldQuestions: FindOperator<string> = In(oldQuestionIds);
+    // const questonList = await SignupFormQuestions.find({
+    //   where: { id: oldQuestions },
+    // });
 
-    const questonList = await SignupFormQuestions.find({
-      where: { id: In(oldQuestionids) },
-    });
+    const existingQuestions = await SignupFormQuestions.getRepository()
+      .createQueryBuilder()
+      .where("id IN (:...ids)", { ids: oldQuestionIds })
+      .getMany();
+
     const questionsMap = new Map<string, boolean>();
-    questonList.forEach((q) => questionsMap.set(q.id.toString(), q.isDefault));
+    existingQuestions.forEach((q) => questionsMap.set(q.id.toString(), q.isDefault));
 
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
