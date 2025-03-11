@@ -3,6 +3,7 @@ require('dotenv').config();
 import config from './config'
 import server from './server';
 import connectionManager from './database';
+import { Seeders } from "./seeders";
 
 const start = async () => {
     console.info('[APP] - Starting application...');
@@ -12,7 +13,9 @@ const start = async () => {
         if (config.get('runMigrations')) {
             await connectionManager.runMigrations();
         }
-
+        // await Seeders.seedEventTypes()
+        // await Seeders.seedEventAgeLimits()
+        await Seeders.seedDefaultRoleSettings()
         if (config.get('runSeeds')) {
             await connectionManager.runSeeders();
         }
