@@ -2,7 +2,7 @@ import { SuccessResponse } from "./base.success.response";
 
 export class DeleteResponse<T> implements SuccessResponse<T> {
   success: boolean = true;
-  statusCode: number = 204;
+  statusCode: number = 202;
   message?: string;
   data?: T;
 
