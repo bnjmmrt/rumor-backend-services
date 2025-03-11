@@ -698,7 +698,6 @@ export class AuthController {
   );
 
 
-  //TO DO FROM here
   public static getUserProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const { id } = req.params;

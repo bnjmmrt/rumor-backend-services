@@ -46,6 +46,7 @@ import {
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
+  BulkCreateUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -104,6 +105,9 @@ import {
   UserDataSimple,
   UserWithRoles,
   BasicHostProfile,
+  BulkCreateUsersResponse,
+  BulkUserResponse,
+  CsvRecord,
   UserIdWithRolesAndToken,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
@@ -134,10 +138,11 @@ import {
   toUser,
   toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
+import * as fs from 'fs';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import { NewUserStatus  } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ProviderAuth, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
@@ -202,6 +207,9 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
+import { generateUniqueFileName } from 'rumor-utils/files_migrated_service_utils/src/commons/helpers';
+import S3Service from '../utils/aws/s3';
+import { count } from 'console';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -424,28 +432,30 @@ export class AuthService {
     });
     await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
 
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'applicants_name',
-          value: `${newUser.firstName} ${newUser.lastName}`,
-        },
-      ],
-      'Application Submitted',
-      [newUser.email], // Send email to the member
-      null,
-    );
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'link_to_application',
-          value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${newUser.id}/new-applicant`,
-        },
-      ],
-      'Super Admin - New Member Application',
-      ['admin@therumor.com'],
-      null,
-    );
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'applicants_name',
+            value: `${newUser.firstName} ${newUser.lastName}`,
+          },
+        ],
+        'Application Submitted',
+        [newUser.email], // Send email to the member
+        null,
+      );
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${newUser.id}/new-applicant`,
+          },
+        ],
+        'Super Admin - New Member Application',
+        ['admin@therumor.com'],
+        null,
+      );
+    } catch (error) { }
 
     const savedUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: newUser.id },
@@ -453,7 +463,7 @@ export class AuthService {
     });
 
     if (!savedUser) {
-       throw new BadRequestError('Error retrieving user after sign-up.');
+      throw new BadRequestError('Error retrieving user after sign-up.');
     }
 
     return {
@@ -505,28 +515,30 @@ export class AuthService {
 
     // Micro-service call
 
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'first_name',
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'first_name',
           value: payload?.firstName || '',
-        },
-      ],  
+          },
+        ],
       'Host Application Submitted',
-      [payload.email],
+        [payload.email],
       null,
-    );
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
+      );
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
           key: 'link_to_application',
           value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
-        },
-      ],
+          },
+        ],
       'Super Admin - New Host Application',
       ['admin@therumor.com'],
       null,
-    );
+      );
+    } catch (error) { }
 
     return '';
   }
@@ -542,13 +554,13 @@ export class AuthService {
   }
 
   public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<Validity> {
-      const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
-      if (!temporaryPasswordToken) return { isValid: false }
-      const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
-      const currentTime = dayjs.utc(new Date()).tz('America/New_York');
-      const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
-      return  { isValid }
-   
+    const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
+    if (!temporaryPasswordToken) return { isValid: false }
+    const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
+    const currentTime = dayjs.utc(new Date()).tz('America/New_York');
+    const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
+    return { isValid }
+
   }
 
   public static async checkService() {
@@ -669,24 +681,26 @@ export class AuthService {
 
     // Micro-service call
 
-    const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'user_name',
-          value: user?.firstName,
-        },
-        {
-          key: 'reset_url',
-          value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
-        },
-      ],
-      'Reset Password',
-      [payload.email],
-      null,
-    );
-    if (!mailServiceResponse) {
-      throw new BadRequestError('Unable to send mail, please try again later.')
-    }
+    try {
+      const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'user_name',
+            value: user?.firstName,
+          },
+          {
+            key: 'reset_url',
+            value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+          },
+        ],
+        'Reset Password',
+        [payload.email],
+        null,
+      );
+      if (!mailServiceResponse) {
+        throw new BadRequestError('Unable to send mail, please try again later.')
+      }
+    } catch (error) { }
     return '';
 
   }
@@ -737,7 +751,9 @@ export class AuthService {
     if (user) return { isValid: false };
 
     //Micro-service call
-    await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+    try {
+      await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+    } catch (error) { }
     return { isValid: true };
   }
 
@@ -780,10 +796,12 @@ export class AuthService {
     const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
 
     // Micro-service call
-    const success = await serviceMesh.notificationService().sendInvitationMessages(successfulInvitations, user.firstName);      
-    if (!success) {
-      throw new BadRequestError('An error occured while sending invitations, please try again.')
-    }
+    try {
+      const success = await serviceMesh.notificationService().sendInvitationMessages(successfulInvitations, user.firstName);
+      if (!success) {
+        throw new BadRequestError('An error occured while sending invitations, please try again.')
+      }
+    } catch (error) { }
 
     return '';
 
@@ -847,10 +865,12 @@ export class AuthService {
         (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
 
       //Micro-service call
-      const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-      if (!success) {
-        throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
-      }
+      try {
+        const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        if (!success) {
+          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        }
+      } catch (error) { }
     }
 
     if (payload.email) {
@@ -869,10 +889,12 @@ export class AuthService {
       }
 
       //Micro-service call
-      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
-      if (!success) {
-        throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
-      }
+      try {
+        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
+        if (!success) {
+          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        }
+      } catch (error) { }
     }
 
     return '';
@@ -918,10 +940,12 @@ export class AuthService {
     ];
 
     // Micro-service call
-    const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
-    if (!success) {
-      throw new BadRequestError('An error occured while sending Email invitation, please try again.')
-    }
+    try {
+      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
+      if (!success) {
+        throw new BadRequestError('An error occured while sending Email invitation, please try again.')
+      }
+    } catch (error) { }
 
     return '';
 
@@ -1007,11 +1031,13 @@ export class AuthService {
 
     // Micro-service call
     if (!user) {
-      if (isEmailLogin) {
-        await this.sendVerificationCodeByEmail({ email: payload.email });
-      } else {
-        await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
-      }
+      try {
+        if (isEmailLogin) {
+          await this.sendVerificationCodeByEmail({ email: payload.email });
+        } else {
+          await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+        }
+      } catch (error) { }
       return { isValid: false };
     }
 
@@ -1040,11 +1066,13 @@ export class AuthService {
       });
 
       if (guest) {
-        if (isEmailLogin) {
-          await this.sendVerificationCodeByEmail({ email: payload.email });
-        } else {
-          serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
-        }
+        try {
+          if (isEmailLogin) {
+            await this.sendVerificationCodeByEmail({ email: payload.email });
+          } else {
+            serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+          }
+        } catch (error) { }
         return { isValid: true, isGuest: true };
       }
     }
@@ -1057,28 +1085,30 @@ export class AuthService {
     temporaryLoginCode.code = code.response.code;
     await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
 
-    if (isEmailLogin) {
-      //TODO: change and proper format
+    try {
+      if (isEmailLogin) {
+        //TODO: change and proper format
 
-      // Micro-service call
-      await serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          {
-            key: 'first_name',
-            value: code.response.code,
-          },
-        ],
-        'Host Application Submitted',
-        [payload.email],
-        null,
-      );
-    } else {
-      // Send verification text for phone login unless bypass conditions are met
-      if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
-        const message = 'Your Rumor verification code: ' + code.response.code;
-        serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        // Micro-service call
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'first_name',
+              value: code.response.code,
+            },
+          ],
+          'Host Application Submitted',
+          [payload.email],
+          null,
+        );
+      } else {
+        // Send verification text for phone login unless bypass conditions are met
+        if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
+          const message = 'Your Rumor verification code: ' + code.response.code;
+          serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        }
       }
-    }
+    } catch (error) { }
 
     return { isValid: true };
   }
@@ -1103,24 +1133,26 @@ export class AuthService {
 
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
-      // const verificationResult = isEmailLogin
-      // Micro-servc
-      // ? await this.verifyCodeByEmail({email: payload.email,verificationCode: payload.code})
-      // : serviceMesh.notificationService().verifyPhoneNumber(payload.phoneNumber, payload.code);
+      try {
+        const verificationResult = isEmailLogin
+          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-      // const isVerified =
-          // ('data' in verificationResult && verificationResult.data?.verified === true) || ('verified' in verificationResult && verificationResult.verified === true);
+        const isVerified: boolean =
+          ('verified' in verificationResult && verificationResult.verified === true) ||
+          ('data' in verificationResult && verificationResult.data?.verified === true);
 
-      // if (!isVerified) {
-      //   throw new NotFoundError('Invalid or expired verification code, please try again.');
-      // }
+        if (!isVerified) {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      } catch (error) { }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
         where: { phoneNumber: payload.phoneNumber, email: payload.email },
       });
-      const isSignUpCompleted = false //invitation?.signUpComplete || false;
-      const isInvited = false //!!invitation;
+      const isSignUpCompleted = invitation?.signUpComplete || false;
+      const isInvited = !!invitation;
 
       const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
@@ -1132,6 +1164,8 @@ export class AuthService {
             roleId: role[0].id,
           },
         ],
+        isSignUpCompleted,
+        isInvited,
         id: user.id,
         user: user,
         isGuest: true,
@@ -1139,16 +1173,20 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-      // const verificationResult = isEmailLogin
-      //   ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-      //   : serviceMesh.notificationService().verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
+      try {
+        const verificationResult = isEmailLogin
+          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-      // const isVerified =
-      //   ('data' in verificationResult && verificationResult.data?.verified === true) || ('verified' in verificationResult && verificationResult.verified === true);
 
-      // if (!isVerified) {
-      //   return responses.notFound('Invalid or expired verification code, please try again.');
-      // }
+        const isVerified: boolean =
+          ('verified' in verificationResult && verificationResult.verified === true) ||
+          ('data' in verificationResult && verificationResult.data?.verified === true);
+
+        if (!isVerified) {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      } catch (error) { }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1251,20 +1289,20 @@ export class AuthService {
       loginId: user.email,
       password: payload.password,
     };
-      const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
-      const additionalHostInformation = user.additionalHostInformation;
-      const data = {
-        token: authenticatedUser.response.token,
-        roles: user.roles.map((item) => {
-          return { roleName: item.role.name, roleId: item.role.id };
-        }),
-        hostDetails: {
-          companyLogo: additionalHostInformation?.companyLogo || '',
-          companyName: additionalHostInformation?.companyName || '',
-          id: user.id,
-        },
-      }
-      return  data;
+    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    const additionalHostInformation = user.additionalHostInformation;
+    const data = {
+      token: authenticatedUser.response.token,
+      roles: user.roles.map((item) => {
+        return { roleName: item.role.name, roleId: item.role.id };
+      }),
+      hostDetails: {
+        companyLogo: additionalHostInformation?.companyLogo || '',
+        companyName: additionalHostInformation?.companyName || '',
+        id: user.id,
+      },
+    }
+    return data;
   }
 
   public static async getCurrentMember(payload: IdRequestDto): Promise<CurrentMember> {
@@ -1284,7 +1322,7 @@ export class AuthService {
     }
 
     // Mirco-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -1332,7 +1370,7 @@ export class AuthService {
     }
 
     //Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
     return (user.roles.map((role) => toCurrentUser(user, focuses, role)));
   }
 
@@ -1622,17 +1660,19 @@ export class AuthService {
     nonMemberUserRole.status = UserStatus.ACTIVE;
     await this.dbConnection.getRepository(UserRole).save(nonMemberUserRole);
 
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'link_to_application',
-          value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
-        },
-      ],
-      'Member Approved into Rumor',
-      [user.email],
-      null,
-    );
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+          },
+        ],
+        'Member Approved into Rumor',
+        [user.email],
+        null,
+      );
+    } catch (error) { }
 
     return responses.ok;
   }
@@ -1706,22 +1746,24 @@ export class AuthService {
       await this.dbConnection.getRepository(UserRole).save(update.userRole);
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
-      if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
-        const user = users.find((u) => u.id === update.userRole.user.id);
-        if (user) {
-          await serviceMesh.notificationService().sendEmailFromTemplate(
-            [
-              {
-                key: 'link_to_application',
-                value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
-              },
-            ],
-            'Member Approved into Rumor',
-            [user.email], // Send email to the approved member
-            null,
-          );
+      try {
+        if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
+          const user = users.find((u) => u.id === update.userRole.user.id);
+          if (user) {
+            await serviceMesh.notificationService().sendEmailFromTemplate(
+              [
+                {
+                  key: 'link_to_application',
+                  value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+                },
+              ],
+              'Member Approved into Rumor',
+              [user.email], // Send email to the approved member
+              null,
+            );
+          }
         }
-      }
+      } catch (error) { }
     }
 
     return { failedUsers, usersToUpdate };;
@@ -1974,7 +2016,7 @@ export class AuthService {
     });
 
     if (!user) {
-      return { count: 0, list: [] };
+      return { totalCount: 0, result: [] };
     }
 
     const allLists = [
@@ -1989,8 +2031,8 @@ export class AuthService {
     ];
 
     return {
-      count: allLists.length,
-      list: allLists.slice(skip, take ? skip + take : undefined),
+      totalCount: allLists.length,
+      result: allLists.slice(skip, take ? skip + take : undefined),
     };
   }
 
@@ -2085,7 +2127,7 @@ export class AuthService {
 
     const users = await Promise.all(
       paginatedUsers.map(async (user) => {
-        const focuses =  (await PlatformService.getUserFocuses({ id: user.id }));
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
         const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -2345,8 +2387,8 @@ export class AuthService {
     const [favoriteUsers, totalCount] = await queryBuilder.getManyAndCount();
     const users = await Promise.all(
       favoriteUsers.map(async (user) => {
-        const focuses = [];
-        const interests = [];
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests =  (await PlatformService.getUserInterests({ id: user.id }));;
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2365,7 +2407,7 @@ export class AuthService {
         });
       }),
     );
-    return { users, totalCount };
+    return { result: users, totalCount };
   }
 
   public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
@@ -2626,32 +2668,34 @@ export class AuthService {
       },
     });
 
-    const isAdmin = admin?.roles?.some((role) => role?.role?.name === 'admin');
-    if (isAdmin) {
-      await serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          {
-            key: 'code',
-            value: verificationCode,
-          },
-        ],
-        'Super Admin - Verify Email',
-        [payload.email],
-        null,
-      );
-    } else {
-      await serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          {
-            key: 'code',
-            value: verificationCode,
-          },
-        ],
-        'Non-Member Verify Email',
-        [payload.email],
-        null,
-      );
-    }
+    try {
+      const isAdmin = admin?.roles?.some((role) => role?.role?.name === 'admin');
+      if (isAdmin) {
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'code',
+              value: verificationCode,
+            },
+          ],
+          'Super Admin - Verify Email',
+          [payload.email],
+          null,
+        );
+      } else {
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'code',
+              value: verificationCode,
+            },
+          ],
+          'Non-Member Verify Email',
+          [payload.email],
+          null,
+        );
+      }
+    } catch (error) { }
 
     // Save the verification code and email into the TemporaryLoginCode entity
     const temporaryLoginCode = new TemporaryLoginCode();
@@ -2935,7 +2979,7 @@ export class AuthService {
         return userData;
       }),
     );
-    return { users, totalCount };
+    return { result: users, totalCount };
   }
 
   // ADMIN Sevice Code
@@ -3149,6 +3193,7 @@ export class AuthService {
     }
 
     return {
+      id: user.id,
       token: loginResponse.response.token,
       roles: user.roles.map((item) => {
         return { roleName: item.role.name, roleId: item.role.id };
@@ -3157,85 +3202,85 @@ export class AuthService {
   }
 
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
-      let nonMember: UserRole | null;
-      try {
-        const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
-        if (response.statusCode == 200 && response?.response?.user) {
-          throw new ConflictError('The user with provided email already exists.')
-        }
-      } catch (e) {
-        if (e.statusCode != 404) {
-          throw new ConflictError('Than error happens when trying register an user.')
-        }
+    let nonMember: UserRole | null;
+    try {
+      const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+      if (response.statusCode == 200 && response?.response?.user) {
+        throw new ConflictError('The user with provided email already exists.')
       }
+    } catch (e) {
+      if (e.statusCode != 404) {
+        throw new ConflictError('Than error happens when trying register an user.')
+      }
+    }
 
-      let user = await this.dbConnection.getRepository(User).findOne({
-        where: { email: payload.email, deletedAt: IsNull() },
-        relations: {
-          roles: { role: true },
-        },
+    let user = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: IsNull() },
+      relations: {
+        roles: { role: true },
+      },
+    });
+    if (user) {
+      nonMember = user.roles.find((item) => {
+        if (item.role.name == 'non_member') return item;
       });
-      if (user) {
-        nonMember = user.roles.find((item) => {
-          if (item.role.name == 'non_member') return item;
-        });
 
-        if (!nonMember) {
-          if (user.phoneNumber === payload.phoneNumber) {
-            throw new BadRequestError('Phone number is already in use')
-          }
-
-          if (user.email === payload.email) {
-            throw new BadRequestError('Email is already in use')
-          }
-        }
-      } else {
-        const newUser = new User();
-
-        if (nonMember) {
-          newUser.id = user.id;
-          await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
+      if (!nonMember) {
+        if (user.phoneNumber === payload.phoneNumber) {
+          throw new BadRequestError('Phone number is already in use')
         }
 
-        newUser.email = payload.email;
-        newUser.firstName = payload.firstName;
-        newUser.lastName = payload.lastName;
-        newUser.dateOfBirth = payload.dateOfBirth;
-        newUser.phoneNumber = payload.phoneNumber;
-        user = this.dbConnection.getRepository(User).create(newUser);
+        if (user.email === payload.email) {
+          throw new BadRequestError('Email is already in use')
+        }
+      }
+    } else {
+      const newUser = new User();
+
+      if (nonMember) {
+        newUser.id = user.id;
+        await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
       }
 
-      const registrationRequest: RegistrationRequest = {
-        registration: {
-          applicationId: config.get('FUSIONAUTH_APP_ID'),
-          username: payload.email.split('@')[0],
-        },
-        sendSetPasswordEmail: false,
-        user: {
-          id: user.id,
-          username: payload.email.split('@')[0],
-          // birthDate: payload.dateOfBirth,
-          email: payload.email,
-          firstName: payload.firstName,
-          lastName: payload.lastName,
-          mobilePhone: payload.phoneNumber,
-          password: payload.password,
-          verified: true,
-          active: true,
-        },
-      };
+      newUser.email = payload.email;
+      newUser.firstName = payload.firstName;
+      newUser.lastName = payload.lastName;
+      newUser.dateOfBirth = payload.dateOfBirth;
+      newUser.phoneNumber = payload.phoneNumber;
+      user = this.dbConnection.getRepository(User).create(newUser);
+    }
 
-      const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-      if (newUser.statusCode !== 200) {
-        throw new ConflictError('There wass an issue creating an admin')
-      }
+    const registrationRequest: RegistrationRequest = {
+      registration: {
+        applicationId: config.get('FUSIONAUTH_APP_ID'),
+        username: payload.email.split('@')[0],
+      },
+      sendSetPasswordEmail: false,
+      user: {
+        id: user.id,
+        username: payload.email.split('@')[0],
+        // birthDate: payload.dateOfBirth,
+        email: payload.email,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        mobilePhone: payload.phoneNumber,
+        password: payload.password,
+        verified: true,
+        active: true,
+      },
+    };
 
-      user.id = newUser.response?.user?.id;
-      await this.dbConnection.getRepository(User).save(user);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
-      return {
-        user
-      }
+    const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    if (newUser.statusCode !== 200) {
+      throw new ConflictError('There wass an issue creating an admin')
+    }
+
+    user.id = newUser.response?.user?.id;
+    await this.dbConnection.getRepository(User).save(user);
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
+    return {
+      user
+    }
   }
 
   public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
@@ -3403,7 +3448,7 @@ export class AuthService {
 
   public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
     const users = await this.dbConnection.getRepository(User).find({
-      where: { id: In(payload.ids) }, 
+      where: { id: In(payload.ids) },
       relations: ['roles', 'roles.role'],
     });
 
@@ -3476,8 +3521,9 @@ export class AuthService {
     await this.dbConnection.getRepository(UserRole).save(hostRoles);
 
     // Send all emails in parallel
-    await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
-
+    try {
+      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
+    } catch (error) { }
     // if (skippedUsers.length > 0) {
     //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
     // }
@@ -3492,31 +3538,31 @@ export class AuthService {
   }
 
   public static async approveHost(user: User): Promise<void> {
-      const password = generateRandomPassword(12);
-      const temporaryPassword = new TemporaryPassword();
-      temporaryPassword.password = password;
-      user.temporaryPassword = temporaryPassword;
-      user = await this.dbConnection.getRepository(User).save(user);
+    const password = generateRandomPassword(12);
+    const temporaryPassword = new TemporaryPassword();
+    temporaryPassword.password = password;
+    user.temporaryPassword = temporaryPassword;
+    user = await this.dbConnection.getRepository(User).save(user);
 
-      const registrationRequest: RegistrationRequest = {
-        registration: {
-          applicationId: config.get('FUSIONAUTH_APP_ID'),
-          username: user.email.split('@')[0],
-        },
-        sendSetPasswordEmail: false,
-        user: {
-          id: user.id,
-          username: user.email.split('@')[0],
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          mobilePhone: user.phoneNumber,
-          password,
-          verified: true,
-          active: true,
-        },
-      };
-      await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    const registrationRequest: RegistrationRequest = {
+      registration: {
+        applicationId: config.get('FUSIONAUTH_APP_ID'),
+        username: user.email.split('@')[0],
+      },
+      sendSetPasswordEmail: false,
+      user: {
+        id: user.id,
+        username: user.email.split('@')[0],
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobilePhone: user.phoneNumber,
+        password,
+        verified: true,
+        active: true,
+      },
+    };
+    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
 
   }
 
@@ -3575,7 +3621,7 @@ export class AuthService {
     };
 
     // Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({id: user.id}));
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -3697,7 +3743,7 @@ export class AuthService {
       'declinedBy',
       'vouch',
     ];
-    const focuses = [];
+    const focuses = (await PlatformService.getUserFocuses({ id: userId }));
 
     const categoryObj = {
       id: 'category',
@@ -3758,7 +3804,7 @@ export class AuthService {
       options: [],
       type: FilterTypeValues.age,
     };
-    const interests = [];
+    const interests = (await PlatformService.getUserInterests({ id: userId }));
     const mappedInterests = interests?.map((interest) => ({
       name: interest.name,
       id: interest.id,
@@ -3799,7 +3845,7 @@ export class AuthService {
       options: mappedEvents,
       type: FilterTypeValues.pastEvents,
     };
-    
+
     const ticketTypes = []
     // const ticketTypes = await serviceMesh.eventService().getTicketTypes({ id: eventId });
     const mappedticketTypes = ticketTypes?.map((ticketType) => ({
@@ -4155,8 +4201,8 @@ export class AuthService {
 
     const users = await Promise.all(
       followedUsers.map(async (user) => {
-        const focuses = [];
-        const interests = [];
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -4175,7 +4221,7 @@ export class AuthService {
         });
       }),
     );
-    return { users, totalCount };
+    return { result: users, totalCount };
 
   }
 
@@ -4275,7 +4321,7 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(Block).save(block);
-    
+
     const data = {
       reportId: '',
       blockId: block.id,
@@ -4370,17 +4416,19 @@ export class AuthService {
   public static async sendSupportEmail(payload: sendSupportEmailRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
     // TO DO: Change email and sms template
-    await serviceMesh.notificationService().sendEmailFromTemplate(
-      [
-        {
-          key: 'first_name',
-          value: payload.message,
-        },
-      ],
-      'Host Application Submitted',
-      [user.email],
-      null,
-    );
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'first_name',
+            value: payload.message,
+          },
+        ],
+        'Host Application Submitted',
+        [user.email],
+        null,
+      );
+    } catch (error) { }
 
     return '';
 

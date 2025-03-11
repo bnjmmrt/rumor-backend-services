@@ -1,26 +1,12 @@
 import { EventsService } from '../services/events.service';
-import { Request, Response } from 'express'
+import { Request, Response } from 'express';
 import {
-  AddressValidationResponse,
-  EventAgeLimitResponse,
-  EventAgeLimitsResponse,
-  EventLocationResponse,
+  AddressValidationResponse, EventLocationResponse,
   EventLocationsResponse,
-  EventResponse,
-  EVENTS_SERVICE_NAME,
-  EventsResponse,
-  EventTypeResponse,
-  EventTypesData,
-  EventTypesResponse,
-  GenerateTicketForGuestResponse,
-  GenericResponse,
-  GetFeaturedEventsResponse,
-  ListEventsFeedResponse,
-  ListEventStatusResponse,
-  ListEventUsedTicketsResponse,
-  ListHostEventsResponse,
-  PaginatedEventsResponse,
-  ToggleGuestCheckStatusResponse,
+  EventResponse, EventTypeResponse,
+  EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
+  ToggleGuestCheckStatusResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
 import {
@@ -31,16 +17,14 @@ import {
   EventAgeLimitDto,
   EventLocationDto,
   ManualEventStatusUpdateRequestDto,
-  QueryRequestDto,
-  UpdateEventAgeLimitRequestDto,
-  UpdateEventLocationRequestDto,
+  QueryRequestDto, UpdateEventLocationRequestDto,
   UpdateEventRequestDto,
   UpdateEventTypeRequestDto,
   UpdateTicketRequestDto,
   ValidateTicketForGuestRequestDto,
   CancelEventAndNotifyRequestDto,
   ListHostEventsDto,
-  ToggleGuestCheckStatusRequestDto,
+  ToggleGuestCheckStatusRequestDto
 } from 'rumor-utils/shared/events/dtos/events.dto';
 
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';

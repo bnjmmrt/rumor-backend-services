@@ -1,27 +1,16 @@
 import {
   GenericResponse,
-  GetGuestProfileResponse,
   GetUserRequestsResponse,
-  GuestDetailsResponse,
-  GuestsDataResponse,
-  GuestsResponse,
-  ListEventGuestsResponse,
-  ListUsersEventInviteesResponse,
-  UsersAttendeesResponse,
-  BulkUploadGuestsResponse,
-  FetchBulkGuestsResponse,
   GetAttendeeCountRequest,
-  GetAttendeeCountResponse,
   PaginatedGuestEventsResponse,
-  Attendees
+  Attendees, Guests, FetchBulkGuestsData
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
-
 import { responses } from '../common/responses';
 import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { NotFoundError, BadRequestError, ValidationError  } from "rumor-utils/errors";
+import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
 import {
   AddGuestsRequestDto,
   CancelEventInvitationRequestDto,
@@ -47,14 +36,14 @@ import { entityToGuestStatus, toGuestData, guestStatusToEntity, toAdditionalGues
 import { parse, ParsedQs } from 'qs';
 import { hasPagination, IdRequestDto, UserAndIdRequestDto, RequestByUserAndEventDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import { Member, SimpleUser, CsvRecord } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
-import {  Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { Gender } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toEventGuest } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import { isValidGuestStatus, isValidUserGender, validateFilters } from '../utils/event.utils';
 import { ProviderType } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { UserQuizAnswer } from 'rumor-utils/shared/events/entities/user-quiz-question-answer.entity';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GuestDataSimple,UserAttendee, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestDataSimple,UserAttendee, UserSource, GuestData, GuestDetails, BulkUserData, UserEventInviteesData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
@@ -65,8 +54,6 @@ import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/s
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
-import type { Guests, FetchBulkGuestsData } from 'rumor-utils/shared/events/grpc/events/events.pb.d.ts';
-import {GuestData, GuestDetails, BulkUserData} from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestService {
   public static dbConnection = database;
@@ -140,7 +127,7 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.users.length > 0) return {message: `Guest created with status ${guestStatus}`};
+            if (createGuests.result.length > 0) return {message: `Guest created with status ${guestStatus}`};
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -248,19 +235,19 @@ export class GuestService {
       };
       const getGuests = await this.getGuests(fetchData);
       // Validate if guest data exists
-      if (!getGuests.users || getGuests.totalCount === 0) {
+      if (!getGuests.result || getGuests.totalCount === 0) {
         throw new NotFoundError('Guest data not found');
       }
 
       // Extract main guest IDs
-      let guestIds: string[] = getGuests.users
+      let guestIds: string[] = getGuests.result
       .filter(
         (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
       )
       .map((guest) => guest.id);
       
       // Extract additional guest IDs (if any)
-      const additionalGuestIds: string[] = getGuests.users
+      const additionalGuestIds: string[] = getGuests.result
       .filter((guest) => guestIds.includes(guest.id)) // Filter based on guestIds
       .flatMap((guest) => guest.additionalGuests || []) // Get additional guests array
       .map((additionalGuest) => additionalGuest.guestId); // Extract their IDs
@@ -407,7 +394,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return { users: guestsTransform, totalCount: guestsTransform.length };
+    return { result: guestsTransform, totalCount: guestsTransform.length };
   }
 
   /**
@@ -811,7 +798,7 @@ export class GuestService {
       }),
     );
     // TO DO: Fix this functionality
-    return { users: buildGuests, totalCount };
+    return { result: buildGuests, totalCount };
   }
 
   public static async applyUserFilters(
@@ -1359,7 +1346,7 @@ export class GuestService {
     return val;
   }
 
-  public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<ListUsersEventInviteesResponse> {
+  public static async getUsersEventInvitees(payload: ListUsersInviteesDto, token: string): Promise<UserEventInviteesData[]> {
       const { userId, query: initialQuery } = payload;
       const parsedQuery = parse(initialQuery) as ParsedQs;
       const user = (await serviceMesh.userService(token).getBasicHostProfile(userId)).data;
@@ -1403,11 +1390,9 @@ export class GuestService {
       }
 
       const users = (await serviceMesh.userService().getMembersOrNonMembers(userId, usersQuery)).data;
-      const inviteesDataList = {
-        data: await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus)),
-      };
+      const inviteesDataList =  await this.mapUsersToInvitees(users, userId, String(parsedQuery.guestStatus))
 
-      return responses.data(inviteesDataList);
+      return inviteesDataList;
   }
 
   // Helper function to map users to invitees
@@ -1785,96 +1770,109 @@ export class GuestService {
       });
       eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
       eventResponse.totalCount = totalCount;
-      return eventResponse
+      return { result: eventResponse.data, totalCount: eventResponse.totalCount };
   }
 
-  public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<GenericResponse> {
-      const event = await this.dbConnection.getRepository(Event).findOne({
-        where: {
-          id: payload.eventId,
-          deletedAt: null,
-          status: EventStatusEnum.APPROVED_STATUS,
-        },
-      });
+  public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<string> {
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: {
+        id: payload.eventId,
+        deletedAt: null,
+        status: EventStatusEnum.APPROVED_STATUS,
+      },
+    });
 
-      if (!event) {
-        throw new NotFoundError('Event not found');
-      }
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
 
-      const user = (await serviceMesh.userService().getUser(payload.id)).data;
+    const user = (await serviceMesh.userService().getUser(payload.id)).data;
 
-      if (!user) {
-        throw new NotFoundError('User not found');
-      }
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
 
-      const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: {
-          user: { id: user.data.id },
-          event: { id: payload.eventId },
-        },
-      });
-      if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
+    const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
+      where: {
+        user: { id: user?.id },
+        event: { id: payload.eventId },
+      },
+    });
 
-      const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
-        where: {
-          event: { id: payload.eventId },
-          required: true,
-          enabled: true,
-        },
-      });
 
-      await Promise.all(
-        payload.answers.map(async (item) => {
-          let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
-            where: {
-              user: { id: user.data.id },
-              event: { id: payload.eventId },
-              question: { id: item.questionId },
-              deletedAt: null,
-            },
+    if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
+
+    const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
+      where: {
+        event: { id: payload.eventId },
+        required: true,
+        enabled: true,
+      },
+    });
+
+    await Promise.all(
+      payload.answers.map(async (item) => {
+        let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
+          where: {
+            user: { id: user?.id },
+            event: { id: payload.eventId },
+            question: { id: item.questionId },
+            deletedAt: null,
+          },
+        });
+
+        if (!actualAnswer) {
+          actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
+            user: { id: user?.id },
+            event: { id: payload.eventId },
+            question: { id: item.questionId },
+            answer: item?.answer || '',
           });
+        } else actualAnswer.answer = item?.answer || '';
 
-          if (!actualAnswer) {
-            actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-              user: { id: user.data.id },
-              event: { id: payload.eventId },
-              question: { id: item.questionId },
-              answer: item?.answer || '',
-            });
-          } else actualAnswer.answer = item?.answer || '';
+        await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
+      }),
+    );
 
-          await this.dbConnection.getRepository(UserQuizAnswer).save(actualAnswer);
-        }),
-      );
+    const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
+      where: {
+        user: { id: user?.id },
+        event: { id: payload.eventId },
+      },
+      relations: { question: true },
+    });
 
-      const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
-        where: {
-          user: { id: user.data.id },
-          event: { id: payload.eventId },
-        },
-        relations: { question: true },
-      });
+    const countMandatoryAlready = usersQuizAnswer.filter((item) => {
+      if (item?.question?.required) return item;
+    }).length;
 
-      const countMandatoryAlready = usersQuizAnswer.filter((item) => {
-        if (item?.question?.required) return item;
-      }).length;
+    if (quiz) {
+      if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
+    }
 
-      if (quiz) {
-        if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
+    if (alreadyGuest) {
+      if (alreadyGuest?.status === GuestStatus.DECLINED || alreadyGuest?.status === GuestStatus.NO_STATUS) {
+        //means guest is again requesting for rsvp
+        alreadyGuest.status = GuestStatus.APPLIED;
+        alreadyGuest.declinedBy = null;
+        alreadyGuest.rejectedReason = null;
       }
-
+      alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+      await this.dbConnection.getRepository(Guest).save(alreadyGuest);
+    } else {
       const guest = new Guest();
       guest.event = event;
-      guest.user = { id: user.data.id };
+      guest.user = { id: user?.id };
       guest.status = GuestStatus.APPLIED;
       guest.additionalRequestedGuests = payload.additionalGuests;
       guest.invitationSource = UserSource.REQUEST_IN_APP;
       await this.dbConnection.getRepository(Guest).save(guest);
+    }
 
-      return responses.ok;
+    return '';
   }
 
-  public static async updateRequestBecomeGuest(payload: UpdateRequestBecomeGuestRequestDto): Promise<GenericResponse> {
+  public static async updateRequestBecomeGuest(payload: UpdateRequestBecomeGuestRequestDto): Promise<string> {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: {
           id: payload.eventId,
@@ -1895,7 +1893,7 @@ export class GuestService {
 
       const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
-          user: { id: user.data.id },
+          user: { id: user?.id },
           event: { id: payload.eventId },
         },
       });
@@ -1919,7 +1917,7 @@ export class GuestService {
         payload.answers.map(async (item) => {
           let actualAnswer = await this.dbConnection.getRepository(UserQuizAnswer).findOne({
             where: {
-              user: { id: user.data.id },
+              user: { id: user?.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               deletedAt: null,
@@ -1928,7 +1926,7 @@ export class GuestService {
 
           if (!actualAnswer) {
             actualAnswer = this.dbConnection.getRepository(UserQuizAnswer).create({
-              user: { id: user.data.id },
+              user: { id: user?.id },
               event: { id: payload.eventId },
               question: { id: item.questionId },
               answer: item?.answer || '',
@@ -1941,7 +1939,7 @@ export class GuestService {
 
       const usersQuizAnswer = await this.dbConnection.getRepository(UserQuizAnswer).find({
         where: {
-          user: { id: user.data.id },
+          user: { id: user?.id },
           event: { id: payload.eventId },
         },
         relations: { question: true },
@@ -1955,7 +1953,7 @@ export class GuestService {
         if (countMandatoryAlready < quiz.length) throw new BadRequestError('The user has not answered all the required questions');
       }
 
-      return responses.ok;
+      return '';
   }
 
   public static async syncUserTopAttendee(): Promise<GenericResponse> {
@@ -2053,7 +2051,7 @@ export class GuestService {
     })
   }
 
-  public static async cancelEventInvitation(payload: CancelEventInvitationRequestDto): Promise<GenericResponse> {
+  public static async cancelEventInvitation(payload: CancelEventInvitationRequestDto): Promise<string> {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
           event: { id: payload.eventId },
@@ -2063,10 +2061,10 @@ export class GuestService {
       if (!guest) throw new NotFoundError('Guest not found');
       if (guest.status !== GuestStatus.APPLIED) throw new BadRequestError('Guest is not cancelled');
       await this.dbConnection.getRepository(Guest).delete(guest.id);
-      return responses.ok;
+      return '';
   }
 
-  public static async declineEventInvitation(payload: DeclineEventInvitationRequestDto): Promise<GenericResponse> {
+  public static async declineEventInvitation(payload: DeclineEventInvitationRequestDto): Promise<string> {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: {
           event: { id: payload.eventId },
@@ -2079,7 +2077,7 @@ export class GuestService {
       guest.rejectedReason = payload.reason;
       guest.declinedBy = { id: payload.userId } as User;
       await this.dbConnection.getRepository(Guest).save(guest);
-      return responses.ok;
+      return '';
   }
 
     /**
@@ -2090,7 +2088,7 @@ export class GuestService {
    *
    * @throws {Error} Logs an error and returns a bad request response if an exception occurs.
    */
-    public static async acceptEventInvitation(payload: AcceptEventInvitationRequestDto): Promise<GenericResponse> {
+    public static async acceptEventInvitation(payload: AcceptEventInvitationRequestDto): Promise<string> {
         const guest = await this.dbConnection.getRepository(Guest).findOne({
           where: {
             event: { id: payload.eventId },
@@ -2101,7 +2099,7 @@ export class GuestService {
         if (guest.status === GuestStatus.CONFIRMED) throw new BadRequestError('Guest is already confirmed');
         guest.status = GuestStatus.CONFIRMED;
         await this.dbConnection.getRepository(Guest).save(guest);
-        return responses.ok;
+        return '';
     }
 
   /**
@@ -2284,10 +2282,10 @@ export class GuestService {
  * @param payload
  * @returns
  */
-  public static async inviteGuests(payload: InvitedGuestsRequestDto): Promise<GuestsDataResponse> {
+  public static async inviteGuests(payload: InvitedGuestsRequestDto): Promise<GuestDataSimple[]> {
       const guests = payload.guests;
-
       const invites = guests.map(async (guestPayload) => {
+
         // Step 1: Fetch event and validate
         const event = await this.dbConnection.getRepository(Event).findOne({
           where: { id: guestPayload.eventId, deletedAt: IsNull() },
@@ -2297,7 +2295,7 @@ export class GuestService {
         // Step 2: Check lead guest presence and confirmation
         const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
           where: {
-            event: { id: event.id },
+            event: { id: guestPayload.eventId },
             user: { id: guestPayload.userId },
             status: GuestStatus.CONFIRMED,
             deletedAt: IsNull(),
@@ -2399,7 +2397,7 @@ export class GuestService {
       const invitedGuestsResults = await Promise.all(invites);
       const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
 
-      return responses.data(invitedGuests);
+      return invitedGuests;
   }
 
   /**
@@ -2587,7 +2585,7 @@ export class GuestService {
         failedUserCount: garbageData.length,
         hostId: payload.hostId,
         users,
-        eventId: payload.eventId,
+        eventId: payload.eventId ? payload.eventId : '',
         errFileUrl: errFileUrl,
         errFilepath: errFilePath,
       };
@@ -2637,7 +2635,7 @@ export class GuestService {
       const [allUsers, totalCount] = await usersQuery.getManyAndCount();
 
       return {
-        users: allUsers.map((user) => toSimpleUser(user)),
+        result: allUsers.map((user) => toSimpleUser(user)),
         totalCount,
       };
   }
@@ -2776,7 +2774,7 @@ export class GuestService {
       return guestData;
   }
 
-  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
+  public static async listUserRequests(payload: GuestsQueryRequestDto): Promise<Guests> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -2868,7 +2866,7 @@ export class GuestService {
         return { ...guestData, category: focuses.map((focus) => focus.name) };
       }),
     );
-    return responses.data({ users: buildGuests, totalCount });
+    return { result: buildGuests, totalCount };
   }
 
   public static async getUserRequests(payload: RequestByUserAndEventDto): Promise<GetUserRequestsResponse> {
@@ -3014,7 +3012,7 @@ export class GuestService {
       };
   }
 
-  public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {
+  public static async listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestDataSimple[]> {
     const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
       if (!event) throw new NotFoundError('Event not found');
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -3045,7 +3043,7 @@ export class GuestService {
         ...restrictedGuests.map((restricted) => toGuestDataSimple(restricted.guest, [], true, restricted.id)),
       ];
 
-      return responses.data([leadGuest].map((guest) => toGuestDataSimple(guest, [], false, undefined, allGuests)));  
+      return [leadGuest].map((guest) => toGuestDataSimple(guest, [], false, undefined, allGuests));  
   }
 
   public static validateManageBulkGuests(payload: ManageBulkGuestsRequestDto): {
@@ -3119,20 +3117,20 @@ export class GuestService {
    * @returns {Promise<BaseResponse>} - Response indicating success or failure of the deletion process.
    */
   public static async deleteInvitedGuest(payload: IdRequestDto): Promise<GenericResponse> {
-      const restrictedInvite = await this.dbConnection.getRepository(RestrictedInvites).findOne({ where: { id: payload.id } });
-      if (restrictedInvite) {
-        await this.dbConnection.getRepository(RestrictedInvites).delete(payload.id);
-        return responses.ok;
-      }
+    const restrictedInvite = await this.dbConnection.getRepository(RestrictedInvites).findOne({ where: { id: payload.id } });
+    if (restrictedInvite) {
+      await this.dbConnection.getRepository(RestrictedInvites).delete(payload.id);
+      return responses.ok;
+    }
 
-      const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id } });
-      if (guest) {
-        await this.dbConnection.getRepository(RestrictedInvites).delete({ guest: { id: payload.id } });
-        await this.dbConnection.getRepository(Guest).delete(payload.id);
-        return responses.ok;
-      }
+    const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: payload.id } });
+    if (guest) {
+      await this.dbConnection.getRepository(RestrictedInvites).delete({ guest: { id: payload.id } });
+      await this.dbConnection.getRepository(Guest).delete(payload.id);
+      return responses.ok;
+    }
 
-     throw new BadRequestError('Guest or restricted entry not found');
+    throw new BadRequestError('Guest or restricted entry not found');
   }
 
   public static async getEventAttendeeCountByTicketType(payload: GetAttendeeCountRequest): Promise<Attendees> {
