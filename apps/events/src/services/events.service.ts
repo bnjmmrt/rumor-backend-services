@@ -2,7 +2,6 @@ import { StatusCodes } from 'http-status-codes';
 import config from '../config';
 import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library';
-import * as QRCode from 'qrcode';
 
 import {
   AddEventToFeaturedSectionDto,
@@ -21,35 +20,25 @@ import {
   UpdateEventTypeRequestDto,
   UpdateTicketRequestDto,
   ValidateTicketForGuestRequestDto,
-} from 'rumor-utils/shared/events/dtos/events.dto'
+} from 'rumor-utils/shared/events/dtos/events.dto';
 import {
   AddressValidationRequest,
   AddressValidationResponse,
-  EventAgeLimitResponse,
-  EventAgeLimitsResponse,
-  EventLocationResponse,
+  EventAgeLimitResponse, EventLocationResponse,
   EventLocationsResponse,
   EventResponse,
   EventsResponse,
   EventTypeResponse,
-  EventTypesData,
-  EventTypesResponse,
-  GenerateTicketForGuestResponse,
-  GenericResponse,
-  GetFeaturedEventsResponse,
-  ListEventsFeedResponse,
-  ListEventStatusResponse,
-  ListEventUsedTicketsResponse,
-  ListHostEventsResponse,
-  PaginatedEventsResponse,
-  ToggleGuestCheckStatusResponse,
+  EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
+  ToggleGuestCheckStatusResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { parse } from 'qs';
 import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { normalizeCatalogName } from '../common/helpers';
-import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, FeaturedEventSection, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from '../../packages/rumor-utils/shared/entities';
+import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates } from '../utils/event.utils';
@@ -61,17 +50,15 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import { EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
-import database from '../database'
+import database from '../database';
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 import { CreateCollaboratorDto, CreateTalentRequestDto, CreateTicketTypeRequestDto, UpdateCollaboratorDto, UpdateTalentRequestDto, UpdateTicketTypeRequestDto } from 'packages/rumor-utils/shared/events/dtos';
 import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
 import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role.pb';
-import { UserWithRoles } from '../../packages/rumor-utils/shared/users/grpc/auth/auth.pb';
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
-import { Role } from '../../packages/rumor-utils/shared/users/entities';
 
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 
 const responses = {
   conflict: (message: string) => ({
@@ -2771,7 +2758,7 @@ export class EventsService {
       return toEvent(event as Event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
     });
     return {
-      eventsResponse: formattedEvents,
+      result: formattedEvents,
       totalCount,
     }
   }

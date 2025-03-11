@@ -491,7 +491,7 @@ export interface GuestsResponse {
 }
 
 export interface Guests {
-  users: Guest[];
+  result: Guest[];
   totalCount: number;
 }
 
@@ -604,7 +604,7 @@ export interface ListEventGuestsResponse {
 }
 
 export interface PaginatedGuestEventsResponse {
-  data: GuestEventData[];
+  result: GuestEventData[];
   totalCount: number;
 }
 
@@ -688,7 +688,7 @@ export interface FetchBulkGuestsRequest {
 }
 
 export interface FetchBulkGuestsData {
-  users: SimpleUser[];
+  result: SimpleUser[];
   totalCount?: number | undefined;
 }
 
@@ -776,7 +776,7 @@ export interface CollaboratorRoles {
 }
 
 export interface PaginatedEventsResponse {
-  eventsResponse: EventData[];
+  result: EventData[];
   totalCount: number;
 }
 
