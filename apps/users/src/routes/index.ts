@@ -129,8 +129,12 @@ router.post('/auth/roles/mark-spam', RoleController.markUserAsSpam);
 
 
 // Settings routes
-router.get('/auth/settings/notification/:id', SettingsController.getNotificationSettings);
-router.put('/auth/profile-notification-settings/:id', SettingsController.updateNotificationSettings);
+
+//Below 2 routes will not be used instead we'll be using notification-preference endpoint
+// router.post('/auth/settings/notification', SettingsController.getNotificationSettings);
+// router.put('/auth/profile-notification-settings/:id', SettingsController.updateNotificationSettings);
+
+
 // router.post('/auth/settings/push-notification-tokens', SettingsController.getPushNotificationTokens);
 router.post('/auth/user/:id/push-notification-token', SettingsController.savePushNotificationToken);
 router.delete('/auth/user/:id/push-notification-token', SettingsController.deletePushNotificationToken);
