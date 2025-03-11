@@ -210,7 +210,9 @@ router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
 
 router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
 
-router.put('/files:id', FilesController.updateFile);
+router.get("/files/view/:id", FilesController.viewFile);
+
+router.put('/files/:id', FilesController.updateFile);
 
 router.delete('/files:id', FilesController.removeFile);
 

@@ -64,6 +64,14 @@ export class FilesControllerHandler {
   });
 
   //'GetFile'    s
+  viewFile = asyncWrapper(async (req, res): Promise<any> => {
+    const payload: string = req.params.id;
+    await S3Service.getFile(payload)
+    const filePath = `https://${config.get("BUCKET_DOCUMENTS_NAME")}.s3.${config.get("AWS_REGION")}.amazonaws.com/${payload}`
+    res.redirect(filePath);
+  });
+
+  //'GetFile'    s
   getFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: RequestByIdDto = req.body;
     const response = await this.handleFileResponse(payload.id);
