@@ -242,7 +242,8 @@ router.get(
   EventsController.getEventByInvitedUserId
 ); /**TestStatus: working */
 router.get("/dashboard/top-users-attendees-events", GuestController.getTopUsersAttendees)  /**TestStatus: working */
-router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) //todo:
+router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) /**TestStatus: working */
+router.get("/events/:eventId/guest-status-counts", EventsController.GetGuestCountForGuestStatuses) /**TODO: TestStatus: not working */
 
 // router.get("/events", AuthMiddleware.fusionAuthRequired, EventsController.listEvents)  /**TestStatus: working */
 // router.get("/feed", EventsController.listEventsFeed)

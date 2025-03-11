@@ -24,12 +24,13 @@ import {
 import {
   AddressValidationRequest,
   AddressValidationResponse,
-  EventAgeLimitResponse, EventLocationResponse,
+  EventAgeLimitResponse, EventGuestCountResponse, EventLocationResponse,
   EventLocationsResponse,
   EventResponse,
   EventsResponse,
   EventTypeResponse,
   EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  GuestCountByStatuses,
   ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
   ToggleGuestCheckStatusResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
@@ -2955,4 +2956,41 @@ export class EventsService {
   //     throw new BadRequestError('Error retrieving event details');
   //   }
   // }
+
+  public static async getGuestCountForGuestStatuses(payload: UserAndIdRequestDto): Promise<GuestCountByStatuses> {
+      const { id: eventId, userId } = payload;
+      const event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: eventId, owner: { id: userId } },
+      });
+      if (!event) throw new NotFoundError('Event not found');
+      const guestCounts = await this.dbConnection.getRepository(Event)
+        .createQueryBuilder('guest')
+        .select([
+          `COUNT(CASE WHEN guest.status = :invited THEN 1 END) AS invitedCount`,
+          `COUNT(CASE WHEN guest.status = :requested THEN 1 END) AS requestedCount`,
+          `COUNT(CASE WHEN guest.status = :confirmed THEN 1 END) AS confirmedCount`,
+          `COUNT(CASE WHEN guest.status = :declined OR guest.status = :refused THEN 1 END) AS declinedCount`,
+          `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
+          `COUNT(guest.id) AS totalCount`,
+        ])
+        .where('guest.event_id = :eventId', {
+          eventId,
+          invited: GuestStatus.INVITED,
+          requested: GuestStatus.APPLIED,
+          confirmed: GuestStatus.CONFIRMED,
+          declined: GuestStatus.DECLINED,
+          refused: GuestStatus.REFUSED,
+          draft: GuestStatus.DRAFT,
+        })
+        .getRawOne();
+
+      return {
+        invitedCount: parseInt(guestCounts.invitedcount) || 0,
+        confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+        requestedCount: parseInt(guestCounts.requestedcount) || 0,
+        declinedCount: parseInt(guestCounts.declinedcount) || 0,
+        draftedCount: parseInt(guestCounts.draftedcount) || 0,
+        totalCount: parseInt(guestCounts.totalcount) || 0,
+      }
+  }
 }
