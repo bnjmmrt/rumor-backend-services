@@ -207,7 +207,7 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
-import { generateUniqueFileName } from 'rumor-utils/files_migrated_service_utils/src/commons/helpers';
+import { generateUniqueFileName } from '../common/helpers';
 import S3Service from '../utils/aws/s3';
 import { count } from 'console';
 
