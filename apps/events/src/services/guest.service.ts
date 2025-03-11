@@ -3,7 +3,8 @@ import {
   GetUserRequestsResponse,
   GetAttendeeCountRequest,
   PaginatedGuestEventsResponse,
-  Attendees, Guests, FetchBulkGuestsData
+  Attendees, Guests, FetchBulkGuestsData,
+  ListEventGuestsResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
 import { responses } from '../common/responses';
@@ -1429,9 +1430,9 @@ export class GuestService {
 
   public static async listEventGuests(payload: ListEventGuestsDto): Promise<PaginatedGuestEventsResponse> {
       const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
-      const eventResponse = { data: [], totalCount: 0 };
+      const eventResponse = { result: [], totalCount: 0 };
       if (!user) {
-        throw new NotFoundError('User not found');
+         throw new NotFoundError('user')
       }
 
       const parsedQuery = parse(payload.query);
@@ -1768,9 +1769,9 @@ export class GuestService {
       events.forEach((event) => {
         event.guests = eventGuestMap.get(event.id) || [];
       });
-      eventResponse.data = events.map((item) => toEventGuest(item, item.guests[0], userId));
+      eventResponse.result = events.map((item) => toEventGuest(item, item.guests[0], userId));
       eventResponse.totalCount = totalCount;
-      return { result: eventResponse.data, totalCount: eventResponse.totalCount };
+      return eventResponse
   }
 
   public static async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<string> {
