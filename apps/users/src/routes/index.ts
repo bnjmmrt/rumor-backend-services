@@ -9,14 +9,14 @@ import AuthMiddleware from '../server/middleware/auth';
 import { PlatformController } from '../controllers/platform.controller';
 import { ReferralRequestController } from '../controllers/referral-request.controller';
 import { ReferralCodeController } from '../controllers/referral-code.controller';
-import FilesController  from '../controllers/files.controller';
+import FilesController from '../controllers/files.controller';
 const multer = require('multer');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 5 * 1024 * 1024, // limit file size to 5MB
+        fileSize: 5 * 1024 * 1024, // limit file size to 5MB
     },
-  });
+});
 
 const router: Router = express.Router();
 
@@ -48,7 +48,7 @@ router.get('/check-service-call', AuthController.checkService);
 
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
-router.post('/auth/logout', AuthController.logout);
+router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
 router.put('/auth/host/password', AuthMiddleware.fusionAuthRequired, AuthController.updateHostPassword);
@@ -81,14 +81,14 @@ router.post('/auth/user/get-member-or-non-member', AuthController.getMembersOrNo
 router.post('/auth/host/:id/follow', AuthController.manageFollowHost);
 router.delete('/auth/host/:id/follow', AuthController.manageFollowHost);
 router.get('/auth/hosts-followed/:id', AuthController.getFollowedHosts);
-router.get('/auth/hosts/custom-lists', AuthController.getCustomUsersLists);
-router.get('/auth/host/custom-lists/:id/users', AuthController.getCustomUsersList);
-router.delete('/auth/host/custom-lists/:id', AuthController.deleteCustomUsersList);
-router.post('/auth/host/custom-lists', AuthController.createCustomUsersList);
-router.put('/auth/host/custom-lists/:id/users', AuthController.updateCustomUsersList);
+router.get('/auth/hosts/custom-lists', AuthMiddleware.fusionAuthRequired, AuthController.getCustomUsersLists);
+router.get('/auth/host/custom-lists/:id/users', AuthMiddleware.fusionAuthRequired, AuthController.getCustomUsersList);
+router.delete('/auth/host/custom-lists/:id', AuthMiddleware.fusionAuthRequired, AuthController.deleteCustomUsersList);
+router.post('/auth/host/custom-lists', AuthMiddleware.fusionAuthRequired, AuthController.createCustomUsersList);
+router.put('/auth/host/custom-lists/:id/users', AuthMiddleware.fusionAuthRequired, AuthController.updateCustomUsersList);
 router.post('/auth/user/:id/favorite', AuthController.manageFavoriteUser);
 router.delete('/auth/user/:id/favorite', AuthController.manageFavoriteUser);
-router.get('/auth/hosts/favorites', AuthController.getFavoriteUsers);
+router.get('/auth/hosts/favorites', AuthMiddleware.fusionAuthRequired, AuthController.getFavoriteUsers);
 router.post('/auth/get-confirmed-members', AuthController.getConfirmedMembers);
 router.post('/auth/get-user-with-roles-by-email', AuthController.getUserWithRolesByEmail);
 router.post('/auth/get-user-with-roles-by-id', AuthController.getUserWithRolesById);
@@ -98,7 +98,7 @@ router.post('/auth/create-user', AuthMiddleware.fusionAuthRequired, AuthControll
 // router.post('/auth/bulk-users', AuthMiddleware.fusionAuthRequired, AuthController.bulkUploadUser);
 router.get('/auth/users-list', AuthMiddleware.fusionAuthRequired, AuthController.getAllUsers);
 router.get('/auth/host/:id/filters', AuthMiddleware.fusionAuthRequired, AuthController.getUserFiltersOptions);
-router.post('/auth/host-feedback', AuthController.hostFeedback);
+router.post('/auth/host-feedback', AuthMiddleware.fusionAuthRequired, AuthController.hostFeedback);
 router.post('/auth/send-verification-code-by-email', AuthController.sendVerificationCodeByEmail);
 router.post('/auth/verify-code-by-email', AuthController.verifyCodeByEmail);
 router.post('/auth/user/:id/set-login-status', AuthController.setLoginStatus);
@@ -112,7 +112,7 @@ router.post('/auth/users/:id/hosts/:hostId/block', AuthMiddleware.fusionAuthRequ
 router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRequired, AuthController.unblockHost);
 router.post('/auth/users/:id/hosts/:hostId/report-and-block', AuthMiddleware.fusionAuthRequired, AuthController.reportAndBlockHost);
 router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthController.sendSupportEmail);
-router.get('/auth/reports', AuthController.getAllReports);
+router.get('/auth/admin/reports', AuthController.getAllReports);
 router.get('/auth/switch-profile/:id', AuthController.switchProfile);
 
 //Role routes
@@ -178,10 +178,10 @@ router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser)
 router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
 
 //Referral Requests
-router.post("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
-router.put("/auth/referral-requests/:id",AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
-router.get("/auth/referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
-router.get("/auth/list-referral-requests",AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+router.post("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
+router.put("/auth/referral-requests/:id", AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
+router.get("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
+router.get("/auth/list-referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
 
 //Referral Codes
 router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
@@ -193,8 +193,8 @@ router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode
 router.post("/auth/referred-users", ReferralCodeController.saveReferredUser)
 
 
-router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings );
-router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings );
+router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings);
+router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings);
 
 //collaborator user routes
 router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
@@ -210,8 +210,8 @@ router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
 
 router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
 
-router.put('/files:id',FilesController.updateFile);
+router.put('/files:id', FilesController.updateFile);
 
-router.delete('/files:id',FilesController.removeFile);
+router.delete('/files:id', FilesController.removeFile);
 
 export default router;

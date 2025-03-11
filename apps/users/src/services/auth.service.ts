@@ -46,42 +46,15 @@ import {
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
-  BulkCreateUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
-  ForgotPasswordResponse,
   LoginSSOResponse,
   OAuthRedirectResponse,
-  LoginResponse,
   ValidateResponse,
-  ValidityResponse,
   SaveOrUpdateProviderAuthResponse,
-  MemberResponse,
-  UpdateUserProfilePictureResponse,
-  UpdateUserProfileResponse,
-  BioProfileResponse,
-  ListUsersByTypeResponse,
-  CreateNonMemberUserResponse,
-  GetFollowedHostsResponse,
-  CustomUsersListsResponse,
-  CustomUsersListResponse,
-  CurrentUserResponse,
-  ConfirmedMembersResponse,
-  SimpleUserResponse,
-  GetUserWithRolesByEmailResponse,
-  CreateUserResponse,
-  GetUsersResponse,
   UserResponseData,
-  UserFilterOptionsResponse,
   customListData,
-  FocusProto,
-  CreateHostCollaboratorResponse,
-  HostFeedbackResponse,
-  VerifyResponse,
-  ReportResponse,
-  FeedbacksResponse,
-  MemberSignUpResponse,
   ConfirmedMember,
   TokenResponseAndRoles,
   Validity,
@@ -105,9 +78,6 @@ import {
   UserDataSimple,
   UserWithRoles,
   BasicHostProfile,
-  BulkCreateUsersResponse,
-  BulkUserResponse,
-  CsvRecord,
   UserIdWithRolesAndToken,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
@@ -168,8 +138,6 @@ import {
   GetMembersResponse,
   HostProfileResponse,
   MemberProfileResponse,
-  SignUpResponse,
-  TokenResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { parse } from 'qs';
 import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
@@ -181,7 +149,7 @@ import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -207,9 +175,6 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
-import { generateUniqueFileName } from 'rumor-utils/files_migrated_service_utils/src/commons/helpers';
-import S3Service from '../utils/aws/s3';
-import { count } from 'console';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
