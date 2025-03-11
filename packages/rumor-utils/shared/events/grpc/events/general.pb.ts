@@ -692,6 +692,7 @@ export interface SignupFormsResponse {
   timeZone: string;
   eventStatus: EventStatusEnum;
   eventName: string;
+  eventId: string;
 }
 
 export interface ISignupFormQuestionsRequest {

@@ -62,7 +62,8 @@ export class SignupFormsController {
       const hostId = (req as any).user;
       if (payload.userId !== hostId) {
         throw new BadRequestError("Invalid host id provided.");
-      }      const data: SignupFormsResponse = await SignupFormsServices.update(
+      }
+      const data: SignupFormsResponse = await SignupFormsServices.update(
         id,
         eventId,
         payload

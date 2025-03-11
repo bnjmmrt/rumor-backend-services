@@ -48,6 +48,7 @@ export const buildSignupFormsResponse = (
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
     eventStatus: event.status,
     eventName: event.name,
+    eventId: event.id,
   };
   result.questions &&
     result.questions.sort((a, b) => {
