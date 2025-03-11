@@ -105,7 +105,7 @@ router.post('/auth/user/:id/set-login-status', AuthController.setLoginStatus);
 router.post('/auth/hosts/custom-lists/duplicate', AuthMiddleware.fusionAuthRequired, AuthController.duplicateCustomList);
 router.delete('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.deleteHostUserMapping);
 router.get('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.getUserProfile);
-router.post('/auth/hosts/followers', AuthMiddleware.fusionAuthRequired, AuthController.getFollowedUsers);
+router.get('/auth/hosts/followers', AuthMiddleware.fusionAuthRequired, AuthController.getFollowedUsers);
 router.post('/auth/user/:id/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageUserSpam);
 router.post('/auth/user/:id/report', AuthMiddleware.fusionAuthRequired, AuthController.reportUser);
 router.post('/auth/users/:id/hosts/:hostId/block', AuthMiddleware.fusionAuthRequired, AuthController.blockHost);

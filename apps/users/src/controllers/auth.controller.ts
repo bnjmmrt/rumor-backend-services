@@ -651,8 +651,8 @@ export class AuthController {
 
   public static duplicateCustomList = asyncWrapper(
     async (req, res): Promise<void> => {
-      const userId = (req as any).user;
-      const payload: DuplicateCustomListRequestDto = { ...req.body, userId };
+      const hostId = (req as any).user;
+      const payload: DuplicateCustomListRequestDto = { ...req.body, hostId };
       const response: CustomUsersList = await AuthService.duplicateCustomList(payload);
       const createResponse = new CreateResponse(response, 'Custom list duplicated successfully');
      res.status(createResponse.statusCode).json(createResponse);
