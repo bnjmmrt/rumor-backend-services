@@ -9,6 +9,14 @@ import AuthMiddleware from '../server/middleware/auth';
 import { PlatformController } from '../controllers/platform.controller';
 import { ReferralRequestController } from '../controllers/referral-request.controller';
 import { ReferralCodeController } from '../controllers/referral-code.controller';
+import FilesController  from '../controllers/files.controller';
+const multer = require('multer');
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // limit file size to 5MB
+    },
+  });
 
 const router: Router = express.Router();
 
@@ -189,5 +197,20 @@ router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, Setti
 
 //collaborator user routes
 router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
+
+
+/**
+ * Files Endpoints
+ */
+
+router.post("/files/generate-download-url", FilesController.getFile);
+
+router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
+
+router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
+
+router.put('/files:id',FilesController.updateFile);
+
+router.delete('/files:id',FilesController.removeFile);
 
 export default router;
