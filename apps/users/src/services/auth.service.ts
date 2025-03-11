@@ -1,5 +1,5 @@
-import { FindOptionsWhere, ILike, In } from 'typeorm';
-import database from '../database'
+import { FindOptionsWhere, In } from 'typeorm';
+import database from '../database';
 import config from '../config';
 
 import {
@@ -45,44 +45,12 @@ import {
   sendSupportEmailRequestDto,
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
-  UpdateHostsStatusRequestDto,
-  BulkCreateUsersRequestDto,
+  UpdateHostsStatusRequestDto
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
-  ForgotPasswordResponse,
   LoginSSOResponse,
-  OAuthRedirectResponse,
-  LoginResponse,
-  ValidateResponse,
-  ValidityResponse,
-  SaveOrUpdateProviderAuthResponse,
-  MemberResponse,
-  UpdateUserProfilePictureResponse,
-  UpdateUserProfileResponse,
-  BioProfileResponse,
-  ListUsersByTypeResponse,
-  CreateNonMemberUserResponse,
-  GetFollowedHostsResponse,
-  CustomUsersListsResponse,
-  CustomUsersListResponse,
-  CurrentUserResponse,
-  ConfirmedMembersResponse,
-  SimpleUserResponse,
-  GetUserWithRolesByEmailResponse,
-  CreateUserResponse,
-  GetUsersResponse,
-  UserResponseData,
-  UserFilterOptionsResponse,
-  customListData,
-  FocusProto,
-  CreateHostCollaboratorResponse,
-  HostFeedbackResponse,
-  VerifyResponse,
-  ReportResponse,
-  FeedbacksResponse,
-  MemberSignUpResponse,
-  ConfirmedMember,
+  OAuthRedirectResponse, ValidateResponse, SaveOrUpdateProviderAuthResponse, UserResponseData, customListData, ConfirmedMember,
   TokenResponseAndRoles,
   Validity,
   UsersData,
@@ -104,11 +72,7 @@ import {
   VerificationStatus,
   UserDataSimple,
   UserWithRoles,
-  BasicHostProfile,
-  BulkCreateUsersResponse,
-  BulkUserResponse,
-  CsvRecord,
-  UserIdWithRolesAndToken,
+  BasicHostProfile, UserIdWithRolesAndToken
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -138,7 +102,6 @@ import {
   toUser,
   toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
-import * as fs from 'fs';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
@@ -159,7 +122,7 @@ import fusionAuthClientHandler from '../utils/fusion-auth/fusionauth';
 //-----------------Admin Imports
 
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
-import { Brackets, IsNull, Repository } from 'typeorm';
+import { Brackets, IsNull } from 'typeorm';
 
 import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
 import {
@@ -167,9 +130,7 @@ import {
   GetHostsResponse,
   GetMembersResponse,
   HostProfileResponse,
-  MemberProfileResponse,
-  SignUpResponse,
-  TokenResponse,
+  MemberProfileResponse
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { parse } from 'qs';
 import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
@@ -181,7 +142,7 @@ import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus, userStatusToEntity } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -207,10 +168,6 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
-import { generateErrorCsv, parseCsv } from '../common/helper';
-import { generateUniqueFileName } from 'rumor-utils/files_migrated_service_utils/src/commons/helpers';
-import S3Service from '../utils/aws/s3';
-import { count } from 'console';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
