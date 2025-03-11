@@ -14,37 +14,52 @@ import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-no
 export class SettingsService {
   static dbConnection = connectionManager;
   
-  public static async getNotificationSettings(id:string): Promise<any> {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id });
-      if (!user) return responses.notFound('User not found!');
+  public static async getNotificationSettings(id: string): Promise<any> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id });
+    if (!user) return responses.notFound('User not found!');
 
-      const notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
+    let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
         where: { user: { id } },
-        select:['id', 'enableAppNotifications', 'enableEmailNotifications', 'enableSmsNotifications']
+        select: ['id', 'enableAppNotifications', 'enableEmailNotifications', 'enableSmsNotifications']
+    });
+
+    if (!notificationSettings) {
+        notificationSettings = this.dbConnection.getRepository(UserSettings).create({
+            user,
+            enableAppNotifications: true, 
+            enableEmailNotifications: true,
+            enableSmsNotifications: true
+        });
+        await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
+    }
+
+    return notificationSettings;
+}
+
+
+public static async updateNotificationSettings(payload: any): Promise<any> {
+  const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+  if (!user) return responses.notFound('User not found!');
+
+  let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
+      where: { user: { id: payload.userId } }
+  });
+
+  if (!notificationSettings) {
+      notificationSettings = this.dbConnection.getRepository(UserSettings).create({
+          user,
+          enableAppNotifications: payload.enableAppNotifications,
+          enableEmailNotifications: payload.enableEmailNotifications,
+          enableSmsNotifications: payload.enableSmsNotifications
       });
-
-      if (!notificationSettings) {
-        return this.dbConnection.getRepository(UserSettings).create({ user });
-      }
-
-      return notificationSettings;
+  } else {
+      Object.assign(notificationSettings, payload);
   }
 
-  public static async updateNotificationSettings(payload: any): Promise<any> {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
+  return await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
+}
 
-      let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
-        where: { user: { id: payload.userId } },
-      });
 
-      const updatedSettings = await this.dbConnection.getRepository(UserSettings).save({
-        id : notificationSettings.id,
-        ...payload
-      });
-
-      return updatedSettings
-  }
 
   public static async savePushNotificationToken(payload: SaveNotificationTokenRequestDto): Promise<GenericResponse> {
     try {

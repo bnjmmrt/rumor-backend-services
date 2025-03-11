@@ -27,11 +27,11 @@ export const protobufPackage = "auth";
 
 /** Gender */
 export enum Gender {
-  MALE = 0,
-  FEMALE = 1,
-  NON_BINARY = 2,
-  NOT_APPLICABLE = 3,
-  UNRECOGNIZED = -1,
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  NON_BINARY = 'NON_BINARY',
+  NOT_APPLICABLE = 'NOT_APPLICABLE',
+  UNRECOGNIZED = 'UNRECOGNIZED',
 }
 
 export interface ContactsListRequest {
