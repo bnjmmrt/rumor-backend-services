@@ -1,40 +1,9 @@
 import { AuthService } from '../services/auth.service';
 import {
-  AUTH_SERVICE_NAME,
-  LoginResponse,
-  ValidateResponse,
-  SignUpResponse,
-  ForgotPasswordResponse,
   LoginSSOResponse,
   OAuthRedirectResponse,
-  ValidityResponse,
   SaveOrUpdateProviderAuthResponse,
-  TokenResponse,
-  MemberResponse,
-  UpdateUserProfilePictureResponse,
-  UpdateUserProfileResponse,
-  BioProfileResponse,
-  ListUsersByTypeResponse,
-  CreateNonMemberUserResponse,
-  GetMembersResponse,
-  GetFollowedHostsResponse,
-  CustomUsersListsResponse,
-  CustomUsersListResponse,
-  CurrentUserResponse,
-  ConfirmedMembersResponse,
-  SimpleUserResponse,
-  GetUserWithRolesByEmailResponse,
-  CreateUserResponse,
-  GetUsersResponse,
   UserResponseData,
-  UserFilterOptionsResponse,
-  MemberProfileResponse,
-  CreateHostCollaboratorResponse,
-  HostFeedbackResponse,
-  VerifyResponse,
-  ReportResponse,
-  FeedbacksResponse,
-  MemberSignUpResponse,
   ConfirmedMember,
   TokenResponseAndRoles,
   Validity,
@@ -69,7 +38,6 @@ import {
   LoginRequestDto,
   MemberSignUpRequestDto,
   OAuthRequestDto,
-  ValidateRequestDto,
   UserInvitationsRequestDto,
   SaveOrUpdateProviderAuthRequestDto,
   MemberLoginRequestDto,
@@ -162,7 +130,7 @@ export class AuthController {
 
   public static logout = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: TokenRequestDto = req.body;
+      const payload: TokenRequestDto = req.token;
       const response: string = await AuthService.logout(payload);
       const createResponse = new CreateResponse(response, 'Logged out successfully.');
      res.status(createResponse.statusCode).json(createResponse);
@@ -541,7 +509,9 @@ export class AuthController {
   //post and delete
   public static manageFavoriteUser = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: ManageFavoriteUserRequestDto = req.body;
+      const favorite = req.method === 'POST' ? true : req.method === 'DELETE' ? false : null;
+      const { id } = req.params;
+      const payload: ManageFavoriteUserRequestDto = {...req.body, userId: id, favorite};
       const response: string = await AuthService.manageFavoriteUser(payload);
       const updateResponse = new UpdateResponse(response, 'Successfully managed user favorite');
       res.status(updateResponse.statusCode).json(updateResponse);
