@@ -17,7 +17,7 @@ export class SettingsController {
 
   public static getNotificationSettings = asyncWrapper(
     async (req, res): Promise<void> => {
-      const userId  = req.user;
+      const userId  = req.params.id;
       const response: UserSettingResponse = await SettingsService.getNotificationSettings(userId);
       const successResponse = new GetResponse(
         response
