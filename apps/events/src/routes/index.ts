@@ -319,14 +319,14 @@ router.delete(
 );
 router.get("/events/:id/guests-overview", GuestController.listGuestsOverview);
 // User request,
+
 router.post(
   "/events/request/guest",
-  AuthMiddleware.fusionAuthRequired,
   GuestController.requestBecomeGuest
 );
+
 router.put(
   "/events/request/guest",
-  AuthMiddleware.fusionAuthRequired,
   GuestController.updateRequestBecomeGuest
 );
 //Guests Profiles
@@ -341,20 +341,19 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   GuestController.getGuestDetails
 );
+
 router.put(
-  "/v1/users/:id/events/:eventId/accept",
-  AuthMiddleware.fusionAuthRequired,
+  "/users/:id/events/:eventId/accept",
   GuestController.acceptEventInvitation
 );
-//users
+
 router.put(
-  "/v1/users/:id/events/:eventId/decline",
-  AuthMiddleware.fusionAuthRequired,
+  "/users/:id/events/:eventId/decline",
   GuestController.declineEventInvitation
 );
+
 router.put(
-  "/v1/users/:id/events/:eventId/cancel",
-  AuthMiddleware.fusionAuthRequired,
+  "/users/:id/events/:eventId/cancel",
   GuestController.cancelEventInvitation
 );
 //Users
@@ -362,34 +361,41 @@ router.get(
   "/users/:userId/events/:eventId/request",
   GuestController.getUserRequests
 ); /**TestStatus: working */
+
+
 router.delete(
-  "/v1/users/:userId/events/:eventId/guest/:id",
+  "/users/:userId/events/:eventId/guest/:id",
   GuestController.deleteInvitedGuest
 );
+
+
 router.post(
-  "/v1/users/:id/events/:eventId/invite-guest",
-  AuthMiddleware.fusionAuthRequired,
+  "/users/:id/events/:eventId/invite-guest",
   GuestController.inviteGuest
 );
+
 router.post(
-  "/v1/users/:id/events/:eventId/invite-guests",
-  AuthMiddleware.fusionAuthRequired,
+  "/users/:id/events/:eventId/invite-guests",
   GuestController.inviteGuests
 );
+
 router.get(
-  "/v1/users/:id/events/:eventId/invited-guests",
+  "/users/:id/events/:eventId/invited-guests",
   GuestController.listInvitedGuests
 );
+
 router.post(
   "/events/:id/bulk-user",
   AuthMiddleware.fusionAuthRequired,
   GuestController.bulkUploadGuests
 );
+
 router.get(
   "/events/:count/bulk-user",
   AuthMiddleware.fusionAuthRequired,
   GuestController.fetchBulkGuests
 );
+
 router.get(
   "/events/users/:id/events",
   GuestController.listGuestEvents

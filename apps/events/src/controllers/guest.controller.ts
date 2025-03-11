@@ -193,8 +193,8 @@ export class GuestController {
         id: (req as any).user,
         ...req.body
       }
-      const response: GenericResponse = await GuestService.requestBecomeGuest(payload);
-      const successResponse = new CreateResponse(response);
+      const response: string = await GuestService.requestBecomeGuest(payload);
+      const successResponse = new CreateResponse(response, "Succesfully applied for the event");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
@@ -205,8 +205,8 @@ export class GuestController {
         id: (req as any).user,
         ...req.body
       }
-      const response: GenericResponse = await GuestService.updateRequestBecomeGuest(payload);
-      const successResponse = new UpdateResponse(response);
+      const response: string = await GuestService.updateRequestBecomeGuest(payload);
+      const successResponse = new UpdateResponse(response, "Application updated succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
@@ -259,9 +259,9 @@ export class GuestController {
         id: req.params.id,
         eventId: req.params.eventId,
         ...req.body
-      }
-      const response: GenericResponse = await GuestService.cancelEventInvitation(payload);
-      const successResponse = new UpdateResponse(response);
+      } 
+      const response: string = await GuestService.cancelEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation cancelled");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
@@ -273,8 +273,8 @@ export class GuestController {
         eventId: req.params.eventId,
         ...req.body
       }
-      const response: GenericResponse = await GuestService.declineEventInvitation(payload);
-      const successResponse = new UpdateResponse(response);
+      const response: string = await GuestService.declineEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation declined");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
@@ -286,8 +286,8 @@ export class GuestController {
         eventId: req.params.eventId,
         ...req.body
       }
-      const response: GenericResponse = await GuestService.acceptEventInvitation(payload);
-      const successResponse = new UpdateResponse(response);
+      const response: string = await GuestService.acceptEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation accepted");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
@@ -307,12 +307,15 @@ export class GuestController {
 
   public static inviteGuests = asyncWrapper(
     async (req, res): Promise<void> => {
+      const { id: userId, eventId } = req.params;
       const payload: InvitedGuestsRequestDto = {
-        userId: req.params.id,
-        eventId: req.params.eventId,
-        ...req.body
-      }
-      const response: GuestsDataResponse = await GuestService.inviteGuests(payload);
+        guests: req.body.guests.map((guest) => ({
+          ...guest,
+          userId,
+          eventId,
+        })),
+      };
+      const response: GuestDataSimple[] = await GuestService.inviteGuests(payload);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -387,7 +390,7 @@ export class GuestController {
         eventId: req.params.eventId,
         ...req.body
       }
-      const response: GuestsDataResponse = await GuestService.listInvitedGuests(payload);
+      const response: GuestDataSimple[] = await GuestService.listInvitedGuests(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
@@ -402,7 +405,7 @@ export class GuestController {
         ...req.body
       }
       const response: GenericResponse = await GuestService.deleteInvitedGuest(payload);
-      const successResponse = new DeleteResponse(response);
+      const successResponse = new DeleteResponse(response, "Plus one deleted succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
