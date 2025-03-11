@@ -310,6 +310,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interest
     category: focuses.map((focus) => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     dateOfBirth: user.dateOfBirth,
+    placeId: user?.address?.googlePlaceId,
     phoneNumber: user.phoneNumber,
     email: user.email,
     gender: user.gender,
