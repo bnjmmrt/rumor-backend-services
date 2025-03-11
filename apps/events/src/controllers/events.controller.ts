@@ -31,7 +31,7 @@ import {
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import { EventData, EventTypeData, GenerateTicketForGuestData } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventData, EventTypeData, GenerateTicketForGuestData, ToggleGuestCheckStatusData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 export class EventsController {
 
@@ -447,7 +447,7 @@ export class EventsController {
     const { id } = req.params
     const { query } = req.params
     const payload: ToggleGuestCheckStatusRequestDto = { id, ...req.body }
-    const response: ToggleGuestCheckStatusResponse = await EventsService.toggleGuestCheckStatus(
+    const response: ToggleGuestCheckStatusData = await EventsService.toggleGuestCheckStatus(
       payload
     );
     const successResponse = new GetResponse(response);
