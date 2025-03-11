@@ -195,7 +195,7 @@ router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
 router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
 router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
 //Referrals
-router.post("/auth/referred-users", ReferralCodeController.saveReferredUser)
+router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
 
 
 router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings);
