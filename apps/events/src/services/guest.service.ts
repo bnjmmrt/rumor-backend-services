@@ -1432,7 +1432,7 @@ export class GuestService {
       const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
       const eventResponse = { result: [], totalCount: 0 };
       if (!user) {
-         throw new NotFoundError('User')
+         throw new NotFoundError('user')
       }
 
       const parsedQuery = parse(payload.query);
