@@ -28,6 +28,7 @@ import {
   UserDataSimple,
   UserWithRoles,
   UserIdWithRolesAndToken,
+  AddUserNote,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -73,6 +74,7 @@ import {
   sendSupportEmailRequestDto,
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
+  AddUserNoteRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { GenericResponse, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
@@ -651,8 +653,8 @@ export class AuthController {
 
   public static duplicateCustomList = asyncWrapper(
     async (req, res): Promise<void> => {
-      const userId = (req as any).user;
-      const payload: DuplicateCustomListRequestDto = { ...req.body, userId };
+      const hostId = (req as any).user;
+      const payload: DuplicateCustomListRequestDto = { ...req.body, hostId };
       const response: CustomUsersList = await AuthService.duplicateCustomList(payload);
       const createResponse = new CreateResponse(response, 'Custom list duplicated successfully');
      res.status(createResponse.statusCode).json(createResponse);
@@ -760,10 +762,22 @@ export class AuthController {
 
   public static switchProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: SwitchProfileDto = req.body;
+      const userId = req.params.id
+      const payload: SwitchProfileDto = {...req.body, userId};
       const response: TokenResponseAndRoles = await AuthService.switchProfile(payload);
       const createResponse = new CreateResponse(response, 'Profile switched successfully');
-     res.status(createResponse.statusCode).json(createResponse);
+      res.status(createResponse.statusCode).json(createResponse);
+    }
+  );
+
+  public static addUserNote = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id } = req.params;
+      const userId = (req as any).user;
+      const payload: AddUserNoteRequestDto = { ...req.body, id, userId };
+      const response: AddUserNote = await AuthService.addUserNote(payload);
+      const createResponse = new CreateResponse(response, 'Note added successfully');
+      res.status(createResponse.statusCode).json(createResponse);
     }
   );
 }

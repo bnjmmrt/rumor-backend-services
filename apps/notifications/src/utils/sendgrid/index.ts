@@ -18,7 +18,7 @@ class SendGridHandler {
             dynamicTemplateData: dynamicData,
           });
         } catch (error) {
-          console.error(error, "sendgrid error for approve member")
+          console.error(error.response.data, "sendgrid error for approve member")
           throw new SendGridError("SendGrid Service Failure");
         }
      }
