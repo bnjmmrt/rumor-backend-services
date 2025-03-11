@@ -4461,17 +4461,38 @@ export class AuthService {
       }
     }
 
-    if (payload.targetRole === "non_member") {
-      return {
-        roles: [
-          {
-            roleName: targetProfile.role.name,
-            roleId: targetProfile.role.id,
-          },
-        ],
-        id: user.id,
-        token: "",
-      };
+    if (payload.targetRole === 'non_member') {
+      try {
+        const request: PasswordlessStartRequest = {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          loginId: user.email,
+        };
+
+        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+
+        return {
+          token: authenticatedUser.response.token,
+          roles: [
+            {
+              roleName: targetProfile.role.name,
+              roleId: targetProfile.role.id,
+            },
+          ],
+          id: user.id,
+        }
+      } catch (error) {
+        return {
+          token: '',
+          roles: [
+            {
+              roleName: targetProfile.role.name,
+              roleId: targetProfile.role.id,
+            },
+          ],
+          id: user.id,
+        }
+      }
     }
 
     const request: PasswordlessStartRequest = {

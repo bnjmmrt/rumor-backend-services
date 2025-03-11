@@ -762,7 +762,8 @@ export class AuthController {
 
   public static switchProfile = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: SwitchProfileDto = req.body;
+      const userId = req.params.id
+      const payload: SwitchProfileDto = {...req.body, userId};
       const response: TokenResponseAndRoles = await AuthService.switchProfile(payload);
       const createResponse = new CreateResponse(response, 'Profile switched successfully');
       res.status(createResponse.statusCode).json(createResponse);
