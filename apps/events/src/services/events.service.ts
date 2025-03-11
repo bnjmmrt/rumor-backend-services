@@ -2963,7 +2963,7 @@ export class EventsService {
         where: { id: eventId, owner: { id: userId } },
       });
       if (!event) throw new NotFoundError('Event not found');
-      const guestCounts = await this.dbConnection.getRepository(Event)
+      const guestCounts = await this.dbConnection.getRepository(Guest)
         .createQueryBuilder('guest')
         .select([
           `COUNT(CASE WHEN guest.status = :invited THEN 1 END) AS invitedCount`,
