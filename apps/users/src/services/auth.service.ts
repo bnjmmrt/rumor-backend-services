@@ -207,7 +207,6 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
-import { generateErrorCsv, parseCsv } from '../common/helper';
 import { generateUniqueFileName } from 'rumor-utils/files_migrated_service_utils/src/commons/helpers';
 import S3Service from '../utils/aws/s3';
 import { count } from 'console';
@@ -3194,6 +3193,7 @@ export class AuthService {
     }
 
     return {
+      id: user.id,
       token: loginResponse.response.token,
       roles: user.roles.map((item) => {
         return { roleName: item.role.name, roleId: item.role.id };
