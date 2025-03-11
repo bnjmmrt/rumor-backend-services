@@ -1985,13 +1985,13 @@ export class AuthService {
     }
 
     const allLists = [
-      { id: null, name: 'Followed', count: user.followers.length, users: [] },
-      { id: null, name: 'Favorite', count: user.favoritedMembers.length, users: [] },
+      { id: null, name: 'Followed', totalCount: user.followers.length, result: [] },
+      { id: null, name: 'Favorite', totalCount: user.favoritedMembers.length, result: [] },
       ...user.customLists.map((list) => ({
         id: list.id,
         name: list.listName,
-        count: list.usersLists.length,
-        users: [],
+        totalCount: list.usersLists.length,
+        result: [],
       })),
     ];
 
@@ -2120,8 +2120,8 @@ export class AuthService {
     const data = {
       name: customList.listName,
       id: customList.id,
-      count: totalCount,
-      users: users,
+      totalCount: totalCount,
+      result: users,
     }
 
     return data;
@@ -2197,8 +2197,8 @@ export class AuthService {
   }
 
   public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersList> {
-    const { hostId, name, userIds, customListId, mappingIds } = payload;
-    if (!name) {
+    const { hostId, customName, userIds, customListId, mappingIds } = payload;
+    if (!customName) {
       throw new BadRequestError("Custom list name is required.");
     }
     const host = await this.dbConnection.getRepository(User).findOne({
@@ -2213,11 +2213,11 @@ export class AuthService {
       throw new NotFoundError("Custom list not found.");
     }
 
-    if (customList.listName !== name) {
-      if (host.customLists.some((list) => list.listName === name)) {
+    if (customList.listName !== customName) {
+      if (host.customLists.some((list) => list.listName === customName)) {
         throw new BadRequestError("Custom list with this name already exists.");
       }
-      customList.listName = name;
+      customList.listName = customName;
       await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
     }
 

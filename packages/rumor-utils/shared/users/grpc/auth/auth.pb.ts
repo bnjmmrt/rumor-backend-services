@@ -839,8 +839,8 @@ export interface SocialMediaStats {
 
 export interface CustomUsersList {
   name: string;
-  users: UsersList[];
-  count?: number | undefined;
+  result: UsersList[];
+  totalCount?: number | undefined;
   id: string;
 }
 
@@ -863,7 +863,7 @@ export interface ManageCustomUsersListRequest {
 
 export interface UpdateCustomUsersListRequest {
   hostId: string;
-  name: string;
+  customName: string;
   userIds: string[];
   customListId: string;
   mappingIds: string[];

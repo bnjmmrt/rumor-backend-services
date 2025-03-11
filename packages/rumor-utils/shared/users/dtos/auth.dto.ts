@@ -490,7 +490,7 @@ export class UpdateCustomUsersListRequestDto implements UpdateCustomUsersListReq
 
   @IsString()
   @IsNotEmpty()
-  name: string;
+  customName: string;
 
   @IsArray()
   @IsUUID('4', { each: true })
