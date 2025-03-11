@@ -164,9 +164,6 @@ export class SignupFormsServices {
       if (!event) {
         throw new NotFoundError("Event");
       }
-      if (!event.isPublished) {
-        throw new ForbiddenError("This event is not published.");
-      }
       if (event.isPrivate) {
         throw new ForbiddenError(
           "You cannot create signup forms for private events."
