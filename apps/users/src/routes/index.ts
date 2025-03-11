@@ -89,7 +89,7 @@ router.post('/auth/user/invite-as-non-member', AuthController.registerInvitesAsN
 router.post('/auth/create-user', AuthMiddleware.fusionAuthRequired, AuthController.createUser);
 router.get('/auth/users-list', AuthMiddleware.fusionAuthRequired, AuthController.getAllUsers);
 router.get('/auth/host/:id/filters', AuthMiddleware.fusionAuthRequired, AuthController.getUserFiltersOptions);
-router.post('/auth/host-feedback', AuthMiddleware.fusionAuthRequired, AuthController.hostFeedback);
+router.post('/auth/host-feedback', AuthController.hostFeedback);
 router.post('/auth/send-verification-code-by-email', AuthController.sendVerificationCodeByEmail);
 router.post('/auth/verify-code-by-email', AuthController.verifyCodeByEmail);
 router.post('/auth/user/:id/set-login-status', AuthController.setLoginStatus);
