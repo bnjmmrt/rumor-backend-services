@@ -241,8 +241,6 @@ export class Seeders {
             deletedAt: null,
           },
         });
-        console.log("🚀 ~ Seeders ~ settingsEntry ~ settingsEntry:", settingsEntry)
-
         if (settingsEntry) {
           Object.assign(settingsEntry, item.config);
         } else {
