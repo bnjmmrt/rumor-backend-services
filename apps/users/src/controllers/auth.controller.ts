@@ -717,7 +717,13 @@ export class AuthController {
 
   public static blockHost = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: BlockHostRequestDto = req.body;
+      const { id, hostId } = req.params;
+      const payload: BlockHostRequestDto = {
+        blockedById: id,
+        blockedToId: hostId,
+        blockedByRoleId: req.body.blockedByRoleId,
+        blockedToRoleId: req.body.blockedToRoleId
+      };
       const response: ReportData = await AuthService.blockHost(payload);
       const createResponse = new CreateResponse(response, 'Host blocked successfully.');
      res.status(createResponse.statusCode).json(createResponse);
@@ -726,7 +732,13 @@ export class AuthController {
 
   public static unblockHost = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: BlockHostRequestDto = req.body;
+      const { id, hostId } = req.params;
+      const payload: BlockHostRequestDto = {
+        blockedById: id,
+        blockedToId: hostId,
+        blockedByRoleId: req.body.blockedByRoleId,
+        blockedToRoleId: req.body.blockedToRoleId
+      };
       const response: string = await AuthService.unblockHost(payload);
       const createResponse = new CreateResponse(response, 'Host unblocked successfully.');
      res.status(createResponse.statusCode).json(createResponse);
@@ -735,7 +747,14 @@ export class AuthController {
 
   public static reportAndBlockHost = asyncWrapper(
     async (req, res): Promise<void> => {
-      const payload: ReportUserRequestDto = req.body;
+      const { id, hostId } = req.params;
+      const payload: ReportUserRequestDto = {
+        reportedById: id,
+        reportedToId: hostId,
+        reportMessage: req.body.reportMessage,
+        reportedByRoleId: req.body.reportedByRoleId,
+        reportedToRoleId: req.body.reportedToRoleId
+      };
       const response: ReportData = await AuthService.reportAndBlockHost(payload);
       const createResponse = new CreateResponse(response, 'Host reported and blocked successfully.');
      res.status(createResponse.statusCode).json(createResponse);
