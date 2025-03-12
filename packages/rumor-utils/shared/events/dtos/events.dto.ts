@@ -369,6 +369,10 @@ export class ValidateTicketForGuestRequestDto implements ValidateTicketForGuestR
   @IsString()
   @IsNotEmpty()
   ticketToken: string;
+
+  @IsString()
+  @IsNotEmpty()
+  eventId: string;
 }
 
 export class ToggleGuestCheckStatusRequestDto implements ToggleGuestCheckStatusRequest {
