@@ -2501,9 +2501,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        existingUsers.forEach((user) => {
-          if (userMap.has(row.email) || userMap.has(row.phoneNumber)) {
-            if (mappingSet.has(user.id)) {
+        const existingUserData = existingUsers.find(
+          (user) => {
+            if(user.email === row.email || user.phoneNumber === row.phoneNumber)
+            return user;
+          }
+        );
+          if (existingUserData && userMap.has(row.email) || userMap.has(row.phoneNumber)) {
+            if (mappingSet.has(existingUserData.id)) {
               const user = {
                 firstName: row.firstName,
                 lastName: row.lastName,
@@ -2516,33 +2521,33 @@ export class GuestService {
               if (row.phoneNumber) userMap.delete(row.phoneNumber);
               return false; // Remove from validData
             }
-            newMappings.push({ user, host: { id: payload.hostId } });
+            newMappings.push({ user: existingUserData, host: { id: payload.hostId } });
             if (row.email) userMap.delete(row.email);
             if (row.phoneNumber) userMap.delete(row.phoneNumber);
             return false; 
           }
           return true; // Keep row in validData 
         });
-      });
     }
       const users: SimpleUser[] = [];
       if (updatedValidData.length > 0) {
-        await Promise.all(
-          updatedValidData.map(async (row: User) => {
-            if (row.email && row.firstName && row.lastName && row.phoneNumber) {
-              const user = (await serviceMesh.userService().registerInvitesAsNonMember(
-                {
-                  ...row,
-                  eventId: payload.eventId,
-                  userId: payload.hostId,
-                }
-              )).data;
-              users.push(user.data);
-            }
-          }),
-        );
+        const userPromises = updatedValidData.map(async (row: User) => {      
+          if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
+            const response = await serviceMesh.userService().registerInvitesAsNonMember({
+              ...row,
+              eventId: payload.eventId,
+              userId: payload.hostId,
+            });
+      
+            return response.data; // Ensure it returns a valid user
+          }
+          return null; // Return null for skipped rows
+        });
+      
+        const resolvedUsers = await Promise.all(userPromises);
+        users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
       }
-
+      
       // Step 7: Generate an error CSV file for invalid or duplicate data
       const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
       let errFileUrl: string | null = null;

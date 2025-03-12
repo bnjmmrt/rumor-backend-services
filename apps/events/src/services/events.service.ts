@@ -2391,7 +2391,7 @@ export class EventsService {
     if (!decodedToken) {
       throw new BadRequestError('Invalid ticket token');
     }
-
+    if (payload.eventId !== decodedToken.eventId) throw new BadRequestError('Event does not match with the guests tickets Event')
     // Step 2: Fetch the ticket details from the database
     const ticket = await this.dbConnection.getRepository(Ticket).findOne({
       where: { id: decodedToken.ticket },
@@ -2423,7 +2423,6 @@ export class EventsService {
       }
       await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: true });
     }
-
     // Step 7: Fetch updated ticket status to return in the response
     const updatedTicket = await this.dbConnection.getRepository(Ticket).findOne({
       where: { id: ticket.id },
