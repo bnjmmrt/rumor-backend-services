@@ -20,37 +20,43 @@ const router: Router = express.Router();
 
 router.get(
   "/event/:eventId/event-announcement-guest",
+  AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.getGuestListForAnnoucement
 );
+
 router.get(
   "/event/:eventId/event-announcement-guest/:announcementId",
+  AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.getRecipientListForAnnoucement
 );
 
-//example route with auth implemented
 router.post(
   "/event/:eventId/event-announcement",
   AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.postAnnouncement
 );
+
 router.patch(
   "/event/:eventId/event-announcement/:announcementId",
   AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.updateAnnouncement
 );
 
-// Exposed API for interserivce communication
 router.get(
   "/event/:eventId/event-announcement/:announcementId",
+  AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.getAnnouncement
 );
 
 router.get(
   "/event/:eventId/event-announcements",
+  AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.getAnnouncements
 );
+
 router.delete(
   "/event/:eventId/event-announcement/:announcementId",
+  AuthMiddleware.fusionAuthRequired,
   EventAnnouncementController.deleteAnnouncement
 );
 
