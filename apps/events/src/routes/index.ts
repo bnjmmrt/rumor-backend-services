@@ -386,7 +386,7 @@ router.get(
 );
 
 router.post(
-  "/events/:id/bulk-user",
+  "/events/bulk-user",
   AuthMiddleware.fusionAuthRequired,
   GuestController.bulkUploadGuests
 );
