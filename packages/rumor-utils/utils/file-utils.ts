@@ -89,7 +89,6 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
           record.reason = reasons.join(', ');
           garbageData.push(record);
         }
-        garbageData.push(record);
       }
 
       if (isUploadUser && record.firstName && record.lastName && record.email && record.phoneNumber) {
