@@ -2824,18 +2824,30 @@ export class EventsService {
       if (!guest) throw new BadRequestError('Guest not found');
 
       // Step 2: Fetch the guest's ticket details dynamically.
-      const ticket = await this.dbConnection.getRepository(Ticket).findOne({
+      let ticket = await this.dbConnection.getRepository(Ticket).findOne({
         where: {
           guest: { id: guest.id },
           event: { id: guest.event.id },
         },
       });
 
-      // If the ticket is not found, canceled, or expired, return an error response.
-      if (!ticket || [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
-        throw new BadRequestError('Ticket not found or is cancelled or expired');
+      if (guest.status === GuestStatus.CONFIRMED && !ticket) {
+        const newTicket = await this.dbConnection.getRepository(Ticket).create({
+        ticketType: guest.ticketType,
+        guest: { id: guest.id },
+        event: { id: guest.event.id },
+        user: { id: guest.user.id },
+        status: TicketStatusEnum.TICKET_GENERATED,
+      });
+      
+      await this.dbConnection.getRepository(Ticket).save(newTicket);
+      ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+    }
+    
+      // If the ticket is canceled, or expired, return an error response.
+      if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+        throw new BadRequestError('Ticket is cancelled or expired');
       }
-
       // Step 3: Update ticket status if it's currently "Generated".
       if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
         await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
@@ -2875,7 +2887,7 @@ export class EventsService {
       // Step 6: Return the updated guest details, ticket status, and guest counts.
       return {
         guestId: guest.id,
-        ticketStatus: entityToTicketStatus[updatedTicket?.status ?? TicketStatusEnum.TICKET_GENERATED], // Fetch dynamically.
+        ticketStatus: updatedTicket?.status, // Fetch dynamically.
         checkInStatus: updatedGuest?.checkIn ?? false, // Fetch dynamically.
         totalConfirmedGuests,
         totalCheckedInGuests,

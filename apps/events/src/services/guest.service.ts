@@ -655,7 +655,7 @@ export class GuestService {
     const ticketType = parsedQuery?.ticketType;
     const partySize = parsedQuery?.partySize;
     const vouch = parsedQuery?.vouch;
-    // const checkedInStatus = parsedQuery?.checkedInStatus
+    const checkedInStatus = parsedQuery?.checkedIn
     const userSource = parsedQuery?.userSource;
     const declinedBy = parsedQuery?.declinedBy;
     const spam = parsedQuery?.spam;
@@ -753,6 +753,7 @@ export class GuestService {
       followed,
       customListNames,
       userSource,
+      checkedInStatus
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -824,6 +825,7 @@ export class GuestService {
     followed,
     customListNames,
     userSource,
+    checkedInStatus
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -836,6 +838,15 @@ export class GuestService {
         }),
       );
     }
+
+    if (checkedInStatus) {
+      const checkedInFilters = typeof checkedInStatus === 'string' ? checkedInStatus.split(',') : checkedInStatus;
+      if (checkedInFilters.includes('checkedIn') && !checkedInFilters.includes('notCheckedIn')) {
+        queryBuilder.andWhere('guest.checkIn = :checkedIn', { checkedIn: true });
+      } else if (checkedInFilters.includes('notCheckedIn') && !checkedInFilters.includes('checkedIn')) {
+        queryBuilder.andWhere('guest.checkIn = :notCheckedIn', { notCheckedIn: false });
+      }
+    } 
 
     if (Object.keys(socialNetworkObject).length > 0) {
       const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
@@ -882,13 +893,13 @@ export class GuestService {
             qb.orWhere((subQb) => {
               const subQuery = subQb
                 .subQuery()
-                .select('listUsers.id')
+                .select('listUsers.user.id')
                 .from(HostCustomUsersLists, 'customList')
-                .innerJoin('customList.users', 'listUsers')
+                .innerJoin('customList.usersLists', 'listUsers')
                 .where('customList.listName IN (:...customListNames)', { customListNames })
                 .andWhere('customList.host.id = :hostId', { hostId: payload.hostId })
                 .getQuery();
-              return `user.id IN ${subQuery}`;
+              return `user.id IN ${subQuery}`;              
             });
           }
         }),
