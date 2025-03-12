@@ -2434,7 +2434,6 @@ export class GuestService {
 
       // Step 2: Fetch the CSV file from S3 storage
       const fileUrl = await S3Service.getFileUrl(payload.filePath);
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ fileUrl:", fileUrl)
 
       // Step 3: Parse the CSV file to extract guest data
       const { validData, garbageData } = await processCsvFile(fileUrl, payload.isUploadUser ?? false);
@@ -2455,7 +2454,6 @@ export class GuestService {
         ],
       });
     }
-    console.log("🚀 ~ GuestService ~ existingUsers ~ existingUsers:", existingUsers)
     
     // Create a map of email to user ID for quick lookup
     const userMap = new Map<string, string>();
@@ -2541,20 +2539,19 @@ export class GuestService {
               eventId: payload.eventId,
               userId: payload.hostId,
             });
-      
+            console.log("🚀 ~ GuestService ~ response ~ response:", response.data)
             return response.data; // Ensure it returns a valid user
           }
+          console.log("🚀 Blank Blank:", false)
           return null; // Return null for skipped rows
         });
       
         const resolvedUsers = await Promise.all(userPromises);
+        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ resolvedUsers:", resolvedUsers)
         users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
       }
       
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users)
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ garbageData:", garbageData)
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ validData:", validData)
-      
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users) 
       // Step 7: Generate an error CSV file for invalid or duplicate data
       const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
       let errFileUrl: string | null = null;
