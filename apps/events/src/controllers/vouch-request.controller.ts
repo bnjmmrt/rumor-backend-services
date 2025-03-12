@@ -35,6 +35,7 @@ export class VouchRequestController {
   public static updateVouchRequest = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: UpdateVouchRequestDto = {
+        userId: (req as any).user,
         id: req.params.id,
         ...req.body
       }

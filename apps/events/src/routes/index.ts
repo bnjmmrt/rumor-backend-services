@@ -412,13 +412,15 @@ router.get(
 );
 
 //Vouches
-router.post("/events/vouch-requests", VouchRequestController.createVouchRequest); /**TestStatus: working */
+router.post("/events/vouch-requests", AuthMiddleware.fusionAuthRequired, VouchRequestController.createVouchRequest); /**TestStatus: working */
 router.get(
   "/events/vouch-requests",
+  AuthMiddleware.fusionAuthRequired,
   VouchRequestController.getAllVouchRequests
 );
 router.put(
   "/events/vouch-requests/:id",
+  AuthMiddleware.fusionAuthRequired,
   VouchRequestController.updateVouchRequest
 ); /**TestStatus: working */
 router.get("/events/user/:id/vouches", VouchRequestController.getUserVouches); /**TestStatus: working */
