@@ -1665,7 +1665,7 @@ export class GuestService {
               },
             })
           : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
-          this.dbConnection.getRepository(Event).find({
+         await this.dbConnection.getRepository(Event).find({
           where: {
             ...whereClause,
             isPrivate: false,
@@ -2430,10 +2430,11 @@ export class GuestService {
       if (!event && !payload.isUploadUser) throw new NotFoundError('Event not found');
 
       // Ensure that the provided hostId is the owner of the event
-      if (!payload.isUploadUser && event.owner.id !== payload.hostId) throw new BadRequestError('Host is not the owner of the event');
+      if (!payload.isUploadUser && (!event.owner || event.owner.id !== payload.hostId)) throw new BadRequestError('Host is not the owner of the event');
 
       // Step 2: Fetch the CSV file from S3 storage
       const fileUrl = await S3Service.getFileUrl(payload.filePath);
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ fileUrl:", fileUrl)
 
       // Step 3: Parse the CSV file to extract guest data
       const { validData, garbageData } = await processCsvFile(fileUrl, payload.isUploadUser ?? false);
@@ -2444,19 +2445,23 @@ export class GuestService {
       if (payload.isUploadUser)
       phoneNumbers = validData.map((row) => row.phoneNumber).filter((phone) => phone);
 
-    // Step 4: Fetch existing users based on extracted emails
-    const existingUsers =  await this.dbConnection.getRepository(User).find({
-      where: [
-        { email: In(emails), deletedAt: IsNull() },
-        { phoneNumber: In(phoneNumbers), deletedAt: IsNull() },
-      ],
-    });
+    // Step 4: Fetch existing users based on extracted emails and phone numbers
+    let existingUsers: User[] = [];
+    if (emails.length > 0 || phoneNumbers.length > 0) {
+      existingUsers = await this.dbConnection.getRepository(User).find({
+        where: [
+          ...(emails.length ? [{ email: In(emails), deletedAt: IsNull() }] : []),
+          ...(phoneNumbers.length ? [{ phoneNumber: In(phoneNumbers), deletedAt: IsNull() }] : [])
+        ],
+      });
+    }
+    console.log("🚀 ~ GuestService ~ existingUsers ~ existingUsers:", existingUsers)
     
     // Create a map of email to user ID for quick lookup
     const userMap = new Map<string, string>();
     const removedEmails = new Set<string>();
     const newMappings = [];
-    let updatedValidData;
+    let updatedValidData: CsvRecord[] = [];
     if (existingUsers.length > 0) {
       existingUsers.forEach((user) => {
         if (user.email) userMap.set(user.email, user.id);
@@ -2502,12 +2507,9 @@ export class GuestService {
           return false; // Remove from validData
         }
         const existingUserData = existingUsers.find(
-          (user) => {
-            if(user.email === row.email || user.phoneNumber === row.phoneNumber)
-            return user;
-          }
+          (user) => user.email === row.email || user.phoneNumber === row.phoneNumber
         );
-          if (existingUserData && userMap.has(row.email) || userMap.has(row.phoneNumber)) {
+          if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
             if (mappingSet.has(existingUserData.id)) {
               const user = {
                 firstName: row.firstName,
@@ -2530,6 +2532,7 @@ export class GuestService {
         });
     }
       const users: SimpleUser[] = [];
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ updatedValidData:", updatedValidData)
       if (updatedValidData.length > 0) {
         const userPromises = updatedValidData.map(async (row: User) => {      
           if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
@@ -2547,6 +2550,10 @@ export class GuestService {
         const resolvedUsers = await Promise.all(userPromises);
         users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
       }
+      
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users)
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ garbageData:", garbageData)
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ validData:", validData)
       
       // Step 7: Generate an error CSV file for invalid or duplicate data
       const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
@@ -3008,6 +3015,7 @@ export class GuestService {
           guestId,
           userId: user?.id || null,
           ticketType: ticketType?.name || null,
+          inviteMessage: guestDetail.inviteMessage,
           maxAdditionalGuests,
           privateGuestNote,
           guestStatus,

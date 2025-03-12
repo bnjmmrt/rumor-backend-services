@@ -119,7 +119,7 @@ router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRe
 router.post('/auth/users/:id/hosts/:hostId/report-and-block', AuthMiddleware.fusionAuthRequired, AuthController.reportAndBlockHost);
 router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthController.sendSupportEmail);
 router.get('/auth/admin/reports', AuthController.getAllReports);
-router.get('/auth/switch-profile/:id', AuthController.switchProfile);
+router.post('/auth/switch-profile/:id', AuthController.switchProfile);
 router.post('/auth/user/:id/note', AuthController.addUserNote);
 
 //Role routes

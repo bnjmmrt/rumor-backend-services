@@ -223,7 +223,6 @@ export class GuestController {
     async (req, res): Promise<void> => {
       const payload: BulkUploadGuestsRequestDto = {
         hostId: (req as any).user,
-        eventId: req.params.id,
         ...req.body
       }
       const response: BulkUserData = await GuestService.bulkUploadGuests(payload);

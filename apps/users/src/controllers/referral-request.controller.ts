@@ -33,7 +33,7 @@ export class ReferralRequestController {
       const payload: IdRequestDto = { id };
       const response: ReferralRequestsResponse =
         await ReferralRequestService.getReferralRequests(payload);
-      const getResponse = new GetResponse(response);
+      const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
     }
   );

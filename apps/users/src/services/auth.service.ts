@@ -3277,7 +3277,7 @@ export class AuthService {
     if (hostRole === undefined) return responses.notFound('Host not found');
 
     if (memberId !== host.id) {
-      const hostFollowing = this.dbConnection.getRepository(HostFollowing).findOne({
+      const hostFollowing = await this.dbConnection.getRepository(HostFollowing).findOne({
         where: {
           follower: { id: memberId },
           host: { id: host.id },
@@ -4065,8 +4065,8 @@ export class AuthService {
       throw new NotFoundError('User')
     }
     const [focuses, interests] = await Promise.all([
-      [],
-      [],
+      (await PlatformService.getUserFocuses({ id: user.id })),
+      (await PlatformService.getUserInterests({ id: user.id }))
     ]);
     const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
       this.dbConnection.getRepository(HostUserSettings).findOne({

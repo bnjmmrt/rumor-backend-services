@@ -39,9 +39,8 @@ export class ReferralRequestService {
   }
 
   public static async getReferralRequests(payload: IdRequestDto): Promise<ReferralRequestsResponse> {
-    try {
-      const referralRequests = await this.dbConnection
-        .getRepository(ReferralRequest).find({
+    const referralRequests = await this.dbConnection
+      .getRepository(ReferralRequest).find({
         where: {
           user: { id: payload.id },
           isApproved: IsNull(),
@@ -51,11 +50,7 @@ export class ReferralRequestService {
         },
       });
 
-      return responses.data(referralRequests.map((referral) => toReferralRequest(referral)));
-    } catch (err) {
-    //   this.logger.error(err);
-      return responses.badRequest('Error getting referral requests');
-    }
+    return responses.data(referralRequests.map((referral) => toReferralRequest(referral)));
   }
 
   public static async updateReferralRequest(payload: UpdateReferralRequestDto): Promise<GenericResponse> {
