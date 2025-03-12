@@ -928,7 +928,7 @@ export class EventsService {
       const eventsFiltered = events
         .map((item) => toEvent(item, null))
         .filter((event) => {
-          const eventStatusString = EventStatus[event.status]?.toLowerCase() ?? '';
+          const eventStatusString = event.status.toLowerCase() ?? '';
           return (
             event.name?.toLowerCase().includes(searchValueLower) ||
             event.description?.toLowerCase().includes(searchValueLower) ||
