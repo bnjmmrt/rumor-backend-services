@@ -1,17 +1,11 @@
 import { GuestService } from '../services/guest.service';
-
 import {
   GenericResponse,
-  GetGuestProfileResponse,
-  GuestsResponse,
-  ListEventGuestsResponse,
-  GuestsDataResponse,
-  ListUsersEventInviteesResponse,
-  UsersAttendeesResponse,
   GetUserRequestsResponse,
-  GuestDetailsResponse,
+  GetAttendeeCountRequest,
+  PaginatedGuestEventsResponse,
+  Attendees, Guests, FetchBulkGuestsData
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-
 import {
   GuestsRequestDto,
   ListEventGuestsDto,
@@ -25,120 +19,398 @@ import {
   GuestsQueryRequestDto,
   ManageBulkGuestsRequestDto,
   ListUsersEventInviteesRequestDto,
+  ManageGuestsRequestDto,
+  BulkUploadGuestsRequestDto,
+  FetchBulkGuestsRequestDto,
+  InvitedGuestsRequestDto,
+  InviteNewUserRequestDto,
+  AddGuestsRequestDto,
+  AcceptEventInvitationRequestDto
 } from 'rumor-utils/shared/events/dtos/guest.dto';
-
-import { AddGuestsRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos';
+import { IdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import asyncWrapper from '../server/helpers/asyncWrapper';
+import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
+import { RequestByUserAndEventDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { GuestDataSimple, GuestData, BulkUserData, GuestDetails, UserAttendee, UserEventInviteesData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 
 export class GuestController {
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'AddGuests')
-  public async addGuests(payload: AddGuestsRequestDto): Promise<GuestsResponse> {
-    return GuestService.addGuests(payload);
-  }
+  public static manageGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageGuestsRequestDto = {
+        hostId: (req as any).user,
+        query: req.query as string,
+        ...req.body
+      }
+      const token = (req as any).token;
+      const response: {message: string} = await GuestService.manageGuests(payload, token);
+      const successResponse = new UpdateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'WithdrawInvites')
-  public async withdrawInvites(payload: GuestsRequestDto): Promise<GenericResponse> {
-    return GuestService.withdrawInvites(payload);
-  }
+  public static addGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: AddGuestsRequestDto = {
+        eventId: req.params.id,
+        hostId: (req as any).user,
+        ...req.body
+      }
+      const token = (req as any).token;
+      const response: Guests = await GuestService.addGuests(payload, token);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuests')
-  public async getGuests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
-    return GuestService.getGuests(payload);
-  }
+  public static withdrawInvites = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsRequestDto = {
+        eventId: req.params.id,
+        ...req.body
+      }
+      const response: GenericResponse = await GuestService.withdrawInvites(payload);
+      const successResponse = new UpdateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateGuests')
-  public async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestsDataResponse> {
-    return GuestService.updateGuests(payload);
-  }
+  public static getGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsQueryRequestDto = {
+        eventId: req.params.id,
+        hostId: (req as any).user,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: Guests = await GuestService.getGuests(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeleteGuests')
-  public async deleteGuests(payload: GuestsRequestDto): Promise<GenericResponse> {
-    return GuestService.deleteGuests(payload);
-  }
+  public static updateGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateGuestsRequestDto = {
+        eventId: req.params.id,
+        hostId: (req as any).user,
+        ...req.body
+      }
+      const response: GuestDataSimple[] = await GuestService.updateGuests(payload);
+      const successResponse = new UpdateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListGuestsOverview')
-  private async listGuestsOverview(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    return GuestService.listGuestsOverview(payload);
-  }
+  public static deleteGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsRequestDto = {
+        eventId: req.params.id,
+        ...req.body
+      }
+      const response: GenericResponse = await GuestService.deleteGuests(payload);
+      const successResponse = new DeleteResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListGuestProfiles')
-  private async listGuestProfiles(payload: GuestsQueryRequestDto): Promise<GuestsDataResponse> {
-    return GuestService.listGuestProfiles(payload);
-  }
+  public static listGuestsOverview = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsQueryRequestDto = {
+        eventId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: GuestDataSimple[] = await GuestService.listGuestsOverview(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuestProfile')
-  private async getGuestProfile(payload: RequestByIdDto): Promise<GetGuestProfileResponse> {
-    return GuestService.getGuestProfile(payload);
-  }
+  public static listGuestProfiles = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsQueryRequestDto = {
+        eventId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: GuestDataSimple[] = await GuestService.listGuestProfiles(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  // GetUserEventInvitees
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetUserEventInvitees')
-  public async getUsersEventInvitees(payload: ListUsersInviteesDto): Promise<ListUsersEventInviteesResponse> {
-    return GuestService.getUsersEventInvitees(payload);
-  }
+  public static getGuestProfile = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserAndIdRequestDto = {
+        eventId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: GuestData = await GuestService.getGuestProfile(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventGuests')
-  private async listGuestEvents(payload: ListEventGuestsDto): Promise<ListEventGuestsResponse> {
-    return GuestService.listEventGuests(payload);
-  }
+  public static getUsersEventInvitees = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListUsersInviteesDto = {
+        userId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const token = (req as any).token;
+      const response: UserEventInviteesData[] = await GuestService.getUsersEventInvitees(payload, token);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'RequestBecomeGuest')
-  private async requestBecomeGuest(payload: RequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    return GuestService.requestBecomeGuest(payload);
-  }
+  public static listGuestEvents = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListEventGuestsDto = {
+        userId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: PaginatedGuestEventsResponse = await GuestService.listEventGuests(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateRequestBecomeGuest')
-  private async updateRequestBecomeGuest(payload: UpdateRequestBecomeGuestRequestDto): Promise<GenericResponse> {
-    return GuestService.updateRequestBecomeGuest(payload);
-  }
+  public static requestBecomeGuest = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RequestBecomeGuestRequestDto = {
+        id: (req as any).user,
+        ...req.body
+      }
+      const response: string = await GuestService.requestBecomeGuest(payload);
+      const successResponse = new CreateResponse(response, "Succesfully applied for the event");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'SyncUserTopAttendee')
-  public async syncUserTopAttendee(): Promise<GenericResponse> {
-    return GuestService.syncUserTopAttendee();
-  }
+  public static updateRequestBecomeGuest = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateRequestBecomeGuestRequestDto = {
+        id: (req as any).user,
+        ...req.body
+      }
+      const response: string = await GuestService.updateRequestBecomeGuest(payload);
+      const successResponse = new UpdateResponse(response, "Application updated succesfully");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetTopUsersAttendees')
-  public async getTopUsersAttendees(): Promise<UsersAttendeesResponse> {
-    return GuestService.getTopUsersAttendees();
-  }
+  public static syncUserTopAttendee = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: GenericResponse = await GuestService.syncUserTopAttendee();
+      const successResponse = new UpdateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  // Guest invitations
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CancelEventInvitation')
-  private async cancelEventInvitation(payload: CancelEventInvitationRequestDto): Promise<GenericResponse> {
-    return GuestService.cancelEventInvitation(payload);
-  }
+  public static getTopUsersAttendees = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const response: UserAttendee[] = await GuestService.getTopUsersAttendees();
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeclineEventInvitation')
-  private async declineEventInvitation(payload: DeclineEventInvitationRequestDto): Promise<GenericResponse> {
-    return GuestService.declineEventInvitation(payload);
-  }
+  public static bulkUploadGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: BulkUploadGuestsRequestDto = {
+        hostId: (req as any).user,
+        ...req.body
+      }
+      const response: BulkUserData = await GuestService.bulkUploadGuests(payload);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'InviteGuest')
-  private async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestsDataResponse> {
-    return GuestService.inviteGuest(payload);
-  }
+  public static fetchBulkGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: FetchBulkGuestsRequestDto = {
+        count: req.params.count,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: FetchBulkGuestsData = await GuestService.fetchBulkGuests(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListUserRequests')
-  private async listUserRequests(payload: GuestsQueryRequestDto): Promise<GuestsResponse> {
-    return GuestService.listUserRequests(payload);
-  }
+  public static cancelEventInvitation = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CancelEventInvitationRequestDto = {
+        id: req.params.id,
+        eventId: req.params.eventId,
+        ...req.body
+      } 
+      const response: string = await GuestService.cancelEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation cancelled");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetUserRequests')
-  private async getUserRequests(payload: RequestByIdDto): Promise<GetUserRequestsResponse> {
-    return GuestService.getUserRequests(payload);
-  }
+  public static declineEventInvitation = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: DeclineEventInvitationRequestDto = {
+        id: req.params.id,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: string = await GuestService.declineEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation declined");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetGuestDetails')
-  private getGuestDetails(payload: RequestByIdDto): Promise<GuestDetailsResponse> {
-    return GuestService.getGuestDetails(payload);
-  }
+  public static acceptEventInvitation = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: AcceptEventInvitationRequestDto = {
+        userId: req.params.id,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: string = await GuestService.acceptEventInvitation(payload);
+      const successResponse = new UpdateResponse(response, "Invitation accepted");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ManageBulkGuests')
-  private manageBulkGuests(payload: ManageBulkGuestsRequestDto): Promise<GenericResponse> {
-    return GuestService.manageBulkGuests(payload);
-  }
+  public static inviteGuest = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InvitedGuestRequestDto = {
+        userId: req.params.id,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: GuestDataSimple[] = await GuestService.inviteGuest(payload);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListInvitedGuests')
-  private listInvitedGuests(payload: ListUsersEventInviteesRequestDto): Promise<GuestsDataResponse> {
-    return GuestService.listInvitedGuests(payload);
-  }
+  public static inviteGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id: userId, eventId } = req.params;
+      const payload: InvitedGuestsRequestDto = {
+        guests: req.body.guests.map((guest) => ({
+          ...guest,
+          userId,
+          eventId,
+        })),
+      };
+      const response: GuestDataSimple[] = await GuestService.inviteGuests(payload);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static inviteNewUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: InviteNewUserRequestDto = {
+        eventId: req.params.eventId,
+        userId: (req as any).user,
+        ...req.body
+      }
+      const token = (req as any).token;
+      const response: GuestDataSimple = await GuestService.inviteNewUser(payload, token);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static listUserRequests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GuestsQueryRequestDto = {
+        eventId: req.params.id,
+        query: req.query as string,
+        ...req.body
+      }
+      const response: Guests = await GuestService.listUserRequests(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static getUserRequests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: RequestByUserAndEventDto = {
+        userId: req.params.userId,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: GetUserRequestsResponse = await GuestService.getUserRequests(payload);
+      const successResponse = new GetResponse(response.data);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static getGuestDetails = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UserAndIdRequestDto = {
+        id: req.params.id,
+        userid: (req as any).user,
+        ...req.body
+      }
+      const response: GuestDetails = await GuestService.getGuestDetails(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static manageBulkGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ManageBulkGuestsRequestDto = req.body;
+      const response: GenericResponse = await GuestService.manageBulkGuests(payload);
+      const successResponse = new UpdateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static listInvitedGuests = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ListUsersEventInviteesRequestDto = {
+        userId: req.params.id,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: GuestDataSimple[] = await GuestService.listInvitedGuests(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static deleteInvitedGuest = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = {
+        id: req.params.id,
+        eventId: req.params.eventId,
+        userId: req.params.userId,
+        ...req.body
+      }
+      const response: GenericResponse = await GuestService.deleteInvitedGuest(payload);
+      const successResponse = new DeleteResponse(response, "Plus one deleted succesfully");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static getEventAttendeeCountByTicketType = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: GetAttendeeCountRequest = {
+        ticketTypeId: req.params.ticketTypeId,
+        eventId: req.params.eventId,
+        ...req.body
+      }
+      const response: Attendees = await GuestService.getEventAttendeeCountByTicketType(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 }

@@ -18,7 +18,7 @@ export class QuizQuestion extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.quizQuestions, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })

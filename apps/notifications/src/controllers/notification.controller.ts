@@ -1,48 +1,109 @@
-import { Controller, Inject } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
-import { NotificationService } from '../services/notification.service';
+import notificationService from "../services/notification.service";
+import asyncWrapper from "../server/helpers/asyncWrapper";
 
-import { NOTIFICATION_SERVICE_NAME, GetNotificationResponse, ListNotificationsResponse, GenericResponse } from '../grpc/notification/notification.pb';
-import {
-  CreateNotificationRequestDto,
-  ListNotificationsRequestDto,
-  RequestByIdDto,
-  SendPushNotificationRequestDto,
-  UpdateNotificationRequestDto,
-} from '../dtos/notification.dto';
-
-@Controller('notification')
 export class NotificationController {
-  @Inject(NotificationService)
-  private readonly service: NotificationService;
+  public static createNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const {
+        title,
+        message,
+        body,
+        notificationType,
+        notificationModule,
+        recipientIds,
+        linkedUserId,
+        linkedEventId,
+      } = req.body;
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'CreateNotification')
-  private async createNotification(payload: CreateNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.createNotification(payload);
-  }
+      const response = await notificationService.createNotification(
+        title,
+        message,
+        body,
+        notificationType,
+        notificationModule,
+        recipientIds,
+        linkedUserId,
+        linkedEventId
+      );
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'UpdateNotification')
-  private async updateNotification(payload: UpdateNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.updateNotification(payload);
-  }
+  public static getAllNotifications = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const recipientId = req.user;
+      const { take = 10, skip = 0 } = req.query;
+      
+      const response = await notificationService.getAllNotifications(
+        recipientId,
+        Number(take),
+        Number(skip)
+      );
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'GetNotification')
-  private async getNotification(payload: RequestByIdDto): Promise<GetNotificationResponse> {
-    return this.service.getNotification(payload);
-  }
+  public static getNotificationDetail = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { notificationId } = req.params;
+      
+      const response = await notificationService.getNotificationDetail(notificationId);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'ListNotifications')
-  private async listNotifications(payload: ListNotificationsRequestDto): Promise<ListNotificationsResponse> {
-    return this.service.listNotifications(payload);
-  }
+  public static deleteNotificationById = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { notificationId } = req.params;
+      
+      const response = await notificationService.deleteNotification(notificationId);
+      res.json(response);
+    }
+  );
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'DeleteNotification')
-  private async deleteNotification(payload: RequestByIdDto): Promise<GenericResponse> {
-    return this.service.deleteNotification(payload);
-  }
+  public static deleteMultipleNotifications = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const recipientId = req.user;
+      const { notificationIds } = req.body;
 
-  @GrpcMethod(NOTIFICATION_SERVICE_NAME, 'SendPushNotification')
-  private async sendPushNotification(payload: SendPushNotificationRequestDto): Promise<GenericResponse> {
-    return this.service.sendPushNotification(payload);
-  }
+      if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return res.status(400).json({ error: "Invalid notificationIds array" });
+      }
+
+      const response = await notificationService.deleteMultipleNotifications(
+        recipientId,
+        notificationIds
+      );
+      res.json(response);
+    }
+  );
+
+  public static getNotificationSummary = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const recipientId  = req.user;
+      const response = await notificationService.getNotificationSummary(recipientId);
+      res.json(response);
+    }
+  );
+
+  public static listNotifications = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { take = 10, skip = 0, notificationByModule, notificationByType } = req.query;
+      
+      const response = await notificationService.findAllNotifications(
+        Number(take),
+        Number(skip),
+        notificationByModule as string,
+        notificationByType as string
+      );
+      res.json(response);
+    }
+  );
+
+  // public static sendPushNotification = asyncWrapper(
+  //   async (req, res): Promise<void> => {
+  //     const response = await notificationService.sendPushNotification(req.body);
+  //     res.json(response);
+  //   }
+  // );
 }

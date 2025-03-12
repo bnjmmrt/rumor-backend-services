@@ -21,3 +21,5 @@ export { EventSignupForms } from './event-signup-forms.entity';
 export { SignupFormQuestions } from './signup-form-questions.entity';
 export { SignupFormStaticQuestions } from './signup-form-static-questions.entity';
 export { SignupFormSubmissions } from './signup-form-submissions.entity';
+export { CsvUploadRecords } from './csv-upload-records.entity'
+export { RestrictedInvites } from './restricted-invites.entity'

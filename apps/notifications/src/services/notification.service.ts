@@ -1,252 +1,207 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  CreateNotificationRequestDto,
-  ListNotificationsRequestDto,
-  RequestByIdDto,
-  SendPushNotificationRequestDto,
-  UpdateNotificationRequestDto,
-} from '../dtos/notification.dto';
-import { GenericResponse, GetNotificationResponse, ListNotificationsResponse } from '../grpc/notification/notification.pb';
-import { ConfigService } from '@nestjs/config';
+import database from '../database';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { NotFoundError } from 'rumor-utils/errors';
+import { Event } from 'rumor-utils/shared/events/entities'
+import { User } from 'rumor-utils/shared/users/entities/user.entity';
+import { In } from 'typeorm' 
 
-import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+class NotificationService {
+    public dbConnection = database;
 
-import { Notification } from '../entities/notification.entity';
-import { NotificationSource, NotificationStatus, NotificationType, RecipientsType } from '../interfaces/notification.interface';
-import {
-  notificationSourceToEntity,
-  notificationStatusToEntity,
-  notificationTypeToEntity,
-  recipientsTypeToEntity,
-  toNotificationData,
-} from '../mappers/notification.mapper';
-
-import { parse } from 'qs';
-import { hasPagination } from '../../../user-service/src/dtos/shared.dto';
-import { CommunicationClient } from '@rumor/shared/clients/communication.client';
-import { EmailTemplate } from '@fusionauth/typescript-client';
-import { AuthClient } from '@rumor/shared/clients/auth.client';
-import { responses } from '../common/responses';
-
-@Injectable()
-export class NotificationService {
-  private readonly logger = new Logger(NotificationService.name);
-
-  @InjectRepository(Notification)
-  private readonly notificationRepository: Repository<Notification>;
-
-  @Inject(AuthClient)
-  private readonly authClient: AuthClient;
-
-  @Inject(CommunicationClient)
-  private readonly communicationClient: CommunicationClient;
-
-  constructor(private readonly configService: ConfigService) {}
-
-  async createNotification(payload: CreateNotificationRequestDto): Promise<GenericResponse> {
-    try {
-      const notification = new Notification();
-      notification.title = payload.title;
-      notification.message = payload.message;
-      notification.date = payload.date;
-      notification.time = payload.time;
-
-      let types: NotificationType[] = [];
-      if (payload.type)
-        types = payload.type.map((item) => {
-          return notificationTypeToEntity[item];
-        });
-      notification.type = types;
-      let recipients: RecipientsType[] = [];
-      if (payload.recipients)
-        recipients = payload.recipients.map((item) => {
-          return recipientsTypeToEntity[item];
-        });
-      notification.recipients = recipients;
-      notification.emails = payload.emails;
-      notification.userIds = payload.userIds;
-      notification.source = notificationSourceToEntity[payload.source];
-
-      if (payload.templateId) {
-        const template: Partial<EmailTemplate> = await this.communicationClient.getTemplateById(payload.templateId);
-        if (template) notification.relatedTemplate = template;
-      }
-
-      await this.notificationRepository.save(notification);
-      return responses.ok;
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('An error occurred, when try to create notification.');
-    }
-  }
-
-  async updateNotification(payload: UpdateNotificationRequestDto): Promise<GenericResponse> {
-    try {
-      const notification = await this.notificationRepository.findOne({ where: { id: payload.id } });
-      if (!notification) return responses.notFound('Notification not found');
-
-      if (notification.status == NotificationStatus.SENT) return responses.badRequest('You can not modify a notification already sent');
-
-      notification.title = payload.title || notification.title;
-      notification.message = payload.message || notification.message;
-      notification.date = payload.date || notification.date;
-      notification.time = payload.time || notification.time;
-      notification.emails = payload.emails || notification.emails;
-      notification.userIds = payload.userIds || notification.userIds;
-
-      notification.source = notificationSourceToEntity[payload.source] || notification.source;
-      notification.status = notificationStatusToEntity[payload.status] || notification.status;
-
-      let types: NotificationType[] = [];
-      if (payload.type)
-        types = payload.type.map((item) => {
-          return notificationTypeToEntity[item];
-        });
-      notification.type = types;
-      let recipients: RecipientsType[] = [];
-      if (payload.recipients)
-        recipients = payload.recipients.map((item) => {
-          return recipientsTypeToEntity[item];
-        });
-      notification.recipients = recipients;
-
-      if (payload.templateId) {
-        const template: Partial<EmailTemplate> = await this.communicationClient.getTemplateById(payload.id);
-        if (template) notification.relatedTemplate = template;
-      }
-
-      await this.notificationRepository.save(notification);
-      return responses.ok;
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('An error occurred, when try to update notification.');
-    }
-  }
-
-  async getNotification(payload: RequestByIdDto): Promise<GetNotificationResponse> {
-    try {
-      const notification = await this.notificationRepository.findOne({
-        where: { id: payload.id },
-        relations: ['relatedTemplate'],
-      });
-      if (!notification) return responses.notFound('Notification not found');
-      return responses.data(toNotificationData(notification));
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('An error occurred, when try to get notification.');
-    }
-  }
-
-  async listNotifications(payload: ListNotificationsRequestDto): Promise<ListNotificationsResponse> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const pagination = hasPagination(parsedQuery)
-        ? {
-            take: parseInt(parsedQuery.take),
-            skip: parseInt(parsedQuery.skip),
-          }
-        : {};
-
-      const queryBuilder = this.notificationRepository.createQueryBuilder('notification');
-
-      if (parsedQuery.recipients) {
-        const recipients = String(parsedQuery.recipients)
-          .split(',')
-          .map((item) => item.trim());
-        queryBuilder.andWhere('notification.recipients @> :recipients', {
-          recipients: JSON.stringify(recipients),
-        });
-      }
-
-      if (parsedQuery.type) {
-        const types = String(parsedQuery.type)
-          .split(',')
-          .map((item) => item.trim());
-        queryBuilder.andWhere('notification.type @> :type', {
-          recipients: JSON.stringify(types),
-        });
-      }
-
-      if (parsedQuery.status) {
-        const statusList = String(parsedQuery.status)
-          .split(',')
-          .map((item) => item.trim() as NotificationStatus);
-        queryBuilder.andWhere('notification.status IN (:...statusList)', { statusList });
-      }
-
-      if (parsedQuery.source) {
-        const sources = String(parsedQuery.source)
-          .split(',')
-          .map((item) => item.trim() as NotificationSource);
-        queryBuilder.andWhere('notification.source IN (:...sources)', { sources });
-      }
-
-      if (parsedQuery.date) {
-        const date = new Date(String(parsedQuery.date));
-        queryBuilder.andWhere('notification.date = :date', { date });
-      }
-
-      if (parsedQuery.findByTitleOrMessage) {
-        queryBuilder.andWhere(
-          new Brackets((qb) => {
-            qb.where('notification.title ILIKE :searchTerm', { searchTerm: `%${parsedQuery.findByTitleOrMessage}%` }).orWhere('notification.message ILIKE :searchTerm', {
-              searchTerm: `%${parsedQuery.findByTitleOrMessage}%`,
+    async createNotification(
+        title: string,
+        message: string,
+        body: object,
+        notificationType: string,
+        notificationModule: string,
+        recipientIds: string[],
+        linkedUserId?: string,
+        linkedEventId?: string
+    ): Promise<Notification> {
+        return await this.dbConnection.connection.transaction(async (transactionalEntityManager) => {
+            const notificationRepository = transactionalEntityManager.getRepository(Notification);
+            const userRepository = transactionalEntityManager.getRepository(User);
+            const eventRepository = transactionalEntityManager.getRepository(Event);
+    
+            const newNotification = notificationRepository.create({
+                title,
+                message,
+                body,
+                notificationType,
+                notificationModule,
+                linkedUser: linkedUserId ? await userRepository.findOne({ where: { id: linkedUserId } }) : null,
+                linkedEvent: linkedEventId ? await eventRepository.findOne({ where: { id: linkedEventId } }) : null,
             });
-          }),
-        );
-      }
-
-      if (parsedQuery.sortBy) {
-        const sortOrder = String(parsedQuery.order || 'ASC').toUpperCase();
-        queryBuilder.orderBy(`notification.${parsedQuery.sortBy}`, sortOrder as 'ASC' | 'DESC');
-      }
-
-      if (pagination.take) queryBuilder.take(pagination.take);
-      if (pagination.skip) queryBuilder.skip(pagination.skip);
-
-      queryBuilder.relation('relatedTemplate');
-
-      const notifications = await queryBuilder.getMany();
-
-      return responses.data(notifications.map((item) => toNotificationData(item)));
-    } catch (err) {
-      console.error(err);
-      this.logger.error(err);
-      return responses.badRequest('An error occurred while trying to list notifications.');
+    
+            const savedNotification = await notificationRepository.save(newNotification);
+    
+            if (recipientIds.length > 0) {
+                const recipients = await userRepository.find({where:{id: In(recipientIds)}});
+                savedNotification.recipients = recipients;
+                await notificationRepository.save(savedNotification);
+            }
+    
+            return savedNotification;
+        });
     }
-  }
 
-  async deleteNotification(payload: RequestByIdDto): Promise<GenericResponse> {
-    try {
-      await this.notificationRepository.delete({ id: payload.id });
-      return responses.ok;
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('An error occurred, when try to delete notification.');
+    async getAllNotifications(
+        recipientId: string, 
+        take = 10, 
+        skip = 0
+    ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', { recipientId })
+            .select([
+                'notification.id',
+                'notification.title AS description',
+                'notification.notificationType',
+                'notification.created_at',
+                'notification.message',
+                'notification.body'
+            ])
+            .orderBy('notification.created_at', 'DESC');
+    
+        // Get total count without pagination
+        const totalCount = await queryBuilder.getCount();
+    
+        // Apply pagination
+        const notifications = await queryBuilder
+            .take(take)
+            .skip(skip)
+            .getRawMany();
+    
+        return { totalCount, notifications };
     }
-  }
 
-  async sendPushNotification(payload: SendPushNotificationRequestDto): Promise<GenericResponse> {
-    try {
-      const userSettings = await this.authClient.getUserSettings(payload.userId);
-      if (!userSettings) return responses.notFound('user settings not found');
 
-      const notificationSettings = userSettings.notificationsSettings;
-      if (!notificationSettings.allowPushNotifications) return responses.ok;
-      if (!notificationSettings.enableAppNotifications) return responses.ok;
+    async getNotificationDetail(notificationId: string): Promise<Notification> {
+        // Fetch the notification
+        const notification = await this.dbConnection.getRepository(Notification).findOne({
+            where: { id: notificationId },
+            relations: ['linkedUser', 'linkedEvent', 'recipients'], // Load relations if needed
+        });
 
-      if (notificationSettings.muteNotifications) return responses.ok;
+        // If notification is not found, throw an error
+        if (!notification) {
+            throw new NotFoundError('Notification not found');
+        }
 
-      const pushNotificationTokens = await this.authClient.getPushNotificationTokens(payload.userId);
-      const notificationTokens = pushNotificationTokens.map((p) => p.notificationToken);
-      if (notificationTokens.length === 0) return responses.ok;
+        // If isSeen is false, update it to true
+        if (!notification.isSeen) {
+            await this.dbConnection.getRepository(Notification).update(notificationId, { isSeen: true });
+        }
 
-      await this.communicationClient.sendPushNotification(notificationTokens, payload.title, payload.body);
-      return responses.ok;
-    } catch (err) {
-      this.logger.error(err);
-      return responses.badRequest('error occurred while trying to send push notification');
+        return notification;
     }
-  }
+
+    async deleteNotification(notificationId: string): Promise<{ message: string }> {
+        const result = await this.dbConnection.getRepository(Notification).delete(notificationId);
+
+        if (result.affected === 0) {
+            throw new NotFoundError('Notification not found');
+        }
+
+        return { message: 'Notification deleted successfully' };
+    }
+
+
+    async findAllNotifications(
+        take = 10, 
+        skip = 0, 
+        notificationByModule?: string, 
+        notificationByType?: string
+    ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .select([
+                'notification.id',
+                'notification.title AS description',
+                'notification.notificationType',
+                'notification.notificationModule',
+                'notification.created_at',
+                'notification.message',
+                'notification.body'
+            ])
+            .orderBy('notification.created_at', 'DESC');
+    
+        // Apply filters if provided
+        if (notificationByModule) {
+            queryBuilder.andWhere('notification.notificationModule = :notificationByModule', { notificationByModule });
+        }
+    
+        if (notificationByType) {
+            queryBuilder.andWhere('notification.notificationType = :notificationByType', { notificationByType });
+        }
+    
+        // Get total count before pagination
+        const totalCount = await queryBuilder.getCount();
+    
+        // Apply pagination
+        const notifications = await queryBuilder
+            .take(take)
+            .skip(skip)
+            .getRawMany();
+    
+        return { totalCount, notifications };
+    }
+
+
+    async getNotificationSummary(recipientId: string): Promise<{
+        totalNotifications: number;
+        notificationsByModule: Record<string, number>;
+        notificationsByType: Record<string, number>;
+    }> {
+        const queryBuilder = this.dbConnection.getRepository(Notification)
+            .createQueryBuilder('notification')
+            .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', { recipientId });
+    
+        // Get total notifications count
+        const totalNotifications = await queryBuilder.getCount();
+    
+        // Get count grouped by notificationModule
+        const notificationsByModule = await queryBuilder
+            .select('notification.notificationModule, COUNT(*) AS count')
+            .groupBy('notification.notificationModule')
+            .getRawMany();
+    
+        // Get count grouped by notificationType
+        const notificationsByType = await queryBuilder
+            .select('notification.notificationType, COUNT(*) AS count')
+            .groupBy('notification.notificationType')
+            .getRawMany();
+    
+        // Format response
+        return {
+            totalNotifications,
+            notificationsByModule: notificationsByModule.reduce((acc, row) => {
+                acc[row.notificationModule] = Number(row.count);
+                return acc;
+            }, {} as Record<string, number>),
+            notificationsByType: notificationsByType.reduce((acc, row) => {
+                acc[row.notificationType] = Number(row.count);
+                return acc;
+            }, {} as Record<string, number>),
+        };
+    }
+
+    async deleteMultipleNotifications(recipientId: string, notificationIds: string[]): Promise<{ deletedCount: number }> {
+        if (!notificationIds || notificationIds.length === 0) {
+            throw new Error('No notification IDs provided.');
+        }
+    
+        const result = await this.dbConnection.getRepository(Notification)
+            .createQueryBuilder()
+            .delete()
+            .from(Notification)
+            .where('id IN (:...notificationIds)', { notificationIds })
+            .andWhere('id IN (SELECT nr.notification_id FROM notification_recipients nr WHERE nr.user_id = :recipientId)', { recipientId })
+            .execute();
+    
+        return { deletedCount: result.affected || 0 };
+    }
 }
+
+const notificationSerice = new NotificationService()
+export default notificationSerice;

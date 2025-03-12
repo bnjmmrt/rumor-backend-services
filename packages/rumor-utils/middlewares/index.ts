@@ -1,1 +1,2 @@
-export { globalErrorHandler } from './global-error-handler.middleware';
+import globalErrorHandler from './global-error-handler.middleware';
+export { globalErrorHandler };

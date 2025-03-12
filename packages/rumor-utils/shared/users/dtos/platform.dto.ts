@@ -3,6 +3,7 @@ import {
   AddFocusRequest,
   CreateInterestRequest,
   EditFocusNameRequest,
+  GetUserVouchRequest,
   IdRequest,
   QueryParamRequest,
   SaveFocusesForUserRequest,
@@ -39,6 +40,16 @@ export class IdRequestDto implements IdRequest {
   @IsUUID()
   @IsNotEmpty()
   id: string;
+}
+
+export class GetUserVouchRequestDto implements GetUserVouchRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  requesterId: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  eventId: string;
 }
 
 // Interest

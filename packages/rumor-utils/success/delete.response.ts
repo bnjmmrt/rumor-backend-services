@@ -1,11 +1,13 @@
 import { SuccessResponse } from "./base.success.response";
 
-export class DeleteResponse implements SuccessResponse<void> {
-  statusCode: number = 204; // Or 200, depending on your preference
+export class DeleteResponse<T> implements SuccessResponse<T> {
+  success: boolean = true;
+  statusCode: number = 202;
   message?: string;
-  data: void = undefined; // Explicitly set data to undefined
+  data?: T;
 
-  constructor(message?: string) {
+  constructor(data?: T, message?: string) {
+    this.data = data;
     this.message = message;
   }
 }

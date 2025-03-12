@@ -1,6 +1,7 @@
 import { SuccessResponse } from "./base.success.response";
 
 export class GetResponse<T> implements SuccessResponse<T> {
+    success: boolean = true;
     statusCode: number = 200;
     data: T;
     message?: string;

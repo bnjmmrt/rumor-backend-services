@@ -1,22 +1,13 @@
 import { EventsService } from '../services/events.service';
-
+import { Request, Response } from 'express';
 import {
-  AddressValidationResponse,
-  EventAgeLimitResponse,
-  EventAgeLimitsResponse,
-  EventLocationResponse,
+  AddressValidationResponse, EventGuestCountResponse, EventLocationResponse,
   EventLocationsResponse,
-  EventResponse,
-  EVENTS_SERVICE_NAME,
-  EventsResponse,
-  EventTypeResponse,
-  EventTypesResponse,
-  GenerateTicketForGuestResponse,
-  GenericResponse,
-  GetFeaturedEventsResponse,
-  ListEventsFeedResponse,
-  ListEventStatusResponse,
-  ListEventUsedTicketsResponse,
+  EventResponse, EventTypeResponse,
+  EventTypesData, GenerateTicketForGuestResponse, GetFeaturedEventsResponse,
+  GuestCountByStatuses,
+  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse,
+  ToggleGuestCheckStatusResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
 import {
@@ -27,191 +18,454 @@ import {
   EventAgeLimitDto,
   EventLocationDto,
   ManualEventStatusUpdateRequestDto,
-  QueryRequestDto,
-  UpdateEventAgeLimitRequestDto,
-  UpdateEventLocationRequestDto,
+  QueryRequestDto, UpdateEventLocationRequestDto,
   UpdateEventRequestDto,
   UpdateEventTypeRequestDto,
   UpdateTicketRequestDto,
   ValidateTicketForGuestRequestDto,
+  CancelEventAndNotifyRequestDto,
+  ListHostEventsDto,
+  ToggleGuestCheckStatusRequestDto
 } from 'rumor-utils/shared/events/dtos/events.dto';
 
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
+import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../../packages/rumor-utils/success';
+import asyncWrapper from '../server/helpers/asyncWrapper';
+import { EventData, EventTypeData, GenerateTicketForGuestData, ToggleGuestCheckStatusData } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 export class EventsController {
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventStatus')
-  public async listEventStatus(): Promise<ListEventStatusResponse> {
-    return EventsService.listEventStatus();
+  public static listEventStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const eventStatuses: string[] = await EventsService.listEventStatus();
+    const successResponse = new GetResponse(eventStatuses);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //Event types Controller
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEventType')
-  public async createEventType(payload: CreateEventTypeRequestDto): Promise<EventTypeResponse> {
-    return EventsService.createEventType(payload);
+  public static createEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: CreateEventTypeRequestDto = req.body;
+    const createdEventType: EventTypeData = await EventsService.createEventType(payload);
+    const successResponse = new CreateResponse(createdEventType);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventTypes')
-  public async listEventTypes(payload: QueryRequestDto): Promise<EventTypesResponse> {
-    return EventsService.listEventTypes(payload);
+  public static listEventTypes = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: QueryRequestDto = req.query;
+    const eventTypeResponse: EventTypesData = await EventsService.listEventTypes(payload);
+    const successResponse = new GetResponse(eventTypeResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetEventType')
-  public async getEventType(payload: RequestByIdDto): Promise<EventTypeResponse> {
-    return EventsService.getEventType(payload);
+  public static getEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const getEventTypeResponse: EventTypeData = await EventsService.getEventType(payload);
+    const successResponse = new GetResponse(getEventTypeResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventType')
-  public async updateEventType(payload: UpdateEventTypeRequestDto): Promise<EventTypeResponse> {
-    return EventsService.updateEventType(payload);
+  public static updateEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: UpdateEventTypeRequestDto = { ...req.body, ...req.params }
+    const updatedEventTypesData: EventTypeResponse = await EventsService.updateEventType(payload);
+    const successResponse = new UpdateResponse();
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeleteEventType')
-  public async deleteEventType(payload: RequestByIdDto): Promise<GenericResponse> {
-    return EventsService.deleteEventType(payload);
+  public static deleteEventType = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const response: string = await EventsService.deleteEventType(payload);
+    const message = "Event Type deleted successfully"
+    const successResponse = new DeleteResponse(response, message);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //Event Controller
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
-  public async createEvent(payload: CreateEventRequestDto): Promise<EventResponse> {
-    return EventsService.createEvent(payload);
+  public static createEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: CreateEventRequestDto = req.body
+    // const id = req.params.id;
+    const event: EventResponse = await EventsService.createEvent(
+      payload
+    );
+    const successResponse = new CreateResponse(event.data);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEvents')
-  public async listEvents(payload: QueryRequestDto): Promise<EventsResponse | ListEventsFeedResponse> {
-    return EventsService.listEvents(payload);
+  public static listEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const queryParams = JSON.stringify(req.query)
+    const payload: QueryRequestDto = { query: queryParams };
+    // const id = req.params.id;
+    const event: EventResponse | ListEventsFeedResponse = await EventsService.listEvents(
+      payload
+    );
+    const successResponse = new GetResponse(event.data);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetEvent')
-  public async getEvent(payload: UserAndIdRequestDto): Promise<EventResponse> {
-    return EventsService.getEvent(payload);
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
+  public static getEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    // const { user: userId } = req
+    const userId = (req as any).user;
+    const { id } = req.params;
+    const payload: UserAndIdRequestDto = { id, userId }
+    // const id = req.params.id;
+    const event: EventData = await EventsService.getEvent(
+      payload
+    );
+    const successResponse = new GetResponse(event);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEvent')
-  public async updateEvent(payload: UpdateEventRequestDto): Promise<EventResponse> {
-    return EventsService.updateEvent(payload);
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
+  public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params
+    req.body.id = id
+    const payload: UpdateEventRequestDto = req.body
+    const event: EventData = await EventsService.updateEvent(
+      payload
+    );
+    const successResponse = new UpdateResponse(event);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeleteEvent')
-  public async deleteEvent(payload: RequestByIdDto): Promise<GenericResponse> {
-    return EventsService.deleteEvent(payload);
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
+  public static deleteEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const userId = (req as any).user;
+    const { id } = req.params;
+    const payload: UserAndIdRequestDto = { id, userId }
+    // const id = req.params.id;
+    const event: string = await EventsService.deleteEvent(
+      payload
+    );
+
+    const successResponse = new DeleteResponse(event);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DuplicateEvent')
-  public async duplicateEvent(payload: RequestByIdDto): Promise<EventResponse> {
-    return EventsService.duplicateEvent(payload);
+  public static duplicateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const eventResponse: EventResponse = await EventsService.duplicateEvent(
+      payload);
+    const successResponse = new CreateResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ValidateAddress')
-  public async validateAddress(payload: AddressValidationDto): Promise<AddressValidationResponse> {
-    return EventsService.validateAddress(payload);
+  public static validateAddress = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: AddressValidationDto = req.body
+    const addressResponse: AddressValidationResponse = await EventsService.validateAddress(
+      payload);
+    const successResponse = new GetResponse(addressResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetUpcomingEvents')
-  public async getUpcomingEvents(): Promise<ListEventsFeedResponse> {
-    return EventsService.getUpcomingEvents();
+  public static getUpcomingEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const eventsResponse: ListEventsFeedResponse = await EventsService.getUpcomingEvents(
+    );
+    const successResponse = new GetResponse(eventsResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
-
+  );
   // events location
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEventLocation')
-  public async createEventLocation(payload: EventLocationDto): Promise<EventLocationResponse> {
-    return EventsService.createEventLocation(payload);
+  public static createEventLocation = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: EventLocationDto = req.body
+    const eventLocationResponse: EventLocationResponse = await EventsService.createEventLocation(
+      payload
+    );
+    const successResponse = new CreateResponse(eventLocationResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventLocation')
-  public async updateEventLocation(payload: UpdateEventLocationRequestDto): Promise<EventLocationResponse> {
-    return EventsService.updateEventLocation(payload);
+  public static updateEventLocation = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: UpdateEventLocationRequestDto = { ...req.body, id }
+    const eventLocationResponse: EventLocationResponse = await EventsService.updateEventLocation(
+      payload
+    );
+    const successResponse = new UpdateResponse(eventLocationResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetEventLocation')
-  public async getEventLocation(payload: RequestByIdDto): Promise<EventLocationResponse> {
-    return EventsService.getEventLocation(payload);
+  public static getEventLocation = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const eventLocationResponse: EventLocationResponse = await EventsService.getEventLocation(
+      payload
+    );
+    const successResponse = new GetResponse(eventLocationResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeleteEventLocation')
-  public async deleteEventLocation(payload: RequestByIdDto): Promise<GenericResponse> {
-    return EventsService.deleteEventLocation(payload);
+  public static deleteEventLocation = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const eventLocationResponse: string = await EventsService.deleteEventLocation(
+      payload
+    );
+    const successResponse = new DeleteResponse(eventLocationResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventLocations')
-  public async listEventLocations(payload: QueryRequestDto): Promise<EventLocationsResponse> {
-    return EventsService.listEventLocations(payload);
+  public static listEventLocations = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: QueryRequestDto = req.query
+    const eventLocationResponse: EventLocationsResponse = await EventsService.listEventLocations(
+      payload
+    );
+    const successResponse = new GetResponse(eventLocationResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventsFeed')
-  public async listEventsFeed(payload: QueryRequestDto): Promise<ListEventsFeedResponse> {
-    return EventsService.listEventsFeed(payload);
+  public static listEventsFeed = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: QueryRequestDto = req.query
+    const eventResponse: ListEventsFeedResponse = await EventsService.listEventsFeed(
+      payload
+    );
+    const successResponse = new GetResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetFeaturedEvents')
-  public async getFeaturedEvents(payload: QueryRequestDto): Promise<GetFeaturedEventsResponse> {
-    return EventsService.getFeaturedEvents(payload);
+  public static getFeaturedEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: QueryRequestDto = req.query
+    const eventResponse: GetFeaturedEventsResponse = await EventsService.getFeaturedEvents(
+      payload
+    );
+    const successResponse = new GetResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
   // Events age limit
-
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEventAgeLimit')
-  public async createEventAgeLimit(payload: EventAgeLimitDto): Promise<EventAgeLimitResponse> {
-    return EventsService.createEventAgeLimit(payload);
+  public static createEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: EventAgeLimitDto = req.body
+    const ageLimitResponse: EventAgeLimit = await EventsService.createEventAgeLimit(
+      payload
+    );
+    const successResponse = new CreateResponse(ageLimitResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
-  public async updateEventAgeLimit(payload: UpdateEventAgeLimitRequestDto): Promise<EventAgeLimitResponse> {
-    return EventsService.updateEventAgeLimit(payload);
+  public static updateEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
+    const ageLimitResponse: EventAgeLimit = await EventsService.createEventAgeLimit(
+      { ...req.body, id }
+    );
+    const successResponse = new CreateResponse(ageLimitResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GetEventAgeLimit')
-  public async getEventAgeLimit(payload: RequestByIdDto): Promise<EventAgeLimitResponse> {
-    return EventsService.getEventAgeLimit(payload);
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
+  public static getEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
+    const ageLimitResponse: EventAgeLimit = await EventsService.getEventAgeLimit(
+      payload
+    );
+    const successResponse = new GetResponse(ageLimitResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
+  public static deleteEventAgeLimit = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const response: string = await EventsService.deleteEventAgeLimit(
+      payload
+    );
+    const message = "Event age limit deleted successfully"
+    const successResponse = new DeleteResponse(response, message);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'DeleteEventAgeLimit')
-  public async deleteEventAgeLimit(payload: RequestByIdDto): Promise<GenericResponse> {
-    return EventsService.deleteEventAgeLimit(payload);
-  }
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
+  public static listEventAgeLimits = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    // const payload: UpdateEventAgeLimitRequestDto = {...req.body, id}
+    const ageLimitResponse: EventAgeLimit[] = await EventsService.listEventAgeLimits(
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventAgeLimits')
-  public async listEventAgeLimits(): Promise<EventAgeLimitsResponse> {
-    return EventsService.listEventAgeLimits();
+    );
+    const successResponse = new GetResponse(ageLimitResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ManualEventStatusUpdate')
-  public async manualEventStatusUpdate(payload: ManualEventStatusUpdateRequestDto): Promise<EventResponse> {
-    return EventsService.manualEventStatusUpdate(payload);
+  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
+  public static getPublicEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const ageLimitResponse: EventData = await EventsService.getPublicEvent(
+      payload
+    );
+    const successResponse = new GetResponse(ageLimitResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'PublishEvent')
-  public async publishEvent(payload: RequestByIdDto): Promise<GenericResponse> {
-    return EventsService.publishEventById(payload);
+  public static manualEventStatusUpdate = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const eventId = req.params.eventId
+    const payload: ManualEventStatusUpdateRequestDto = { ...req.body, eventId }
+    const eventResponse: EventResponse = await EventsService.manualEventStatusUpdate(
+      payload
+    );
+    const successResponse = new UpdateResponse(eventResponse.data);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'PublishPendingEvents')
-  public async publishPendingEvents(): Promise<GenericResponse> {
-    return EventsService.publishPendingEvents();
+  public static publishEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const eventResponse: string = await EventsService.publishEventById(
+      payload
+    );
+    const successResponse = new UpdateResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'GenerateTicketForGuest')
-  public async generateTicketForGuest(payload: RequestByIdDto): Promise<GenerateTicketForGuestResponse> {
-    return EventsService.generateTicketForGuest(payload);
+  public static publishPendingEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const eventResponse: string = await EventsService.publishPendingEvents(
+    );
+    const successResponse = new UpdateResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ValidateTicketForGuest')
-  public async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<GenericResponse> {
-    return EventsService.validateTicketForGuest(payload);
-  }
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'ListEventUsedTickets')
-  public async listEventUsedTickets(payload: RequestByIdDto): Promise<ListEventUsedTicketsResponse> {
-    return EventsService.listEventUsedTickets(payload);
+  public static generateTicketForGuest = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const ticketResponse: GenerateTicketForGuestData = await EventsService.generateTicketForGuest(
+      payload
+    );
+    const successResponse = new CreateResponse(ticketResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateTicket')
-  public async updateTicket(payload: UpdateTicketRequestDto): Promise<GenericResponse> {
-    return EventsService.updateTicket(payload);
+  public static validateTicketForGuest = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: ValidateTicketForGuestRequestDto = req.body
+    const ticketResponse: GenerateTicketForGuestData = await EventsService.validateTicketForGuest(
+      payload
+    );
+    const successResponse = new CreateResponse(ticketResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
 
-  //@GrpcMethod(EVENTS_SERVICE_NAME, 'AddEventToFeaturedSection')
-  public async addEventToFeaturedSection(payload: AddEventToFeaturedSectionDto): Promise<GenericResponse> {
-    return EventsService.addEventToFeaturedSection(payload);
+  public static listEventUsedTickets = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: RequestByIdDto = { id }
+    const ticketResponse: ListEventUsedTicketsResponse = await EventsService.listEventUsedTickets(
+      payload
+    );
+    const successResponse = new GetResponse(ticketResponse);
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  )
+
+  public static updateTicket = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: UpdateTicketRequestDto = { id, ...req.body }
+    const ticketResponse: string = await EventsService.updateTicket(
+      payload
+    );
+    const successResponse = new UpdateResponse(ticketResponse);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  )
+
+  public static addEventToFeaturedSection = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const payload: AddEventToFeaturedSectionDto = { id, ...req.body }
+    const eventResponse: string = await EventsService.addEventToFeaturedSection(
+      payload
+    );
+    const successResponse = new CreateResponse(eventResponse);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  )
+
+  public static cancelEventAndNotify = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload: CancelEventAndNotifyRequestDto = { ...req.params, ...req.body }
+    const response: string = await EventsService.cancelEventAndNotify(
+      payload
+    );
+    const successResponse = new UpdateResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
+
+  public static getEventByInvitedUserId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { userId, eventId } = req.params
+    const payload: UserAndIdRequestDto = { userId, id: eventId }
+    const response: EventData = await EventsService.getEventByInvitedUserId(
+      payload
+    );
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
+
+  public static listHostEvents = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const id = (req as any).user;
+    const queryParams = JSON.stringify(req.query)
+    const payload: ListHostEventsDto = { userId: id, query: queryParams }
+    const response: PaginatedEventsResponse = await EventsService.listHostEvents(
+      payload
+    );
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
+
+  public static toggleGuestCheckStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params
+    const { query } = req.params
+    const payload: ToggleGuestCheckStatusRequestDto = { id, ...req.body }
+    const response: ToggleGuestCheckStatusData = await EventsService.toggleGuestCheckStatus(
+      payload
+    );
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
+
+
+  public static GetGuestCountForGuestStatuses = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UserAndIdRequestDto = {
+        userId: id,
+        id: req.params.eventId
+      }
+      const response: GuestCountByStatuses = await EventsService.getGuestCountForGuestStatuses(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
 }

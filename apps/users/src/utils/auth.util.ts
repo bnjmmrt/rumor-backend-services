@@ -55,7 +55,7 @@ export const newHost = (payload: HostSignUpRequestDto): User => {
   return user;
 };
 
-export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): User => {
+export const hostToUpdatev0 = (host: User, payload: UpdateHostProfileRequestDto): User => {
   host.firstName = payload.firstName || host.firstName;
   host.lastName = payload.lastName || host.lastName;
   host.email = payload.email || host.email;
@@ -64,21 +64,51 @@ export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): 
   host.additionalHostInformation = {
     companyName: payload.companyName || host.additionalHostInformation?.companyName || '',
     companyLogo: payload.companyLogo || host.additionalHostInformation?.companyLogo || '',
-    website: payload.website || host.additionalHostInformation?.website || '',
+    website: payload.website !== undefined ? payload.website : host.additionalHostInformation?.website || '',
     referredBy: payload.referredBy || host.additionalHostInformation?.referredBy,
     eventsPerYear: payload.eventsPerYear || host.additionalHostInformation?.eventsPerYear,
-    bio: payload.bio || host.additionalHostInformation?.bio,
+    bio: payload.bio !== undefined ? payload.bio : host.additionalHostInformation?.bio,
     socialMedia: {
-      instagram: payload.socialMedia.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram,
-      tiktok: payload.socialMedia.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok,
-      linkedin: payload.socialMedia.linkedin !== undefined ? payload.socialMedia.linkedin : host.additionalHostInformation?.socialMedia?.linkedin,
-      youtube: payload.socialMedia.youtube !== undefined ? payload.socialMedia.youtube : host.additionalHostInformation?.socialMedia?.youtube,
-      facebook: payload.socialMedia.facebook !== undefined ? payload.socialMedia.facebook : host.additionalHostInformation?.socialMedia?.facebook,
-      x: payload.socialMedia.x !== undefined ? payload.socialMedia.x : host.additionalHostInformation?.socialMedia?.x,
+      instagram: payload?.socialMedia?.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram,
+      tiktok: payload?.socialMedia?.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok,
+      linkedin: payload?.socialMedia?.linkedin !== undefined ? payload.socialMedia.linkedin : host.additionalHostInformation?.socialMedia?.linkedin,
+      youtube: payload?.socialMedia?.youtube !== undefined ? payload.socialMedia.youtube : host.additionalHostInformation?.socialMedia?.youtube,
+      facebook: payload?.socialMedia?.facebook !== undefined ? payload.socialMedia.facebook : host.additionalHostInformation?.socialMedia?.facebook,
+      x: payload?.socialMedia?.x !== undefined ? payload.socialMedia.x : host.additionalHostInformation?.socialMedia?.x,
     },
   };
   return host;
 };
+
+export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): User => {
+  host.firstName = payload.firstName || host.firstName;
+  host.lastName = payload.lastName || host.lastName;
+  host.email = payload.email || host.email;
+  host.phoneNumber = payload.phoneNumber || host.phoneNumber;
+
+  // Ensure additionalHostInformation exists
+  host.additionalHostInformation = {
+    companyName: payload.companyName || host.additionalHostInformation?.companyName || '',
+    companyLogo: payload.companyLogo || host.additionalHostInformation?.companyLogo || '',
+    website: payload.website !== undefined ? payload.website : host.additionalHostInformation?.website || '',
+    referredBy: payload.referredBy || host.additionalHostInformation?.referredBy,
+    eventsPerYear: payload.eventsPerYear || host.additionalHostInformation?.eventsPerYear,
+    bio: payload.bio !== undefined ? payload.bio : host.additionalHostInformation?.bio,
+    
+    // Ensure socialMedia exists
+    socialMedia: {
+      instagram: payload.socialMedia?.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram || '',
+      tiktok: payload.socialMedia?.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok || '',
+      linkedin: payload.socialMedia?.linkedin !== undefined ? payload.socialMedia.linkedin : host.additionalHostInformation?.socialMedia?.linkedin || '',
+      youtube: payload.socialMedia?.youtube !== undefined ? payload.socialMedia.youtube : host.additionalHostInformation?.socialMedia?.youtube || '',
+      facebook: payload.socialMedia?.facebook !== undefined ? payload.socialMedia.facebook : host.additionalHostInformation?.socialMedia?.facebook || '',
+      x: payload.socialMedia?.x !== undefined ? payload.socialMedia.x : host.additionalHostInformation?.socialMedia?.x || '',
+    },
+  };
+
+  return host;
+};
+
 
 export const formatToUnits = (num: number) => {
   const abbrev = ['', 'K', 'M'];
@@ -185,4 +215,25 @@ export const formatSinceDate = (prefix: string, date: Date): string => {
   const shortYear = `'${year.slice(-2)}`;
 
   return `${prefix} since ${month} ${shortYear}`;
+};
+
+export const prepareQueryString = (paramsObject: Record<string, unknown>): string => {
+  const params = new URLSearchParams();
+  // Loop through the object and add each key-value pair to the query string
+  for (const [key, value] of Object.entries(paramsObject)) {
+    if (value !== undefined && value !== null) {
+      params.append(key, String(value)); // Convert value to string
+    }
+  }
+  return params.toString();
+};
+
+export const formatDateToMMDDYYYYHHmm = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };

@@ -1,0 +1,51 @@
+import { Router } from "express";
+import * as express from "express";
+import { CommunicationController } from "../controllers/communication.controller";
+import { NotificationController } from "../controllers/notification.controller";
+const router: Router = express.Router();
+
+/**
+ * @description - Routes used for sending Text Messages
+ */
+
+router.post('/communication/send-verification-code', CommunicationController.sendVerificationCode);
+router.post('/communication/verify-code', CommunicationController.verifyCode);
+router.post('/communication/send-invitation-messages', CommunicationController.sendInvitationMessages);
+router.post('/communication/send-text-message', CommunicationController.sendTextMessage);
+
+/**
+ * @description - Route for sending email using template ID
+ */
+router.post('/communication/template-email/send', CommunicationController.sendEmailFromTemplate);
+
+/**
+ * @description - Routes for managing Email Templates
+ */
+router.post('/communication/template-email', CommunicationController.createEmailTemplate);
+router.get('/communication/template-emails', CommunicationController.listEmailTemplates);
+router.delete('/communication/template-email', CommunicationController.deleteEmailTemplate);
+router.get('/get-email-template', CommunicationController.getEmailTemplate);
+
+/**
+ * Route for Notification Creation - Will be used in service Mesh for interservice communication call
+ */
+
+router.post('/notification', NotificationController.createNotification);
+
+/**
+ * Routes for  - User Notifications - Host, Member
+ */
+
+router.get('/notifications', NotificationController.getAllNotifications);
+router.get('/notification:notificationId', NotificationController.getNotificationDetail);
+router.delete('/notification/:notificationId',NotificationController.deleteNotificationById);
+
+/**
+ * Routes for  - Admin Notifications
+ */
+router.get('/notifications-list', NotificationController.listNotifications);
+router.get('/notifications/summary', NotificationController.getNotificationSummary);
+router.delete('/notifications/bulk-delete', NotificationController.deleteMultipleNotifications);
+
+
+export default router;

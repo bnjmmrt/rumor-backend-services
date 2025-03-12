@@ -32,34 +32,59 @@ import {
   NonMemberSignUpRequestDto,
   InviteNewHostRequestDto,
   LoginVerificationRequestDto,
+  UpdateCustomUsersListRequestDto,
+  FilterRequestDto,
+  DuplicateCustomListRequestDto,
+  ManageUserRequestDto,
+  CreateHostCollaboratorRequestDto,
+  HostFeedbackRequestDto,
+  SendVerificationCodeByEmailRequestDto,
+  VerifyCodeByEmailRequestDto,
+  ReportUserRequestDto,
+  BlockHostRequestDto,
+  sendSupportEmailRequestDto,
+  SwitchProfileDto,
+  GetUserWithRolesByPhoneRequestDto,
+  UpdateHostsStatusRequestDto,
+  AddUserNoteRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
-  ForgotPasswordResponse,
   LoginSSOResponse,
   OAuthRedirectResponse,
-  LoginResponse,
   ValidateResponse,
-  ValidityResponse,
   SaveOrUpdateProviderAuthResponse,
-  MemberResponse,
-  UpdateUserProfilePictureResponse,
-  UpdateUserProfileResponse,
-  BioProfileResponse,
-  ListUsersByTypeResponse,
-  CreateNonMemberUserResponse,
-  GetFollowedHostsResponse,
-  CustomUsersListsResponse,
-  CustomUsersListResponse,
-  CurrentUserResponse,
-  ConfirmedMembersResponse,
-  SimpleUserResponse,
-  GetUserWithRolesByEmailResponse,
-  CreateUserResponse,
+  UserResponseData,
+  customListData,
+  ConfirmedMember,
+  TokenResponseAndRoles,
+  Validity,
+  UsersData,
+  MemberProfile,
+  ReportData,
+  Feedback,
+  CustomUsersList,
+  CustomUsersListsData,
+  HostsProfile,
+  Member,
+  CurrentMember,
+  SimpleUser,
+  Data,
+  CurrentUser,
+  UserProfilePicture,
+  UserProfile,
+  Filter,
+  HostFeedbackData,
+  VerificationStatus,
+  UserDataSimple,
+  UserWithRoles,
+  BasicHostProfile,
+  UserIdWithRolesAndToken,
+  AddUserNote,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
-// import { Invitation } from 'rumor-utils/shared/users/entities';
+import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
@@ -72,7 +97,7 @@ import {
   ChangePasswordRequest,
 } from '@fusionauth/typescript-client';
 
-import { newAddress, newHost, newMember } from '../utils/auth.util';
+import { formatDateToMMDDYYYYHHmm, newAddress, newHost, newMember, prepareQueryString } from '../utils/auth.util';
 import {
   entityToGender,
   genderToEntity,
@@ -82,12 +107,16 @@ import {
   toCurrentUser,
   toSimpleUser,
   toUserDataSimple,
+  toUser,
+  toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
+import * as fs from 'fs';
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
-import { hasPagination, TokenRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
-import { ProviderAuth } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import { AdditionalHostInformation, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import { NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { ProviderAuth, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { entityToProviderType, providerTypeToEntity } from 'rumor-utils/shared/users/mappers/social.mapper';
@@ -95,8 +124,9 @@ import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library/build/src/auth/jwtclient';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
 import { ParsedQs } from 'qs';
-import GoogleAddressClient from '../utils/clients/googleAddress.client';
+import { GoogleAddressClient } from '../utils/google';
 import { getCityNameFromAddressComponents } from 'rumor-utils/shared/events/utils/event.utils';
+import fusionAuthClientHandler from '../utils/fusion-auth/fusionauth';
 
 //-----------------Admin Imports
 
@@ -110,23 +140,21 @@ import {
   GetMembersResponse,
   HostProfileResponse,
   MemberProfileResponse,
-  SignUpResponse,
-  TokenResponse,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 import { parse } from 'qs';
 import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { responses } from '../common/responses.common';
 import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
-import FusionAuthClient, { RegistrationRequest } from '@fusionauth/typescript-client';
+import { RegistrationRequest } from '@fusionauth/typescript-client';
 import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
-import { toBasicHostProfile, toHostProfile, toMemberProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
+import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
 import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { GenericResponse, NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
+import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 // import { CommunicationClient } from 'rumor-utils/clients/communication.client';
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { SocialProvider } from 'rumor-utils/shared/users/entities/social-provider.entity';
@@ -138,6 +166,17 @@ import * as tz from 'dayjs/plugin/timezone';
 import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
+import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
+
+import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.entity';
+import { Report } from 'rumor-utils/shared/users/entities/report.entity';
+import { Block } from 'rumor-utils/shared/users/entities/block.entity';
+import { Guest } from 'rumor-utils/shared/entities';
+import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { PlatformService } from './platform.service';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -154,41 +193,39 @@ export class AuthService {
 
   public static dbConnection = database;
 
-  public static fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'), config.get('FUSIONAUTH_BASE_URL'));
-
-  public static async login(payload: LoginRequestDto): Promise<LoginResponse> {
+  public static async login(payload: LoginRequestDto): Promise<Data> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: { email: payload.email, deletedAt: IsNull() },
       });
-      
+
       if (!user) {
-        return responses.forbidden('Verify your password and email');
+        throw new ForbiddenError("user");
       }
       const loginUserRequest: LoginRequest = {
         loginId: payload.email,
         password: payload.password,
       };
 
-      const loginUser = await this.fusionAuthClient.login(loginUserRequest);
+      const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
-        return responses.forbidden('User or password not valid.');
+        throw new ForbiddenError("User or password not valid.");
       }
 
       if (loginUser?.response?.user?.passwordChangeRequired) {
-        return responses.forbidden('User must to reset its password.');
+        throw new ForbiddenError("User must to reset its password.");
       }
 
       if (!loginUser?.response?.user?.active) {
-        return responses.forbidden('User is not active.');
+        throw new ForbiddenError("User is not active.");
       }
 
       if (!loginUser?.response?.user?.verified) {
-        return responses.forbidden('User is not verified.');
+        throw new ForbiddenError("User is not verified.");
       }
 
-      return responses.data({
+      return {
         token: loginUser.response.token,
         user: {
           username: loginUser?.response?.user?.username || '',
@@ -199,26 +236,25 @@ export class AuthService {
           birthDate: loginUser?.response?.user?.birthDate || '',
           mobilePhone: loginUser?.response?.user?.mobilePhone || '',
           verified: !!loginUser?.response?.user?.verified,
-          status: entityToUserStatus[UserStatus.UNRECOGNIZED],
           roles: [],
         },
-      });
+      };
     } catch (err) {
       if (err?.statusCode == 423) {
-        return responses.forbidden('User is locked.');
+        throw new ForbiddenError("User is locked.");
       }
       if (err.statusCode == 404) {
-        return responses.forbidden('Verify your password and email.');
+        throw new ForbiddenError("Verify your password and email.");
       }
-      return responses.forbidden('Unable to login.');
+      throw new ForbiddenError("Unable to login.");
     }
   }
 
   public static async validate({ token }: ValidateRequestDto): Promise<ValidateResponse> {
     try {
-      const findUser = await this.fusionAuthClient.retrieveUserUsingJWT(token);
+      const findUser = await fusionAuthClientHandler.fusionAuthClient().retrieveUserUsingJWT(token);
       if (!findUser?.response?.user?.active) {
-        return responses.forbidden('User is not active');
+        throw new ForbiddenError("User is not active.");
       }
       return responses.data({
         userId: findUser.response.user.id,
@@ -236,72 +272,94 @@ export class AuthService {
       });
     } catch (err) {
       if (err?.statusCode == 423) {
-        return responses.forbidden('User is locked.');
+        throw new ForbiddenError("User is locked.");
       }
       if (err.statusCode == 404) {
-        return responses.forbidden('Verify your password and email.');
+        throw new ForbiddenError("Verify your password and email.");
       }
-      return responses.badRequest('Unable to validate user.');
+      throw new BadRequestError("Unable to validate user.");
     }
   }
 
-  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<SignUpResponse> {
-    try {
-      let nonMember: UserRole | null = null;
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: [
-          { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
-          { email: payload.email, deletedAt: IsNull() },
-        ],
-        relations: {
-          roles: { role: true },
-        },
-      });
+  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<UserIdWithRolesAndToken> {
+    let existingUser: User | null = null;
+    let fusionAuthUser = null;
+    let requiresFusionAuthRegistration = false;
+    let fusionAuthToken: string | null = null;
 
-      if (user) {
-        nonMember = user.roles.find((item) => {
-          if (item.role.name == 'non_member') return item;
-        });
-        if (!nonMember) {
-          if (user.phoneNumber === payload.phoneNumber) {
-            return responses.badRequest('Phone number is already in use, please try with a different phone number.');
-          }
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: [
+        { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
+        { email: payload.email, deletedAt: IsNull() },
+      ],
+      relations: {
+        roles: { role: true },
+      },
+    });
 
-          if (user.email === payload.email) {
-            return responses.badRequest('Email is already in use, please try with a different email.');
-          }
-        }
+    if (user) {
+      existingUser = user;
+      const isHost = user.roles.some((item) => item.role.name === 'host');
+      const isMember = user.roles.some((item) => item.role.name === 'member');
+      const isNonMember = user.roles.some((item) => item.role.name === 'non_member');
+
+      if (isMember) {
+        throw new BadRequestError('You are already registered as a member.')
       }
 
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      let placeLocation: any = null;
-      if (payload.address.placeId) {
-        placeLocation = await GoogleAddressClient.geodecodePlaceId(payload.address.placeId);
-      }
-      const userAddress = await newAddress(payload.address, placeLocation);
-      const address = await this.dbConnection.getRepository(Address).save(userAddress);
-      let newUser = newMember(payload, address);
-
-      if (payload.socialUrl) {
-        newUser.additionalMemberInformation = {
-          socialUrl: payload.socialUrl,
+      if (isHost) {
+        const request: PasswordlessStartRequest = {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          loginId: user.email,
         };
-      }
-      if (nonMember) {
-        newUser.id = user.id;
-        await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
+        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+        fusionAuthToken = authenticatedUser.response.token;
+
+        requiresFusionAuthRegistration = false;
+      } else if (isNonMember) {
+        try {
+          const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+          requiresFusionAuthRegistration = fusionAuthResponse.statusCode !== 200;
+        } catch (error) {
+          requiresFusionAuthRegistration = true;
+        }
       } else {
-        newUser = this.dbConnection.getRepository(User).create(newUser);
+        requiresFusionAuthRegistration = true;
       }
+    } else {
+      requiresFusionAuthRegistration = true;
+    }
 
-      if (payload.instagramAccessToken) {
-        await SocialService.getInstagramData(newUser.id, payload.instagramAccessToken, payload.platform);
-      } else if (payload.linkedInAccessToken) {
-        await SocialService.getLinkedInData(newUser.id, payload.linkedInAccessToken, payload.platform);
-      } else if (payload.facebookAccessToken) {
-        SocialService.getFacebookData(newUser.id, payload.linkedInAccessToken, payload.platform);
-      }
+    // Get address
+    let placeLocation = null;
+    if (payload.address.placeId) {
+      placeLocation = await GoogleAddressClient.geodecodePlaceId(payload.address.placeId);
+    }
+    const userAddress = await newAddress(payload.address, placeLocation);
+    const address = await this.dbConnection.getRepository(Address).save(userAddress);
 
+    // Always use `newMember` for user creation
+    let newUser = newMember(payload, address);
+
+    // Retain ID if user exists
+    if (existingUser) {
+      newUser.id = existingUser.id;
+    }
+
+    if (payload.socialUrl) {
+      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+    }
+
+    if (payload.instagramAccessToken) {
+      await SocialService.getInstagramData(newUser.id, payload.instagramAccessToken, payload.platform);
+    } else if (payload.linkedInAccessToken) {
+      await SocialService.getLinkedInData(newUser.id, payload.linkedInAccessToken, payload.platform);
+    } else if (payload.facebookAccessToken) {
+      SocialService.getFacebookData(newUser.id, payload.linkedInAccessToken, payload.platform);
+    }
+
+    if (!existingUser || requiresFusionAuthRegistration) {
       const registrationRequest: RegistrationRequest = {
         registration: {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
@@ -321,511 +379,468 @@ export class AuthService {
         },
       };
 
-      const fusionAuthUser = await this.fusionAuthClient.register(newUser.id, registrationRequest);
+      fusionAuthUser = await fusionAuthClientHandler.fusionAuthClient().register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
-        return responses.conflict(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+        throw new ConflictError(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
       }
-
       newUser.id = fusionAuthUser.response?.user?.id;
-      newUser = await this.dbConnection.getRepository(User).save(newUser);
-      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'member' });
-      
-      // Micro-service call - need to shift the focus from platfrom to users
-      //await this.platformClient.saveFocusesForUser(newUser.id, payload.focusIds, this.logger);
-      
-      // await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
-      
-      // Micro-service call - need to shift this call to notifications services, right now at commununication service
-
-      // await this.communicationClient.sendEmailFromTemplate(
-      //   [
-      //     {
-      //       key: 'link_to_application',
-      //       value: config.get('RUMOR_WEBSITE') + `users/${newUser.id}/new-applicant`,
-      //     },
-      //   ],
-      //   'Super Admin - New Member Application',
-      //   ['admin@therumor.com'],
-      //   null,
-      //   this.logger,
-      // );
-
-      return responses.data(fusionAuthUser.response.token);
-    } catch (err) {
-      return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
+      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
     }
+
+    newUser = await this.dbConnection.getRepository(User).save(newUser);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    await PlatformService.saveFocusesForUser({
+      userId: newUser.id,
+      focusIds: payload.focusIds,
+    });
+    await PlatformService.saveInterestsForUser({
+      userId: newUser.id,
+      interestsIds: payload.interestsIds,
+    });
+    await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
+
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'applicants_name',
+            value: `${newUser.firstName} ${newUser.lastName}`,
+          },
+        ],
+        'Application Submitted',
+        [newUser.email], // Send email to the member
+        null,
+      );
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${newUser.id}/new-applicant`,
+          },
+        ],
+        'Super Admin - New Member Application',
+        ['admin@therumor.com'],
+        null,
+      );
+    } catch (error) { }
+
+    const savedUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: newUser.id },
+      relations: { roles: { role: true } },
+    });
+
+    if (!savedUser) {
+      throw new BadRequestError('Error retrieving user after sign-up.');
+    }
+
+    return {
+      id: savedUser.id,
+      roles: savedUser.roles.map((role) => ({
+        roleName: role.role.name,
+        roleId: role.role.id,
+      })),
+      token: fusionAuthToken, // Now token is set correctly
+    };
+
   }
 
-  public static async hostSignUp(payload: HostSignUpRequestDto): Promise<SignUpResponse> {
-    try {
-      let nonMember: UserRole | null;
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: [
-          { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
-          { email: payload.email, deletedAt: IsNull() },
-        ],
-        relations: {
-          roles: { role: true },
-        },
+  public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
+    let nonMember: UserRole | null;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: [
+        { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
+        { email: payload.email, deletedAt: IsNull() },
+      ],
+      relations: {
+        roles: { role: true },
+      },
+    });
+
+    if (user) {
+      nonMember = user.roles.find((item) => {
+        if (item.role.name == 'non_member') return item;
       });
+      if (!nonMember) {
+        if (user.phoneNumber === payload.phoneNumber) {
+          throw new BadRequestError("Phone number is already in use.");
+        }
 
-      if (user) {
-        nonMember = user.roles.find((item) => {
-          if (item.role.name == 'non_member') return item;
-        });
-        if (!nonMember) {
-          if (user.phoneNumber === payload.phoneNumber) {
-            return responses.badRequest('Phone number is already in use, please try with a different phone number.');
-          }
-
-          if (user.email === payload.email) {
-            return responses.badRequest('Email is already in use, please try with a different email.');
-          }
+        if (user.email === payload.email) {
+          throw new BadRequestError("Email is already in use.");
         }
       }
-
-      let newUser = newHost(payload);
-      if (nonMember) {
-        newUser.id = user.id;
-        await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
-      }
-      newUser = await this.dbConnection.getRepository(User).save(newUser);
-
-      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
-      
-      // Micro-service call
-      
-      // await this.communicationClient.sendEmailFromTemplate(
-      //   [
-      //     {
-      //       key: 'first_name',
-      //       value: payload?.firstName || '',
-      //     },
-      //   ],
-      //   'Host Application Submitted',
-      //   [payload.email],
-      //   null,
-      //   this.logger,
-      // );
-      // await this.communicationClient.sendEmailFromTemplate(
-      //   [
-      //     {
-      //       key: 'link_to_application',
-      //       value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
-      //     },
-      //   ],
-      //   'Super Admin - New Host Application',
-      //   ['admin@therumor.com'],
-      //   null,
-      //   this.logger,
-      // );
-
-      return responses.data('');
-    } catch (err) {
-      return responses.badRequest('Unkown error occured, please try again later.');
     }
-  }
 
-  public static async logout(payload: TokenRequestDto): Promise<SignUpResponse> {
-    try {
-      const response = await this.fusionAuthClient.logout(false, payload.token);
-      if (!response.wasSuccessful()) return responses.badRequest('Invalid session token');
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Unkown error occured, please try again later.');
+    let newUser = newHost(payload);
+    if (nonMember) {
+      newUser.id = user.id;
+      await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
     }
-  }
+    newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-  public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<ValidityResponse> {
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
+
+    // Micro-service call
+
     try {
-      const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
-      if (!temporaryPasswordToken) return responses.data({ isValid: false });
-      const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
-      const currentTime = dayjs.utc(new Date()).tz('America/New_York');
-      const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
-      return responses.data({ isValid });
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again later.');
-    }
-  }
-
-  public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<GenericResponse> {
-    try {
-      if (payload.password !== payload.repeatedPassword) return responses.badRequest('Passwords do not match.');
-
-      const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({
-        where: { token: payload.token },
-        relations: { user: true },
-      });
-      if (!temporaryPasswordToken) return responses.badRequest('Unable to set password, please try again later.');
-
-      const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
-      const currentTime = dayjs.utc(new Date()).tz('America/New_York');
-      const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
-      if (!isValid) return responses.badRequest('Token has expired');
-
-      const temporaryPassword = await this.dbConnection.getRepository(TemporaryPassword).findOne({ where: { user: { id: temporaryPasswordToken.user.id } } });
-      if (!temporaryPassword) return responses.badRequest('Unable to set password, please try again later.');
-
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: {
-          id: temporaryPasswordToken.user.id,
-        },
-        relations: {
-          temporaryPassword: true,
-          temporaryPasswordToken: true,
-        },
-      });
-
-      const request: ChangePasswordRequest = {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        loginId: temporaryPasswordToken.user.email,
-        currentPassword: temporaryPassword.password,
-        password: payload.password,
-      };
-
-      await this.fusionAuthClient.changePasswordByIdentity(request);
-
-      // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
-      // Nullify relationships
-      user.temporaryPassword = null;
-      user.temporaryPasswordToken = null;
-      await this.dbConnection.getRepository(User).save(user);
-
-      // Delete entities successfully
-      await this.dbConnection.getRepository(TemporaryPassword).delete(temporaryPassword.id);
-      await this.dbConnection.getRepository(TemporaryPasswordToken).delete(temporaryPasswordToken.id);
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again later.');
-    }
-  }
-
-  public static async updateHostPassword(payload: UpdateHostPasswordRequestDto): Promise<GenericResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: {
-          id: payload.id,
-        },
-        relations: {
-          roles: {
-            role: true,
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'first_name',
+            value: payload?.firstName || '',
           },
-        },
-      });
-
-      const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
-      if (hostRole === undefined) return responses.notFound('Host not found');
-
-      const request: ChangePasswordRequest = {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        loginId: user.email,
-        currentPassword: payload.currentPassword,
-        password: payload.newPassword,
-      };
-
-      await this.fusionAuthClient.changePasswordByIdentity(request);
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Unkown error occured, please try again later.');
-    }
-  }
-
-  public static async forgot(payload: ForgotPasswordRequestDto): Promise<ForgotPasswordResponse> {
-    try {
-      const user: User = await this.dbConnection.getRepository(User).findOne({
-        where: { email: payload.email, deletedAt: null },
-        relations: {
-          roles: {
-            role: true,
+        ],
+        'Host Application Submitted',
+        [payload.email],
+        null,
+      );
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
           },
-        },
-      });
-      if (!user) {
-        return responses.notFound('No user found');
-      }
-      const passwordResetRequest: ForgotPasswordRequest = {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        email: payload.email,
-        sendForgotPasswordEmail: false,
-      };
-      const forgotPasswordResponse = await this.fusionAuthClient.forgotPassword(passwordResetRequest);
-      const token = forgotPasswordResponse.response?.changePasswordId;
-      if (!token) {
-        return responses.badRequest('Unable to call forgot password, please try again later.');
-      }
-      const redirectPath = `auth/reset-password/${token}`;
-      
-      // Micro-service call
+        ],
+        'Super Admin - New Host Application',
+        ['admin@therumor.com'],
+        null,
+      );
+    } catch (error) { }
 
-      // const mailServiceResponse = await this.communicationClient.sendEmailFromTemplate(
-      //   [
-      //     {
-      //       key: 'user_name',
-      //       value: user?.firstName,
-      //     },
-      //     {
-      //       key: 'reset_url',
-      //       value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
-      //     },
-      //   ],
-      //   'Reset Password',
-      //   [payload.email],
-      //   null,
-      //   this.logger,
-      // );
-      // if (!mailServiceResponse) {
-      //   return responses.badRequest('Unable to send mail, please try again later.');
-      // }
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Unable to call forgot password, please try again later.');
-    }
+    return '';
   }
 
-  public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponse> {
-    try {
-      const { password, token, repeatedPassword } = payload;
-      if (password !== repeatedPassword) return responses.badRequest('Passwords do not match.');
-      const changePasswordRequest: ChangePasswordRequest = {
-        password: payload.password,
-      };
-      const fusionAuthResponse = await this.fusionAuthClient.retrieveUserByChangePasswordId(token);
-      const email = fusionAuthResponse?.response?.user?.email;
-      if (!email) {
-        return responses.badRequest('Unable to find user, please try again later.');
-      }
-      const changePasswordFusionAuthResponse = await this.fusionAuthClient.changePassword(token, changePasswordRequest);
-      if (changePasswordFusionAuthResponse?.statusCode !== 200) {
-        return responses.badRequest('Unable to reset password, please try again later.');
-      }
-      return await this.hostLogin({ email, password });
-    } catch (err) {
-      return responses.badRequest('Unable to reset password, please try again later.');
+  public static async logout(payload: TokenRequestDto): Promise<string> {
+    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+
+    if (!response.wasSuccessful()) {
+      throw new BadRequestError("Invalid session token.");
     }
+    return '';
+
+  }
+
+  public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<Validity> {
+    const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
+    if (!temporaryPasswordToken) return { isValid: false }
+    const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
+    const currentTime = dayjs.utc(new Date()).tz('America/New_York');
+    const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
+    return { isValid }
+
+  }
+
+  public static async checkService() {
+    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
+    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
+    let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
+    return response
+  }
+
+
+  public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<string> {
+    if (payload.password !== payload.repeatedPassword) {
+      throw new BadRequestError("Passwords do not match.");
+    }
+
+    const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({
+      where: { token: payload.token },
+      relations: { user: true },
+    });
+    if (!temporaryPasswordToken) {
+      throw new BadRequestError("Unable to set password.");
+    }
+
+    const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
+    const currentTime = dayjs.utc(new Date()).tz('America/New_York');
+    const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
+    if (!isValid) {
+      throw new BadRequestError("Token has expired");
+    }
+
+    const temporaryPassword = await this.dbConnection.getRepository(TemporaryPassword).findOne({ where: { user: { id: temporaryPasswordToken.user.id } } });
+    if (!temporaryPassword) {
+      throw new BadRequestError("Unable to set password");
+    }
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: temporaryPasswordToken.user.id,
+      },
+      relations: {
+        temporaryPassword: true,
+        temporaryPasswordToken: true,
+      },
+    });
+
+    const request: ChangePasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: temporaryPasswordToken.user.email,
+      currentPassword: temporaryPassword.password,
+      password: payload.password,
+    };
+
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+
+    // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
+    // Nullify relationships
+    user.temporaryPassword = null;
+    user.temporaryPasswordToken = null;
+    await this.dbConnection.getRepository(User).save(user);
+
+    // Delete entities successfully
+    await this.dbConnection.getRepository(TemporaryPassword).delete(temporaryPassword.id);
+    await this.dbConnection.getRepository(TemporaryPasswordToken).delete(temporaryPasswordToken.id);
+    return '';
+  }
+
+  public static async updateHostPassword(payload: UpdateHostPasswordRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: payload.id,
+      },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
+    if (hostRole === undefined) {
+      throw new NotFoundError("Host");
+    }
+
+    const request: ChangePasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: user.email,
+      password: payload.newPassword,
+    };
+
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+    return '';
+  }
+
+  public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+    if (!user) {
+      throw new NotFoundError("user");
+    }
+    const passwordResetRequest: ForgotPasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      email: payload.email,
+      sendForgotPasswordEmail: false,
+    };
+    const forgotPasswordResponse = await fusionAuthClientHandler.fusionAuthClient().forgotPassword(passwordResetRequest);
+    const token = forgotPasswordResponse.response?.changePasswordId;
+    if (!token) {
+      throw new BadRequestError("token");
+
+    }
+    const redirectPath = `auth/reset-password/${token}`;
+
+    // Micro-service call
+
+    try {
+      const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'user_name',
+            value: user?.firstName,
+          },
+          {
+            key: 'reset_url',
+            value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+          },
+        ],
+        'Reset Password',
+        [payload.email],
+        null,
+      );
+      if (!mailServiceResponse) {
+        throw new BadRequestError('Unable to send mail, please try again later.')
+      }
+    } catch (error) { }
+    return '';
+
+  }
+
+  public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponseAndRoles> {
+    const { password, token, repeatedPassword } = payload;
+    if (password !== repeatedPassword) {
+      throw new BadRequestError("Passwords do not match.");
+    }
+    const changePasswordRequest: ChangePasswordRequest = {
+      password: payload.password,
+    };
+    const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByChangePasswordId(token);
+    const email = fusionAuthResponse?.response?.user?.email;
+    if (!email) {
+      throw new BadRequestError("email");
+    }
+    const changePasswordFusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().changePassword(token, changePasswordRequest);
+    if (changePasswordFusionAuthResponse?.statusCode !== 200) {
+      throw new BadRequestError("Unable to reset password");
+    }
+    return await this.hostLogin({ email, password });
   }
 
   public static async loginSSO(): Promise<LoginSSOResponse> {
-    try {
-      const uri = `${config.get('FUSIONAUTH_BASE_URL')}oauth2/authorize?client_id=${config.get('FUSIONAUTH_APP_ID')}&response_type=code&redirect_uri=${encodeURIComponent(config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect')}`;
-
-      return responses.data(uri);
-    } catch (err) {
-      return responses.badRequest('Unable to call login sso, please try again later.');
-    }
+    const uri = `${config.get('FUSIONAUTH_BASE_URL')}oauth2/authorize?client_id=${config.get('FUSIONAUTH_APP_ID')}&response_type=code&redirect_uri=${encodeURIComponent(config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect')}`;
+    return responses.data(uri);
   }
 
   public static async oAuthRedirect(payload: OAuthRequestDto): Promise<OAuthRedirectResponse> {
-    try {
-      const accesToken = await this.fusionAuthClient.exchangeOAuthCodeForAccessToken(
-        payload.code,
-        config.get('FUSIONAUTH_APP_ID'),
-        config.get('FUSIONAUTH_CLIENT_SECRET'),
-        config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect',
-      );
+    const accesToken = await fusionAuthClientHandler.fusionAuthClient().exchangeOAuthCodeForAccessToken(
+      payload.code,
+      config.get('FUSIONAUTH_APP_ID'),
+      config.get('FUSIONAUTH_CLIENT_SECRET'),
+      config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect',
+    );
 
-      return responses.data(accesToken.response.access_token);
-    } catch (err) {
-      return responses.badRequest('Invalid SSO sesion redirect.');
-    }
+    return responses.data(accesToken.response.access_token);
   }
 
-  public static async checkPhoneNumber(payload: PhoneNumberRequestDto): Promise<ValidityResponse> {
+  public static async checkPhoneNumber(payload: PhoneNumberRequestDto): Promise<Validity> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        phoneNumber: payload.phoneNumber,
+        deletedAt: IsNull(),
+      },
+    });
+    if (user) return { isValid: false };
+
+    //Micro-service call
     try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: {
-          phoneNumber: payload.phoneNumber,
-          deletedAt: IsNull(),
-        },
-      });
-      if (user) return responses.data({ isValid: false });
+      await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+    } catch (error) { }
+    return { isValid: true };
+  }
+
+  public static async checkEmail(payload: CheckEmailRequestDto): Promise<Validity> {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } });
+    if (user) {
+      throw new ConflictError("This email is already taken");
+    }
+    return { isValid: true };
+  }
+
+  public static async checkAge(payload: CheckAgeRequestDto): Promise<Validity> {
+    if (dayjs(new Date()).diff(payload.dateOfBirth, 'year') < 18) {
+      throw new BadRequestError("Error. Age requirement not met.");
+    }
+    return { isValid: true };
+  }
+
+  public static async sendInvitations(payload: UserInvitationsRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!user) {
+      throw new NotFoundError("user");
+    }
+
+    const invitations = await Promise.all(
+      payload.phoneNumbers.map(async (phoneNumber) => {
+        try {
+          const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+          if (existingInvitation) return existingInvitation;
+
+          const invitation = new Invitation();
+          invitation.phoneNumber = phoneNumber;
+          invitation.inviteeUser = user;
+          return await this.dbConnection.getRepository(Invitation).save(invitation);
+        } catch (err) {
+          return null;
+        }
+      }),
+    );
+    const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
+
+    // Micro-service call
+    try {
+      const success = await serviceMesh.notificationService().sendInvitationMessages(successfulInvitations, user.firstName);
+      if (!success) {
+        throw new BadRequestError('An error occured while sending invitations, please try again.')
+      }
+    } catch (error) { }
+
+    return '';
+
+  }
+
+  public static async saveInvitations(payload: UserInvitationsRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!user) {
+      throw new NotFoundError('user')
+    }
+
+    await Promise.all(
+      payload.phoneNumbers.map(async (phoneNumber) => {
+        try {
+          const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+          if (existingInvitation) return existingInvitation;
+
+          const invitation = new Invitation();
+          invitation.phoneNumber = phoneNumber;
+          invitation.inviteeUser = user;
+          return await this.dbConnection.getRepository(Invitation).save(invitation);
+        } catch (err) {
+          return null;
+        }
+      }),
+    );
+    return '';
+  }
+
+  public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<string> {
+    const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!invitee) {
+      throw new NotFoundError('User')
+    }
+
+    const existingUser = await this.dbConnection.getRepository(User).findOne({
+      where: [{ phoneNumber: payload.phoneNumber }, { email: payload.email }],
+    });
+
+    if (existingUser) {
+      if (existingUser.phoneNumber === payload.phoneNumber) {
+        throw new BadRequestError('This user is already a part of our database')
+      }
+
+      if (existingUser.email === payload.email) {
+        throw new BadRequestError('This user is already a part of our database')
+      }
+    }
+
+    const invitation = new Invitation();
+    invitation.phoneNumber = payload.phoneNumber;
+    invitation.email = payload.email;
+    invitation.referralCode = payload.referralCode;
+    invitation.inviteeUser = invitee;
+
+    await this.dbConnection.getRepository(Invitation).save(invitation);
+
+    if (payload.phoneNumber) {
+      const message =
+        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
+        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
 
       //Micro-service call
-      //await this.communicationClient.sendVerificationCode(payload.phoneNumber, this.logger);
-      return responses.data({ isValid: true });
-    } catch (err) {
-      return responses.badRequest('Invalid phone number provided.');
-    }
-  }
-
-  public static async checkEmail(payload: CheckEmailRequestDto): Promise<ValidityResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } });
-      if (user) return responses.conflict('This email is already taken, please try a different one.');
-      return responses.data({ isValid: true });
-    } catch (err) {
-      return responses.badRequest('Invalid email provided.');
-    }
-  }
-
-  public static async checkAge(payload: CheckAgeRequestDto): Promise<ValidityResponse> {
-    try {
-      if (dayjs(new Date()).diff(payload.dateOfBirth, 'year') < 18) {
-        return responses.badRequest('Error. Age requirement not met.');
-      }
-      return responses.data({ isValid: true });
-    } catch (err) {
-      return responses.badRequest('Error. Age requirement not met.');
-    }
-  }
-
-  public static async sendInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
-
-      // const invitations = await Promise.all(
-      //   payload.phoneNumbers.map(async (phoneNumber) => {
-      //     try {
-      //       const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
-      //       if (existingInvitation) return existingInvitation;
-
-      //       const invitation = new Invitation();
-      //       invitation.phoneNumber = phoneNumber;
-      //       invitation.inviteeUser = user;
-      //       return await this.dbConnection.getRepository(Invitation).save(invitation);
-      //     } catch (err) {
-      //       return null;
-      //     }
-      //   }),
-      // );
-      //const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
-      
-      //Micro-service call
-      // const success = await this.communicationClient.sendInvitationMessages(successfulInvitations, user.firstName);      
-      // if (!success) return responses.badRequest('An error occured while sending invitations, please try again.');
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('An error occured while sending invitations, please try again.');
-    }
-  }
-
-  public static async saveInvitations(payload: UserInvitationsRequestDto): Promise<GenericResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
-
-      // await Promise.all(
-      //   payload.phoneNumbers.map(async (phoneNumber) => {
-      //     try {
-      //       const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
-      //       if (existingInvitation) return existingInvitation;
-
-      //       const invitation = new Invitation();
-      //       invitation.phoneNumber = phoneNumber;
-      //       invitation.inviteeUser = user;
-      //       return await this.dbConnection.getRepository(Invitation).save(invitation);
-      //     } catch (err) {
-      //       return null;
-      //     }
-      //   }),
-      // );
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('An error occured while saving invitations, please try again.');
-    }
-  }
-
-  public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<GenericResponse> {
-    try {
-      const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!invitee) return responses.notFound('User not found!');
-
-      const existingUser = await this.dbConnection.getRepository(User).findOne({
-        where: [{ phoneNumber: payload.phoneNumber }, { email: payload.email }],
-      });
-
-      if (existingUser) {
-        if (existingUser.phoneNumber === payload.phoneNumber) {
-          return responses.badRequest(`Phone number is already in use by ${existingUser.firstName} ${existingUser.lastName}`);
+      try {
+        const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        if (!success) {
+          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
         }
-
-        if (existingUser.email === payload.email) {
-          return responses.badRequest(`Email is already in use by ${existingUser.firstName} ${existingUser.lastName}.`);
-        }
-      }
-
-      // const invitation = new Invitation();
-      // invitation.phoneNumber = payload.phoneNumber;
-      // invitation.email = payload.email;
-      // invitation.referralCode = payload.referralCode;
-      // invitation.inviteeUser = invitee;
-
-      // await this.dbConnection.getRepository(Invitation).save(invitation);
-
-      if (payload.phoneNumber) {
-        const message =
-          `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-          (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
-        
-        //Micro-service call
-          // const success = await this.communicationClient.sendTextMessage(payload.phoneNumber, message);
-        // if (!success) {
-        //   return responses.badRequest('An error occured while sending SMS invitation, please try again.');
-        // }
-      }
-
-      if (payload.email) {
-        const params = [
-          {
-            key: 'invitee_first_name',
-            value: payload.name,
-          },
-        ];
-
-        if (payload.referralCode) {
-          params.push({
-            key: 'referral_code',
-            value: payload.referralCode,
-          });
-        }
-
-        //Micro-service call
-        // const success = await this.communicationClient.sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null, this.logger);
-        // if (!success) {
-        //   return responses.badRequest('An error occured while sending Email invitation, please try again.');
-        // }
-      }
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('An error occured while sending invitation, please try again.');
+      } catch (error) { }
     }
-  }
 
-  public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<GenericResponse> {
-    try {
-      const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!invitee) return responses.notFound('User not found!');
-
-      const whereCondition: FindOptionsWhere<User>[] = [{ email: payload.email }];
-      if (payload.phoneNumber) {
-        whereCondition.push({ phoneNumber: payload.phoneNumber });
-      }
-
-      const existingUser = await this.dbConnection.getRepository(User).findOne({
-        where: whereCondition,
-      });
-
-      if (existingUser) {
-        if (payload.phoneNumber && existingUser.phoneNumber === payload.phoneNumber) {
-          return responses.badRequest(`Phone number is already in use by ${existingUser.firstName} ${existingUser.lastName}`);
-        }
-
-        if (existingUser.email === payload.email) {
-          return responses.badRequest(`Email is already in use by ${existingUser.firstName} ${existingUser.lastName}.`);
-        }
-      }
-
-      // const invitation = new Invitation();
-      // invitation.phoneNumber = payload.phoneNumber;
-      // invitation.email = payload.email;
-      // invitation.inviteeUser = invitee;
-
-      // await this.dbConnection.getRepository(Invitation).save(invitation);
-
+    if (payload.email) {
       const params = [
         {
           key: 'invitee_first_name',
@@ -833,16 +848,74 @@ export class AuthService {
         },
       ];
 
-      // Micro-service call
-      // const success = await this.communicationClient.sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null, this.logger);
-      // if (!success) {
-      //   return responses.badRequest('An error occured while sending Email invitation, please try again.');
-      // }
+      if (payload.referralCode) {
+        params.push({
+          key: 'referral_code',
+          value: payload.referralCode,
+        });
+      }
 
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('An error occured while sending invitation, please try again.');
+      //Micro-service call
+      try {
+        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
+        if (!success) {
+          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        }
+      } catch (error) { }
     }
+
+    return '';
+  }
+
+  public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<string> {
+    const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!invitee) {
+      throw new NotFoundError('User')
+    }
+
+    const whereCondition: FindOptionsWhere<User>[] = [{ email: payload.email }];
+    if (payload.phoneNumber) {
+      whereCondition.push({ phoneNumber: payload.phoneNumber });
+    }
+
+    const existingUser = await this.dbConnection.getRepository(User).findOne({
+      where: whereCondition,
+    });
+
+    if (existingUser) {
+      if (payload.phoneNumber && existingUser.phoneNumber === payload.phoneNumber) {
+        throw new BadRequestError('Phone number is already in use')
+      }
+
+      if (existingUser.email === payload.email) {
+        throw new BadRequestError('Email is already in use')
+      }
+    }
+
+    const invitation = new Invitation();
+    invitation.phoneNumber = payload.phoneNumber;
+    invitation.email = payload.email;
+    invitation.inviteeUser = invitee;
+
+    await this.dbConnection.getRepository(Invitation).save(invitation);
+
+    const params = [
+      {
+        key: 'invitee_first_name',
+        value: payload.name,
+      },
+    ];
+
+    // Micro-service call
+    try {
+      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
+      if (!success) {
+        throw new BadRequestError('An error occured while sending Email invitation, please try again.')
+      }
+    } catch (error) { }
+
+    return '';
+
   }
 
   public static async saveOrUpdateProvider(payload: SaveOrUpdateProviderAuthRequestDto): Promise<SaveOrUpdateProviderAuthResponse> {
@@ -855,7 +928,7 @@ export class AuthService {
     });
 
     if (!user) {
-      return responses.notFound('Verify user exists and is active.');
+      throw new NotFoundError('User')
     }
 
     let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -903,612 +976,816 @@ export class AuthService {
     return responses.data(resp);
   }
 
-  public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<ValidityResponse> {
+  public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
+    const isEmailLogin = !!payload.email;
+    const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
+
+    if (!loginIdentifier) {
+      throw new BadRequestError('Email or phone number is required.');
+    }
+
+    // Search for user by email or phone number
+    let user: User | null = null;
+    if (isEmailLogin) {
+      user = await this.dbConnection.getRepository(User).findOne({
+        where: [{ email: payload.email, deletedAt: IsNull() }],
+      });
+    } else {
+      user = await this.dbConnection.getRepository(User).findOne({
+        where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
+      });
+    }
+
+    // Micro-service call
+    if (!user) {
+      try {
+        if (isEmailLogin) {
+          await this.sendVerificationCodeByEmail({ email: payload.email });
+        } else {
+          await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+        }
+      } catch (error) { }
+      return { isValid: false };
+    }
+
+    const request: PasswordlessStartRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: user.email,
+    };
+
+    // Remove all previous login attempts (both email and phone)
+    const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+    // const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber } });
+
+    if (existingLoginAttempts.length) {
+      await Promise.all(
+        existingLoginAttempts.map(async (attempt) => {
+          await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
+        }),
+      );
+    }
+
     try {
-      const isEmailLogin = !!payload.email;
-      const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
+      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+    } catch (error) {
+      const guest = await this.dbConnection.getRepository(Guest).findOne({
+        where: { user: { id: user.id }, status: GuestStatus.INVITED },
+      });
 
-      if (!loginIdentifier) {
-        return responses.badRequest('Email or phone number is required.');
+      if (guest) {
+        try {
+          if (isEmailLogin) {
+            await this.sendVerificationCodeByEmail({ email: payload.email });
+          } else {
+            serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+          }
+        } catch (error) { }
+        return { isValid: true, isGuest: true };
       }
+    }
 
-      // Search for user by email or phone number
-      let user: User | null = null;
-      if (isEmailLogin) {
-        user = await this.dbConnection.getRepository(User).findOne({
-          where: [{ email: payload.email, deletedAt: IsNull() }],
-        });
-      } else {
-        user = await this.dbConnection.getRepository(User).findOne({
-          where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
-        });
-      }
+    // Start a new login and save the code
+    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    const temporaryLoginCode = new TemporaryLoginCode();
+    temporaryLoginCode.email = payload.email;
+    temporaryLoginCode.phoneNumber = payload.phoneNumber;
+    temporaryLoginCode.code = code.response.code;
+    await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
 
-      // Micro-service call
-      // if (!user) {
-      //   if (isEmailLogin) {
-      //     await this.sendVerificationCodeByEmail(payload.email);
-      //   } else {
-      //     await this.communicationClient.sendVerificationCode(payload.phoneNumber, this.logger);
-      //   }
-      //   return responses.data({ isValid: false });
-      // }
-
-      const request: PasswordlessStartRequest = {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        loginId: user.email,
-      };
-
-      // Remove all previous login attempts (both email and phone)
-      const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      // const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber } });
-
-      if (existingLoginAttempts.length) {
-        await Promise.all(
-          existingLoginAttempts.map(async (attempt) => {
-            await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
-          }),
-        );
-      }
-
-      // Start a new login and save the code
-      const code = await this.fusionAuthClient.startPasswordlessLogin(request);
-      const temporaryLoginCode = new TemporaryLoginCode();
-      temporaryLoginCode.email = payload.email;
-      temporaryLoginCode.phoneNumber = payload.phoneNumber;
-      temporaryLoginCode.code = code.response.code;
-      await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
-
+    try {
       if (isEmailLogin) {
         //TODO: change and proper format
-        
+
         // Micro-service call
-        // await this.communicationClient.sendEmailFromTemplate(
-        //   [
-        //     {
-        //       key: 'first_name',
-        //       value: code.response.code,
-        //     },
-        //   ],
-        //   'Host Application Submitted',
-        //   [payload.email],
-        //   null,
-        //   this.logger,
-        // );
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'first_name',
+              value: code.response.code,
+            },
+          ],
+          'Host Application Submitted',
+          [payload.email],
+          null,
+        );
       } else {
         // Send verification text for phone login unless bypass conditions are met
         if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
           const message = 'Your Rumor verification code: ' + code.response.code;
-          // await this.communicationClient.sendTextMessage(payload.phoneNumber, message, this.logger);
+          serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
         }
       }
+    } catch (error) { }
 
-      return responses.data({ isValid: true });
-    } catch (err) {
-      return responses.badRequest('Invalid email or phone number provided.');
-    }
+    return { isValid: true };
   }
 
-  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponse> {
-    try {
-      const isEmailLogin = !!payload.email;
-      const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
+  public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
+    const isEmailLogin = !!payload.email;
+    const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
-      // Search for user by email or phone number
-      let user: User | null = null;
-      if (isEmailLogin) {
-        user = await this.dbConnection.getRepository(User).findOne({
-          where: [{ email: payload.email, deletedAt: IsNull() }],
-          relations: { roles: { role: true } },
-        });
-      } else {
-        user = await this.dbConnection.getRepository(User).findOne({
-          where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
-          relations: { roles: { role: true } },
-        });
-      }
+    // Search for user by email or phone number
+    let user: User | null = null;
+    if (isEmailLogin) {
+      user = await this.dbConnection.getRepository(User).findOne({
+        where: [{ email: payload.email, deletedAt: IsNull() }],
+        relations: { roles: { role: true } },
+      });
+    } else {
+      user = await this.dbConnection.getRepository(User).findOne({
+        where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
+        relations: { roles: { role: true } },
+      });
+    }
 
-      // If user is not found, verify OTP and create a new user entry
-      if (!user && !payload.isExist) {
+    // If user is not found, verify OTP and create a new user entry
+    if (payload.isGuest) {
+      try {
         const verificationResult = isEmailLogin
-        // Micro-servc
-          // ? await this.verifyCodeByEmail(payload.email, payload.code)
-          // : await this.communicationClient.verifyPhoneNumber(payload.phoneNumber, payload.code, this.logger);
+          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        if (!verificationResult) {
-          return responses.notFound('Invalid or expired verification code, please try again.');
+        const isVerified: boolean =
+          ('verified' in verificationResult && verificationResult.verified === true) ||
+          ('data' in verificationResult && verificationResult.data?.verified === true);
+
+        if (!isVerified) {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
+      } catch (error) { }
 
-        // Check for invitation and set flags
-        // const invitation = await this.dbConnection.getRepository(Invitation).findOne({
-        //   where: { phoneNumber: payload.phoneNumber, email: payload.email },
-        // });
-        const isSignUpCompleted = false //invitation?.signUpComplete || false;
-        const isInvited = false //!!invitation;
+      // Check for invitation and set flags
+      const invitation = await this.dbConnection.getRepository(Invitation).findOne({
+        where: { phoneNumber: payload.phoneNumber, email: payload.email },
+      });
+      const isSignUpCompleted = invitation?.signUpComplete || false;
+      const isInvited = !!invitation;
 
-        const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
+      const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
 
-        return responses.data({
-          token: '',
-          roles: [
-            {
-              roleName: role[0].name,
-              roleId: role[0].id,
-            },
-          ],
-          isSignUpCompleted,
-          isInvited,
-        });
-      }
-
-      // Handle bypass verification logic for testing or review environment
-      if (config.get('APP_REVIEW_LOGIN') === loginIdentifier || config.get('BYPASS_VERIFICATION_CODE')) {
-        const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-        if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
-
-        const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: temporaryCode.code });
-        if (completedLogin.statusCode > 299) {
-          return responses.badRequest(`Unable to login: ${completedLogin.exception.message}`);
-        }
-
-        await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
-
-        return responses.data({
-          token: completedLogin.response.token,
-          roles: user.roles.map((item) => ({
-            roleName: item.role.name,
-            roleId: item.role.id,
-          })),
-        });
-      } else {
-        const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
-          where: {
-            [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
-            code: payload.code,
+      return {
+        token: '',
+        roles: [
+          {
+            roleName: role[0].name,
+            roleId: role[0].id,
           },
-        });
-        if (!temporaryCode) return responses.notFound('Unable to login, please try again.');
-
-        const completedLogin = await this.fusionAuthClient.passwordlessLogin({ code: payload.code });
-        if (completedLogin.statusCode > 299) {
-          return responses.badRequest(`Unable to login: ${completedLogin.exception.message}`);
-        }
-
-        await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
-
-        return responses.data({
-          token: completedLogin.response.token,
-          roles: user.roles.map((item) => ({
-            roleName: item.role.name,
-            roleId: item.role.id,
-          })),
-        });
-      }
-    } catch (err) {
-      return responses.badRequest('Unable to login, please try again.');
+        ],
+        isSignUpCompleted,
+        isInvited,
+        id: user.id,
+        user: user,
+        isGuest: true,
+      };
     }
-  }
 
-  public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: {
-          email: payload.email,
-          deletedAt: IsNull(),
-          roles: {
-            role: {
-              name: RoleType.Host,
-            },
+    if (!user && !payload.isExist) {
+      try {
+        const verificationResult = isEmailLogin
+          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+
+        const isVerified: boolean =
+          ('verified' in verificationResult && verificationResult.verified === true) ||
+          ('data' in verificationResult && verificationResult.data?.verified === true);
+
+        if (!isVerified) {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      } catch (error) { }
+
+      // Check for invitation and set flags
+      const invitation = await this.dbConnection.getRepository(Invitation).findOne({
+        where: { phoneNumber: payload.phoneNumber, email: payload.email },
+      });
+      const isSignUpCompleted = invitation?.signUpComplete || false;
+      const isInvited = !!invitation;
+
+      const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
+
+      return {
+        id: '',
+        token: '',
+        roles: [
+          {
+            roleName: role[0].name,
+            roleId: role[0].id,
           },
-        },
-        relations: {
-          roles: { role: true },
+        ],
+        isSignUpCompleted,
+        isInvited,
+        user: user,
+        isGuest: false,
+      };
+    }
+
+    // Handle bypass verification logic for testing or review environment
+    if (config.get('APP_REVIEW_LOGIN') === loginIdentifier || config.get('BYPASS_VERIFICATION_CODE')) {
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+
+      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: temporaryCode.code });
+      if (completedLogin.statusCode > 299) {
+        throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      }
+
+      await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
+
+      return {
+        id: user.id,
+        token: completedLogin.response.token,
+        roles: user.roles.map((item) => ({
+          roleName: item.role.name,
+          roleId: item.role.id,
+        })),
+        user: user,
+        isGuest: false,
+      };
+    } else {
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          code: payload.code,
         },
       });
-      if (!user) return responses.notFound('Host with this email was not found.');
-
-      const request: LoginRequest = {
-        loginId: user.email,
-        password: payload.password,
+      if (!temporaryCode) {
+        throw new NotFoundError('Unable to login.');
       };
-      const authenticatedUser = await this.fusionAuthClient.login(request);
-      const additionalHostInformation = user.additionalHostInformation;
-      return responses.data({
-        token: authenticatedUser.response.token,
-        roles: user.roles.map((item) => {
-          return { roleName: item.role.name, roleId: item.role.id };
-        }),
-        hostDetails: {
-          companyLogo: additionalHostInformation?.companyLogo || '',
-          companyName: additionalHostInformation?.companyName || '',
+
+      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
+      if (completedLogin.statusCode > 299) {
+        throw new BadRequestError('Unable to login.');
+      }
+
+      await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
+
+      return {
+        token: completedLogin.response.token,
+        roles: user.roles.map((item) => ({
+          roleName: item.role.name,
+          roleId: item.role.id,
+        })),
+        id: user.id,
+        user: user,
+        isGuest: false,
+      };
+    }
+  }
+
+  public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        email: payload.email,
+        deletedAt: IsNull(),
+        roles: {
+          role: {
+            name: RoleType.Host,
+          },
+        },
+      },
+      relations: {
+        roles: { role: true },
+      },
+    });
+    if (!user) {
+      throw new NotFoundError('Host');
+    }
+
+    const request: LoginRequest = {
+      loginId: user.email,
+      password: payload.password,
+    };
+    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    const additionalHostInformation = user.additionalHostInformation;
+    const data = {
+      token: authenticatedUser.response.token,
+      roles: user.roles.map((item) => {
+        return { roleName: item.role.name, roleId: item.role.id };
+      }),
+      hostDetails: {
+        companyLogo: additionalHostInformation?.companyLogo || '',
+        companyName: additionalHostInformation?.companyName || '',
+        id: user.id,
+      },
+    }
+    return data;
+  }
+
+  public static async getCurrentMember(payload: IdRequestDto): Promise<CurrentMember> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+      relations: { address: true, socialProviders: true, roles: { role: true } },
+    });
+
+    if (!user) {
+      throw new NotFoundError('user');
+    }
+
+    const memberRole = user.roles.find((role) => role.role.name === 'member');
+
+    if (memberRole === undefined) {
+      throw new NotFoundError('User');
+    }
+
+    // Mirco-service call
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+
+    const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+      where: {
+        user: {
           id: user.id,
         },
-      });
-    } catch (err) {
-      return responses.badRequest(`Unable to login, please try again.`);
-    }
+        type: SocialProviderType.INSTAGRAM,
+      },
+      relations: ['user'],
+    });
+
+    return (toCurrentMember(user, focuses, memberRole, socialProvider?.username));
   }
 
-  public static async getCurrentMember(payload: IdRequestDto): Promise<MemberResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id },
-        relations: { address: true, socialProviders: true, roles: { role: true } },
-      });
+  public static async getUser(payload: IdRequestDto): Promise<SimpleUser> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+      relations: { address: true, socialProviders: true, roles: { role: true } },
+    });
 
-      if (!user) return responses.notFound('User not found!');
-
-      const memberRole = user.roles.find((role) => role.role.name === 'member');
-
-      if (memberRole === undefined) return responses.notFound('User not found!');
-
-      // Mirco-service call
-      // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
-
-      return responses.data(toCurrentMember(user, [{id:"1",name:"focuses"}], memberRole, socialProvider?.username));
-    } catch (err) {
-      return responses.badRequest('Unable to get user, please try again.');
+    if (!user) {
+      throw new NotFoundError('user');
     }
+
+    const memberRole = user.roles.find((role) => role.role.name === 'member' || role.role.name === 'host' || role.role.name === 'non_member');
+
+    if (memberRole === undefined) {
+      throw new NotFoundError('user');
+    }
+
+    const data = (toSimpleUser(user, memberRole));
+    return data;
   }
 
-  public static async getUser(payload: IdRequestDto): Promise<SimpleUserResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id },
-        relations: { address: true, socialProviders: true, roles: { role: true } },
-      });
-
-      if (!user) return responses.notFound('User not found!');
-
-      const memberRole = user.roles.find((role) => role.role.name === 'member' || role.role.name === 'host');
-
-      if (memberRole === undefined) return responses.notFound('User not found!');
-
-      return responses.data(toSimpleUser(user, memberRole));
-    } catch (err) {
-      return responses.badRequest('Unable to get user, please try again.');
+  public static async getMe(payload: IdRequestDto): Promise<CurrentUser> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+      relations: { address: true, socialProviders: true, roles: { role: true } },
+    });
+    if (!user) {
+      throw new NotFoundError('user')
+    };
+    if (!user.roles.length) {
+      throw new ForbiddenError('insufficient permissions');
     }
+
+    //Micro-service call
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+    const roleData = user.roles.map((role) => toCurrentUser(user, focuses, [role]));
+    return {
+      ...roleData[0],
+      role: roleData.flatMap(r => r.role)
+    };
   }
 
-  public static async getCurrentUser(payload: IdRequestDto): Promise<CurrentUserResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id },
-        relations: { address: true, socialProviders: true, roles: { role: true } },
-      });
-      if (!user) return responses.notFound('User not found!');
-      if (!user.roles.length) return responses.forbidden('You do not have sufficient permisissions to access this resource!');
-
-      //Micro-service call
-      //const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-      return responses.data(user.roles.map((role) => toCurrentUser(user, [{id:"1",name:"focuses"}], role)));
-    } catch (err) {
-      return responses.badRequest('Unable to get user, please try again.');
+  public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UserProfile> {
+    const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
+    const actualUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: ['address'],
+    });
+    if (!actualUser) {
+      throw new NotFoundError('user')
     }
-  }
+    const updateUserPayload: Partial<User> = {};
 
-  public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UpdateUserProfileResponse> {
-    try {
-      const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
-      const actualUser = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id, deletedAt: null },
-        relations: ['address'],
-      });
-      if (!actualUser) return responses.notFound('User not found!');
-      const updateUserPayload: Partial<User> = {};
-
-      for (const [key, val] of Object.entries(payload)) {
-        if (key == 'gender') {
-          const genderKey = val as keyof typeof genderToEntity;
-          updateUserPayload[key] = genderToEntity[genderKey];
-        } else if (key == 'birthDate') {
-          updateUserPayload.dateOfBirth = payload.birthDate;
-        } else if (key !== 'address') {
-          updateUserPayload[key] = val;
-        }
+    for (const [key, val] of Object.entries(payload)) {
+      if (key == 'gender') {
+        const genderKey = val as keyof typeof genderToEntity;
+        updateUserPayload[key] = genderToEntity[genderKey];
+      } else if (key == 'birthDate') {
+        updateUserPayload.dateOfBirth = payload.birthDate;
+      } else if (key !== 'address' && key != 'focusIds') {
+        updateUserPayload[key] = val;
       }
-      //Verify if address is in payload
-      if (payload?.address) {
-        //Verifies if already or not has the PlaceID
+    }
+    //Verify if address is in payload
+    if (payload?.address) {
+      //Verifies if already or not has the PlaceID
 
-        if (!payload?.address?.placeId) {
-          if (payload.address.address) {
-            const request = {
-              address: {
-                regionCode: payload.address.regionCode || 'US',
-                addressLines: [payload.address.address],
-              },
-            };
-            //Verifies if it is a valid Place
-            const addressValidationClient = new AddressValidationClient({ authClient: this.googleAuthClient });
-            const validations = await addressValidationClient.validateAddress(request);
-            const addressUserValidated = validations[0]?.result?.address?.formattedAddress || null;
-            if (addressUserValidated) {
-              //Request for Google Places ID
+      if (!payload?.address?.placeId) {
+        if (payload.address.address) {
+          const request = {
+            address: {
+              regionCode: payload.address.regionCode || 'US',
+              addressLines: [payload.address.address],
+            },
+          };
+          //Verifies if it is a valid Place
+          const addressValidationClient = new AddressValidationClient({ authClient: this.googleAuthClient });
+          const validations = await addressValidationClient.validateAddress(request);
+          const addressUserValidated = validations[0]?.result?.address?.formattedAddress || null;
+          if (addressUserValidated) {
+            //Request for Google Places ID
 
-              const placeResponse = await fetch(
-                `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(addressUserValidated)}&inputtype=textquery&fields=place_id&key=${GOOGLE_MAPS_API_KEY}`,
-              );
-              const placeData = await placeResponse.json();
-              const placeId = placeData.candidates[0].place_id;
+            const placeResponse = await fetch(
+              `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(addressUserValidated)}&inputtype=textquery&fields=place_id&key=${GOOGLE_MAPS_API_KEY}`,
+            );
+            const placeData = await placeResponse.json();
+            const placeId = placeData.candidates[0].place_id;
 
-              const placeLocation = await GoogleAddressClient.geodecodePlaceId(placeId);
-              const geoLocation = placeLocation?.results[0]?.geometry?.location;
-              const addressComponents = placeLocation?.results[0]?.address_components || [];
-              const city = getCityNameFromAddressComponents(addressComponents);
+            const placeLocation = await GoogleAddressClient.geodecodePlaceId(placeId);
+            const geoLocation = placeLocation?.results[0]?.geometry?.location;
+            const addressComponents = placeLocation?.results[0]?.address_components || [];
+            const city = getCityNameFromAddressComponents(addressComponents);
 
-              //Verifies if user already has an id of address
-              if (actualUser.address) {
-                await this.dbConnection.getRepository(Address).update(
-                  { id: actualUser.address.id },
-                  {
-                    address: payload.address.address,
-                    googlePlaceId: placeId,
-                    city,
-                    latitude: geoLocation?.lat,
-                    longitude: geoLocation?.lng,
-                  },
-                );
-                updateUserPayload.address = actualUser.address;
-              } else {
-                const savedAddress = this.dbConnection.getRepository(Address).create({
+            //Verifies if user already has an id of address
+            if (actualUser.address) {
+              await this.dbConnection.getRepository(Address).update(
+                { id: actualUser.address.id },
+                {
                   address: payload.address.address,
                   googlePlaceId: placeId,
                   city,
                   latitude: geoLocation?.lat,
                   longitude: geoLocation?.lng,
-                });
-                const saved = await this.dbConnection.getRepository(Address).save(savedAddress);
-                updateUserPayload.address = saved;
-              }
-            }
-          }
-        } else {
-          //Gets the address based on Google place id
-          const placeResponse = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${payload.address.placeId}&key=${GOOGLE_MAPS_API_KEY}`);
-          const placeDetailsData = await placeResponse.json();
-          const placeId = payload.address.placeId;
-
-          const placeLocation = await GoogleAddressClient.geodecodePlaceId(placeId);
-          const geoLocation = placeLocation?.results[0]?.geometry?.location;
-          const addressComponents = placeLocation?.results[0]?.address_components || [];
-          const city = getCityNameFromAddressComponents(addressComponents);
-
-          //Verifies if user already has a place to update
-          if (actualUser.address) {
-            await this.dbConnection.getRepository(Address).update(
-              { id: actualUser.address.id },
-              {
-                address: placeDetailsData.result.formatted_address,
+                },
+              );
+              updateUserPayload.address = actualUser.address;
+            } else {
+              const savedAddress = this.dbConnection.getRepository(Address).create({
+                address: payload.address.address,
                 googlePlaceId: placeId,
                 city,
                 latitude: geoLocation?.lat,
                 longitude: geoLocation?.lng,
-              },
-            );
-            updateUserPayload.address = actualUser.address;
-          } else {
-            const savedAddress = this.dbConnection.getRepository(Address).create({
+              });
+              const saved = await this.dbConnection.getRepository(Address).save(savedAddress);
+              updateUserPayload.address = saved;
+            }
+          }
+        }
+      } else {
+        //Gets the address based on Google place id
+        const placeResponse = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${payload.address.placeId}&key=${GOOGLE_MAPS_API_KEY}`);
+        const placeDetailsData = await placeResponse.json();
+        const placeId = payload.address.placeId;
+
+        const placeLocation = await GoogleAddressClient.geodecodePlaceId(placeId);
+        const geoLocation = placeLocation?.results[0]?.geometry?.location;
+        const addressComponents = placeLocation?.results[0]?.address_components || [];
+        const city = getCityNameFromAddressComponents(addressComponents);
+
+        //Verifies if user already has a place to update
+        if (actualUser.address) {
+          await this.dbConnection.getRepository(Address).update(
+            { id: actualUser.address.id },
+            {
               address: placeDetailsData.result.formatted_address,
               googlePlaceId: placeId,
               city,
               latitude: geoLocation?.lat,
               longitude: geoLocation?.lng,
-            });
-            const saved = await this.dbConnection.getRepository(Address).save(savedAddress);
-            updateUserPayload.address = saved;
-          }
+            },
+          );
+          updateUserPayload.address = actualUser.address;
+        } else {
+          const savedAddress = this.dbConnection.getRepository(Address).create({
+            address: placeDetailsData.result.formatted_address,
+            googlePlaceId: placeId,
+            city,
+            latitude: geoLocation?.lat,
+            longitude: geoLocation?.lng,
+          });
+          const saved = await this.dbConnection.getRepository(Address).save(savedAddress);
+          updateUserPayload.address = saved;
         }
       }
+    }
 
-      await this.dbConnection.getRepository(User).update({ id: payload.id }, updateUserPayload);
-      const responseUser = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id, deletedAt: null },
-        relations: {
-          address: true,
-          roles: {
-            role: true,
-          },
+    await this.dbConnection.getRepository(User).update({ id: payload.id }, updateUserPayload);
+    if (payload.focusIds && payload.focusIds.length > 0) {
+      await PlatformService.saveFocusesForUser({
+        userId: payload.id,
+        focusIds: payload.focusIds,
+      });
+    }
+    const responseUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: {
+        address: true,
+        roles: {
+          role: true,
         },
-      });
+      },
+    });
 
-      const memberRole = responseUser.roles.find((role) => role.role.name === 'member');
-      if (memberRole === undefined) return responses.notFound('User not found!');
+    const memberRole = responseUser.roles.find((role) => role.role.name === 'member');
+    const nonMemberRole = responseUser.roles.find((role) => role.role.name === 'non-member');
+    const hostRole = responseUser.roles.find((role) => role.role.name === 'host');
 
-      return responses.data({
-        firstName: responseUser.firstName || null,
-        email: responseUser.email || null,
-        lastName: responseUser.lastName || null,
-        dateOfBirth: responseUser.dateOfBirth || null,
-        phoneNumber: responseUser.phoneNumber || null,
-        gender: entityToGender[responseUser.gender || 'NOT_APPLICABLE'],
-        status: entityToUserStatus[memberRole.status],
-        source: memberRole.source ? entityToUserSource[memberRole.source] : null,
-        address: responseUser.address
-          ? {
-              id: responseUser.address.id,
-              address: responseUser.address?.address,
-              googlePlaceId: responseUser.address.googlePlaceId,
-              latitude: String(responseUser.address.latitude),
-              longitude: String(responseUser.address.longitude),
-              city: responseUser.address.city,
-            }
-          : null,
-      });
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again later.');
+    let userStatus = null;
+    let userSource = null;
+
+    if (memberRole) {
+      userStatus = entityToUserStatus[memberRole.status];
+      userSource = memberRole.source ? entityToUserSource[memberRole.source] : null;
+    } else if (nonMemberRole) {
+      userStatus = entityToUserStatus[nonMemberRole.status];
+      userSource = nonMemberRole.source ? entityToUserSource[nonMemberRole.source] : null;
+    } else if (hostRole) {
+      userStatus = entityToUserStatus[hostRole.status];
+      userSource = hostRole.source ? entityToUserSource[hostRole.source] : null;
     }
+
+    return {
+      firstName: responseUser.firstName || null,
+      email: responseUser.email || null,
+      lastName: responseUser.lastName || null,
+      birthDate: responseUser.dateOfBirth,
+      mobilePhone: responseUser.phoneNumber || null,
+      gender: entityToGender[responseUser.gender || 'NOT_APPLICABLE'],
+      status: userStatus,
+      source: userSource,
+      address: responseUser.address
+        ? {
+          address: responseUser.address?.address,
+          placeId: responseUser.address.googlePlaceId,
+          latitude: String(responseUser.address.latitude),
+          longitude: String(responseUser.address.longitude),
+          city: responseUser.address.city,
+        }
+        : null,
+    };
+
   }
 
-  public static async updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UpdateUserProfilePictureResponse> {
-    try {
-      let actualUser = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id, deletedAt: null },
-        relations: ['address'],
-      });
-      if (!actualUser) return responses.notFound('User not found!');
-      await this.dbConnection.getRepository(User).update(
-        { id: payload.id },
-        {
-          profilePicture: payload.profilePicture,
-        },
-      );
-      actualUser = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id, deletedAt: null },
-        relations: ['address'],
-      });
-      return responses.data({ profilePicture: actualUser.profilePicture });
-    } catch (err) {
-      return responses.badRequest('Unkown error occured, please try again later.');
+  public static async updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UserProfilePicture> {
+    let actualUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: ['address'],
+    });
+    if (!actualUser) {
+      throw new NotFoundError('user')
     }
+    await this.dbConnection.getRepository(User).update(
+      { id: payload.id },
+      {
+        profilePicture: payload.profilePicture,
+      },
+    );
+    actualUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: ['address'],
+    });
+    return { profilePicture: actualUser.profilePicture };
   }
 
-  public static async getBioProfile(payload: IdRequestDto): Promise<BioProfileResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
-      if (!user) return responses.notFound('User not found!');
-      const additionalInfo = user.additionalHostInformation;
-      return responses.data(additionalInfo);
-    } catch (err) {
-      return responses.badRequest('Error at get bio profile.');
+  public static async getBioProfile(payload: IdRequestDto): Promise<AdditionalHostInformation> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
+    if (!user) {
+      throw new NotFoundError('user')
     }
+    const additionalInfo = user.additionalHostInformation;
+    return additionalInfo;
   }
 
-  public static async createBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
-      const { bio } = payload;
-      let additionalInfo: AdditionalHostInformation;
-      if (user.additionalHostInformation) {
-        additionalInfo = user.additionalHostInformation;
-        additionalInfo.bio = bio;
-        user.additionalHostInformation = additionalInfo;
-      } else {
-        additionalInfo = {
-          bio,
-          companyName: '',
-          companyLogo: '',
-          eventsPerYear: 0,
-          website: '',
-          referredBy: '',
-          socialMedia: {},
-        };
-
-        user.additionalHostInformation = additionalInfo;
-      }
-      await user.save();
-      return responses.data(additionalInfo);
-    } catch (err) {
-      return responses.badRequest('Error at create bio profile.');
+  public static async createBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!user) {
+      throw new NotFoundError('user')
     }
+    const { bio } = payload;
+    let additionalInfo: AdditionalHostInformation;
+    if (user.additionalHostInformation) {
+      additionalInfo = user.additionalHostInformation;
+      additionalInfo.bio = bio;
+      user.additionalHostInformation = additionalInfo;
+    } else {
+      additionalInfo = {
+        bio,
+        companyName: '',
+        companyLogo: '',
+        eventsPerYear: 0,
+        website: '',
+        referredBy: '',
+        socialMedia: {},
+      };
+
+      user.additionalHostInformation = additionalInfo;
+    }
+    await user.save();
+    return additionalInfo;
   }
 
-  public static async updateBioProfile(payload: BioProfileRequestDto): Promise<BioProfileResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
-      const { bio } = payload;
-      let additionalInfo: AdditionalHostInformation;
-      if (user.additionalHostInformation) {
-        additionalInfo = user.additionalHostInformation;
-        additionalInfo.bio = bio;
-        user.additionalHostInformation = additionalInfo;
-      } else {
-        additionalInfo = {
-          bio,
-          companyName: '',
-          companyLogo: '',
-          eventsPerYear: 0,
-          website: '',
-          referredBy: '',
-          socialMedia: {},
-        };
-
-        user.additionalHostInformation = additionalInfo;
-      }
-      await user.save();
-      return responses.data(additionalInfo);
-    } catch (err) {
-      return responses.badRequest('Error at update bio profile.');
+  public static async updateBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+    if (!user) {
+      throw new NotFoundError('user')
     }
+    const { bio } = payload;
+    let additionalInfo: AdditionalHostInformation;
+    if (user.additionalHostInformation) {
+      additionalInfo = user.additionalHostInformation;
+      additionalInfo.bio = bio;
+      user.additionalHostInformation = additionalInfo;
+    } else {
+      additionalInfo = {
+        bio,
+        companyName: '',
+        companyLogo: '',
+        eventsPerYear: 0,
+        website: '',
+        referredBy: '',
+        socialMedia: {},
+      };
+
+      user.additionalHostInformation = additionalInfo;
+    }
+    await user.save();
+    return additionalInfo;
   }
 
   public static async approveMember(payload: IdRequestDto): Promise<GenericResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.id, deletedAt: null },
-        relations: { roles: { role: true } },
-      });
-      if (!user) return responses.notFound('User not found!');
-
-      const memberRole = user.roles.find((role) => role.role.name === 'member');
-      if (memberRole === undefined) return responses.notFound('User not found!');
-
-      await RoleService.updateUserStatus(memberRole.id, UserStatus.ACTIVE);
-      await user.save();
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error at active user.');
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: { roles: { role: true } },
+    });
+    if (!user) {
+      throw new NotFoundError('user')
     }
+    const nonMemberUserRole = user.roles.find((userRole) => userRole.role.name === 'non_member');
+    if (!nonMemberUserRole) return responses.notFound('User not found!');
+
+    // Find the member role
+    const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+    if (!memberRole) {
+      throw new NotFoundError('Member role not found');
+    }
+
+    // Find the user's current role entry
+    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { user: { id: payload.id } } });
+    if (!userRole) {
+      throw new NotFoundError('User role entry not found');
+    }
+
+    // Update role and status
+    nonMemberUserRole.role = memberRole;
+    nonMemberUserRole.status = UserStatus.ACTIVE;
+    await this.dbConnection.getRepository(UserRole).save(nonMemberUserRole);
+
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+          },
+        ],
+        'Member Approved into Rumor',
+        [user.email],
+        null,
+      );
+    } catch (error) { }
+
+    return responses.ok;
   }
 
-  public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<ListUsersByTypeResponse> {
-    try {
-      const users = await this.dbConnection.getRepository(User).find({
-        where: {
-          deletedAt: null,
-          roles: {
-            role: {
-              name: payload.type,
-            },
+  public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
+    const users = await this.dbConnection.getRepository(User).find({
+      where: {
+        deletedAt: null,
+        roles: {
+          role: {
+            name: payload.type,
           },
         },
-      });
-      const userList = users.map((user) => {
-        return toUserDataSimple(user);
-      });
-      return responses.data(userList);
-    } catch (err) {
-      return responses.badRequest('Error at get user list.');
-    }
+      },
+    });
+    const userList = users.map((user) => {
+      return toUserDataSimple(user);
+    });
+    return userList;
   }
 
-  public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<CreateNonMemberUserResponse> {
-    try {
-      const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-      if (exists) return responses.badRequest('User already exists');
-      let user = new User();
-      user.email = payload.email;
-      user.firstName = payload.firstName || 'NA';
-      user.lastName = payload.lastName || 'NA';
-      user.phoneNumber = payload.phoneNumber || '';
-      user = await this.dbConnection.getRepository(User).save(user);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: 'non_member' });
-      return responses.data({ userId: user.id });
-    } catch (err) {
-      return responses.badRequest('Error at get user list.');
+  public static async updateUsersStatus(payload: UpdateUsersStatusDto): Promise<any> {
+    const users = await this.dbConnection.getRepository(User).find({
+      where: { id: In(payload.ids), deletedAt: null },
+      relations: { roles: { role: true } },
+    });
+
+    if (users.length === 0) {
+      throw new NotFoundError('Users')
     }
+
+    const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+    if (!memberRole) {
+      throw new NotFoundError('Role')
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: In(payload.ids) } },
+      relations: ['user', 'role'],
+    });
+
+    if (userRoles.length === 0) {
+      throw new NotFoundError('UserRole')
+    }
+
+    const failedUsers: string[] = [];
+    const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
+
+    for (const user of users) {
+      const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
+
+      if (payload.status === UserStatus.WAITLISTED) {
+        if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
+          console.error(`User ${user.id} is active and cannot be waitlisted`);
+          failedUsers.push(user.id);
+          continue;
+        }
+      }
+
+      if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
+      }
+    }
+
+    // Perform bulk updates only for valid users
+    for (const update of usersToUpdate) {
+      update.userRole.status = update.newStatus;
+      if (update.newRole) {
+        update.userRole.role = update.newRole;
+      }
+      await this.dbConnection.getRepository(UserRole).save(update.userRole);
+
+      // Send email only to users who are now "ACTIVE" and got the "member" role
+      try {
+        if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
+          const user = users.find((u) => u.id === update.userRole.user.id);
+          if (user) {
+            await serviceMesh.notificationService().sendEmailFromTemplate(
+              [
+                {
+                  key: 'link_to_application',
+                  value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+                },
+              ],
+              'Member Approved into Rumor',
+              [user.email], // Send email to the approved member
+              null,
+            );
+          }
+        }
+      } catch (error) { }
+    }
+
+    return { failedUsers, usersToUpdate };;
+
   }
 
-  public static async getMembersOrNonMembers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
+  public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<UserIdData> {
+    const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+    if (exists) {
+      throw new BadRequestError('user exists')
+    }
+    let user = new User();
+    user.email = payload.email;
+    user.firstName = payload.firstName || 'NA';
+    user.lastName = payload.lastName || 'NA';
+    user.phoneNumber = payload.phoneNumber || '';
+    user = await this.dbConnection.getRepository(User).save(user);
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'non_member' });
+    return { userId: user.id };
+  }
+
+
+  public static async createHostCollaborator(payload: CreateHostCollaboratorRequestDto): Promise<UserIdData> {
+    const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }] });
+    if (exists) {
+      throw new BadRequestError('user exists')
+    }
+    let user = new User();
+
+    user.email = payload.email;
+    user.firstName = payload.firstName || 'NA';
+    user.lastName = payload.lastName || 'NA';
+    user.phoneNumber = payload.phoneNumber || '';
+    user = await this.dbConnection.getRepository(User).save(user);
+    //check if user role is already in the database
+    const userWithRoles: any = await this.getUserWithRolesByEmail({ email: payload.email });
+    const hasRole = userWithRoles.roles.some((role) => role.name === payload.role);
+    if (!hasRole) {
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+    }
+    return { userId: user.id };
+  }
+
+  public static async getMembersOrNonMembers(payload: ListUsersInviteesDto): Promise<Member[]> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const hostId = payload.userId;
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
     const where: unknown = { deletedAt: null };
     let customListName = parsedQuery.customListName;
@@ -1521,10 +1798,10 @@ export class AuthService {
       if (typeof customListName === 'string') {
         const customList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
           where: { listName: customListName },
-          relations: ['users'],
+          relations: ['usersLists', 'usersLists.user'],
         });
         if (customList) {
-          const customListUserIds = customList.users.map((user) => user.id);
+          const customListUserIds = customList.usersLists.map((listUser) => listUser.user.id);
           const existingUserIds = Array.isArray(parsedQuery.usersIds)
             ? parsedQuery.usersIds.filter((id): id is string => typeof id === 'string')
             : typeof parsedQuery.usersIds === 'string'
@@ -1565,10 +1842,10 @@ export class AuthService {
     );
     const members = await Promise.all(
       users.map(async (user) => {
-        
+
         // Micro-service call
-        // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-        // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
@@ -1581,44 +1858,50 @@ export class AuthService {
           relations: ['user'],
         });
 
-        return toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-
-        //return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+        return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
       }),
     );
-    return responses.data(members);
+    return members;
   }
 
-  public static async manageFollowHost(payload: ManageFollowHostRequestDto): Promise<GenericResponse> {
-    try {
-      const { userId, hostId, follow } = payload;
-
-      const [follower, host] = await this.findUsers(userId, hostId);
-      if (!follower) return responses.notFound('User not found!');
-      if (!host) return responses.notFound('Host not found!');
-      const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
-      if (!validateRoleHost) return responses.notFound('User is not a host!');
-      if (follower.id === host.id) return responses.badRequest('You cannot follow yourself!');
-
-      const followHost = await this.dbConnection.getRepository(HostFollowing).findOne({
-        where: {
-          follower: { id: follower.id },
-          host: { id: host.id },
-        },
-      });
-
-      if (follow) {
-        if (followHost) return responses.badRequest('You are already following this host!');
-        await this.addFollowHost(follower, host);
-      } else {
-        if (!followHost) return responses.badRequest('You are not following this host!');
-        await this.dbConnection.getRepository(HostFollowing).delete({ follower, host });
-      }
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error at follow user.');
+  public static async manageFollowHost(payload: ManageFollowHostRequestDto): Promise<string> {
+    const { userId, hostId, follow } = payload;
+    const [follower, host] = await this.findUsers(userId, hostId);
+    if (!follower) {
+      throw new NotFoundError('User')
     }
+    if (!host) {
+      throw new NotFoundError('Host')
+
+    }
+    const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
+    if (!validateRoleHost) {
+      throw new NotFoundError('User')
+    }
+    if (follower.id === host.id) {
+      throw new BadRequestError('You cannot follow yourself!')
+
+    }
+    const followHost = await this.dbConnection.getRepository(HostFollowing).findOne({
+      where: {
+        follower: { id: follower.id },
+        host: { id: host.id },
+      },
+    });
+
+    if (follow) {
+      if (followHost) {
+        throw new BadRequestError('Already following host')
+
+      }
+      await this.addFollowHost(follower, host);
+    } else {
+      if (!followHost) {
+        throw new BadRequestError('You are not following this host!')
+      }
+      await this.dbConnection.getRepository(HostFollowing).delete({ follower, host });
+    }
+    return '';
   }
 
   public static async findUsers(userId: string, hostId: string): Promise<[User, User]> {
@@ -1635,396 +1918,594 @@ export class AuthService {
   }
 
   public static async addFollowHost(follower: User, host: User): Promise<void> {
-    const followHost = {follower, host}
+    const followHost = { follower, host }
     await this.dbConnection.getRepository(HostFollowing).save(followHost);
   }
 
   public static async addFavoriteHost(member: User, host: User): Promise<void> {
-    try {
-      const favoriteHost = { member, host }
-      await this.dbConnection.getRepository(HostFavorite).save(favoriteHost);
-    } catch (err) {
-      console.log("🚀 ~ AuthService ~ addFavoriteHost ~ err:", err)
-    }
+    const favoriteHost = { member, host }
+    await this.dbConnection.getRepository(HostFavorite).save(favoriteHost);
   }
 
-  public static async getFollowedHosts(payload: PaginatedRequestDto): Promise<GetFollowedHostsResponse> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const name = parsedQuery?.name ? String(parsedQuery.name).toLowerCase() : undefined;
+  public static async getFollowedHosts(payload: PaginatedRequestDto): Promise<HostsProfile> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const name = parsedQuery?.name ? String(parsedQuery.name).toLowerCase() : undefined;
 
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.userId },
-        relations: { following: { host: true } },
-      });
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: { following: { host: true } },
+    });
 
-      if (!user) return responses.notFound('User not found!');
+    if (!user) {
+      throw new NotFoundError('user')
+    }
+    const followingIds = user.following.map((follow) => follow.host.id);
 
-      const followingIds = user.following.map((follow) => follow.host.id);
+    let hostsFollowing = await this.dbConnection.getRepository(User).find({
+      where: [{ id: In(followingIds) }],
+      relations: { roles: { role: true } },
+      take,
+      skip,
+    });
 
-      let hostsFollowing = await this.dbConnection.getRepository(User).find({
-        where: [{ id: In(followingIds) }],
-        relations: { roles: { role: true } },
-        take,
-        skip,
-      });
+    hostsFollowing = hostsFollowing.filter((host) => host.roles.some((role) => role.role.name === 'host'));
+    const transformedHosts = hostsFollowing.map((item) => {
+      const hostProfile = toBasicHostProfile(
+        item,
+        entityToUserStatus[item.roles.find((el) => el.role.name === 'host').status],
+        entityToUserSource[item.roles.find((el) => el.role.name === 'host').source],
+      );
 
-      hostsFollowing = hostsFollowing.filter((host) => host.roles.some((role) => role.role.name === 'host'));
+      return hostProfile;
+    });
 
-      const transformedHosts = hostsFollowing.map((item) => {
-        const hostProfile = toBasicHostProfile(
-          item,
-          entityToUserStatus[item.roles.find((el) => el.role.name === 'host').status],
-          entityToUserSource[item.roles.find((el) => el.role.name === 'host').source],
-        );
+    if (name) {
+      return {
+        hosts: transformedHosts.filter((host) => host.companyName.toLowerCase().includes(name)).slice(skip, skip + take),
+      };
+    }
+    return { hosts: transformedHosts };
+  }
 
-        return hostProfile;
-      });
+  public static async getCustomUsersLists(payload: CustomUsersListRequestDto): Promise<CustomUsersListsData> {
+    const { userId } = payload;
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId },
+      relations: {
+        customLists: { usersLists: true },
+        favoritedMembers: true,
+        followers: true,
+      },
+      order: {
+        customLists: { createdAt: 'DESC' },
+      },
+    });
 
-      if (name) {
-        return responses.data({
-          hosts: transformedHosts.filter((host) => host.companyName.toLowerCase().includes(name)).slice(skip, skip + take),
+    if (!user) {
+      return { totalCount: 0, result: [] };
+    }
+
+    const allLists = [
+      { id: null, name: 'Followed', totalCount: user.followers.length, result: [] },
+      { id: null, name: 'Favorite', totalCount: user.favoritedMembers.length, result: [] },
+      ...user.customLists.map((list) => ({
+        id: list.id,
+        name: list.listName,
+        totalCount: list.usersLists.length,
+        result: [],
+      })),
+    ];
+
+    return {
+      totalCount: allLists.length,
+      result: allLists.slice(skip, take ? skip + take : undefined),
+    };
+  }
+
+  public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersList> {
+    const parsedQuery = parse(payload.query) as ParsedQs;
+    const customListId = payload.id;
+    const hostId = payload.userId;
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: {
+        customLists: {
+          usersLists: {
+            user: {
+              address: true,
+              roles: { role: true },
+              socialProviders: true,
+              hostedEvents: true,
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError("User");
+    }
+
+    const customList = user.customLists.find((list) => list.id === customListId);
+    if (!customList) {
+      throw new NotFoundError("CustomList");
+    }
+
+    const userIds = customList.usersLists.map((listUser) => listUser.user.id);
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .innerJoin('host_custom_users_lists_users', 'usersList', 'user.id = usersList.user_id')
+      .innerJoin('host_custom_users_lists', 'customList', 'usersList.list_id = customList.id')
+      .where('customList.host_id = :hostId', { hostId: hostId })
+      .andWhere('customList.id = :listId', { listId: customListId });
+
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('usersList.createdAt', 'DESC');
+    }
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes);
+
+    const [allUsers, totalCount] = await queryBuilder.getManyAndCount();
+    let paginatedUsers = allUsers;
+    if (take !== undefined && skip !== undefined) {
+      paginatedUsers = allUsers.slice(skip, skip + take);
+    }
+
+
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: hostId } },
+      relations: ['member'],
+    });
+    const favoriteUserIds = favorites.map((fav) => fav.member.id);
+    this.dbConnection.getRepository(HostCustomUsersListsUsers).find
+    const userMappingIds = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+      where: {
+        list: { id: customListId },
+        user: In(userIds),
+      },
+      relations: ['user'],
+      select: ['id', 'user'],
+    });
+
+    const mappingIdMap: { [key: string]: string } = {};
+    userMappingIds.forEach((mapping) => {
+      mappingIdMap[mapping.user.id] = mapping.id;
+    });
+
+    const users = await Promise.all(
+      paginatedUsers.map(async (user) => {
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
         });
-      }
 
-      return responses.data({ hosts: transformedHosts });
-    } catch (err) {
-      return responses.badRequest('Error at get follow hosts.');
+        const socialProviderUsername = socialProvider?.username || null;
+
+        const userData = toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        const mappingId = mappingIdMap[user.id];
+        userData.listMappingId = mappingId;
+        return userData;
+      }),
+    );
+
+    const data = {
+      name: customList.listName,
+      id: customList.id,
+      totalCount: totalCount,
+      result: users,
     }
+
+    return data;
   }
 
-  public static async getCustomUsersLists(payload: IdRequestDto): Promise<CustomUsersListsResponse> {
-    const { id: userId } = payload;
-    try {
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId },
-        relations: {
-          customLists: {
-            users: {
-              address: true,
-              roles: { role: true },
-              socialProviders: true,
-              hostedEvents: true,
-            },
-          },
-        },
-      });
+  public static async deleteCustomUsersList(payload: UserAndIdRequestDto): Promise<string> {
+    const { userId, id } = payload;
 
-      if (!user || !user.customLists?.length) {
-        return responses.data([]);
-      }
-
-      const customLists = user.customLists.map((list) => ({
-        customName: list.listName,
-        users: list.users.map((user) => toUserDataSimple(user)),
-      }));
-
-      return responses.data(customLists);
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+    if (!user) {
+      throw new NotFoundError("User");
     }
+
+    if (!userId) {
+      throw new NotFoundError('User ids not found.');
+    }
+
+    const customList = user.customLists.find((list) => list.id === id);
+    if (!customList) {
+      throw new NotFoundError("Custom List");
+    }
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({ list: { id: customList.id } });
+    await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
+    return '';
   }
 
-  public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId } = payload;
-    try {
-      const parsedQuery = parse(payload.query);
-      if (!parsedQuery.customName) {
-        return responses.badRequest('Custom name is required!');
-      }
-
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: {
-          customLists: {
-            users: {
-              address: true,
-              roles: { role: true },
-              socialProviders: true,
-              hostedEvents: true,
-            },
-          },
-        },
-      });
-
-      if (!user) {
-        return responses.notFound('User not found!');
-      }
-
-      const customList = user.customLists.find((list) => list.listName === parsedQuery.customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found!');
-      }
-
-      return responses.data({
-        customName: parsedQuery.customName as string,
-        users: customList.users.map((user) => toUserDataSimple(user)),
-      });
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
-    }
-  }
-
-  public static async deleteCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId } = payload;
-    try {
-      const parsedQuery = parse(payload.query);
-      if (!parsedQuery.customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: { customLists: true },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const customList = user.customLists.find((list) => list.listName === parsedQuery.customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found.');
-      }
-      await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
-    }
-  }
-
-  public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
+  public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersList> {
     const { userId, customName, userIds } = payload;
-    try {
-      if (!customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: { customLists: true },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const existingList = user.customLists.find((list) => list.listName === customName);
-      if (existingList) {
-        return responses.badRequest('Custom list already exists.');
-      }
-      const validUsers = await this.dbConnection.getRepository(User).find({
-        where: { id: In(userIds) },
-      });
-      if (validUsers.length !== userIds.length) {
-        return responses.badRequest('Invalid user IDs provided.');
-      }
+    if (!customName) {
+      throw new BadRequestError("Custom list name is required.");
+    }
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+    if (!user) {
+      throw new NotFoundError("User");
+    }
+    const existingList = user.customLists.find((list) => list.listName === customName);
+    if (existingList) {
+      throw new BadRequestError("Custom list already exists.");
+    }
+    const validUsers = await this.dbConnection.getRepository(User).find({
+      where: { id: In(userIds) },
+    });
+    if (validUsers.length !== userIds.length) {
+      throw new BadRequestError("Invalid user IDs provided.");
+    }
 
-      const customList = new HostCustomUsersLists();
+    const customList = new HostCustomUsersLists();
+    customList.listName = customName;
+    customList.host = user;
+    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
+    const userListEntries = validUsers.map((validUser) => {
+      const listUser = new HostCustomUsersListsUsers();
+      listUser.user = validUser;
+      listUser.list = customList;
+      return listUser;
+    });
+
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+
+    const customListSaved = await this.getCustomUsersList({
+      userId: userId,
+      id: savedCustomList.id,
+      query: 'take=10&skip=0',
+    });
+    return customListSaved;
+
+  }
+
+  public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersList> {
+    const { hostId, customName, userIds, customListId, mappingIds } = payload;
+    if (!customName) {
+      throw new BadRequestError("Custom list name is required.");
+    }
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: { customLists: { usersLists: { user: true } } },
+    });
+    if (!host) {
+      throw new NotFoundError("Host");
+    }
+    const customList = host.customLists.find((list) => list.id === customListId);
+    if (!customList) {
+      throw new NotFoundError("Custom list not found.");
+    }
+
+    if (customList.listName !== customName) {
+      if (host.customLists.some((list) => list.listName === customName)) {
+        throw new BadRequestError("Custom list with this name already exists.");
+      }
       customList.listName = customName;
-      customList.users = validUsers; // Set the users directly instead of userIds
-      customList.host = user;
       await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
-
-      const customListSaved = await this.getCustomUsersList({
-        userId,
-        query: `customName=${encodeURIComponent(customName)}`,
-      });
-      return responses.data(customListSaved.data);
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
     }
+
+    const existingUserIds = customList.usersLists.map((listUser) => listUser.user.id);
+    const userIdsToAdd = userIds.filter((id) => !existingUserIds.includes(id));
+
+    if (userIdsToAdd.length) {
+      const validUsers = await this.dbConnection.getRepository(User).find({ where: { id: In(userIdsToAdd) } });
+
+      if (validUsers.length !== userIdsToAdd.length) {
+        throw new NotFoundError("Invalid user IDs provided.");
+      }
+
+      const userListEntries = validUsers.map((validUser) => {
+        const listUser = new HostCustomUsersListsUsers();
+        listUser.user = validUser;
+        listUser.list = customList;
+        return listUser;
+      });
+
+      await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+    }
+
+    if (mappingIds.length) {
+      const existingMappings = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+        where: { id: In(mappingIds) },
+      });
+
+      const existingMappingIds = existingMappings.map((mapping) => mapping.id);
+      const invalidMappingIds = mappingIds.filter((id) => !existingMappingIds.includes(id));
+
+      if (invalidMappingIds.length) {
+        throw new BadRequestError("Invalid mapping IDs provided");
+      }
+
+      await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({
+        id: In(existingMappingIds),
+      });
+    }
+
+    const customListSaved = await this.getCustomUsersList({
+      userId: hostId,
+      id: customList.id,
+      query: 'take=10&skip=0',
+    });
+    return customListSaved;
   }
 
-  public static async updateCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersListResponse> {
-    const { userId, customName, userIds } = payload;
-    try {
-      if (!customName) {
-        return responses.badRequest('Custom list name is required.');
-      }
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: userId, deletedAt: IsNull() },
-        relations: {
-          customLists: {
-            users: true, // Include users relation
-          },
-        },
-      });
-      if (!user) {
-        return responses.notFound('User not found.');
-      }
-      const customList = user.customLists.find((list) => list.listName === customName);
-      if (!customList) {
-        return responses.notFound('Custom list not found.');
-      }
-      const validUsers = await this.dbConnection.getRepository(User).find({
-        where: { id: In(userIds) },
-      });
-      if (validUsers.length !== userIds.length) {
-        return responses.badRequest('Invalid user IDs provided.');
-      }
+  public static async manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<string> {
+    const { userId, targetUserId, favorite } = payload;
 
-      customList.users = validUsers; // Update the users relation directly
-      await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
-
-      const customListSaved = await this.getCustomUsersList({
-        userId,
-        query: `customName=${encodeURIComponent(customName)}`,
-      });
-      return responses.data(customListSaved.data);
-    } catch (err) {
-      return responses.badRequest('Error at get custom users list.');
+    const [targetUser, host] = await this.findUsers(targetUserId, userId);
+    if (!targetUser) {
+      throw new NotFoundError('User')
     }
+    if (!host) {
+      throw new NotFoundError('User')
+
+    }
+    const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
+    if (!validateRoleHost) {
+      throw new NotFoundError('User is not a host')
+    }
+    if (targetUser.id === host.id) {
+      throw new BadRequestError('You cannot mark yourself as favorite!')
+    }
+
+    const favoriteByHosts = await this.dbConnection.getRepository(HostFavorite).findOne({
+      where: {
+        member: { id: targetUser.id },
+        host: { id: host.id },
+      },
+    });
+
+    if (favorite) {
+      if (favoriteByHosts) {
+        throw new BadRequestError('You already marked this user as favorite!')
+      }
+      await this.addFavoriteHost(targetUser, host);
+    } else {
+      if (!favoriteByHosts) {
+        throw new BadRequestError('User was not found in your favorite list!')
+      }
+      await this.dbConnection.getRepository(HostFavorite).delete({ member: targetUser, host });
+    }
+    return '';
+
   }
 
-  public static async manageFavoriteUser(payload: ManageFavoriteUserRequestDto): Promise<GenericResponse> {
-    try {
-      const { userId, targetUserId, favorite } = payload;
-
-      const [targetUser, host] = await this.findUsers(targetUserId, userId);
-      if (!targetUser) return responses.notFound('User not found!');
-      if (!host) return responses.notFound('Host not found!');
-      const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
-      if (!validateRoleHost) return responses.notFound('User is not a host!');
-      if (targetUser.id === host.id) return responses.badRequest('You cannot mark yourself as favorite!');
-
-      const favoriteByHosts = await this.dbConnection.getRepository(HostFavorite).findOne({
-        where: {
-          member: { id: targetUser.id },
-          host: { id: host.id },
-        },
-      });
-
-      if (favorite) {
-        if (favoriteByHosts) return responses.badRequest('You already marked this user as favorite!');
-        await this.addFavoriteHost(targetUser, host);
-      } else {
-        if (!favoriteByHosts) return responses.badRequest('User was not found in your favorite list!');
-        await this.dbConnection.getRepository(HostFavorite).delete({ member: targetUser, host });
-      }
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Error at favorite user.');
+  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<UsersData> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: { favoritedMembers: { member: true } },
+    });
+    if (!user) {
+      throw new NotFoundError('User')
     }
-  }
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .innerJoin('user.favoritedByHosts', 'hf')
+      .addSelect(['hf.createdAt'])
+      .where('hf.host.id = :hostId', { hostId: payload.userId })
+      .take(take)
+      .skip(skip);
 
-  public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
-    try {
-      const parsedQuery = parse(payload.query);
-      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-      const name = parsedQuery?.name ? parsedQuery.name : undefined;
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.userId },
-        relations: { favoritedMembers: { member: true } },
-      });
-      if (!user) return responses.badRequest('User not found!');
-      const favoriteIds = user.favoritedMembers.map((favorite) => favorite.member.id);
-      const whereCondition: any = { id: In(favoriteIds) };
-      if (name) {
-        whereCondition.firstName = ILike(`%${name}%`);
-      }
-      const favoriteUsers = await this.dbConnection.getRepository(User).find({
-        where: [whereCondition, { lastName: ILike(`%${name}%`) }],
-        relations: {
-          address: true,
-          roles: { role: true },
-          socialProviders: true,
-          hostedEvents: true,
-          socialStats: true,
-        },
-        take,
-        skip,
-      });
-      const members = await Promise.all(
-        favoriteUsers.map(async (user) => {
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('hf.createdAt', 'DESC');
+    }
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    const [favoriteUsers, totalCount] = await queryBuilder.getManyAndCount();
+    const users = await Promise.all(
+      favoriteUsers.map(async (user) => {
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));;
 
-          //Micro-service call
-          // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-          // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
-
-          const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-            where: {
-              user: {
-                id: user.id,
-              },
-              type: SocialProviderType.FACEBOOK,
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
             },
-            relations: ['user'],
-          });
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
 
-          return toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-          //return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+        const socialProviderUsername = socialProvider?.username || null;
+
+        return toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+      }),
+    );
+    return { result: users, totalCount };
+  }
+
+  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
+    const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
+    const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
+
+    const queryBuilder = this.dbConnection.getRepository(User).createQueryBuilder('user').innerJoinAndSelect('user.roles', 'user_role');
+
+    if (emails.length > 0 && phoneNumbers.length > 0) {
+      queryBuilder.where(
+        new Brackets((qb) => {
+          qb.where('user.email IN (:...emails)', { emails }).orWhere('user.phone_number IN (:...numbers)', { numbers: phoneNumbers });
         }),
       );
-      return responses.data(members);
-    } catch (err) {
-      return responses.badRequest('Error at get favorite users.');
+    } else if (phoneNumbers.length > 0) {
+      queryBuilder.where('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
+    } else {
+      queryBuilder.where('user.email IN (:...emails)', { emails });
     }
+
+    queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
+
+    const users = await queryBuilder.getMany();
+
+    if (!users || users.length == 0) {
+      throw new NotFoundError('members')
+    }
+    const members = users.map(toConfirmedMember);
+    return members;
   }
 
-  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMembersResponse> {
-    try {
-      const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
-      const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
-
-      const queryBuilder = this.dbConnection.getRepository(User).createQueryBuilder('user').innerJoinAndSelect('user.roles', 'user_role');
-
-      if (emails.length > 0 && phoneNumbers.length > 0) {
-        queryBuilder.where(
-          new Brackets((qb) => {
-            qb.where('user.email IN (:...emails)', { emails }).orWhere('user.phone_number IN (:...numbers)', { numbers: phoneNumbers });
-          }),
-        );
-      } else if (phoneNumbers.length > 0) {
-        queryBuilder.where('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
-      } else {
-        queryBuilder.where('user.email IN (:...emails)', { emails });
-      }
-
-      queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
-
-      const users = await queryBuilder.getMany();
-
-      if (!users || users.length == 0) {
-        return responses.notFound('No members found');
-      }
-
-      const members = users.map(toConfirmedMember);
-
-      return responses.data(members);
-    } catch (err) {
-      return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
-    }
-  }
-
-  public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<GetUserWithRolesByEmailResponse> {
-    try {
-      const user: User = await this.dbConnection.getRepository(User).findOne({
-        where: { email: payload.email, deletedAt: null },
-        relations: {
-          roles: {
-            role: true,
-          },
+  public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<UserWithRoles> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
         },
-      });
+      },
+    });
 
-      if (!user) {
-        return responses.notFound('No user found');
-      }
-
-      return responses.data({
-        name: user.firstName + ' ' + user.lastName,
-        email: user.email,
-        id: user.id,
-        roles: user.roles.map((item) => {
-          return {
-            name: item.role.name,
-            id: item.role.id,
-          };
-        }),
-      });
-    } catch (err) {
-      {
-        return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
-      }
+    if (!user) {
+      throw new NotFoundError('User')
     }
+
+    const data = {
+      name: user.firstName + ' ' + user.lastName,
+      email: user.email,
+      id: user.id,
+      profilePicture: user.profilePicture,
+      roles: user.roles.map((item) => {
+        return {
+          name: item.role.name,
+          status: item.status,
+          id: item.role.id,
+        };
+      }),
+    }
+
+    return data;
+  }
+
+
+  public static async getUserWithRolesById(payload: IdRequestDto): Promise<UserWithRoles> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+
+    const data = {
+      name: user.firstName + ' ' + user.lastName,
+      email: user.email,
+      id: user.id,
+      phoneNumber: user.phoneNumber,
+      profilePicture: user.profilePicture,
+      isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles.map((item) => {
+        return {
+          name: item.role.name,
+          status: item.status,
+          id: item.role.id,
+        };
+      }),
+    }
+
+    return data;
+  }
+
+  public static async getUserWithRolesByPhone(payload: GetUserWithRolesByPhoneRequestDto): Promise<UserWithRoles> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { phoneNumber: payload.phoneNumber, deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+
+    const data = {
+      name: user.firstName + ' ' + user.lastName,
+      email: user.email,
+      id: user.id,
+      profilePicture: user.profilePicture,
+      roles: user.roles.map((item) => {
+        return {
+          name: item.role.name,
+          status: item.status,
+          id: item.role.id,
+        };
+      }),
+    }
+
+    return data;
   }
 
   /**
@@ -2036,169 +2517,468 @@ export class AuthService {
    * @param payload
    * @returns SimpleUserResponse
    */
-  public static async registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUserResponse> {
-    try {
-      let user: User | null = null;
-      const userFindOptionWhere: FindOptionsWhere<User>[] = [];
-      if (payload.email) {
-        userFindOptionWhere.push({ email: payload.email, deletedAt: IsNull() });
-      } else {
-        userFindOptionWhere.push({ phoneNumber: payload.phoneNumber, deletedAt: IsNull() });
-      }
-      user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
-
-      const newUser: User | null = new User();
-      if (!user) {
-        newUser.email = payload.email;
-        newUser.firstName = payload.firstName;
-        newUser.lastName = payload.lastName;
-        newUser.phoneNumber = payload.phoneNumber;
-        this.dbConnection.getRepository(User).create(newUser);
-        user = await this.dbConnection.getRepository(User).save(newUser);
-        await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
-      }
-
-      return responses.data(toSimpleUser(user));
-    } catch (err: any) {
-      return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
+  public static async registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUser> {
+    let user: User | null = null;
+    const userFindOptionWhere: FindOptionsWhere<User>[] = [];
+    if (payload.email) {
+      userFindOptionWhere.push({ email: payload.email, deletedAt: IsNull() });
+    } else {
+      userFindOptionWhere.push({ phoneNumber: payload.phoneNumber, deletedAt: IsNull() });
     }
+    user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
+
+    const newUser: User | null = new User();
+    if (!user) {
+      newUser.email = payload.email ?? '';
+      newUser.firstName = payload.firstName;
+      newUser.lastName = payload.lastName;
+      newUser.phoneNumber = payload.phoneNumber ?? '';
+      this.dbConnection.getRepository(User).create(newUser);
+      user = await this.dbConnection.getRepository(User).save(newUser);
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+    }
+
+    return toSimpleUser(user);
   }
 
-  public static async createUser(payload: NonMemberSignUpRequestDto): Promise<CreateUserResponse> {
-    try {
-      const userByEmail = payload.email ? await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } }) : null;
-      const userByPhone = payload.phoneNumber ? await this.dbConnection.getRepository(User).findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } }) : null;
-      const hasEmail = !!userByEmail;
-      const hasPhone = !!userByPhone;
-      if (userByEmail || userByPhone) {
-        const existingUser = userByEmail || userByPhone;
-        return responses.data({
-          message: 'User already exists.',
+  public static async createUser(payload: NonMemberSignUpRequestDto): Promise<UserResponseData> {
+    // Check if the user exists by email or phone concurrently
+    const [userByEmail, userByPhone] = await Promise.all([
+      payload.email ? this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } }) : null,
+      payload.phoneNumber ? this.dbConnection.getRepository(User).findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } }) : null
+    ]);
+    const hasEmail = !!userByEmail;
+    const hasPhone = !!userByPhone;
+    // If user exists by either email or phone
+    if (userByEmail || userByPhone) {
+      const existingUser = userByEmail || userByPhone;
+      const existingMapping = await this.dbConnection.getRepository(HostUserMapping).find({
+        where: { host: { id: payload.id }, user: { id: existingUser.id } },
+      });
+
+      if (existingMapping.length > 0) {
+        return {
+          message: 'User already exists',
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
-        });
+        };
       }
-      const newUser = this.dbConnection.getRepository(User).create({
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        email: payload.email,
-        phoneNumber: payload.phoneNumber,
-      });
-      const user = await this.dbConnection.getRepository(User).save(newUser);
+
       const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
       const hostCreated = this.dbConnection.getRepository(HostUserMapping).create({
-        user: user,
+        user: existingUser,
         host: host,
       });
+
       await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
-      return responses.data({
+
+      return {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
-        user: toCreateUser(user),
-      });
-    } catch (err: any) {
-      return responses.badRequest(`Unkown error occured, please try again later: ${err}`);
+        user: toCreateUser(existingUser),
+      };
     }
+    // If user doesn't exist, create a new user
+    const newUser = this.dbConnection.getRepository(User).create({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      email: payload.email,
+      phoneNumber: payload.phoneNumber,
+    });
+
+    const user = await this.dbConnection.getRepository(User).save(newUser);
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+
+    const hostCreated = this.dbConnection.getRepository(HostUserMapping).create({
+      user: user,
+      host: host,
+    });
+
+    await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+    return {
+      message: 'User created successfully.',
+      hasEmail,
+      hasPhone,
+      user: toCreateUser(user),
+    };
   }
 
-  public static async sendVerificationCodeByEmail(email: string): Promise<GenericResponse> {
+  public static async sendVerificationCodeByEmail(payload: SendVerificationCodeByEmailRequestDto): Promise<string> {
+    // Remove all previous login attempts (both email and phone)
+    const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { email: payload.email } });
+    // const existingLoginAttempts = await this.temporaryLoginCodeRepository.find({ where: { phoneNumber: payload.phoneNumber } });
+
+    if (existingLoginAttempts.length) {
+      await Promise.all(
+        existingLoginAttempts.map(async (attempt) => {
+          await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
+        }),
+      );
+    }
+
+    const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+    if (existingLoginAttempts.length) {
+      await Promise.all(
+        existingLoginAttempts.map(async (attempt) => {
+          await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
+        }),
+      );
+    }
+
+    const admin: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: IsNull() },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
     try {
-      const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+      const isAdmin = admin?.roles?.some((role) => role?.role?.name === 'admin');
+      if (isAdmin) {
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'code',
+              value: verificationCode,
+            },
+          ],
+          'Super Admin - Verify Email',
+          [payload.email],
+          null,
+        );
+      } else {
+        await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'code',
+              value: verificationCode,
+            },
+          ],
+          'Non-Member Verify Email',
+          [payload.email],
+          null,
+        );
+      }
+    } catch (error) { }
 
-      // Micro-service Call
-      // Send the verification code to the user's email
-      // await this.communicationClient.sendEmailFromTemplate(
-      //   [
-      //     {
-      //       key: 'first_name',
-      //       value: verificationCode,
-      //     },
-      //   ],
-      //   'Host Application Submitted',
-      //   [email],
-      //   null,
-      //   this.logger,
-      // );
-
-      // Save the verification code and email into the TemporaryLoginCode entity
-      const temporaryLoginCode = new TemporaryLoginCode();
-      temporaryLoginCode.email = email;
-      temporaryLoginCode.code = verificationCode;
-      await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
-
-      return responses.ok;
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again');
-    }
+    // Save the verification code and email into the TemporaryLoginCode entity
+    const temporaryLoginCode = new TemporaryLoginCode();
+    temporaryLoginCode.email = payload.email;
+    temporaryLoginCode.code = verificationCode;
+    await this.dbConnection.getRepository(TemporaryLoginCode).save(temporaryLoginCode);
+    return '';
   }
 
-  public static async verifyCodeByEmail(email: string, code: string) {
-    try {
-      // Retrieve the stored code from the database for the given email
-      const storedCodeRecord = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
-        where: { email },
-      });
+  public static async verifyCodeByEmail(payload: VerifyCodeByEmailRequestDto): Promise<VerificationStatus> {
+    // Retrieve the stored code from the database for the given email
+    const storedCodeRecord = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+      where: { email: payload.email },
+    });
 
-      if (!storedCodeRecord) {
-        return responses.badRequest('Verification code not found or expired');
-      }
-
-      const isValid = storedCodeRecord.code === code;
-
-      if (isValid) {
-        await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
-      }
-
-      return isValid;
-    } catch (err) {
-      return responses.badRequest('Unknown error occurred, please try again');
+    if (!storedCodeRecord) {
+      throw new BadRequestError('Verification code not found or expired')
     }
+
+    const isValid = storedCodeRecord.code === payload.verificationCode;
+
+    if (isValid) {
+      await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    }
+
+    return { verified: isValid };
   }
 
-  public static async getAllusers(payload: ListUsersInviteesDto): Promise<GetMembersResponse> {
+  public static async setLoginStatus(payload: IdRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+    });
+
+    if (!user) {
+      throw new NotFoundError('user')
+    }
+
+    if (user.isFirstTimeLoggedIn) {
+      throw new BadRequestError('User has already logged in before')
+    }
+
+    user.isFirstTimeLoggedIn = true;
+    await this.dbConnection.getRepository(User).save(user);
+
+    await user.save();
+    return '';
+  }
+
+  public static async getAllusers(payload: ListUsersInviteesDto): Promise<UsersData> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const eventId = parsedQuery?.eventId;
     const hostId = payload.userId;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    const where: unknown = {
-      deletedAt: null,
-      id: In(
-        (
-          await this.dbConnection.getRepository(HostUserMapping).find({
-            where: { host: { id: hostId } },
-            relations: ['user'],
-          })
-        ).map((entry) => entry.user.id),
-      ),
-    };
-    let customListName = parsedQuery.customListName;
-    if (typeof customListName === 'string' && customListName.trim() !== '') {
-      customListName = customListName.trim();
-    } else {
-      customListName = null;
-    }
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const customListName = parsedQuery.list;
+    const customListId = parsedQuery?.customListId ? (parsedQuery.customListId as string) : undefined;
+    const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let favorite = false;
+    let followed = false;
+    let customListNames: string[] = [];
     if (customListName && customListName.length) {
-      if (typeof customListName === 'string') {
-        const customList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
-          where: { listName: customListName },
-          relations: ['users'],
-        });
-        if (customList) {
-          const customListUserIds = customList.users.map((user) => user.id);
-          const existingUserIds = Array.isArray(parsedQuery.usersIds)
-            ? parsedQuery.usersIds.filter((id): id is string => typeof id === 'string')
-            : typeof parsedQuery.usersIds === 'string'
-              ? parsedQuery.usersIds.split(',')
-              : [];
-          parsedQuery.usersIds = [...existingUserIds, ...customListUserIds];
-        }
+      if (customListName && typeof customListName === 'string') {
+        const allListNames = customListName.split(',').map((name) => name.trim());
+        // Separate system default lists and update customListName
+        const separatedLists = allListNames.filter((item) => systemDefaultLists.includes(item));
+        customListNames = allListNames.filter((item) => !systemDefaultLists.includes(item));
+        favorite = separatedLists.includes('myFavourites-systemDefault');
+        followed = separatedLists.includes('myFollowers-systemDefault');
       }
     }
 
+    const idsResult = await this.dbConnection.getRepository(HostUserMapping).find({
+      where: { host: { id: hostId } },
+      relations: ['user'],
+    });
+    const ids = idsResult.map((result) => result.user.id);
+
+    const usersQuery = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.roles', 'userRole')
+      .innerJoinAndSelect('userRole.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .leftJoinAndSelect('user.address', 'address')
+      .where('user.deletedAt IS NULL')
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
+            new Brackets((subQb) => {
+              subQb.where('role.name = :nonMemberRole', { nonMemberRole: 'non_member' });
+              if (ids.length > 0) {
+                subQb.andWhere('user.id IN (:...ids)', { ids });
+              } else {
+                subQb.andWhere('user.id IS NULL');
+              }
+            }),
+          );
+        }),
+      )
+      .skip(skip)
+      .take(take);
+    if (eventId) {
+      usersQuery.andWhere(
+        `NOT EXISTS (
+            SELECT 1 FROM guest WHERE guest.user_id = user.id AND guest.event_id = :eventId
+          )`,
+        { eventId },
+      );
+    }
+    let userTypes = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+    if (userTypes.length) {
+      usersQuery.andWhere(
+        new Brackets((qb) => {
+          qb.where('role.name IN (:...roleNames)', { roleNames: userTypes }); // Separate condition for userTypes
+        }),
+      );
+    }
+
+    // Apply OR conditions for followed, favorite, and custom lists
+    if (favorite || followed || customListNames.length > 0) {
+      usersQuery.andWhere(
+        new Brackets((qb) => {
+          if (favorite) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFavorite.member.id')
+                .from(HostFavorite, 'hostFavorite')
+                .where('hostFavorite.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (followed) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('hostFollow.follower.id')
+                .from(HostFollowing, 'hostFollow')
+                .where('hostFollow.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+          if (customListNames.length > 0) {
+            qb.orWhere((subQb) => {
+              const subQuery = subQb
+                .subQuery()
+                .select('listUsers.id')
+                .from(HostCustomUsersLists, 'customList')
+                .innerJoin('customList.users', 'listUsers')
+                .where('customList.listName IN (:...customListNames)', { customListNames })
+                .andWhere('customList.host.id = :hostId', { hostId })
+                .getQuery();
+              return `user.id IN ${subQuery}`;
+            });
+          }
+        }),
+      );
+    }
+    // Apply AND conditions for other filters
+    if (searchValue) {
+      usersQuery.andWhere(
+        new Brackets((qb) => {
+          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` }).orWhere('user.lastName ILIKE :searchValue', {
+            searchValue: `%${searchValue}%`,
+          });
+        }),
+      );
+    }
+    if (focuses && typeof focuses === 'string') {
+      const focusIds = focuses.split(',').map((id) => id.trim());
+      usersQuery.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('focus_users_user.userId')
+          .from('focus_users_user', 'focus_users_user')
+          .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+    if (interest && typeof interest === 'string') {
+      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+      usersQuery.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('interest_users_user.userId')
+          .from('interest_users_user', 'interest_users_user')
+          .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+    if (gender && typeof gender === 'string') {
+      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const validGenders = Object.values(Gender) as string[];
+      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      if (filteredGenders.length > 0) {
+        usersQuery.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
+      }
+    }
+
+    if (baseCity && typeof baseCity === 'string') {
+      const placeIds = baseCity.split(',').map((id) => id.trim());
+      if (placeIds.length > 0) {
+        usersQuery.andWhere((qb) => {
+          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+          return `user.address_id IN ${subQuery}`;
+        });
+      }
+    }
+    if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0; // Default minimum age is 0
+      const ageTo =
+        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null; // Null indicates no upper limit
+      const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+      const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+      if (ageTo !== null) {
+        conditions.push(`${ageQuery} <= :ageTo`);
+      }
+      usersQuery.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    }
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      usersQuery.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      usersQuery.orderBy('user.createdAt', 'DESC');
+    }
+
+    const [allUsers, totalCount] = await usersQuery.getManyAndCount();
+
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: hostId } },
+      relations: ['member'],
+    });
+    const favoriteUserIds = favorites.map((fav) => fav.member.id);
+
+    let listUserIds: string[] = [];
+    if (customListId) {
+      const customListUsers = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
+        where: { list: { id: customListId } },
+        relations: ['user'],
+      });
+
+      listUserIds = customListUsers.map((listUser) => listUser.user.id);
+    }
+
+    const users = await Promise.all(
+      allUsers.map(async (user) => {
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
+
+        const socialProviderUsername = socialProvider?.username || null;
+
+        const userData = toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        if (customListId) {
+          userData.isInCustomList = listUserIds.includes(user.id);
+        }
+        return userData;
+      }),
+    );
+    return { result: users, totalCount };
+  }
+
+  // ADMIN Sevice Code
+
+  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
+    const parsedQuery = JSON.parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
+    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
+    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const { error: validationError, response: validation } = this.validateFilters(payload.query);
+
+    if (validationError) {
+      throw new BadRequestError('validationError')
+    }
+    let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
+    if (typeof socialNetworkNames === 'string') {
+      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      socialNetworkObject = socialNetworkArray.reduce(
+        (acc, name) => {
+          acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
+          return acc;
+        },
+        {} as { [key in keyof typeof SocialProviderType]?: string },
+      );
+    }
     const usersQuery = this.dbConnection.getRepository(User)
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.roles', 'userRole')
@@ -2219,104 +2999,6 @@ export class AuthService {
       .limit(take)
       .orderBy('user.createdAt', 'DESC');
 
-    if (searchValue) {
-      usersQuery.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` }).orWhere('user.lastName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
-          });
-        }),
-      );
-    }
-    const followed = parsedQuery.followed === 'true' ? true : parsedQuery.followed === 'false' ? false : false;
-    const favorite = parsedQuery.favorite === 'true' ? true : parsedQuery.favorite === 'false' ? false : false;
-    if (followed) {
-      where['following'] = { host: { id: hostId } };
-    }
-    if (favorite) {
-      where['favoritedByHosts'] = { host: { id: hostId } };
-    }
-    if (parsedQuery.usersIds) {
-      where['id'] = In(
-        String(parsedQuery.usersIds)
-          .split(',')
-          .map((id) => id.trim()),
-      );
-    }
-    const users = await usersQuery.getMany();
-    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
-      where: { host: { id: hostId } },
-      relations: ['member'],
-    });
-    const favoriteUserIds = favorites.map((fav) => fav.member.id);
-    const members = await Promise.all(
-      users.map(async (user) => {
-        // Micro-service Call
-        // const focuses = await this.platformClient.getUserFocuses(user.id, this.logger);
-        // const interests = await this.platformClient.getUserInterests(user.id, this.logger);
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
-            },
-            type: SocialProviderType.FACEBOOK,
-          },
-          relations: ['user'],
-        });
-        const member = toMember(user, [], [], user.roles[0], undefined, socialProvider?.username);
-
-        //const member = toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
-        member.isFavourite = favoriteUserIds.includes(user.id);
-        return member;
-      }),
-    );
-    return responses.data(members);
-  }
-
-// ADMIN Sevice Code
-
-public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //GetMembersResponse
-  try {
-    const parsedQuery = parse(payload.query);
-    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
-    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    const { error: validationError, response: validation } = this.validateFilters(payload.query);
-
-    if (validationError) return responses.badRequest(validation);
-    let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
-    if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-      socialNetworkObject = socialNetworkArray.reduce(
-        (acc, name) => {
-          acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
-          return acc;
-        },
-        {} as { [key in keyof typeof SocialProviderType]?: string },
-      );
-    }
-    const usersQuery = this.dbConnection.getRepository(User)
-      .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'userRole')
-      .innerJoinAndSelect('userRole.role', 'role')
-      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-      .leftJoinAndSelect('user.socialStats', 'socialStats')
-      .leftJoinAndSelect('user.address', 'address')
-      .where('role.name = :roleName', { roleName: 'member' })
-      .andWhere('user.deletedAt IS NULL')
-      .groupBy('user.id')
-      .addGroupBy('userRole.id')
-      .addGroupBy('role.id')
-      .addGroupBy('socialProvider.id')
-      .addGroupBy('socialStats.id')
-      .addGroupBy('address.id')
-      .addGroupBy('userRole.role.id')
-      .offset(skip)
-      .limit(take)
-      .orderBy('user.createdAt', 'DESC');
     if (searchValue) {
       usersQuery.andWhere(
         new Brackets((qb) => {
@@ -2354,8 +3036,8 @@ public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //
       users.map(async (user) => {
 
         // Micro-service call
-        const focuses = [] //await this.platformClient.getUserFocuses(user.id, this.logger);
-        const interests = [] //await this.platformClient.getUserInterests(user.id, this.logger);
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
 
         const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
           where: {
@@ -2370,14 +3052,10 @@ public static async getMembers(payload: PaginatedRequestDto): Promise<any > { //
       }),
     );
     return responses.data(members);
-  } catch (err) {
-    return responses.badRequest('Unkown error occured, please try again later.');
   }
-}
 
-public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
-  try {
-    const parsedQuery = parse(payload.query);
+  public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
+    const parsedQuery = JSON.parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
@@ -2448,13 +3126,10 @@ public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResp
     });
 
     return responses.data(hosts);
-  } catch (err) {
-    return responses.badRequest('Unkown error occured, please try again later.');
-  }
-}
 
-public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse> {
-  try {
+  }
+
+  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
@@ -2464,7 +3139,9 @@ public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse>
       },
     });
 
-    if (!user) return responses.forbidden('Invalid credentials');
+    if (!user) {
+      throw new NotFoundError('User not found')
+    }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: user.id } },
@@ -2472,40 +3149,39 @@ public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponse>
     });
 
     const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
-    if (isAllowed === undefined) return responses.forbidden('Invalid credentials');
+    if (isAllowed === undefined) {
+      throw new ForbiddenError('Invalid credentials')
+    }
 
-    const loginResponse = await this.fusionAuthClient.login({ loginId: payload.email, password: payload.password });
+    const loginResponse = await fusionAuthClientHandler.fusionAuthClient().login({ loginId: payload.email, password: payload.password });
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      return responses.forbidden('Invalid credentials');
+      throw new ForbiddenError('Invalid credentials')
     }
 
     if (loginResponse?.response?.user?.passwordChangeRequired) {
-      return responses.forbidden('Password change is required');
+      throw new ForbiddenError('Password change is required')
     }
 
-    return responses.data({
+    return {
+      id: user.id,
       token: loginResponse.response.token,
       roles: user.roles.map((item) => {
         return { roleName: item.role.name, roleId: item.role.id };
       }),
-    });
-  } catch (err) {
-    return responses.badRequest('Unable to login.');
+    }
   }
-}
 
-public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpResponse> {
-  try {
+  public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
     let nonMember: UserRole | null;
     try {
-      const response = await this.fusionAuthClient.retrieveUserByEmail(payload.email);
+      const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
       if (response.statusCode == 200 && response?.response?.user) {
-        return responses.conflict('The user with provided email already exists.');
+        throw new ConflictError('The user with provided email already exists.')
       }
     } catch (e) {
       if (e.statusCode != 404) {
-        return responses.conflict('An error happens when trying register an user ' + e + '.');
+        throw new ConflictError('Than error happens when trying register an user.')
       }
     }
 
@@ -2522,11 +3198,11 @@ public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpR
 
       if (!nonMember) {
         if (user.phoneNumber === payload.phoneNumber) {
-          return responses.badRequest('Phone number is already in use, please try with a different phone number.');
+          throw new BadRequestError('Phone number is already in use')
         }
 
         if (user.email === payload.email) {
-          return responses.badRequest('Email is already in use, please try with a different email.');
+          throw new BadRequestError('Email is already in use')
         }
       }
     } else {
@@ -2554,7 +3230,7 @@ public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpR
       user: {
         id: user.id,
         username: payload.email.split('@')[0],
-        birthDate: payload.dateOfBirth,
+        // birthDate: payload.dateOfBirth,
         email: payload.email,
         firstName: payload.firstName,
         lastName: payload.lastName,
@@ -2565,33 +3241,28 @@ public static async createAdmin(payload: AdminSignUpRequestDto): Promise<SignUpR
       },
     };
 
-    const newUser = await this.fusionAuthClient.register(user.id, registrationRequest);
+    const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
     if (newUser.statusCode !== 200) {
-      return responses.conflict(`There wass an issue creating an admin: ${newUser.exception.name}`);
+      throw new ConflictError('There wass an issue creating an admin')
     }
 
     user.id = newUser.response?.user?.id;
     await this.dbConnection.getRepository(User).save(user);
-
     await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
-
-    return responses.ok;
-  } catch (err) {
-    return responses.badRequest('Unable to sign up, please try again later.');
+    return {
+      user
+    }
   }
-}
 
-public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
-  console.log('getHostProfile() payload: ', payload);
-
-  try {
+  public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
     const memberId = payload.userId; //Only valid if endpoint was called by a member
     let isMemberFollowingHost = false;
+    let isMemberBlockedHost = false;
 
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
       relations: {
-        hostedEvents: true,
+        hostedEvents: { location: true },
       },
     });
     if (!host) return responses.notFound('Host not found.');
@@ -2604,6 +3275,9 @@ public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostPr
     });
 
     const hostRole = userRoles.find((role) => role.role.name === 'host');
+    const roleId = hostRole.role.id;
+    const roleName = hostRole.role.name;
+
     if (hostRole === undefined) return responses.notFound('Host not found');
 
     if (memberId !== host.id) {
@@ -2615,21 +3289,28 @@ public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostPr
       });
 
       if (hostFollowing) isMemberFollowingHost = true;
+
+      const isBlocked = await this.dbConnection.getRepository(Block).findOne({
+        where: {
+          blockedBy: { id: memberId },
+          blockedTo: { id: host.id },
+        },
+      });
+
+      if (isBlocked) isMemberBlockedHost = true;
     }
 
-    return responses.data(toHostProfile(host, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source], isMemberFollowingHost));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
+    return toHostProfile(host, hostRole.status, hostRole.source, isMemberFollowingHost, isMemberBlockedHost, roleId, roleName)
   }
-}
 
-public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
-  try {
+  public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
 
-    if (!host) return responses.notFound('Host not found.');
+    if (!host) {
+      throw new NotFoundError('host')
+    }
 
     if (payload?.email) {
       const existingUser = await this.dbConnection.getRepository(User).findOne({
@@ -2637,7 +3318,7 @@ public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Pro
       });
 
       if (existingUser && host.id !== existingUser.id) {
-        return responses.badRequest('Email is already in use, please use different email.');
+        throw new ConflictError('Email is already in use')
       }
     }
 
@@ -2646,7 +3327,7 @@ public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Pro
         where: [{ phoneNumber: payload.phoneNumber }],
       });
       if (existingUser && host.id !== existingUser.id) {
-        return responses.badRequest('Phone number is already in use, please use a different phone number.');
+        throw new ConflictError('Phone number is already in use')
       }
     }
 
@@ -2660,22 +3341,23 @@ public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Pro
     });
 
     const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
+    if (hostRole === undefined) {
+      throw new NotFoundError('Host')
+    }
 
+    const roleStatus: any = hostRole.status
+    const roleSource: any = hostRole.source
     await this.dbConnection.getRepository(UserRole).update(hostRole.id, { profileSetupCompleted: true });
-
-    return responses.data(toBasicHostProfile(updatedUser, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
+    return responses.data(toBasicHostProfile(updatedUser, roleStatus, roleSource));
   }
-}
 
-public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfileResponse> {
-  try {
+  public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHostProfile> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
-    if (!user) return responses.notFound('Host not found.');
+    if (!user) {
+      throw new NotFoundError('Host not fond')
+    }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: user.id } },
@@ -2685,131 +3367,148 @@ public static async getBasicHostProfile(payload: IdRequestDto): Promise<BasicHos
     });
 
     const hostRole = userRoles.find((role) => role.role.name === 'host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
-
-    return responses.data(toBasicHostProfile(user, entityToUserStatus[hostRole.status], entityToUserSource[hostRole.source]));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
-  }
-}
-
-public static validateFilters(query: string): { error: boolean; response: string } {
-  const parsedFilters = parse(query);
-  const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-  const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-  const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
-  const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
-  if (searchValue) {
-    if (typeof searchValue !== 'string' || searchValue.length === 0) {
-      return { error: true, response: 'searchValue must be a string.' };
+    if (hostRole === undefined) {
+      throw new NotFoundError('Host role not found')
     }
+
+    const roleStatus: any = hostRole.status
+    const roleSource: any = hostRole.source
+
+    const data = toBasicHostProfile(user, roleStatus, roleSource);
+    return data
   }
 
-  if (socialNetworkNames) {
-    if (followerCountFrom === undefined || followerCountTo === undefined) {
-      return {
-        error: true,
-        response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
-      };
+  //TO do from here
+  public static validateFilters(query: string): { error: boolean; response: string } {
+    const parsedFilters = parse(query);
+    const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
+    const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
+    const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+    const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
+    if (searchValue) {
+      if (typeof searchValue !== 'string' || searchValue.length === 0) {
+        return { error: true, response: 'searchValue must be a string.' };
+      }
     }
-    if (followerCountFrom > followerCountTo) {
-      return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
-    }
 
-    if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
-
-      const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
-
-      if (invalidNames.length > 0) {
-        return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+    if (socialNetworkNames) {
+      if (followerCountFrom === undefined || followerCountTo === undefined) {
+        return {
+          error: true,
+          response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
+        };
+      }
+      if (followerCountFrom > followerCountTo) {
+        return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
       }
 
-      return { error: false, response: socialNetworkArray.join(',') };
-    }
-  }
-  return { error: false, response: '' };
-}
+      if (typeof socialNetworkNames === 'string') {
+        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
 
-public static async updateHostStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
-  try {
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.id },
-      relations: {
-        roles: {
-          role: true,
-        },
+        const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+
+        if (invalidNames.length > 0) {
+          return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+        }
+
+        return { error: false, response: socialNetworkArray.join(',') };
+      }
+    }
+    return { error: false, response: '' };
+  }
+
+  public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
+    const users = await this.dbConnection.getRepository(User).find({
+      where: { id: In(payload.ids) },
+      relations: ['roles', 'roles.role'],
+    });
+
+
+    if (!users.length) {
+      throw new NotFoundError('Host')
+    }
+
+    const hostRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: {
+        id: In(users.flatMap((user) => user?.roles?.filter((role) => role.role.name === 'host' || role.role.name === 'co_host').map((role) => role.id))),
       },
     });
 
-    const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
-    if (hostRole === undefined) return responses.notFound('Host not found');
+    if (!hostRoles.length) throw new NotFoundError('valid hosts');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: hostRole.id } });
-    if (!hostRole) return responses.notFound('Host not found');
+    const skippedUsers: string[] = [];
+    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
 
-    userRole.status = newUserStatusTosUserStatus[payload.status];
-    await this.dbConnection.getRepository(UserRole).save(userRole);
+    for (const user of users) {
+      const hostRole = hostRoles.find((role) => role.id === user.roles.find((r) => r.role.name === 'host' || r.role.name === 'co_host')?.id);
 
-    if (payload.status === NewUserStatus.APPROVE) {
-      const users = await this.fusionAuthClient.searchUsersByIds([user.id]);
-      if (users.response.total === 0) {
-        await this.approveHost(user);
-        const token = await this.generateToken(user);
+      if (!hostRole) continue;
 
-        // Micro-service call
-        // await this.communicationClient.sendEmailFromTemplate(
-        //   [
-        //     {
-        //       key: 'first_name',
-        //       value: user.firstName,
-        //     },
-        //     {
-        //       key: 'company_name',
-        //       value: user.additionalHostInformation?.companyName ?? user.firstName,
-        //     },
-        //     {
-        //       key: 'password_token',
-        //       value: this.configService.get<string>('RUMOR_WEBSITE') + `token/${token}`,
-        //     },
-        //   ],
-        //   'Host Application Approved',
-        //   [user.email],
-        //   null,
-        //   this.logger,
-        // );
+
+      // If changing to WAITLIST, prevent already approved users from being waitlisted
+      if (
+        newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+        hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+      ) {
+        skippedUsers.push(user.email);
+        continue;
       }
-    } else if (payload.status === NewUserStatus.WAITLIST) {
-      // Micro-service call
-      // await this.communicationClient.sendEmailFromTemplate([], 'Host Application Denied', [user.email], null, this.logger);
-    } else if (payload.status === NewUserStatus.DEACTIVATE) {
-      const today = new Date();
-      const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-      const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-      // example December 31, 2024, at 11:59PM EST
-      const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-    // Micro-service call
-    //   await this.communicationClient.sendEmailFromTemplate(
-    //     [
-    //       { key: 'first_name', value: user.firstName },
-    //       { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-    //     ],
-    //     'Account Deactivated',
-    //     [user.email],
-    //     null,
-    //     this.logger,
-    //   );
+
+      hostRole.status = newUserStatusTosUserStatus[payload.status];
+
+      if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.APPROVE]) {
+        const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
+        if (users.response.total === 0) {
+          await this.approveHost(user);
+          const token = await this.generateToken(user);
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Host Application Approved',
+            data: [
+              { key: 'first_name', value: user.firstName },
+              { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
+              { key: 'password_token', value: config.get('RUMOR_WEBSITE') + `token/${token}` },
+            ],
+          });
+        }
+      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST]) {
+        emailsToSend.push({ email: user.email, subject: 'Host Application Denied', data: [] });
+      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]) {
+        const today = new Date();
+        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+        emailsToSend.push({
+          email: user.email,
+          subject: 'Account Deactivated',
+          data: [
+            { key: 'first_name', value: user.firstName },
+            { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+          ],
+        });
+      }
+    }
+
+    await this.dbConnection.getRepository(UserRole).save(hostRoles);
+
+    // Send all emails in parallel
+    try {
+      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
+    } catch (error) { }
+    // if (skippedUsers.length > 0) {
+    //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
     // }
 
-    return responses.ok;
-  } 
-  } catch (err) {
-    return responses.badRequest(`Unable to update host status: ${err}`);
+    return {
+      updatedUsers: users.map(user => ({
+        id: user.id,
+        status: hostRoles.find(role => role.id === user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id)?.status ?? null,
+      })),
+      skippedUsers,
+    }
   }
-}
 
-public static async approveHost(user: User): Promise<void> {
-  try {
+  public static async approveHost(user: User): Promise<void> {
     const password = generateRandomPassword(12);
     const temporaryPassword = new TemporaryPassword();
     temporaryPassword.password = password;
@@ -2834,15 +3533,11 @@ public static async approveHost(user: User): Promise<void> {
         active: true,
       },
     };
+    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
 
-    await this.fusionAuthClient.register(user.id, registrationRequest);
-  } catch (err) {
-    // throw new BadRequestException(`Unable to approve host: ${err}`);
   }
-}
 
-public static async generateToken(user: User): Promise<string> {
-  try {
+  public static async generateToken(user: User): Promise<string> {
     const token = generateTemporaryToken(36);
     const temporaryPasswordToken = new TemporaryPasswordToken();
     temporaryPasswordToken.token = token;
@@ -2850,14 +3545,9 @@ public static async generateToken(user: User): Promise<string> {
     user.temporaryPasswordToken = temporaryPasswordToken;
     await this.dbConnection.getRepository(User).save(user);
     return token;
-  } catch (err) {
-    // this.logger.error(`Unable to approve host: ${err}`);
-    // throw new BadRequestException(`Unable to approve host: ${err}`);
   }
-}
 
-public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
-  try {
+  public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: {
@@ -2868,23 +3558,20 @@ public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Pro
     });
 
     const memberRole = user.roles.find((role) => role.role.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    if (memberRole === undefined) {
+      throw new NotFoundError('Member')
+    }
 
     const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) return responses.notFound('Member not found');
-
+    if (!userRole) {
+      throw new NotFoundError('Member')
+    }
     userRole.status = newUserStatusTosUserStatus[payload.status];
     await this.dbConnection.getRepository(UserRole).save(userRole);
-
     return responses.ok;
-  } catch (err) {
-    // this.logger.error(err);
-    return responses.badRequest(`Unable to update host status: ${err}`);
   }
-}
 
-public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfileResponse> {
-  try {
+  public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfileResponse> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: {
@@ -2896,14 +3583,16 @@ public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfi
       },
     });
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
+    const memberRole = user.roles.find((role) => role?.role?.name === 'member');
     if (memberRole === undefined) return responses.notFound('Member not found');
 
     const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) return responses.notFound('Member not found');
+    if (!userRole) {
+      throw new NotFoundError('Member')
+    };
 
     // Micro-service call
-    const focuses = []//await this.platformClient.getUserFocuses(user.id, this.logger);
+    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
     const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
       where: {
@@ -2915,9 +3604,946 @@ public static async getMemberProfile(payload: IdRequestDto): Promise<MemberProfi
       relations: ['user'],
     });
 
-    return responses.data(toMemberProfile(user, focuses, userRole, socialProvider?.username));
-  } catch (err) {
-    return responses.badRequest(`Unable to get host profile: ${err}`);
+    return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username));
   }
-}
+
+  public static async applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes) {
+    //Apply type filter
+    if (userTypes.length > 0) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where('role.name IN (:...roleNames)', { roleNames: userTypes });
+        }),
+      );
+    }
+
+    // Apply search value filter
+    if (searchValue) {
+      const searchWords = searchValue.trim().split(/\s+/);
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          searchWords.forEach((word) => {
+            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+          });
+        }),
+      );
+    }
+
+    // Apply focuses filter
+    if (focuses && typeof focuses === 'string') {
+      const focusIds = focuses.split(',').map((id) => id.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('focus_users_user.userId')
+          .from('focus_users_user', 'focus_users_user')
+          .where('focus_users_user.focusId IN (:...focusIds)', { focusIds })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+
+    // Apply interests filter
+    if (interest && typeof interest === 'string') {
+      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('interest_users_user.userId')
+          .from('interest_users_user', 'interest_users_user')
+          .where('interest_users_user.interestId IN (:...interestFilter)', { interestFilter })
+          .getQuery();
+        return `user.id IN ${subQuery}`;
+      });
+    }
+
+    // Apply gender filter
+    if (gender && typeof gender === 'string') {
+      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const validGenders = Object.values(Gender) as string[];
+      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      if (filteredGenders.length > 0) {
+        queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
+      }
+    }
+
+    // Apply baseCity filter
+    if (baseCity && typeof baseCity === 'string') {
+      const placeIds = baseCity.split(',').map((id) => id.trim());
+      if (placeIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+          return `user.address_id IN ${subQuery}`;
+        });
+      }
+    }
+
+    // Apply age filter
+    if (parsedQuery.ageFrom || parsedQuery.ageTo) {
+      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
+      const ageTo =
+        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
+      const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
+      const conditions: string[] = [`${ageQuery} >= :ageFrom`];
+      if (ageTo !== null) {
+        conditions.push(`${ageQuery} <= :ageTo`);
+      }
+      queryBuilder.andWhere(conditions.join(' AND '), { ageFrom, ageTo });
+    }
+    return queryBuilder;
+  }
+
+  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<Filter[]> {
+    const { userId } = payload;
+    const parsedQuery = parse(payload.query) as ParsedQs;
+    const eventId = parsedQuery?.eventId as string;
+    const filterOptionsSequence = [
+      'list',
+      'pastEvents',
+      'category',
+      'baseCity',
+      'gender',
+      'age',
+      'interest',
+      'type',
+      'ticketType',
+      'partySize',
+      'checkedIn',
+      'spammed',
+      'userSource',
+      'declinedBy',
+      'vouch',
+    ];
+    const focuses = (await PlatformService.getUserFocuses({ id: userId }));
+
+    const categoryObj = {
+      id: 'category',
+      label: 'Category',
+      options: focuses,
+      isSearchable: true,
+      type: FilterTypeValues.category,
+    };
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: userId },
+      relations: {
+        customLists: {
+          usersLists: {
+            user: {
+              address: true,
+              roles: { role: true },
+              socialProviders: true,
+              hostedEvents: true,
+            },
+          },
+        },
+      },
+    });
+    const customLists = user?.customLists?.map((list) => ({
+      name: list.listName,
+      id: list.listName,
+    }));
+    const hostDefaultList = [
+      { id: 'myFavourites-systemDefault', name: 'My Favorites' },
+      { id: 'myFollowers-systemDefault', name: 'My Followers' },
+    ];
+    const hostCustomLists = [...hostDefaultList, ...customLists];
+    const listObj = {
+      id: 'list',
+      label: 'My Lists',
+      options: hostCustomLists,
+      type: FilterTypeValues.list,
+    };
+    const baseCityObj = {
+      id: 'basecity',
+      label: 'Base City',
+      options: [],
+      type: FilterTypeValues.baseCity,
+    };
+    const genderObj = {
+      id: 'gender',
+      label: 'Gender',
+      options: [
+        { id: Gender.MALE, name: 'Male' },
+        { id: Gender.FEMALE, name: 'Female' },
+        { id: Gender.NON_BINARY, name: 'Non-Binary' },
+      ],
+      type: FilterTypeValues.gender,
+    };
+    const ageObj = {
+      id: 'age',
+      label: 'Age',
+      options: [],
+      type: FilterTypeValues.age,
+    };
+    const interests = (await PlatformService.getUserInterests({ id: userId }));
+    const mappedInterests = interests?.map((interest) => ({
+      name: interest.name,
+      id: interest.id,
+    }));
+    const interestObj = {
+      id: 'interest',
+      label: 'Interests',
+      options: mappedInterests,
+      type: FilterTypeValues.interest,
+    };
+    const typeObj = {
+      id: 'type',
+      label: 'Type',
+      options: [
+        { id: RoleType.Member, name: 'Member' },
+        { id: RoleType.NonMember, name: 'Non-Member' },
+      ],
+      type: FilterTypeValues.type,
+    };
+    const now = new Date();
+    //TODO: check if this logic affects on date format changes
+    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    const queryParams = {
+      ownerId: userId,
+      statusName: 'PAST_STATUS',
+      maxEndDate: formattedDate,
+      isPublished: true,
+    };
+    const queryString = prepareQueryString(queryParams);
+    const listEvents = [];
+    const mappedEvents = listEvents?.map((event) => ({
+      name: event.name,
+      id: event.id,
+    }));
+    const pastEventsObj = {
+      id: 'pastEvents',
+      label: 'Past Events',
+      options: mappedEvents,
+      type: FilterTypeValues.pastEvents,
+    };
+
+    const ticketTypes = []
+    // const ticketTypes = await serviceMesh.eventService().getTicketTypes({ id: eventId });
+    const mappedticketTypes = ticketTypes?.map((ticketType) => ({
+      name: ticketType.name,
+      id: ticketType.id,
+    }));
+    const ticketTypeObj = {
+      id: 'ticketType',
+      label: 'Ticket Type',
+      options: mappedticketTypes,
+      type: FilterTypeValues.ticketType,
+    };
+
+    const partySizeObj = {
+      id: 'partySize',
+      label: 'Party Size',
+      options: [],
+      type: FilterTypeValues.partySize,
+    };
+
+    const checkedInObj = {
+      id: 'checkedIn',
+      label: 'Check-in Status',
+      options: [
+        { id: 'checkedIn', name: 'Checked-in' },
+        { id: 'notCheckedIn', name: 'Not Checked-in' },
+      ],
+      type: FilterTypeValues.checkedIn,
+    };
+
+    const spammedObj = {
+      id: 'spammed',
+      label: 'Spam',
+      options: [
+        { id: 'isSpammed', name: 'Marked as Spam' },
+        { id: 'isNotSpammed', name: 'Not marked as Spam' },
+      ],
+      type: FilterTypeValues.spammed,
+    };
+
+    const userSourceObj = {
+      id: 'userSource',
+      label: 'Request Source',
+      options: [
+        // { id: UserSource.INVITED_BY_HOST, name: 'Invited by Host' },
+        // { id: UserSource.INVITED_BY_ADMIN, name: 'Invited by Admin' },
+        // { id: UserSource.INVITED_BY_COLLABORATOR, name: 'Invited by Collaborator' },
+        { id: UserSource.SIGN_UP_FORM, name: 'Sign Up Form' },
+        { id: UserSource.REQUEST_IN_APP, name: 'In App' },
+      ],
+      type: FilterTypeValues.userSource,
+    };
+
+    const declinedByObj = {
+      id: 'declinedBy',
+      label: 'Declined By',
+      options: [
+        { id: 'declinedByUser', name: 'Declined By User' },
+        // { id: 'declinedByCollaborator', name: 'Declined By Event Collaborator' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const vouchObj = {
+      id: 'vouch',
+      label: 'Vouch',
+      options: [
+        { id: 'hasVouches', name: 'Has Vouches' },
+        { id: 'hasNoVouches', name: 'Does Not Have Vouches' },
+      ],
+      type: FilterTypeValues.declinedBy,
+    };
+
+    const followersObj = {
+      id: 'followers',
+      label: 'Followers',
+      options: [
+        {
+          id: 'instagram',
+          name: 'Instagram',
+        },
+      ],
+      type: FilterTypeValues.followers,
+    };
+
+    const objectsMap = {
+      baseCity: baseCityObj,
+      gender: genderObj,
+      age: ageObj,
+      interest: interestObj,
+      category: categoryObj,
+      type: typeObj,
+      list: listObj,
+      pastEvents: pastEventsObj,
+      ticketType: ticketTypeObj,
+      partySize: partySizeObj,
+      checkedIn: checkedInObj,
+      spammed: spammedObj,
+      userSource: userSourceObj,
+      declinedBy: declinedByObj,
+      vouch: vouchObj,
+      followersObj,
+    };
+    // Arrange objects in the desired sequence
+    const orderedObjects = filterOptionsSequence.map((id) => objectsMap[id]).filter((node) => node);
+    //ends here
+    return orderedObjects;
+  }
+
+  /**
+   * Functionality to store host feedback.
+   * Logic:
+   *    1. Based on user id store host feedback along with a tag.
+   * @param payload
+   * @returns FeedbackResponse
+   */
+  public static async hostFeedback(payload: HostFeedbackRequestDto): Promise<HostFeedbackData> {
+    const host: User = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId, deletedAt: IsNull() },
+    });
+
+    if (!host) {
+      throw new NotFoundError('User')
+    }
+
+    const { description, tag } = payload;
+
+    const feedback = this.dbConnection.getRepository(HostFeedback).create({
+      description,
+      tag,
+      user: host,
+    });
+
+    const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
+
+    return {
+      description: savedFeedback.description,
+      tag: savedFeedback.tag,
+      feedbackId: savedFeedback.id,
+    };
+  }
+
+  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersList> {
+    const { customListId, customName, hostId, listType } = payload;
+
+
+    if (!customName) {
+      throw new BadRequestError("customName");
+    }
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: hostId, deletedAt: IsNull() },
+      relations: { customLists: true },
+    });
+
+    if (!host) {
+      throw new NotFoundError("host");
+
+    }
+
+    if (host.customLists.some((list) => list.listName === customName)) {
+      throw new BadRequestError("customName exists");
+    }
+
+    let existingList;
+
+    switch (true) {
+      case !customListId: {
+        switch (listType) {
+          case 'followed':
+
+            existingList = await this.dbConnection.getRepository(HostFollowing).find({
+              where: { host: { id: hostId } },
+              relations: { follower: true },
+            });
+            break;
+          case 'favorite':
+            existingList = await this.dbConnection.getRepository(HostFavorite).find({
+              where: { host: { id: hostId } },
+              relations: { member: true },
+            });
+            break;
+          default:
+            throw new BadRequestError('Invalid list type provided.')
+        }
+
+        if (!existingList || existingList.length === 0) {
+          throw new NotFoundError("listType");
+        }
+        break;
+      }
+
+      default: {
+        existingList = await this.dbConnection.getRepository(HostCustomUsersLists).findOne({
+          where: { id: customListId, host: { id: hostId } },
+          relations: ['usersLists', 'usersLists.user'],
+        });
+
+        if (!existingList) {
+          throw new NotFoundError("existingList");
+        }
+      }
+    }
+
+    const newCustomList = new HostCustomUsersLists();
+    newCustomList.listName = customName;
+    newCustomList.host = host;
+    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(newCustomList);
+
+    const userListEntries = (customListId ? existingList.usersLists : existingList).map((listUser) => {
+      const newListUser = new HostCustomUsersListsUsers();
+      newListUser.user = customListId ? listUser.user : listType === 'followed' ? listUser.follower : listUser.member;
+      newListUser.list = savedCustomList;
+      return newListUser;
+    });
+
+    await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
+    const customListSaved = await this.getCustomUsersList({
+      userId: hostId,
+      id: savedCustomList.id,
+      query: 'take=10&skip=0',
+    });
+    return customListSaved;
+  }
+
+  public static async deleteHostUserMapping(payload: IdRequestDto): Promise<string> {
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!hostUserMapping) {
+      throw new NotFoundError('User')
+    }
+    await this.dbConnection.getRepository(HostUserMapping).remove(hostUserMapping);
+    return '';
+  }
+
+  public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfile> {
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: {
+        roles: {
+          role: true,
+        },
+        address: true,
+        socialStats: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+    const [focuses, interests] = await Promise.all([
+      (await PlatformService.getUserFocuses({ id: user.id })),
+      (await PlatformService.getUserInterests({ id: user.id }))
+    ]);
+    const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
+      this.dbConnection.getRepository(HostUserSettings).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
+      this.dbConnection.getRepository(HostFavorite).findOne({
+        where: { host: { id: payload.id }, member: { id: user.id } },
+      }),
+      this.dbConnection.getRepository(HostFollowing).findOne({
+        where: { follower: { id: user.id }, host: { id: payload.id } },
+      }),
+      this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { user: { id: user.id }, host: { id: payload.id } },
+      }),
+    ]);
+    const formattedLists = await this.getUserCustomLists(payload.id, user.id);
+    const userRole = user.roles.find((r) => ['member', 'non_member'].includes(r.role.name));
+
+    const isFollow = !!hostFollowing;
+    const isFavorite = !!hostUserFavorite;
+    const isSpam = hostUserSettings?.isSpam ?? false;
+    const note = hostUserSettings?.note ?? '';
+    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    userData.isFavourite = isFavorite;
+    userData.isFollow = isFollow;
+    userData.isSpam = isSpam;
+    userData.note = note;
+    userData.hostUserMappingId = hostUserMapping?.id ?? '';
+
+    return userData;
+
+  }
+
+  public static async getUserCustomLists(hostId: string, userId: string): Promise<customListData[]> {
+
+    const result = await this.dbConnection.getRepository(HostCustomUsersListsUsers)
+      .createQueryBuilder('listUserMapping')
+      .leftJoin('listUserMapping.list', 'list')
+      .leftJoin('listUserMapping.user', 'listUser')
+      .where('list.host.id = :hostId', { hostId })
+      .andWhere(':userId IN (SELECT user_id FROM host_custom_users_lists_users WHERE list_id = list.id)', { userId })
+      .select('list.id', 'id')
+      .addSelect('list.listName', 'customName')
+      .addSelect('COUNT(listUser.id)', 'userCount')
+      .groupBy('list.id')
+      .getRawMany();
+
+    return result.map((list) => ({
+      id: list.id,
+      customName: list.customName,
+      totalCount: list.userCount,
+    }));
+  }
+
+  public static async getFollowedUsers(payload: PaginatedRequestDto): Promise<UsersData> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const type = parsedQuery?.type;
+    const gender = parsedQuery?.gender;
+    const focuses = parsedQuery.category;
+    const baseCity = parsedQuery.basecity;
+    const interest = parsedQuery.interest;
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+      relations: { followers: { follower: true } },
+    });
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+    const queryBuilder = this.dbConnection.getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProviders')
+      .leftJoinAndSelect('user.hostedEvents', 'hostedEvents')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .innerJoin('user.following', 'hf')
+      .addSelect(['hf.createdAt'])
+      .where('hf.host.id = :hostId', { hostId: payload.userId })
+      .take(take)
+      .skip(skip);
+    let userTypes: string[] = [];
+    if (type && typeof type === 'string') {
+      userTypes = type.split(',').map((name) => name.trim());
+    }
+
+    if (parsedQuery.sortBy === 'name') {
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+    } else {
+      queryBuilder.orderBy('hf.createdAt', 'DESC');
+    }
+
+    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
+
+    const users = await Promise.all(
+      followedUsers.map(async (user) => {
+        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+
+        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
+          },
+          relations: ['user'],
+        });
+
+        const socialProviderUsername = socialProvider?.username || null;
+
+        return toUser(user, focuses, interests, user.roles[0], {
+          INSTAGRAM: socialProviderUsername,
+        });
+      }),
+    );
+    return { result: users, totalCount };
+
+  }
+
+  public static async manageUserSpam(payload: ManageUserRequestDto): Promise<string> {
+
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+
+    if (!user || !host) {
+      throw new NotFoundError('User or Host')
+    }
+    let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+      where: {
+        user: { id: payload.userId },
+        host: { id: payload.id },
+      },
+    });
+
+    if (!hostUserSettings) {
+      hostUserSettings = new HostUserSettings();
+      hostUserSettings.user = user;
+      hostUserSettings.host = host;
+      hostUserSettings.isSpam = payload.isSpam;
+    } else {
+      hostUserSettings.isSpam = payload.isSpam;
+    }
+    await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    return '';
+  }
+
+  /**
+   * Reports a user by storing a report record with associated role IDs.
+   * @param payload - The DTO containing report details.
+   * @returns A response containing the report details or an error message.
+   */
+  public static async reportUser(payload: ReportUserRequestDto): Promise<ReportData> {
+    const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
+    const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
+
+    if (!reportedBy || !reportedTo) {
+      throw new NotFoundError('User')
+    }
+
+    // Fetch role records from the roles table
+
+    const reportedByRole = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.reportedByRoleId } });
+    const reportedToRole = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.reportedToRoleId } });
+
+    if (!reportedByRole || !reportedToRole) {
+      throw new BadRequestError('Invalid role IDs provided')
+    }
+
+    // Store the report with role IDs
+    const report = this.dbConnection.getRepository(Report).create({
+      reportedBy,
+      reportedTo,
+      reportMessage: payload.reportMessage,
+      reportedByRole,
+      reportedToRole,
+    });
+
+    await this.dbConnection.getRepository(Report).save(report);
+
+    const data = {
+      reportId: report.id,
+      reportMessage: report.reportMessage,
+      reportedByRoleId: reportedByRole.id,
+      reportedToRoleId: reportedToRole.id,
+    };
+
+    return data;
+  }
+
+  public static async blockHost(payload: BlockHostRequestDto): Promise<ReportData> {
+    const blockedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedById } });
+    const blockedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedToId } });
+
+    if (!blockedBy || !blockedTo) {
+      throw new NotFoundError('User')
+    }
+
+    // Check if already blocked
+    const existingBlock = await this.dbConnection.getRepository(Block).findOne({
+      where: { blockedBy: { id: blockedBy.id }, blockedTo: { id: blockedTo.id } },
+    });
+
+    if (existingBlock) {
+      throw new BadRequestError('User already blocked')
+    }
+
+    // Store the block record
+    const block = this.dbConnection.getRepository(Block).create({
+      blockedBy,
+      blockedTo,
+      blockedByRole: { id: payload.blockedByRoleId },
+      blockedToRole: { id: payload.blockedToRoleId },
+    });
+
+    await this.dbConnection.getRepository(Block).save(block);
+
+    const data = {
+      reportId: '',
+      blockId: block.id,
+      reportMessage: 'Blocked succesfully',
+    }
+
+    return data;
+  }
+
+  public static async unblockHost(payload: BlockHostRequestDto): Promise<string> {
+    const block = await this.dbConnection.getRepository(Block).findOne({
+      where: {
+        blockedBy: { id: payload.blockedById },
+        blockedTo: { id: payload.blockedToId },
+      },
+    });
+
+    if (!block) {
+      throw new NotFoundError('User')
+    }
+
+    await this.dbConnection.getRepository(Block).remove(block);
+
+    return '';
+  }
+
+  public static async reportAndBlockHost(payload: ReportUserRequestDto): Promise<ReportData> {
+    const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
+    const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
+
+    if (!reportedBy || !reportedTo) {
+      throw new NotFoundError('User')
+    }
+
+    let reportId = null;
+    let blockId = null;
+    let reportMessage = '';
+
+    // Check if already reported
+
+    const existingReport = await this.dbConnection.getRepository(Report).findOne({
+      where: { reportedBy: { id: reportedBy.id }, reportedTo: { id: reportedTo.id } },
+    });
+
+    if (!existingReport) {
+      // Create a new report
+      const report = this.dbConnection.getRepository(Report).create({
+        reportedBy,
+        reportedTo,
+        reportMessage: payload.reportMessage,
+        reportedByRole: { id: payload.reportedByRoleId },
+        reportedToRole: { id: payload.reportedToRoleId },
+      });
+
+      await this.dbConnection.getRepository(Report).save(report);
+      reportId = report.id;
+    } else {
+      reportId = existingReport.id;
+      reportMessage = 'User already reported';
+    }
+
+    // Check if already blocked
+
+    const existingBlock = await this.dbConnection.getRepository(Block).findOne({
+      where: { blockedBy: reportedBy, blockedTo: reportedTo },
+    });
+
+    if (!existingBlock) {
+      // Block the user after reporting
+      const block = this.dbConnection.getRepository(Block).create({
+        blockedBy: reportedBy,
+        blockedTo: reportedTo,
+        blockedByRole: { id: payload.reportedByRoleId },
+        blockedToRole: { id: payload.reportedToRoleId },
+      });
+
+      await this.dbConnection.getRepository(Block).save(block);
+      blockId = block.id;
+    } else {
+      blockId = existingBlock.id;
+    }
+
+    const data = {
+      reportId,
+      blockId,
+      reportMessage,
+    }
+
+    return data;
+  }
+
+  public static async sendSupportEmail(payload: sendSupportEmailRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    // TO DO: Change email and sms template
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'first_name',
+            value: payload.message,
+          },
+        ],
+        'Host Application Submitted',
+        [user.email],
+        null,
+      );
+    } catch (error) { }
+
+    return '';
+
+  }
+
+  public static async getAllFeedbacks(payload: ReportAndFeedbackRequestDto): Promise<Feedback[]> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const query = this.dbConnection.getRepository(HostFeedback).createQueryBuilder('feedback').leftJoinAndSelect('feedback.user', 'user').take(take).skip(skip);
+
+    if (searchValue) {
+      query.andWhere('(user.firstName ILIKE :search OR user.lastName ILIKE :search)', { search: `%${searchValue}%` });
+    }
+
+    const feedbacks = await query.getMany();
+
+    const response = responses.data({
+      feedbacks: feedbacks.map((feedback) => ({
+        id: feedback.id ?? null,
+        tag: feedback.tag ?? null,
+        description: feedback.description ?? null,
+        user: feedback.user
+          ? {
+            id: feedback.user.id ?? null,
+            firstName: feedback.user.firstName ?? null,
+            lastName: feedback.user.lastName ?? null,
+            dateOfBirth: feedback.user.dateOfBirth ?? null,
+            email: feedback.user.email ?? null,
+            username: feedback.user.username ?? null,
+            phoneNumber: feedback.user.phoneNumber ?? null,
+            gender: feedback.user.gender ?? null,
+            additionalHostInformation: feedback.user.additionalHostInformation ?? null,
+            profilePicture: feedback.user.profilePicture ?? null,
+            instagramUserName: feedback.user.instagramUserName ?? null,
+            isFirstTimeLoggedIn: feedback.user.isFirstTimeLoggedIn ?? null,
+          }
+          : undefined,
+      })),
+    });
+
+    return response.data.feedbacks;
+  }
+
+  public static async switchProfile(payload: SwitchProfileDto): Promise<TokenResponseAndRoles> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId, deletedAt: IsNull() },
+      relations: { roles: { role: true } },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User')
+    };
+
+    const targetProfile = user.roles.find((item) => item.role.name === payload.targetRole);
+    if (!targetProfile) {
+      throw new ForbiddenError("User does not have the requested role.");
+    }
+    if (payload.targetRole === 'host' || payload.targetRole === 'member') {
+      if (targetProfile.status !== UserStatus.ACTIVE) {
+        throw new ForbiddenError('User is not active.')
+      }
+    }
+
+    if (payload.targetRole === 'non_member') {
+      try {
+        const request: PasswordlessStartRequest = {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          loginId: user.email,
+        };
+
+        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+
+        return {
+          token: authenticatedUser.response.token,
+          roles: [
+            {
+              roleName: targetProfile.role.name,
+              roleId: targetProfile.role.id,
+            },
+          ],
+          id: user.id,
+        }
+      } catch (error) {
+        return {
+          token: '',
+          roles: [
+            {
+              roleName: targetProfile.role.name,
+              roleId: targetProfile.role.id,
+            },
+          ],
+          id: user.id,
+        }
+      }
+    }
+
+    const request: PasswordlessStartRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: user.email,
+    };
+
+    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+
+    return {
+      token: authenticatedUser.response.token,
+      roles: [
+        {
+          roleName: targetProfile.role.name,
+          roleId: targetProfile.role.id,
+        },
+      ],
+      id: user.id,
+    };
+  }
+
+  public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    if (!user || !host) {
+      throw new NotFoundError('User or Host')
+    }
+    let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+      where: {
+        user: { id: payload.userId },
+        host: { id: payload.id },
+      },
+    });
+    if (!hostUserSettings) {
+      hostUserSettings = new HostUserSettings();
+      hostUserSettings.user = user;
+      hostUserSettings.host = host;
+      hostUserSettings.note = payload.note;
+    } else {
+      hostUserSettings.note = payload.note;
+    }
+    const userHostSettings = await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+
+    return {
+      note: userHostSettings.note,
+      hostUserSettingsId: userHostSettings.id,
+    };
+  }
 }

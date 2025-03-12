@@ -11,105 +11,55 @@ import { SaveNotificationTokenRequestDto } from 'rumor-utils/shared/users/dtos/s
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 
-
 export class SettingsService {
   static dbConnection = connectionManager;
   
-  public static async getNotificationSettings(payload: IdRequestDto): Promise<UserSettingResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
-      if (!user) return responses.notFound('User not found!');
+  public static async getNotificationSettings(id: string): Promise<any> {
+    const user = await this.dbConnection.getRepository(User).findOneBy({ id });
+    if (!user) return responses.notFound('User not found!');
 
-      const notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
-        where: { user: { id: payload.id } },
-      });
+    let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
+        where: { user: { id } },
+        select: ['id', 'enableAppNotifications', 'enableEmailNotifications', 'enableSmsNotifications']
+    });
 
-      if (!notificationSettings) {
-        const notificationSettingsSave = await this.createNotificationSettingsForUser(user);
-        return this.buildUserResponse(user, { ...notificationSettingsSave });
-      }
-
-      const { muteNotifications, muteDuration, currentTimeSetDuration } = notificationSettings;
-      const validateSetDurationTime = isWithinTimeRange(currentTimeSetDuration, muteDuration);
-
-      let updatedMuteNotification = muteNotifications;
-      let updatedSetDurationTime = muteDuration;
-
-      if (muteNotifications && !validateSetDurationTime.validate) {
-        updatedMuteNotification = false;
-        updatedSetDurationTime = null;
-        await this.updateNotificationSettings({
-          ...notificationSettings,
-          userId: payload.id,
-          muteNotifications: updatedMuteNotification,
-          muteDuration: null,
+    if (!notificationSettings) {
+        notificationSettings = this.dbConnection.getRepository(UserSettings).create({
+            user,
+            enableAppNotifications: true, 
+            enableEmailNotifications: true,
+            enableSmsNotifications: true
         });
-      }
-
-      const NotificationsSettings: ProfileNotificationSetting = {
-        ...notificationSettings,
-        muteNotifications: updatedMuteNotification,
-        muteDuration: updatedSetDurationTime,
-        timeLeftMuteNotification: validateSetDurationTime.timeLeft,
-      };
-
-      return this.buildUserResponse(user, NotificationsSettings);
-    } catch (err) {
-      return responses.badRequest('Error at get notification settings.');
+        await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
     }
-  }
 
-  public static async createNotificationSettings(payload: IdRequestDto): Promise<UserSettingResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
-      if (!user) return responses.notFound('User not found!');
-      const notificationSettings = await this.createNotificationSettingsForUser(user);
-      return this.buildUserResponse(user, notificationSettings);
-    } catch (err) {
-      return responses.badRequest('Error at create notification settings.');
-    }
-  }
+    return notificationSettings;
+}
 
-  public static async updateNotificationSettings(payload: UpdateNotificationSettingRequestDto): Promise<UserSettingResponse> {
-    try {
-      const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
-      if (!user) return responses.notFound('User not found!');
 
-      if (payload.muteNotifications && !payload.muteDuration) {
-        return responses.notFound('Set Duration Time is required');
-      }
+public static async updateNotificationSettings(payload: any): Promise<any> {
+  const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
+  if (!user) return responses.notFound('User not found!');
 
-      let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
-        where: { user: { id: payload.userId } },
+  let notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
+      where: { user: { id: payload.userId } }
+  });
+
+  if (!notificationSettings) {
+      notificationSettings = this.dbConnection.getRepository(UserSettings).create({
+          user,
+          enableAppNotifications: payload.enableAppNotifications,
+          enableEmailNotifications: payload.enableEmailNotifications,
+          enableSmsNotifications: payload.enableSmsNotifications
       });
-
-      if (!notificationSettings) {
-        notificationSettings = this.dbConnection.getRepository(UserSettings).create({ user: { id: payload.userId } });
-        notificationSettings = await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
-        notificationSettings = await this.dbConnection.getRepository(UserSettings).findOne({
-          where: { user: { id: payload.userId } },
-        });
-      }
-
-      const updatedSettings = await this.dbConnection.getRepository(UserSettings).save({
-        ...notificationSettings,
-        ...payload,
-        currentTimeSetDuration: payload.muteNotifications ? new Date() : null,
-        setDurationTime: payload.muteNotifications ? payload.muteDuration : null,
-      });
-
-      const validateSetDurationTime = isWithinTimeRange(updatedSettings.currentTimeSetDuration, updatedSettings.setDurationTime);
-
-      const NotificationsSettings: ProfileNotificationSetting = {
-        ...updatedSettings,
-        timeLeftMuteNotification: validateSetDurationTime.timeLeft,
-      };
-
-      return this.buildUserResponse(user, NotificationsSettings);
-    } catch (err) {
-      return responses.badRequest('Error at update notification settings.');
-    }
+  } else {
+      Object.assign(notificationSettings, payload);
   }
+
+  return await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
+}
+
+
 
   public static async savePushNotificationToken(payload: SaveNotificationTokenRequestDto): Promise<GenericResponse> {
     try {
@@ -171,15 +121,7 @@ export class SettingsService {
     return responses.data(pushNotificationTokens);
   }
 
-  public static async createNotificationSettingsForUser(user: User): Promise<ProfileNotificationSetting> {
-    const notificationSettings = this.dbConnection.getRepository(UserSettings).create({ user });
-    await this.dbConnection.getRepository(UserSettings).save(notificationSettings);
-    const validateSetDurationTime = isWithinTimeRange(null, null);
-    return {
-      ...notificationSettings,
-      timeLeftMuteNotification: validateSetDurationTime.timeLeft,
-    };
-  }
+  
 
   public static buildUserResponse(user: User, notificationSettings: ProfileNotificationSetting): UserSettingResponse {
     const UserData: UserDataSimple = {

@@ -26,6 +26,10 @@ export class CreateSignupFormDto implements CreateSignupFormRequest {
   @IsString()
   description: string;
 
+  @IsOptional()
+  @IsString()
+  name: string;
+
   @IsNotEmpty()
   @IsBoolean()
   hasAccessForAdditionalGuests: boolean;
@@ -47,10 +51,14 @@ export class QuestionsDto implements ISignupFormQuestionsRequest {
 
   @IsNotEmpty()
   @IsString()
-  type: string;
+  action: string;
 
   @IsBoolean()
   isRequired: boolean;
+
+  @IsString()
+  @IsOptional()
+  value: string;
 }
 
 export class SignupFormAnswersDto implements ISignupFormQuestionsRequest {
@@ -64,7 +72,7 @@ export class SignupFormAnswersDto implements ISignupFormQuestionsRequest {
 
   @IsNotEmpty()
   @IsString()
-  type: string;
+  action: string;
 
   @IsNotEmpty()
   @IsString()
