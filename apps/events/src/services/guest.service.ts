@@ -2434,6 +2434,7 @@ export class GuestService {
 
       // Step 2: Fetch the CSV file from S3 storage
       const fileUrl = await S3Service.getFileUrl(payload.filePath);
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ fileUrl:", fileUrl)
 
       // Step 3: Parse the CSV file to extract guest data
       const { validData, garbageData } = await processCsvFile(fileUrl, payload.isUploadUser ?? false);
@@ -2451,12 +2452,13 @@ export class GuestService {
         { phoneNumber: In(phoneNumbers), deletedAt: IsNull() },
       ],
     });
+    console.log("🚀 ~ GuestService ~ existingUsers ~ existingUsers:", existingUsers)
     
     // Create a map of email to user ID for quick lookup
     const userMap = new Map<string, string>();
     const removedEmails = new Set<string>();
     const newMappings = [];
-    let updatedValidData;
+    let updatedValidData = [];
     if (existingUsers.length > 0) {
       existingUsers.forEach((user) => {
         if (user.email) userMap.set(user.email, user.id);
@@ -2530,6 +2532,7 @@ export class GuestService {
         });
     }
       const users: SimpleUser[] = [];
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ updatedValidData:", updatedValidData)
       if (updatedValidData.length > 0) {
         const userPromises = updatedValidData.map(async (row: User) => {      
           if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
@@ -2547,6 +2550,10 @@ export class GuestService {
         const resolvedUsers = await Promise.all(userPromises);
         users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
       }
+      
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users)
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ garbageData:", garbageData)
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ validData:", validData)
       
       // Step 7: Generate an error CSV file for invalid or duplicate data
       const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
@@ -3008,6 +3015,7 @@ export class GuestService {
           guestId,
           userId: user?.id || null,
           ticketType: ticketType?.name || null,
+          inviteMessage: guestDetail.inviteMessage,
           maxAdditionalGuests,
           privateGuestNote,
           guestStatus,
