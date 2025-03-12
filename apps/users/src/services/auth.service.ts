@@ -4065,8 +4065,8 @@ export class AuthService {
       throw new NotFoundError('User')
     }
     const [focuses, interests] = await Promise.all([
-      [],
-      [],
+      (await PlatformService.getUserFocuses({ id: user.id })),
+      (await PlatformService.getUserInterests({ id: user.id }))
     ]);
     const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
       this.dbConnection.getRepository(HostUserSettings).findOne({
