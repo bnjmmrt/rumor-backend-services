@@ -14,7 +14,7 @@ const multer = require('multer');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024, // limit file size to 5MB
+        fileSize: 5 * 1024 * 1024,
     },
 });
 
@@ -28,9 +28,14 @@ router.post('/auth/admin/create', AdminController.createAdmin);
 router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
 router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id
 router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
-router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
 router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
-router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
+
+/**
+ * Added Authorization in these 2 APIs & updated the endpoints
+ */
+router.get('/auth/host/profile',AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);         // get basic host profile by id
+router.put('/auth/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);           // update host profile 
+
 router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
 router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
 router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);

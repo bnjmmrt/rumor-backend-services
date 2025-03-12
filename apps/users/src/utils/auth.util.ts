@@ -55,7 +55,7 @@ export const newHost = (payload: HostSignUpRequestDto): User => {
   return user;
 };
 
-export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): User => {
+export const hostToUpdatev0 = (host: User, payload: UpdateHostProfileRequestDto): User => {
   host.firstName = payload.firstName || host.firstName;
   host.lastName = payload.lastName || host.lastName;
   host.email = payload.email || host.email;
@@ -79,6 +79,36 @@ export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): 
   };
   return host;
 };
+
+export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): User => {
+  host.firstName = payload.firstName || host.firstName;
+  host.lastName = payload.lastName || host.lastName;
+  host.email = payload.email || host.email;
+  host.phoneNumber = payload.phoneNumber || host.phoneNumber;
+
+  // Ensure additionalHostInformation exists
+  host.additionalHostInformation = {
+    companyName: payload.companyName || host.additionalHostInformation?.companyName || '',
+    companyLogo: payload.companyLogo || host.additionalHostInformation?.companyLogo || '',
+    website: payload.website !== undefined ? payload.website : host.additionalHostInformation?.website || '',
+    referredBy: payload.referredBy || host.additionalHostInformation?.referredBy,
+    eventsPerYear: payload.eventsPerYear || host.additionalHostInformation?.eventsPerYear,
+    bio: payload.bio !== undefined ? payload.bio : host.additionalHostInformation?.bio,
+    
+    // Ensure socialMedia exists
+    socialMedia: {
+      instagram: payload.socialMedia?.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram || '',
+      tiktok: payload.socialMedia?.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok || '',
+      linkedin: payload.socialMedia?.linkedin !== undefined ? payload.socialMedia.linkedin : host.additionalHostInformation?.socialMedia?.linkedin || '',
+      youtube: payload.socialMedia?.youtube !== undefined ? payload.socialMedia.youtube : host.additionalHostInformation?.socialMedia?.youtube || '',
+      facebook: payload.socialMedia?.facebook !== undefined ? payload.socialMedia.facebook : host.additionalHostInformation?.socialMedia?.facebook || '',
+      x: payload.socialMedia?.x !== undefined ? payload.socialMedia.x : host.additionalHostInformation?.socialMedia?.x || '',
+    },
+  };
+
+  return host;
+};
+
 
 export const formatToUnits = (num: number) => {
   const abbrev = ['', 'K', 'M'];
