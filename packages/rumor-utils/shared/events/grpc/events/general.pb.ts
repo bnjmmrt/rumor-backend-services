@@ -648,7 +648,7 @@ export interface GenerateTicketForGuestData {
 
 export interface ToggleGuestCheckStatusData {
   guestId?: string | undefined;
-  ticketStatus?: TicketStatus | undefined;
+  ticketStatus?: string | undefined;
   checkInStatus: boolean;
   totalConfirmedGuests?: number | undefined;
   totalCheckedInGuests?: number | undefined;
