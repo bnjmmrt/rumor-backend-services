@@ -175,9 +175,9 @@ export class EventAnnouncementService {
                 .getRepository(Guest)
                 .createQueryBuilder("guest")
                 .where("guest.event_id = :eventId", { eventId })
-                .andWhere("guest.ticketTypeId = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
-                .andWhere("guest.addedById = :addedById", { addedById: announcement.addedBy?.id })
-                .andWhere("guest.status = :status", { status: "confirmed" })
+                .andWhere("guest.ticket_type_id = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
+                .andWhere("guest.added_by_id = :addedById", { addedById: announcement.addedBy?.id })
+                .andWhere("guest.status = :status", { status: GuestStatus.CONFIRMED })
                 .getCount();
         }
 
@@ -221,9 +221,9 @@ export class EventAnnouncementService {
         recipientCount = await database.getRepository(Guest)
             .createQueryBuilder("guest")
             .where("guest.event_id = :eventId", { eventId })
-            .andWhere("guest.ticketTypeId = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
-            .andWhere("guest.addedById = :addedById", { addedById: announcement.addedBy?.id })
-            .andWhere("guest.status = :status", { status: "confirmed" })
+            .andWhere("guest.ticket_type_id = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
+            .andWhere("guest.added_by_id = :addedById", { addedById: announcement.addedBy?.id })
+            .andWhere("guest.status = :status", { status: GuestStatus.CONFIRMED })
             .getCount();
     }
 
