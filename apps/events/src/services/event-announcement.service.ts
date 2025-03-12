@@ -219,7 +219,7 @@ export class EventAnnouncementService {
     if (!event) throw new NotFoundError("Event not found");
 
     // Fetch the announcement along with relations
-    const announcement: any = await database
+    const announcement = await database
       .getRepository(EventAnnouncement)
       .findOne({
         where: { id, event: { id: eventId }, deletedAt: IsNull() },
