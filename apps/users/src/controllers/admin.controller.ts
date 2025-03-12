@@ -85,6 +85,8 @@ export class AdminController {
   public static getBasicHostProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: IdRequestDto = { id: req.user };
+      console.log("🚀 ~ AdminController ~ payload:", payload)
+
       const response: BasicHostProfile = await AuthService.getBasicHostProfile(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
