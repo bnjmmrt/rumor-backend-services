@@ -2815,7 +2815,6 @@ export class EventsService {
    * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
    */
   public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
-    try {
       // Step 1: Fetch guest details along with associated event.
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: { id: payload.id },
@@ -2882,11 +2881,6 @@ export class EventsService {
         totalConfirmedGuests,
         totalCheckedInGuests,
       };
-    } catch (err) {
-      // Log any errors encountered and return an error response.
-      // this.logger.error(err);
-      throw new BadRequestError('Error at validate ticket');
-    }
   }
 
 

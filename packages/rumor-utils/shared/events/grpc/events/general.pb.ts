@@ -57,11 +57,11 @@ export enum GuestStatus {
 }
 
 export enum Gender {
-  MALE = 0,
-  FEMALE = 1,
-  NON_BINARY = 2,
-  NOT_APPLICABLE = 3,
-  UNRECOGNIZED = -1,
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  NON_BINARY = 'NON_BINARY',
+  NOT_APPLICABLE = 'NOT_APPLICABLE',
+  UNRECOGNIZED = 'UNRECOGNIZED',
 }
 
 export enum TicketStatus {
@@ -368,7 +368,7 @@ export interface Guest {
   name: string;
   addedBy: string;
   declinedBy: string;
-  status: GuestStatus;
+  status: string;
   ticketType?: string | undefined;
   partySize?: number | undefined;
   category: string[];
@@ -377,10 +377,10 @@ export interface Guest {
   maxAdditionalGuests?: number | undefined;
   id: string;
   profilePicture?: string | undefined;
-  source?: UserSource | undefined;
+  source?: string | undefined;
   checkIn?: boolean | undefined;
   additionalRequestedGuests?: number | undefined;
-  invitationSource: UserSource;
+  invitationSource: string;
   email?: string | undefined;
   privateGuestNote?: string | undefined;
   isBanned?: boolean | undefined;
@@ -408,13 +408,13 @@ export interface AdditionalGuest {
   category: string[];
   ticketType?: string | undefined;
   numFollowers?: string | undefined;
-  status?: GuestStatus | undefined;
+  status?: string | undefined;
   baseCity?: string | undefined;
   declinedByPicture?: string | undefined;
   declinedBy?: string | undefined;
   gender: Gender;
   isBanned?: boolean | undefined;
-  invitationSource: UserSource;
+  invitationSource: string;
 }
 
 export interface GuestData {
