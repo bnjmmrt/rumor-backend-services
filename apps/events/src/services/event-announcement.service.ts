@@ -302,8 +302,8 @@ export class EventAnnouncementService {
 
     // If there are no recipients, fetch based on ticketType & addedBy
     if (recipientIds.length === 0) {
-        query.andWhere("guest.ticketTypeId = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
-            .andWhere("guest.addedById = :addedById", { addedById: announcement.addedBy?.id });
+        query.andWhere("guest.ticket_type_id = :ticketTypeId", { ticketTypeId: announcement.ticketType?.id })
+            .andWhere("guest.added_by_id = :addedById", { addedById: announcement.addedBy?.id });
     } else {
         query.andWhere("guest.id IN (:...recipientIds)", { recipientIds });
     }
