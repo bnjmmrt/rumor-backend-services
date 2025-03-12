@@ -2454,151 +2454,155 @@ export class GuestService {
         ],
       });
     }
-    
-    // Create a map of email to user ID for quick lookup
-    const userMap = new Map<string, string>();
-    const removedEmails = new Set<string>();
-    const newMappings = [];
-    let updatedValidData: CsvRecord[] = [];
-    if (existingUsers.length > 0) {
-      existingUsers.forEach((user) => {
-        if (user.email) userMap.set(user.email, user.id);
-        if (user.phoneNumber) userMap.set(user.phoneNumber, user.id);
-        });
-
-        // Step 5: Retrieve guests already associated with the event
-        if(!payload.isUploadUser) {
-        const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
-          where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
-          relations: { user: true, addedBy: true },
-        });
-
-        if (existingGuestList.length > 0) {
-          existingGuestList.map((guest) => {
-            if (userMap.has(guest.user.email)) {
-              const user: CsvRecord = {
-                firstName: guest.user.firstName,
-                lastName: guest.user.lastName,
-                email: guest.user.email,
-                phoneNumber: guest.user.phoneNumber,
-                reason: `User already exists in the event with status ${guest.status}`,
-              };
-              garbageData.push(user);
-              userMap.delete(guest.user.email);
-              removedEmails.add(guest.user.email);
-            }
+    try {
+      // Create a map of email to user ID for quick lookup
+      const userMap = new Map<string, string>();
+      const removedEmails = new Set<string>();
+      const newMappings = [];
+      let updatedValidData: CsvRecord[] = [];
+      if (existingUsers.length > 0) {
+        existingUsers.forEach((user) => {
+          if (user.email) userMap.set(user.email, user.id);
+          if (user.phoneNumber) userMap.set(user.phoneNumber, user.id);
           });
+  
+          // Step 5: Retrieve guests already associated with the event
+          if(!payload.isUploadUser) {
+          const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
+            where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
+            relations: { user: true, addedBy: true },
+          });
+  
+          if (existingGuestList.length > 0) {
+            existingGuestList.map((guest) => {
+              if (userMap.has(guest.user.email)) {
+                const user: CsvRecord = {
+                  firstName: guest.user.firstName,
+                  lastName: guest.user.lastName,
+                  email: guest.user.email,
+                  phoneNumber: guest.user.phoneNumber,
+                  reason: `User already exists in the event with status ${guest.status}`,
+                };
+                garbageData.push(user);
+                userMap.delete(guest.user.email);
+                removedEmails.add(guest.user.email);
+              }
+            });
+          }
         }
-      }
-
-      const existingMappings = await this.dbConnection.getRepository(HostUserMapping).find({
-        where: {
-          host: { id: payload.hostId },
-          user: In(existingUsers.map((user) => user.id)),
-        },
-        relations: ['user'],
-      });
-      const mappingSet = new Set(existingMappings.map((mapping) => mapping.user.id));
-      // Step 6: Remove users from validData who were moved to garbageData
-      updatedValidData = validData.filter((row) => {
-        if (removedEmails.has(row.email)) {
-          return false; // Remove from validData
-        }
-        const existingUserData = existingUsers.find(
-          (user) => user.email === row.email || user.phoneNumber === row.phoneNumber
-        );
-          if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
-            if (mappingSet.has(existingUserData.id)) {
-              const user = {
-                firstName: row.firstName,
-                lastName: row.lastName,
-                email: row.email ? row.email : '',
-                phoneNumbers: row.phoneNumber ? row.phoneNumber : '',
-                reason: 'User already exists',
-              };
-              garbageData.push(user);
+  
+        const existingMappings = await this.dbConnection.getRepository(HostUserMapping).find({
+          where: {
+            host: { id: payload.hostId },
+            user: In(existingUsers.map((user) => user.id)),
+          },
+          relations: ['user'],
+        });
+        const mappingSet = new Set(existingMappings.map((mapping) => mapping.user.id));
+        // Step 6: Remove users from validData who were moved to garbageData
+        updatedValidData = validData.filter((row) => {
+          if (removedEmails.has(row.email)) {
+            return false; // Remove from validData
+          }
+          const existingUserData = existingUsers.find(
+            (user) => user.email === row.email || user.phoneNumber === row.phoneNumber
+          );
+            if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
+              if (mappingSet.has(existingUserData.id)) {
+                const user = {
+                  firstName: row.firstName,
+                  lastName: row.lastName,
+                  email: row.email ? row.email : '',
+                  phoneNumbers: row.phoneNumber ? row.phoneNumber : '',
+                  reason: 'User already exists',
+                };
+                garbageData.push(user);
+                if (row.email) userMap.delete(row.email);
+                if (row.phoneNumber) userMap.delete(row.phoneNumber);
+                return false; // Remove from validData
+              }
+              newMappings.push({ user: existingUserData, host: { id: payload.hostId } });
               if (row.email) userMap.delete(row.email);
               if (row.phoneNumber) userMap.delete(row.phoneNumber);
-              return false; // Remove from validData
+              return false; 
             }
-            newMappings.push({ user: existingUserData, host: { id: payload.hostId } });
-            if (row.email) userMap.delete(row.email);
-            if (row.phoneNumber) userMap.delete(row.phoneNumber);
-            return false; 
-          }
-          return true; // Keep row in validData 
+            return true; // Keep row in validData 
+          });
+      }
+        const users: SimpleUser[] = [];
+        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ updatedValidData:", updatedValidData)
+        if (updatedValidData.length > 0) {
+          const userPromises = updatedValidData.map(async (row: User) => {      
+            if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
+              const response = await serviceMesh.userService().registerInvitesAsNonMember({
+                ...row,
+                eventId: payload.eventId,
+                userId: payload.hostId,
+              });
+              console.log("🚀 ~ GuestService ~ response ~ response:", response.data)
+              return response.data; // Ensure it returns a valid user
+            }
+            console.log("🚀 Blank Blank:", false)
+            return null; // Return null for skipped rows
+          });
+        
+          const resolvedUsers = await Promise.all(userPromises);
+          console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ resolvedUsers:", resolvedUsers)
+          users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
+        }
+        
+        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users) 
+        // Step 7: Generate an error CSV file for invalid or duplicate data
+        const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
+        let errFileUrl: string | null = null;
+        let errFilePath: string | null = null;
+        const fileName = `${uuidv4()}.csv`;
+  
+        if (errorCsvContent) {
+          errFilePath = `error_csv/${fileName}`;
+          await S3Service.uploadFile({
+            file: errorCsvContent,
+            filename: fileName,
+            size: errorCsvContent.length,
+            type: 'text/csv',
+            contentType: 'text/csv',
+            fileKeyId: errFilePath,
+          });
+          errFileUrl = await S3Service.getFileUrl(errFilePath);
+        }
+  
+        // Step 8: Record CSV upload details in the database
+        let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
+          event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
+          host: { id: payload.hostId }, // Reference the User entity correctly
+          uploadType: payload.isUploadUser ? UploadType.USER_UPLOAD : UploadType.EVENT_UPLOAD,
+          originalCsvPath: payload.filePath,
+          errorCsvPath: errFilePath || null, // Ensure it's null if no error file
         });
+        // Save the entity
+        csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).save(csvUploadRecord);
+        users.map(async (user) => {
+          await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+        });
+  
+        newMappings.push(...users.map((user) => ({ user, host: { id: payload.hostId } })));
+        await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+  
+        // Step 9: Return the response with success and failure counts
+        return {
+          message: 'Bulk user creation completed.',
+          SuccessUserCount: users.length,
+          failedUserCount: garbageData.length,
+          hostId: payload.hostId,
+          users,
+          eventId: payload.eventId ? payload.eventId : '',
+          errFileUrl: errFileUrl,
+          errFilepath: errFilePath,
+        };
+    } catch (errr) {
+      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ errr:", errr)
+      
     }
-      const users: SimpleUser[] = [];
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ updatedValidData:", updatedValidData)
-      if (updatedValidData.length > 0) {
-        const userPromises = updatedValidData.map(async (row: User) => {      
-          if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
-            const response = await serviceMesh.userService().registerInvitesAsNonMember({
-              ...row,
-              eventId: payload.eventId,
-              userId: payload.hostId,
-            });
-            console.log("🚀 ~ GuestService ~ response ~ response:", response.data)
-            return response.data; // Ensure it returns a valid user
-          }
-          console.log("🚀 Blank Blank:", false)
-          return null; // Return null for skipped rows
-        });
-      
-        const resolvedUsers = await Promise.all(userPromises);
-        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ resolvedUsers:", resolvedUsers)
-        users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
-      }
-      
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users) 
-      // Step 7: Generate an error CSV file for invalid or duplicate data
-      const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
-      let errFileUrl: string | null = null;
-      let errFilePath: string | null = null;
-      const fileName = `${uuidv4()}.csv`;
-
-      if (errorCsvContent) {
-        errFilePath = `error_csv/${fileName}`;
-        await S3Service.uploadFile({
-          file: errorCsvContent,
-          filename: fileName,
-          size: errorCsvContent.length,
-          type: 'text/csv',
-          contentType: 'text/csv',
-          fileKeyId: errFilePath,
-        });
-        errFileUrl = await S3Service.getFileUrl(errFilePath);
-      }
-
-      // Step 8: Record CSV upload details in the database
-      let csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).create({
-        event: payload.eventId ? { id: payload.eventId } : null, // Ensure null if not an event upload
-        host: { id: payload.hostId }, // Reference the User entity correctly
-        uploadType: payload.isUploadUser ? UploadType.USER_UPLOAD : UploadType.EVENT_UPLOAD,
-        originalCsvPath: payload.filePath,
-        errorCsvPath: errFilePath || null, // Ensure it's null if no error file
-      });
-      // Save the entity
-      csvUploadRecord = await this.dbConnection.getRepository(CsvUploadRecords).save(csvUploadRecord);
-      users.map(async (user) => {
-        await this.dbConnection.getRepository(User).update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
-      });
-
-      newMappings.push(...users.map((user) => ({ user, host: { id: payload.hostId } })));
-      await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
-
-      // Step 9: Return the response with success and failure counts
-      return {
-        message: 'Bulk user creation completed.',
-        SuccessUserCount: users.length,
-        failedUserCount: garbageData.length,
-        hostId: payload.hostId,
-        users,
-        eventId: payload.eventId ? payload.eventId : '',
-        errFileUrl: errFileUrl,
-        errFilepath: errFilePath,
-      };
   }
 
   /**
