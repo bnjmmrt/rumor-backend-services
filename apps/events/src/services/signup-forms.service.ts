@@ -554,7 +554,9 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      const count = await SignupFormSubmissions.count();
+      const count = await SignupFormSubmissions.count({where: {
+        signupForm: {id: id}
+      }});
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
