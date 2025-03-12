@@ -3277,7 +3277,7 @@ export class AuthService {
     if (hostRole === undefined) return responses.notFound('Host not found');
 
     if (memberId !== host.id) {
-      const hostFollowing = this.dbConnection.getRepository(HostFollowing).findOne({
+      const hostFollowing = await this.dbConnection.getRepository(HostFollowing).findOne({
         where: {
           follower: { id: memberId },
           host: { id: host.id },

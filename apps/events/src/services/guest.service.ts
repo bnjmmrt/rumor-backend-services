@@ -1665,7 +1665,7 @@ export class GuestService {
               },
             })
           : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
-          this.dbConnection.getRepository(Event).find({
+         await this.dbConnection.getRepository(Event).find({
           where: {
             ...whereClause,
             isPrivate: false,
