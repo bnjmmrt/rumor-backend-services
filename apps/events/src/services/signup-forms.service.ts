@@ -569,6 +569,7 @@ export class SignupFormsServices {
       const getCountQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
 
       const submissionsQuery = database
