@@ -113,12 +113,12 @@ export class SignupFormsController {
     }
   );
 
-  public static setName = asyncWrapper(
-    async (req: Request, res: Response): Promise<void> => {
-      const payload = req.body;
-      const id = req.params.id;
-      const sforms = await SignupFormsServices.setName(id, payload.name);
-      res.json(new GetResponse(sforms));
-    }
-  );
+  // public static setName = asyncWrapper(
+  //   async (req: Request, res: Response): Promise<void> => {
+  //     const payload = req.body;
+  //     const id = req.params.id;
+  //     const sforms = await SignupFormsServices.setName(id, payload.name);
+  //     res.json(new GetResponse(sforms));
+  //   }
+  // );
 }
