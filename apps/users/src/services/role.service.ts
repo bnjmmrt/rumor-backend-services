@@ -89,6 +89,23 @@ export class RoleService {
     }
   }
 
+  static async checkHostRole(payload: RoleRequestDto): Promise<CheckRoleResponse> {
+    try {
+
+    const userRole = await this.dbConnection.getRepository(UserRole)
+    .createQueryBuilder('userRole')
+    .leftJoinAndSelect('userRole.user', 'user')
+    .leftJoinAndSelect('userRole.role', 'role')
+    .where('userRole.user.id = :userId', {userId: payload.userId })
+    .andWhere('role.name = :roleName', { roleName: payload.roleName })
+    .getOne();
+      const isAllowed = userRole !== null;
+      return { isAllowed };
+    } catch (err) {
+      return { isAllowed: false };
+    }
+  }
+
   static async updateUserStatus(
     roleId: string,
     status: UserStatus

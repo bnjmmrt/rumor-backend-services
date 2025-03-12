@@ -3,6 +3,7 @@ import config from '../../config'
 import FusionAuthClient from '@fusionauth/typescript-client';
 import { ValidateRequestDto } from "rumor-utils/shared/users/dtos/auth.dto";
 import { ForbiddenError , AuthorizationError } from 'rumor-utils/errors';
+import { RoleService } from "../../services/role.service"
 
 class AuthMiddleware {
     fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -78,17 +79,48 @@ class AuthMiddleware {
         };
     };
 
-    checkAdminRole = (req: Request, res: Response, next: NextFunction) => {
-        const userId = res.getHeader("userId") as string;
-        const adminRole = "admin";
+  checkAdminRole = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+      const userId = (req as any).user;
 
-        // Simulating role check
-        const isAdmin = true; // Replace with actual role validation logic
-        if (!isAdmin) {
-            return res.status(403).send("Forbidden");
-        }
-        next();
-    };
+      if (!userId) {
+        res.status(401).send("Unauthorized");
+        return
+      }
+
+      const roleName = "admin";
+      const { isAllowed } = await RoleService.checkRole({ userId, roleName });
+
+      if (!isAllowed) {
+        res.status(403).send("Forbidden");
+        return;
+      }
+
+      next();
+    } catch (error) {
+      res.status(500).send(`Error checking admin role: ${error.message || error}`);
+    }
+  };
+
+
+  checkHostRole = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    try {
+      const userId = (req as any).user;
+      if (!userId) {
+        res.status(401).send("Unauthorized");
+        return
+      }
+      const roleName = "host";
+      const { isAllowed } = await RoleService.checkHostRole({ userId, roleName });
+      if (!isAllowed) {
+        res.status(403).send("Forbidden");
+        return;
+      }
+      next();
+    } catch (error) {
+      res.status(500).send(`Error checking host role: ${error.message || error}`);
+    }
+  };
 }
 
 const authMiddleware = new AuthMiddleware()

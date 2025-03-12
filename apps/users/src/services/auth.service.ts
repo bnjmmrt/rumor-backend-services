@@ -1324,7 +1324,7 @@ export class AuthService {
     return data;
   }
 
-  public static async getCurrentUser(payload: IdRequestDto): Promise<CurrentUser[]> {
+  public static async getMe(payload: IdRequestDto): Promise<CurrentUser> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: { address: true, socialProviders: true, roles: { role: true } },
@@ -1333,12 +1333,16 @@ export class AuthService {
       throw new NotFoundError('user')
     };
     if (!user.roles.length) {
-      throw new ForbiddenError('insufficient permisissions');
+      throw new ForbiddenError('insufficient permissions');
     }
 
     //Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-    return (user.roles.map((role) => toCurrentUser(user, focuses, role)));
+    const roleData = user.roles.map((role) => toCurrentUser(user, focuses, [role]));
+    return {
+      ...roleData[0],
+      role: roleData.flatMap(r => r.role)
+    };
   }
 
   public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UserProfile> {

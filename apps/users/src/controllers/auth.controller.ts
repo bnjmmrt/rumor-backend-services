@@ -319,11 +319,11 @@ export class AuthController {
     res.status(successResponse.statusCode).json(successResponse);
   });
 
-  public static getCurrentUser = asyncWrapper(
+  public static getMe = asyncWrapper(
     async (req, res): Promise<void> => {
       const id = (req as any).user;
       const payload: IdRequestDto = { id };
-      const response: CurrentUser[] = await AuthService.getCurrentUser(payload);
+      const response: CurrentUser = await AuthService.getMe(payload);
       const successResponse = new GetResponse(
         response,
         "Successfully retrieved current user."
