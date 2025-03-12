@@ -533,8 +533,8 @@ export class AuthController {
 
   public static manageFollowHost = asyncWrapper(
     async (req, res): Promise<void> => {
-      const id = req.params.id;
-      const payload: ManageFollowHostRequestDto = { ...req.body, userId: id };
+      const hostId = req.params.id;
+      const payload: ManageFollowHostRequestDto = { ...req.body, hostId };
       const response: string = await AuthService.manageFollowHost(payload);
       const successResponse = new CreateResponse(
         response,
