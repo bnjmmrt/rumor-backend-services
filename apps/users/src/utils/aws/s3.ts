@@ -9,6 +9,7 @@ import {
   PutObjectCommandOutput,
   DeleteObjectCommandOutput,
   HeadObjectCommandOutput,
+  GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -132,6 +133,29 @@ class S3ServiceHandler {
     });
 
     const command = new HeadObjectCommand({
+      Bucket: bucketName,
+      Key: fileKeyId,
+    });
+
+    try {
+      return await s3Client.send(command);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  public async getFileStream(fileKeyId: string): Promise<GetObjectCommandOutput> {
+    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+
+    const s3Client = new S3Client({
+      region: config.get("AWS_REGION"),
+      credentials: {
+        accessKeyId: config.get("AWS_ACCESS_KEY"),
+        secretAccessKey: config.get("AWS_SECRET_KEY"),
+      },
+    });
+
+    const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: fileKeyId,
     });

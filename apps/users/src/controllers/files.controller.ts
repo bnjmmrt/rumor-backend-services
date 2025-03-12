@@ -66,9 +66,18 @@ export class FilesControllerHandler {
   //'GetFile'
   viewFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: string = req.params.id;
-    await S3Service.getFile(payload)
-    const filePath = `https://${config.get("BUCKET_DOCUMENTS_NAME")}.s3.${config.get("AWS_REGION")}.amazonaws.com/${payload}`
-    res.redirect(filePath);
+    const fileResponse:any =  await S3Service.getFileStream(payload)
+
+    if (!fileResponse.Body) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Set headers for the response
+    res.setHeader("Content-Type", fileResponse.ContentType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${payload}"`);
+
+    // Pipe the S3 file stream to the response
+    fileResponse.Body.pipe(res);
   });
 
   //'GetFile'
