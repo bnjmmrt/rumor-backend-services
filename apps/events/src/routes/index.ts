@@ -107,11 +107,11 @@ router.get(
   SignupFormsController.listSubmissions
 );
 
-router.patch(
-  "/signup-forms/:id/set-name",
-  AuthMiddleware.fusionAuthRequired,
-  SignupFormsController.setName
-);
+// router.patch(
+//   "/signup-forms/:id/set-name",
+//   AuthMiddleware.fusionAuthRequired,
+//   SignupFormsController.setName
+// );
 
 // router.post(
 //   "/events/:eventId/signup-forms/:id/publish",
@@ -186,19 +186,25 @@ router.get(
   QuizQuestionController.getUserQuizAnswers
 ); /**TestStatus: working */
 
-//Talent  
-router.post("/talent", TalentController.createTalent)
-router.get("/talent", TalentController.getAllTalent) /**TestStatus: working */
-router.get("/talent/:id", TalentController.getTalent) /**TestStatus: working */
-router.put("/talent/:id", TalentController.updateTalent)
-router.delete("/talent/:id", TalentController.deleteTalent)
+//Talent
+router.post("/talent", TalentController.createTalent);
+router.get("/talent", TalentController.getAllTalent); /**TestStatus: working */
+router.get("/talent/:id", TalentController.getTalent); /**TestStatus: working */
+router.put("/talent/:id", TalentController.updateTalent);
+router.delete("/talent/:id", TalentController.deleteTalent);
 
 //Ticket types
-router.post("/ticket-type", TicketTypeController.createTicketType)
-router.put("/ticket-type/:id", TicketTypeController.updateTicketType)
-router.delete("/ticket-type/:id", TicketTypeController.deleteTicketType)
-router.get("/ticket-type/:id", TicketTypeController.getTicketType)  /**TestStatus: working */
-router.get("/ticket-types/:id", TicketTypeController.getTicketTypes) /**TestStatus: working */
+router.post("/ticket-type", TicketTypeController.createTicketType);
+router.put("/ticket-type/:id", TicketTypeController.updateTicketType);
+router.delete("/ticket-type/:id", TicketTypeController.deleteTicketType);
+router.get(
+  "/ticket-type/:id",
+  TicketTypeController.getTicketType
+); /**TestStatus: working */
+router.get(
+  "/ticket-types/:id",
+  TicketTypeController.getTicketTypes
+); /**TestStatus: working */
 
 // Collaborators
 router.get(
@@ -216,21 +222,48 @@ router.get(
 ); /**TestStatus: working */
 
 //Event location
-router.post("/event-location", EventsController.createEventLocation)
-router.put("/event-location/:id", EventsController.updateEventLocation)
-router.get("/event-location/:id", EventsController.getEventLocation)
-router.get("/event-locations", EventsController.listEventLocations)
-router.delete("/event-location/:id", EventsController.deleteEventLocation)
+router.post("/event-location", EventsController.createEventLocation);
+router.put("/event-location/:id", EventsController.updateEventLocation);
+router.get("/event-location/:id", EventsController.getEventLocation);
+router.get("/event-locations", EventsController.listEventLocations);
+router.delete("/event-location/:id", EventsController.deleteEventLocation);
 
 //events routes
-router.post("/event", AuthMiddleware.fusionAuthRequired, EventsController.createEvent) /**TestStatus: working */
-router.delete("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.deleteEvent) /**TestStatus: working */
-router.put("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.updateEvent) /**TestStatus: working (need to retest mails on update of location or date)*/
-router.put("/event/:id/publish", AuthMiddleware.fusionAuthRequired, EventsController.publishEvent) /**TestStatus: working */
-router.post("/event/:eventId/cancel", AuthMiddleware.fusionAuthRequired, EventsController.cancelEventAndNotify); /**TestStatus: working(need to check for signup form updates) */
-router.get("/event-status", EventsController.listEventStatus); /**TestStatus: working */
+router.post(
+  "/event",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.createEvent
+); /**TestStatus: working */
+router.delete(
+  "/event/:id",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.deleteEvent
+); /**TestStatus: working */
+router.put(
+  "/event/:id",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.updateEvent
+); /**TestStatus: working (need to retest mails on update of location or date)*/
+router.put(
+  "/event/:id/publish",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.publishEvent
+); /**TestStatus: working */
+router.post(
+  "/event/:eventId/cancel",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.cancelEventAndNotify
+); /**TestStatus: working(need to check for signup form updates) */
+router.get(
+  "/event-status",
+  EventsController.listEventStatus
+); /**TestStatus: working */
 
-router.get("/events",AuthMiddleware.fusionAuthRequired, EventsController.listEvents);
+router.get(
+  "/events",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.listEvents
+);
 router.get("/feed", EventsController.listEventsFeed);
 router.get("/feed/featured", EventsController.getFeaturedEvents);
 router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents);
@@ -247,18 +280,36 @@ router.get(
   "/users/:userId/events/:eventId",
   EventsController.getEventByInvitedUserId
 ); /**TestStatus: working */
-router.get("/dashboard/top-users-attendees-events", GuestController.getTopUsersAttendees)  /**TestStatus: working */
-router.get("/:eventId/ticket-type/:ticketTypeId/attendees/count", GuestController.getEventAttendeeCountByTicketType) /**TestStatus: working */
-router.get("/events/:eventId/guest-status-counts", EventsController.GetGuestCountForGuestStatuses) /**TODO: TestStatus: not working */
+router.get(
+  "/dashboard/top-users-attendees-events",
+  GuestController.getTopUsersAttendees
+); /**TestStatus: working */
+router.get(
+  "/:eventId/ticket-type/:ticketTypeId/attendees/count",
+  GuestController.getEventAttendeeCountByTicketType
+); /**TestStatus: working */
+router.get(
+  "/events/:eventId/guest-status-counts",
+  EventsController.GetGuestCountForGuestStatuses
+); /**TODO: TestStatus: not working */
 
 // router.get("/events", AuthMiddleware.fusionAuthRequired, EventsController.listEvents)  /**TestStatus: working */
 // router.get("/feed", EventsController.listEventsFeed)
 // router.get("/feed/featured", EventsController.getFeaturedEvents)
 // router.get("/dashboard/upcoming-events", EventsController.getUpcomingEvents) /**TestStatus: working */
-router.put("/event/:id/duplicate", EventsController.duplicateEvent) /*this api is not used as we are using create event api to duplicate event*/
-router.post("/featured-events", EventsController.addEventToFeaturedSection)
-router.get("/public/:eventId", EventsController.getPublicEvent)  /**TestStatus: working */
-router.get("/users/:userId/events/:eventId", EventsController.getEventByInvitedUserId) /**TestStatus: working */
+router.put(
+  "/event/:id/duplicate",
+  EventsController.duplicateEvent
+); /*this api is not used as we are using create event api to duplicate event*/
+router.post("/featured-events", EventsController.addEventToFeaturedSection);
+router.get(
+  "/public/:eventId",
+  EventsController.getPublicEvent
+); /**TestStatus: working */
+router.get(
+  "/users/:userId/events/:eventId",
+  EventsController.getEventByInvitedUserId
+); /**TestStatus: working */
 
 // router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
 router.get(
@@ -274,15 +325,37 @@ router.get(
   EventsController.listHostEvents
 ); /**TestStatus: working */
 //admin status
-router.put("/admin/events/:eventId/status", AuthMiddleware.fusionAuthRequired, EventsController.manualEventStatusUpdate) /** working */
+router.put(
+  "/admin/events/:eventId/status",
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.manualEventStatusUpdate
+); /** working */
 
-router.get("/users/:id/events", GuestController.listGuestEvents) /**TestStatus: working */
+router.get(
+  "/users/:id/events",
+  GuestController.listGuestEvents
+); /**TestStatus: working */
 // Admission types
-router.post("/admission-types", AdmissionTypeController.createAdmissionType) /**TestStatus: working */
-router.put("/admission-types/:id", AdmissionTypeController.updateAdmissionType) /**TestStatus: working */
-router.delete("/admission-types/:id", AdmissionTypeController.deleteAdmissionType) /**TestStatus: working */
-router.get("/admissions-types", AdmissionTypeController.getAdmissionsTypes) /**TestStatus: working */
-router.get("/admission-types/:id", AdmissionTypeController.getAdmissionTypeById) /**TestStatus: working */
+router.post(
+  "/admission-types",
+  AdmissionTypeController.createAdmissionType
+); /**TestStatus: working */
+router.put(
+  "/admission-types/:id",
+  AdmissionTypeController.updateAdmissionType
+); /**TestStatus: working */
+router.delete(
+  "/admission-types/:id",
+  AdmissionTypeController.deleteAdmissionType
+); /**TestStatus: working */
+router.get(
+  "/admissions-types",
+  AdmissionTypeController.getAdmissionsTypes
+); /**TestStatus: working */
+router.get(
+  "/admission-types/:id",
+  AdmissionTypeController.getAdmissionTypeById
+); /**TestStatus: working */
 
 //ends here
 /**
@@ -327,15 +400,9 @@ router.delete(
 router.get("/events/:id/guests-overview", GuestController.listGuestsOverview);
 // User request,
 
-router.post(
-  "/events/request/guest",
-  GuestController.requestBecomeGuest
-);
+router.post("/events/request/guest", GuestController.requestBecomeGuest);
 
-router.put(
-  "/events/request/guest",
-  GuestController.updateRequestBecomeGuest
-);
+router.put("/events/request/guest", GuestController.updateRequestBecomeGuest);
 //Guests Profiles
 router.get("/events/guest-profiles/:id", GuestController.listGuestProfiles);
 router.get(
@@ -369,12 +436,10 @@ router.get(
   GuestController.getUserRequests
 ); /**TestStatus: working */
 
-
 router.delete(
   "/users/:userId/events/:eventId/guest/:id",
   GuestController.deleteInvitedGuest
 );
-
 
 router.post(
   "/users/:id/events/:eventId/invite-guest",
@@ -418,7 +483,10 @@ router.get(
 );
 
 //Vouches
-router.post("/events/vouch-requests", VouchRequestController.createVouchRequest); /**TestStatus: working */
+router.post(
+  "/events/vouch-requests",
+  VouchRequestController.createVouchRequest
+); /**TestStatus: working */
 router.get(
   "/events/vouch-requests",
   VouchRequestController.getAllVouchRequests
@@ -427,8 +495,14 @@ router.put(
   "/events/vouch-requests/:id",
   VouchRequestController.updateVouchRequest
 ); /**TestStatus: working */
-router.get("/events/user/:id/vouches", VouchRequestController.getUserVouches); /**TestStatus: working */
-router.get("/events/event/:eventId/request/:requesterId", VouchRequestController.getUserVouchesByEvent);
+router.get(
+  "/events/user/:id/vouches",
+  VouchRequestController.getUserVouches
+); /**TestStatus: working */
+router.get(
+  "/events/event/:eventId/request/:requesterId",
+  VouchRequestController.getUserVouchesByEvent
+);
 
 router.get(
   "/guest/ticket/:id",

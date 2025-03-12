@@ -595,18 +595,18 @@ export class SignupFormsServices {
     }
   }
 
-  public static async setName(id: string, name: string) {
-    try {
-      const signupForm: EventSignupForms = await EventSignupForms.findOne({
-        where: { id: id },
-      });
-      if (!signupForm) {
-        throw new ForbiddenError("Signup Forms does not exists.");
-      }
-      signupForm.name = name;
-      await signupForm.save();
-    } catch (err) {
-      throw err;
-    }
-  }
+  // public static async setName(id: string, name: string) {
+  //   try {
+  //     const signupForm: EventSignupForms = await EventSignupForms.findOne({
+  //       where: { id: id },
+  //     });
+  //     if (!signupForm) {
+  //       throw new ForbiddenError("Signup Forms does not exists.");
+  //     }
+  //     signupForm.name = name;
+  //     await signupForm.save();
+  //   } catch (err) {
+  //     throw err;
+  //   }
+  // }
 }
