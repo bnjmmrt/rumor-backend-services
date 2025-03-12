@@ -1185,7 +1185,7 @@ export class AuthService {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
+      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: temporaryCode.code });
       if (completedLogin.statusCode > 299) {
         throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
       }

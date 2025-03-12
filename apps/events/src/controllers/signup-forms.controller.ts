@@ -9,6 +9,7 @@ import {
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { BadRequestError } from "rumor-utils/errors";
+import { UpdateResult } from "typeorm";
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -94,8 +95,9 @@ export class SignupFormsController {
   public static deactivate = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const id = req.params.id;
-      await SignupFormsServices.deactivate(id);
-      res.json(new GetResponse({}));
+      const data: UpdateResult = await SignupFormsServices.deactivate(id);
+      const successResponse = new GetResponse(data.affected);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 

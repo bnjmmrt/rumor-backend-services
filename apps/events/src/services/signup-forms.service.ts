@@ -25,7 +25,7 @@ import {
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource, QueryRunner } from "typeorm";
+import { Brackets, DataSource, QueryRunner, UpdateResult } from "typeorm";
 import { isUUID } from "class-validator";
 import {
   EventStatusEnum,
@@ -464,7 +464,8 @@ export class SignupFormsServices {
    * @param id
    */
   public static async deactivate(id: string) {
-    await EventSignupForms.update(id, { isPublished: false, isActive: false });
+    const data: UpdateResult = await EventSignupForms.update(id, { isPublished: false, isActive: false });
+    return data;
   }
 
   /**
@@ -554,7 +555,9 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      const count = await SignupFormSubmissions.count();
+      const count = await SignupFormSubmissions.count({where: {
+        signupForm: {id: id}
+      }});
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
