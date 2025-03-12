@@ -63,7 +63,7 @@ export class FilesControllerHandler {
     res.status(deleteResponse.statusCode).json(deleteResponse);
   });
 
-  //'GetFile'    s
+  //'GetFile'
   viewFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: string = req.params.id;
     await S3Service.getFile(payload)
@@ -71,7 +71,7 @@ export class FilesControllerHandler {
     res.redirect(filePath);
   });
 
-  //'GetFile'    s
+  //'GetFile'
   getFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: RequestByIdDto = req.body;
     const response = await this.handleFileResponse(payload.id);
