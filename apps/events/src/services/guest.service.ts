@@ -2454,7 +2454,6 @@ export class GuestService {
         ],
       });
     }
-    try {
       // Create a map of email to user ID for quick lookup
       const userMap = new Map<string, string>();
       const removedEmails = new Set<string>();
@@ -2529,29 +2528,29 @@ export class GuestService {
             return true; // Keep row in validData 
           });
       }
-        const users: SimpleUser[] = [];
-        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ updatedValidData:", updatedValidData)
-        if (updatedValidData.length > 0) {
-          const userPromises = updatedValidData.map(async (row: User) => {      
-            if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
-              const response = await serviceMesh.userService().registerInvitesAsNonMember({
-                ...row,
-                eventId: payload.eventId,
-                userId: payload.hostId,
-              });
-              console.log("🚀 ~ GuestService ~ response ~ response:", response.data)
-              return response.data; // Ensure it returns a valid user
-            }
-            console.log("🚀 Blank Blank:", false)
-            return null; // Return null for skipped rows
-          });
+      const users: SimpleUser[] = [];
+      const dataToProcess = updatedValidData.length > 0 && existingUsers.length > 0 ? updatedValidData 
+                          : existingUsers.length === 0 && validData.length > 0 ? validData 
+                          : [];
+      
+      if (dataToProcess.length > 0) {
+        const userPromises = dataToProcess.map(async (row: User) => {      
+          if (row.firstName && row.lastName && (row.phoneNumber || row.email)) {
+            const response = await serviceMesh.userService().registerInvitesAsNonMember({
+              ...row,
+              eventId: payload.eventId,
+              userId: payload.hostId,
+            });
+            return response.data; // Ensure it returns a valid user
+          }
+          return null; // Return null for skipped rows
+        });
+      
+        const resolvedUsers = await Promise.all(userPromises);
+        users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
+      }
+      
         
-          const resolvedUsers = await Promise.all(userPromises);
-          console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ resolvedUsers:", resolvedUsers)
-          users.push(...resolvedUsers.filter((user) => user !== null)); // Remove null values
-        }
-        
-        console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ users:", users) 
         // Step 7: Generate an error CSV file for invalid or duplicate data
         const errorCsvContent = garbageData.length > 0 ? await generateErrorCsv(garbageData) : null;
         let errFileUrl: string | null = null;
@@ -2599,10 +2598,6 @@ export class GuestService {
           errFileUrl: errFileUrl,
           errFilepath: errFilePath,
         };
-    } catch (errr) {
-      console.log("🚀 ~ GuestService ~ bulkUploadGuests ~ errr:", errr)
-      
-    }
   }
 
   /**
