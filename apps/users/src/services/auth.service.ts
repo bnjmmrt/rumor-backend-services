@@ -2824,13 +2824,13 @@ export class AuthService {
             qb.orWhere((subQb) => {
               const subQuery = subQb
                 .subQuery()
-                .select('listUsers.id')
+                .select('listUsers.user.id')
                 .from(HostCustomUsersLists, 'customList')
-                .innerJoin('customList.users', 'listUsers')
+                .innerJoin('customList.usersLists', 'listUsers')
                 .where('customList.listName IN (:...customListNames)', { customListNames })
                 .andWhere('customList.host.id = :hostId', { hostId })
                 .getQuery();
-              return `user.id IN ${subQuery}`;
+              return `user.id IN ${subQuery}`;              
             });
           }
         }),
@@ -2921,7 +2921,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-      listUserIds = customListUsers.map((listUser) => listUser.user.id);
+      listUserIds = customListUsers.map((listUser) => listUser.user?.id);
     }
 
     const users = await Promise.all(
