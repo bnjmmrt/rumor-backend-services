@@ -220,10 +220,10 @@ export class GuestService {
         }
         // Extract main guest IDs
         const usersData = (await serviceMesh.userService(token).getAllusers(payload.query)).data
-        if (usersData.users.length === 0 || usersData.totalCount === 0) {
+        if (usersData.result.length === 0 || usersData.totalCount === 0) {
           throw new NotFoundError('Users data not found');
         }
-        let userIds: string[] = usersData.users.map((user) => user.id);
+        let userIds: string[] = usersData.result.map((user) => user.id);
         if (exclusiveIds.length > 0) {
           userIds = userIds.filter((id) => !exclusiveIds.includes(id));
         }
