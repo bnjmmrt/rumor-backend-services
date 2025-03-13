@@ -304,7 +304,7 @@ export class EventsService {
     event.limitOnePlus = payload.limitOnePlus;
     event.useQr = payload.useQr;
     event.isPrivate = payload.isPrivate;
-    event.capacity = payload.capacity;
+    event.capacity = payload.capacity || 0;
     event.imageFlyer = payload.imageFlyer;
     event.imageCover = payload.imageCover;
     event.furtherInstructions = payload.furtherInstructions;
@@ -412,7 +412,7 @@ export class EventsService {
         return {
           name,
           description: ticketTypePayload.description,
-          capacity: ticketTypePayload.capacity,
+          capacity: ticketTypePayload.capacity || 0,
           event: { id: eventId } as Event,
         };
       });
@@ -1454,7 +1454,7 @@ export class EventsService {
             data: {
               name: normalizeCatalogName(ticket.name),
               description: ticket.description,
-              capacity: ticket.capacity,
+              capacity: ticket.capacity || 0,
             },
           });
         } else if (ticket.action === 'delete') {
@@ -1524,7 +1524,7 @@ export class EventsService {
     }
   }
 
- private static async handleReassignments(
+  private static async handleReassignments(
     reassignMap: { oldId: string; newId?: string; newName?: string }[],
     ticketTypesDto: UpdateTicketTypeRequestDto[],
     eventId: string,
@@ -1594,7 +1594,7 @@ export class EventsService {
         {
           name: normalizeCatalogName(matchingTicket.name),
           description: matchingTicket.description,
-          capacity: matchingTicket.capacity,
+          capacity: matchingTicket.capacity || 0,
         }
       );
 
@@ -1769,7 +1769,7 @@ export class EventsService {
         event.isPrivate = payload.isPrivate;
       }
       if (payload.capacity) {
-        event.capacity = payload.capacity;
+        event.capacity = payload.capacity || 0;
       }
       if (payload.imageFlyer) {
         event.imageFlyer = payload.imageFlyer;
@@ -2249,7 +2249,7 @@ export class EventsService {
     newEvent.limitOnePlus = event.limitOnePlus;
     newEvent.useQr = event.useQr;
     newEvent.isPrivate = event.isPrivate;
-    newEvent.capacity = event.capacity;
+    newEvent.capacity = event.capacity || 0;
     newEvent.imageFlyer = event.imageFlyer;
     newEvent.imageCover = event.imageCover;
     newEvent.furtherInstructions = event.furtherInstructions;
@@ -2855,20 +2855,20 @@ export class EventsService {
     }
   }
 
-   /**
-   * Toggles the check-in status of a guest for an event.
-   *
-   * - Fetches the guest and associated event.
-   * - Validates the guest's ticket status.
-   * - Updates the ticket status if needed.
-   * - Sets the check-in status based on the payload.
-   * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
-   * - Returns updated check-in status, ticket status, and total guest counts.
-   *
-   * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
-   * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
-   */
-   public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
+  /**
+  * Toggles the check-in status of a guest for an event.
+  *
+  * - Fetches the guest and associated event.
+  * - Validates the guest's ticket status.
+  * - Updates the ticket status if needed.
+  * - Sets the check-in status based on the payload.
+  * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
+  * - Returns updated check-in status, ticket status, and total guest counts.
+  *
+  * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
+  * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
+  */
+  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
     // Step 1: Fetch guest details along with associated event.
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
@@ -2888,17 +2888,17 @@ export class EventsService {
 
     if (guest.status === GuestStatus.CONFIRMED && !ticket) {
       const newTicket = await this.dbConnection.getRepository(Ticket).create({
-      ticketType: guest.ticketType,
-      guest: { id: guest.id },
-      event: { id: guest.event.id },
-      user: { id: guest.user.id },
-      status: TicketStatusEnum.TICKET_GENERATED,
-    });
-    
-    await this.dbConnection.getRepository(Ticket).save(newTicket);
-    ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
-  }
-  
+        ticketType: guest.ticketType,
+        guest: { id: guest.id },
+        event: { id: guest.event.id },
+        user: { id: guest.user.id },
+        status: TicketStatusEnum.TICKET_GENERATED,
+      });
+
+      await this.dbConnection.getRepository(Ticket).save(newTicket);
+      ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+    }
+
     // If the ticket is canceled, or expired, return an error response.
     if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
       throw new BadRequestError('Ticket is cancelled or expired');
@@ -2947,7 +2947,7 @@ export class EventsService {
       totalConfirmedGuests,
       totalCheckedInGuests,
     };
-}
+  }
 
 
   /**
