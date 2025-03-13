@@ -2855,7 +2855,7 @@ export class EventsService {
     }
   }
 
-  /**
+   /**
    * Toggles the check-in status of a guest for an event.
    *
    * - Fetches the guest and associated event.
@@ -2868,7 +2868,7 @@ export class EventsService {
    * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
    * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
    */
-  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
+   public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
     // Step 1: Fetch guest details along with associated event.
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
@@ -2888,17 +2888,17 @@ export class EventsService {
 
     if (guest.status === GuestStatus.CONFIRMED && !ticket) {
       const newTicket = await this.dbConnection.getRepository(Ticket).create({
-        ticketType: guest.ticketType,
-        guest: { id: guest.id },
-        event: { id: guest.event.id },
-        user: { id: guest.user.id },
-        status: TicketStatusEnum.TICKET_GENERATED,
-      });
-
-      await this.dbConnection.getRepository(Ticket).save(newTicket);
-      ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
-    }
-
+      ticketType: guest.ticketType,
+      guest: { id: guest.id },
+      event: { id: guest.event.id },
+      user: { id: guest.user.id },
+      status: TicketStatusEnum.TICKET_GENERATED,
+    });
+    
+    await this.dbConnection.getRepository(Ticket).save(newTicket);
+    ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+  }
+  
     // If the ticket is canceled, or expired, return an error response.
     if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
       throw new BadRequestError('Ticket is cancelled or expired');
@@ -2947,7 +2947,7 @@ export class EventsService {
       totalConfirmedGuests,
       totalCheckedInGuests,
     };
-  }
+}
 
 
   /**
