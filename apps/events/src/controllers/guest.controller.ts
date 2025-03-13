@@ -260,7 +260,7 @@ export class GuestController {
   public static declineEventInvitation = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: DeclineEventInvitationRequestDto = {
-        id: req.params.id,
+        userId: req.params.id,
         eventId: req.params.eventId,
         ...req.body
       }
