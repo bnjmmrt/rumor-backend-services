@@ -1021,4 +1021,40 @@ export class AuthController {
     );
     res.status(createResponse.statusCode).json(createResponse);
   });
+
+  public static deactivateUserAccount = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    // const userId = (req as any).user;
+    const payload: IdRequestDto = { id };
+    const response: any = await AuthService.deactivateUserAccount(payload);
+    const deleteResponse = new DeleteResponse(
+      response,
+      "User account deactivated successfully"
+    );
+    res.status(deleteResponse.statusCode).json(deleteResponse);
+  });
+
+  public static reactivateUserAccount = asyncWrapper(async (req, res): Promise<void> => {
+    // const userId = (req as any).user;
+    const payload: CheckEmailRequestDto = req.body;
+    const response: any = await AuthService.reactivateUserAccount(payload);
+    const createResponse = new CreateResponse(
+      response,
+      "User account reactivated successfully"
+    );
+    res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static permanantlyDeleteAccount = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    // const userId = (req as any).user;
+    const payload: IdRequestDto = { id };
+    const response: any = await AuthService.permanantlyDeleteAccount(payload);
+    const deleteResponse = new DeleteResponse(
+      response,
+      "User account permanantly deleted"
+    );
+    res.status(deleteResponse.statusCode).json(deleteResponse);
+  });
+
 }

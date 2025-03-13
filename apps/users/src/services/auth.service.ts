@@ -81,6 +81,7 @@ import {
   BasicHostProfile,
   UserIdWithRolesAndToken,
   AddUserNote,
+  CheckEmaiLRequest,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -4565,5 +4566,88 @@ export class AuthService {
       note: userHostSettings.note,
       hostUserSettingsId: userHostSettings.id,
     };
+  }
+
+  public static async deactivateUserAccount(payload: IdRequestDto) {
+    await this.dbConnection.getRepository(User).update(payload.id, {
+      isDeactivated: true,
+      deactivatedAt: new Date(),
+    });
+
+    return '';
+  }
+
+  public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, isDeactivated: true } });
+
+    if (user && this.isWithin30Days(user.deactivatedAt)) {
+      await this.dbConnection.getRepository(User).update(user.id, { isDeactivated: false, deactivatedAt: null });
+    }
+
+    return '';
+  }
+
+  public static async isWithin30Days(deactivatedAt: Date) {
+    return new Date().getTime() - new Date(deactivatedAt).getTime() <= 30 * 24 * 60 * 60 * 1000;
+  }
+
+  public static async cleanupGuestOnAccountDeletion(payload: IdRequestDto): Promise<GenericResponse> {
+    const addedGuests = await this.dbConnection.getRepository(Guest).find({
+      where: { addedBy: { id: payload.id } },
+    });
+
+    if (addedGuests.length > 0) {
+      await this.dbConnection.getRepository(Guest).update({ addedBy: { id: payload.id } }, { status: GuestStatus.DECLINED, addedBy: null });
+    }
+    await this.dbConnection.getRepository(Guest).delete({ user: { id: payload.id } });
+
+    await this.removeUserRolesAndCleanup({ id: payload.id });
+
+    return responses.ok;
+
+  }
+
+  public static async permanantlyDeleteAccount(payload: IdRequestDto): Promise<GenericResponse> {
+    await this.cleanupGuestOnAccountDeletion({ id: payload.id });
+    return responses.ok;
+  }
+
+  public static async removeUserRolesAndCleanup(payload: IdRequestDto): Promise<GenericResponse> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+      relations: ['roles', 'roles.role'],
+    });
+
+    if (!user) {
+      return responses.badRequest('User not found');
+    }
+
+    const removableRoleNames = ['member', 'non-member'];
+    const removableRoles = user.roles.filter((role) => removableRoleNames.includes(role?.role?.name));
+    const remainingRoles = user.roles.filter((role) => !removableRoleNames.includes(role?.role?.name));
+    const hasHostRole = remainingRoles.some((role) => role?.role?.name === 'host');
+
+    if (removableRoles.length > 0) {
+      const removableRoleIds = removableRoles.map((role) => role.role.id);
+      await this.dbConnection.getRepository(User)
+        .createQueryBuilder()
+        .delete()
+        .from(UserRole)
+        .where('user_id = :userId', { userId: payload.id })
+        .andWhere('role_id IN (:...roleIds)', { roleIds: removableRoleIds })
+        .execute();
+    }
+
+    if (remainingRoles.length === 0) {
+      await this.dbConnection.getRepository(User).delete({ id: payload.id });
+    } else {
+      await this.dbConnection.getRepository(User).update(payload.id, {
+        additionalMemberInformation: null,
+        profilePicture: null,
+        ...(hasHostRole ? {} : { additionalHostInformation: null }),
+      });
+    }
+
+    return responses.ok;
   }
 }
