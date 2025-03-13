@@ -8,7 +8,7 @@ import {
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
 import { responses } from '../common/responses';
-import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
+import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
@@ -3171,8 +3171,12 @@ export class GuestService {
     return { attendeeCount: count }
   }
 
-  public static async hasGuestsAssignedToTicketTypes(ticketTypeIds: string[], eventId: string): Promise<boolean> {
-    const count = await this.dbConnection.getRepository(Guest).count({
+  public static async hasGuestsAssignedToTicketTypes(
+    ticketTypeIds: string[],
+    eventId: string,
+    queryRunner: QueryRunner
+  ): Promise<boolean> {
+    const count = await queryRunner.manager.getRepository(Guest).count({
       where: {
         event: { id: eventId },
         ticketType: { id: In(ticketTypeIds) },
