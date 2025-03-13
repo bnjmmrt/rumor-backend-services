@@ -2326,17 +2326,20 @@ export class EventsService {
     if (!event) throw new NotFoundError('Event not found');
     const status = EventStatus[payload.status as keyof typeof EventStatus];
     if (!status) throw new BadRequestError('Invalid status');
-    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus]) throw new ConflictError('Event is already in the selected status');
-    if (payload.status === EventStatus[EventStatus.UPCOMING_STATUS]) {
+    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus]) return responses.conflict('Event is already in the selected status');
+    if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      event.isPublished = true;
-    } else if (payload.status === EventStatus[EventStatus.SCHEDULED_STATUS]) {
-      event.status = EventStatusEnum.APPROVED_STATUS;
+      if (event.publishDate) {
+        event.isPublished = new Date(event.publishDate) <= new Date();
+      } else {
+        event.isPublished = true;
+      }
+    } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
+      event.status = EventStatusEnum.REJECTED_STATUS;
       event.isPublished = false;
     } else {
       event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
-      event.isPublished =
-        payload.status !== EventStatus[EventStatus.APPROVED_STATUS] || payload.status !== EventStatus[EventStatus.UPCOMING_STATUS] ? false : event.isPublished;
+      event.isPublished = false;
     }
     await this.dbConnection.getRepository(Event).save(event);
     const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
