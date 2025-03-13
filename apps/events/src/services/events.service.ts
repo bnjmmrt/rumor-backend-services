@@ -48,7 +48,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
-import {EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData, ToggleGuestCheckStatusData} from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData, ToggleGuestCheckStatusData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
 import database from '../database';
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
@@ -304,7 +304,7 @@ export class EventsService {
     event.limitOnePlus = payload.limitOnePlus;
     event.useQr = payload.useQr;
     event.isPrivate = payload.isPrivate;
-    event.capacity = payload.capacity;
+    event.capacity = payload.capacity || 0;
     event.imageFlyer = payload.imageFlyer;
     event.imageCover = payload.imageCover;
     event.furtherInstructions = payload.furtherInstructions;
@@ -412,7 +412,7 @@ export class EventsService {
         return {
           name,
           description: ticketTypePayload.description,
-          capacity: ticketTypePayload.capacity,
+          capacity: ticketTypePayload.capacity || 0,
           event: { id: eventId } as Event,
         };
       });
@@ -1421,14 +1421,14 @@ export class EventsService {
       const eventId = event.id;
       let createTickets: CreateTicketTypeRequestDto[] = [];
       const updateTickets: { id: string; data: Partial<UpdateTicketTypeRequestDto> }[] = [];
-      const deleteIds: string[] = [];
+      let deleteIds: string[] = [];
       const reassignMap: { oldId: string; newId?: string; newName?: string }[] = [];
       // Collect IDs of tickets that are being deleted
       const deleteIdsSet = new Set(ticketTypesDto.filter((t) => t.action === 'delete').map((t) => t.id));
 
       //  FIRST: Process Reassignments & Updates Before Creating New Tickets
       for (const ticket of ticketTypesDto) {
-        // starts here: it is checkeing dependency a-> b-> c  (only 1 level delete dependency check)
+        // starts here: it is checking dependency a-> b-> c  (only 1 level delete dependency check)
         //TODO: this dependency check logic can be improve by getting all reassigned tickets and then check if any one of the reassigned ticket is also set to delete if so then throw error.
         if (ticket.action === 'delete' && ticket.reassignTo?.id) {
           // Check if the reassigned ticket is also being deleted
@@ -1454,7 +1454,7 @@ export class EventsService {
             data: {
               name: normalizeCatalogName(ticket.name),
               description: ticket.description,
-              capacity: ticket.capacity,
+              capacity: ticket.capacity || 0,
             },
           });
         } else if (ticket.action === 'delete') {
@@ -1471,84 +1471,21 @@ export class EventsService {
               continue; //  No need to delete; just rename
             }
           }
-          else {
-            deleteIds.push(ticket.id);
-          }
+          deleteIds.push(ticket.id);
         } else if (ticket.action === 'create') {
           createTickets.push(ticket); // Hold for later after handling reassignment
         }
       }
+      // STEP 2: Handle Reassignments Before Deleting Anything
+      const { reassignedNames, ticketsIdsAfterBeingReassigned } = await this.handleReassignments(reassignMap, ticketTypesDto, eventId, queryRunner);
+      deleteIds = [...deleteIds, ...ticketsIdsAfterBeingReassigned]
       //check if deleteIds contains the guest associated with it (it should not delete without reassigning)
-      const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId);   //TODO: check this after taking pull from dev-temp
+      const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId, queryRunner);   //TODO: check this after taking pull from dev-temp
       if (hasAssignedGuests) {
         throw new BadRequestError('Cannot delete ticket types as they are assigned to guests.');
       }
-      //ends here
-      //  STEP 2: Handle Reassignments Before Deleting Anything
-      const reassignedNames = new Set<string>(); // Track reassigned ticket names
-
-      for (const reassignment of reassignMap) {
-        if (reassignment.newId) {
-          //  Case 1: Reassigning to an existing ticket type
-          await Promise.all([
-            queryRunner.manager
-              .createQueryBuilder()
-              .update(Guest)
-              .set({ ticketType: { id: reassignment.newId } })
-              .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
-              .execute(),
-
-            queryRunner.manager
-              .createQueryBuilder()
-              .update(Ticket)
-              .set({ ticketType: { id: reassignment.newId } })
-              .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
-              .execute(),
-
-            queryRunner.manager
-              .createQueryBuilder()
-              .update(Collaborator)
-              .set({ ticketType: { id: reassignment.newId } })
-              .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
-              .execute(),
-          ]);
-        } else if (reassignment.newName) {
-          //  Case 2: Rename name and other data of old ticket instead of deleting it
-
-          // Find the original ticket being reassigned
-          const originalTicket = ticketTypesDto.find((ticket) => ticket.id === reassignment.oldId);
-
-          const matchingTicket = ticketTypesDto.find((ticket) => ticket.name === reassignment.newName && ticket.action === 'create');
-          if (matchingTicket) {
-            await queryRunner.manager.update(
-              TicketType,
-              { id: reassignment.oldId, event: { id: eventId } },
-              {
-                name: normalizeCatalogName(matchingTicket.name),
-                description: matchingTicket.description,
-                capacity: matchingTicket.capacity,
-              },
-            );
-            // Track this reassigned ticket so it's NOT inserted again
-            reassignedNames.add(matchingTicket.name);
-          } else {
-            // ERROR: No matching "create" ticket for reassignment
-            const availableCreateNames = ticketTypesDto
-              .filter((ticket) => ticket.action === 'create')
-              .map((ticket) => `"${ticket.name}"`)
-              .join(', ');
-
-            throw new Error(
-              `Invalid reassignment: Ticket "${originalTicket?.name || 'Unknown Ticket'}" was set to be reassigned to "${reassignment.newName}", 
-    but no matching ticket with this name was found.
-    Available tickets are: [${availableCreateNames}]`,
-            );
-          }
-        }
-      }
 
       //  STEP 3: Only now delete tickets that were not reassigned
-      //TODO: also for tickets that are not reassigned but have dependencies for guests we can add a check here rather than deleting directly
       if (deleteIds.length > 0) {
         // Delete Collaborators associated with the TicketType first
         await queryRunner.manager
@@ -1585,6 +1522,124 @@ export class EventsService {
       // this.logger.error(`Error updating ticket types: ${error.message}`);
       throw new Error(`Failed to update ticket types., ${error.message}`);
     }
+  }
+
+  private static async handleReassignments(
+    reassignMap: { oldId: string; newId?: string; newName?: string }[],
+    ticketTypesDto: UpdateTicketTypeRequestDto[],
+    eventId: string,
+    queryRunner: QueryRunner
+  ): Promise<{ reassignedNames: Set<string>; ticketsIdsAfterBeingReassigned: string[] }> {
+    const reassignedNames = new Set<string>(); // Track reassigned ticket names
+    const deleteIds: string[] = []; // Store IDs that should be deleted
+    const reassignmentGroups = new Map<string, string[]>(); // Maps newName -> [oldIds]
+
+    for (const reassignment of reassignMap) {
+      if (reassignment.newId) {
+        //  Case 1: Reassigning to an existing ticket type
+        await Promise.all([
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Guest)
+            .set({ ticketType: { id: reassignment.newId } })
+            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .execute(),
+
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Ticket)
+            .set({ ticketType: { id: reassignment.newId } })
+            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .execute(),
+
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Collaborator)
+            .set({ ticketType: { id: reassignment.newId } })
+            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .execute(),
+        ]);
+      } else if (reassignment.newName) {
+        //  Case 2: Rename old ticket instead of deleting it
+        if (!reassignmentGroups.has(reassignment.newName)) {
+          reassignmentGroups.set(reassignment.newName, []);
+        }
+        reassignmentGroups.get(reassignment.newName)?.push(reassignment.oldId);
+      }
+    }
+    for (const [newName, oldIds] of reassignmentGroups.entries()) {
+      const primaryOldId = oldIds[0]; // Retain the first old ticket ID
+
+      // Find the corresponding create ticket
+      const matchingTicket = ticketTypesDto.find(
+        (ticket) => ticket.name === newName && ticket.action === 'create'
+      );
+      if (!matchingTicket) {
+        const availableCreateNames = ticketTypesDto
+          .filter((ticket) => ticket.action === 'create')
+          .map((ticket) => `"${ticket.name}"`)
+          .join(', ');
+
+        throw new Error(
+          `Invalid reassignment: Ticket(s) [${oldIds.join(', ')}] were set to be reassigned to "${newName}",  //TODO: add here name instead of oldId
+  but no matching ticket with this name was found. 
+  Available tickets are: [${availableCreateNames}]`
+        );
+      }
+
+      // Update primary old ticket instead of creating a new one
+      await queryRunner.manager.update(
+        TicketType,
+        { id: primaryOldId, event: { id: eventId } },
+        {
+          name: normalizeCatalogName(matchingTicket.name),
+          description: matchingTicket.description,
+          capacity: matchingTicket.capacity || 0,
+        }
+      );
+
+      // Reassign all related data to primaryOldId
+      await Promise.all(
+        oldIds.map((oldId) =>
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Guest)
+            .set({ ticketType: { id: primaryOldId } })
+            .where({ ticketType: { id: oldId }, event: { id: eventId } })
+            .execute()
+        )
+      );
+
+      await Promise.all(
+        oldIds.map((oldId) =>
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Ticket)
+            .set({ ticketType: { id: primaryOldId } })
+            .where({ ticketType: { id: oldId }, event: { id: eventId } })
+            .execute()
+        )
+      );
+
+      await Promise.all(
+        oldIds.map((oldId) =>
+          queryRunner.manager
+            .createQueryBuilder()
+            .update(Collaborator)
+            .set({ ticketType: { id: primaryOldId } })
+            .where({ ticketType: { id: oldId }, event: { id: eventId } })
+            .execute()
+        )
+      );
+
+      // Track reassigned ticket name to prevent duplicate creation
+      reassignedNames.add(matchingTicket.name);
+      // Remove other old ticket IDs except the primary one
+      const redundantDeletes = oldIds.filter((id) => id !== primaryOldId);
+      deleteIds.push(...redundantDeletes);
+    }
+
+    return { reassignedNames, ticketsIdsAfterBeingReassigned: deleteIds };
   }
 
   public static async updateQuizQuestionsWithTransaction(quizQuestionsDto: UpdateQuizQuestionRequestDto[], queryRunner: QueryRunner, event: Event): Promise<void> {
@@ -1714,7 +1769,7 @@ export class EventsService {
         event.isPrivate = payload.isPrivate;
       }
       if (payload.capacity) {
-        event.capacity = payload.capacity;
+        event.capacity = payload.capacity || 0;
       }
       if (payload.imageFlyer) {
         event.imageFlyer = payload.imageFlyer;
@@ -2194,7 +2249,7 @@ export class EventsService {
     newEvent.limitOnePlus = event.limitOnePlus;
     newEvent.useQr = event.useQr;
     newEvent.isPrivate = event.isPrivate;
-    newEvent.capacity = event.capacity;
+    newEvent.capacity = event.capacity || 0;
     newEvent.imageFlyer = event.imageFlyer;
     newEvent.imageCover = event.imageCover;
     newEvent.furtherInstructions = event.furtherInstructions;
@@ -2271,17 +2326,20 @@ export class EventsService {
     if (!event) throw new NotFoundError('Event not found');
     const status = EventStatus[payload.status as keyof typeof EventStatus];
     if (!status) throw new BadRequestError('Invalid status');
-    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus]) throw new ConflictError('Event is already in the selected status');
-    if (payload.status === EventStatus[EventStatus.UPCOMING_STATUS]) {
+    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus]) return responses.conflict('Event is already in the selected status');
+    if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      event.isPublished = true;
-    } else if (payload.status === EventStatus[EventStatus.SCHEDULED_STATUS]) {
-      event.status = EventStatusEnum.APPROVED_STATUS;
+      if (event.publishDate) {
+        event.isPublished = new Date(event.publishDate) <= new Date();
+      } else {
+        event.isPublished = true;
+      }
+    } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
+      event.status = EventStatusEnum.REJECTED_STATUS;
       event.isPublished = false;
     } else {
       event.status = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
-      event.isPublished =
-        payload.status !== EventStatus[EventStatus.APPROVED_STATUS] || payload.status !== EventStatus[EventStatus.UPCOMING_STATUS] ? false : event.isPublished;
+      event.isPublished = false;
     }
     await this.dbConnection.getRepository(Event).save(event);
     const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
@@ -2801,97 +2859,97 @@ export class EventsService {
   }
 
   /**
-   * Toggles the check-in status of a guest for an event.
-   *
-   * - Fetches the guest and associated event.
-   * - Validates the guest's ticket status.
-   * - Updates the ticket status if needed.
-   * - Sets the check-in status based on the payload.
-   * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
-   * - Returns updated check-in status, ticket status, and total guest counts.
-   *
-   * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
-   * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
-   */
+  * Toggles the check-in status of a guest for an event.
+  *
+  * - Fetches the guest and associated event.
+  * - Validates the guest's ticket status.
+  * - Updates the ticket status if needed.
+  * - Sets the check-in status based on the payload.
+  * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
+  * - Returns updated check-in status, ticket status, and total guest counts.
+  *
+  * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
+  * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
+  */
   public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
-      // Step 1: Fetch guest details along with associated event.
-      const guest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { id: payload.id },
-        relations: ['user', 'event'], // Load related user and event details.
-      });
+    // Step 1: Fetch guest details along with associated event.
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { id: payload.id },
+      relations: ['user', 'event'], // Load related user and event details.
+    });
 
-      // If guest does not exist, return an error response.
-      if (!guest) throw new BadRequestError('Guest not found');
+    // If guest does not exist, return an error response.
+    if (!guest) throw new BadRequestError('Guest not found');
 
-      // Step 2: Fetch the guest's ticket details dynamically.
-      let ticket = await this.dbConnection.getRepository(Ticket).findOne({
-        where: {
-          guest: { id: guest.id },
-          event: { id: guest.event.id },
-        },
-      });
+    // Step 2: Fetch the guest's ticket details dynamically.
+    let ticket = await this.dbConnection.getRepository(Ticket).findOne({
+      where: {
+        guest: { id: guest.id },
+        event: { id: guest.event.id },
+      },
+    });
 
-      if (guest.status === GuestStatus.CONFIRMED && !ticket) {
-        const newTicket = await this.dbConnection.getRepository(Ticket).create({
+    if (guest.status === GuestStatus.CONFIRMED && !ticket) {
+      const newTicket = await this.dbConnection.getRepository(Ticket).create({
         ticketType: guest.ticketType,
         guest: { id: guest.id },
         event: { id: guest.event.id },
         user: { id: guest.user.id },
         status: TicketStatusEnum.TICKET_GENERATED,
       });
-      
+
       await this.dbConnection.getRepository(Ticket).save(newTicket);
       ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
     }
-    
-      // If the ticket is canceled, or expired, return an error response.
-      if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
-        throw new BadRequestError('Ticket is cancelled or expired');
-      }
-      // Step 3: Update ticket status if it's currently "Generated".
-      if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
-        await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
-      }
 
-      // Step 4: Update guest check-in status based on the payload.
-      if (guest.checkIn !== payload.checkIn) {
-        await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: payload.checkIn });
-      } else throw new BadRequestError('Check-in value is not valid, Guest already in checked-in or checked-out state');
+    // If the ticket is canceled, or expired, return an error response.
+    if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+      throw new BadRequestError('Ticket is cancelled or expired');
+    }
+    // Step 3: Update ticket status if it's currently "Generated".
+    if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
+      await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+    }
 
-      // Step 5: Fetch updated guest check-in status, ticket status, and total guest counts in parallel.
-      const [updatedGuest, updatedTicket, totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
-        // Fetch updated guest check-in status.
-        this.dbConnection.getRepository(Guest).findOne({ where: { id: guest.id }, select: ['checkIn'] }),
+    // Step 4: Update guest check-in status based on the payload.
+    if (guest.checkIn !== payload.checkIn) {
+      await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: payload.checkIn });
+    } else throw new BadRequestError('Check-in value is not valid, Guest already in checked-in or checked-out state');
 
-        // Fetch updated ticket status.
-        this.dbConnection.getRepository(Ticket).findOne({ where: { id: ticket.id }, select: ['status'] }),
+    // Step 5: Fetch updated guest check-in status, ticket status, and total guest counts in parallel.
+    const [updatedGuest, updatedTicket, totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+      // Fetch updated guest check-in status.
+      this.dbConnection.getRepository(Guest).findOne({ where: { id: guest.id }, select: ['checkIn'] }),
 
-        // Count total confirmed guests for the event.
-        this.dbConnection.getRepository(Guest).count({
-          where: {
-            event: { id: guest.event.id },
-            status: GuestStatus.CONFIRMED,
-          },
-        }),
+      // Fetch updated ticket status.
+      this.dbConnection.getRepository(Ticket).findOne({ where: { id: ticket.id }, select: ['status'] }),
 
-        // Count total guests who have checked in.
-        this.dbConnection.getRepository(Guest).count({
-          where: {
-            event: { id: guest.event.id },
-            checkIn: true,
-            status: GuestStatus.CONFIRMED,
-          },
-        }),
-      ]);
+      // Count total confirmed guests for the event.
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: guest.event.id },
+          status: GuestStatus.CONFIRMED,
+        },
+      }),
 
-      // Step 6: Return the updated guest details, ticket status, and guest counts.
-      return {
-        guestId: guest.id,
-        ticketStatus: updatedTicket?.status, // Fetch dynamically.
-        checkInStatus: updatedGuest?.checkIn ?? false, // Fetch dynamically.
-        totalConfirmedGuests,
-        totalCheckedInGuests,
-      };
+      // Count total guests who have checked in.
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: guest.event.id },
+          checkIn: true,
+          status: GuestStatus.CONFIRMED,
+        },
+      }),
+    ]);
+
+    // Step 6: Return the updated guest details, ticket status, and guest counts.
+    return {
+      guestId: guest.id,
+      ticketStatus: updatedTicket?.status, // Fetch dynamically.
+      checkInStatus: updatedGuest?.checkIn ?? false, // Fetch dynamically.
+      totalConfirmedGuests,
+      totalCheckedInGuests,
+    };
   }
 
 

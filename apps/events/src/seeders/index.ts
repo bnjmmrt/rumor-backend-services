@@ -231,6 +231,7 @@ export class Seeders {
         },
       ];
 
+      //TODO: first check if data exists or not if not then only this should run also it can be move to auth service
       for (const item of data) {
         const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(item.role)).data;
 
