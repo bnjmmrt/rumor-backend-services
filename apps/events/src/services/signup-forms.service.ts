@@ -180,7 +180,7 @@ export class SignupFormsServices {
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
-      signupForm.name = body.name || companyName;
+      signupForm.name = body.name || `${companyName} 's`;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
