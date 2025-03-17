@@ -102,6 +102,11 @@ export class GuestService {
     // Extract relevant fields from payload
     const { hostId, ticketTypeId, maxAdditionalGuests, inviteMessage, privateGuestNote, sendNotification } = payload;
 
+    // Prevent sending invites if the event is not approved
+    if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
+      throw new BadRequestError('You cannot send invites until the event has been approved by the Rumor admin');
+    }
+    
     // Handle different actions for managing guests
     switch (action) {
       case ManageGuestsAction.CREATE:
