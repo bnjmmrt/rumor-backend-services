@@ -478,7 +478,7 @@ export class AuthService {
     }
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
 
     // Micro-service call
 
