@@ -110,7 +110,8 @@ import {
   toUser,
   toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
-import * as fs from 'fs';
+import { SettingsService } from '../services/settings.service';
+
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
@@ -434,6 +435,9 @@ export class AuthService {
       throw new BadRequestError('Error retrieving user after sign-up.');
     }
 
+    // Save FCM Token for the user
+    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+
     return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
@@ -479,7 +483,7 @@ export class AuthService {
     }
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
 
     // Micro-service call
 
@@ -499,7 +503,7 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE') + `hosts/${newUser.id}/new-applicant`,
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `hosts/${newUser.id}/new-applicant`,
           },
         ],
         'Super Admin - New Host Application',
@@ -507,6 +511,9 @@ export class AuthService {
         null,
       );
     } catch (error) { }
+
+    // Save FCM Token for the user
+    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
     return '';
   }
@@ -537,7 +544,6 @@ export class AuthService {
     let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
     return response
   }
-
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<string> {
     if (payload.password !== payload.repeatedPassword) {
@@ -632,7 +638,7 @@ export class AuthService {
       },
     });
     if (!user) {
-      throw new NotFoundError("user");
+      throw new NotFoundError("The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.");
     }
     const passwordResetRequest: ForgotPasswordRequest = {
       applicationId: config.get('FUSIONAUTH_APP_ID'),
@@ -642,23 +648,37 @@ export class AuthService {
     const forgotPasswordResponse = await fusionAuthClientHandler.fusionAuthClient().forgotPassword(passwordResetRequest);
     const token = forgotPasswordResponse.response?.changePasswordId;
     if (!token) {
-      throw new BadRequestError("token");
-
+      throw new BadRequestError('Unable to call forgot password, please try again later.');
     }
-    const redirectPath = `auth/reset-password/${token}`;
-
-    // Micro-service call
-
-    try {
+    const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    if (isAdmin) {
+      const redirectPath = `new-password?token=${token}`;
+      const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'reset_url',
+            value: config.get('RUMOR_WEBSITE_ADMIN') + `${redirectPath}`,
+          },
+        ],
+        'Super Admin - Reset Password',
+        [payload.email],
+        null,
+        // this.logger,
+      );
+      if (!mailServiceResponse) {
+        throw new BadRequestError('Unable to send mail, please try again later.');
+      }
+    } else {
+      const redirectPath = `auth/reset-password/${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
         [
           {
             key: 'user_name',
-            value: user?.firstName,
+            value: user?.additionalHostInformation?.companyName || 'Host',
           },
           {
             key: 'reset_url',
-            value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+            value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
           },
         ],
         'Reset Password',
@@ -666,31 +686,37 @@ export class AuthService {
         null,
       );
       if (!mailServiceResponse) {
-        throw new BadRequestError('Unable to send mail, please try again later.')
+        throw new BadRequestError('Unable to send mail, please try again later.');
       }
-    } catch (error) { }
+    }
     return '';
 
   }
 
   public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponseAndRoles> {
     const { password, token, repeatedPassword } = payload;
-    if (password !== repeatedPassword) {
-      throw new BadRequestError("Passwords do not match.");
-    }
+    if (password !== repeatedPassword) throw new BadRequestError('Passwords do not match.');
     const changePasswordRequest: ChangePasswordRequest = {
       password: payload.password,
     };
     const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByChangePasswordId(token);
     const email = fusionAuthResponse?.response?.user?.email;
     if (!email) {
-      throw new BadRequestError("email");
+      throw new BadRequestError('The email address you provided does not match any account in our system. Please check for any typos or try a different email.');
     }
     const changePasswordFusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().changePassword(token, changePasswordRequest);
     if (changePasswordFusionAuthResponse?.statusCode !== 200) {
-      throw new BadRequestError("Unable to reset password");
+      throw new BadRequestError('Unable to reset password, please try again later.');
     }
-    return await this.hostLogin({ email, password });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: email }, relations: { roles: { role: true } } });
+    const isAdmin = user.roles.some((role) => role.role.name === 'admin');
+    const isHost = user.roles.some((role) => role.role.name === 'host');
+
+    if (isAdmin) {
+      return await this.adminLogin({ email, password });
+    } else if (isHost) {
+      return await this.hostLogin({ email, password });
+    }
   }
 
   public static async loginSSO(): Promise<LoginSSOResponse> {
@@ -978,6 +1004,9 @@ export class AuthService {
   }
 
   public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
+    if(payload.phoneNumber) {
+      payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -1042,6 +1071,15 @@ export class AuthService {
           }
         } catch (error) { }
         return { isValid: true, isGuest: true };
+      } else {
+        try {
+          if (isEmailLogin) {
+            await this.sendVerificationCodeByEmail({ email: payload.email });
+          } else {
+            serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+          }
+        } catch (error) { }
+        return { isValid: true, isGuest: false };
       }
     }
 
@@ -1082,6 +1120,9 @@ export class AuthService {
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
+    if(payload.phoneNumber) {
+      payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -1193,6 +1234,8 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
+      // Save FCM Token for the User
+      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
       return {
         id: user.id,
         token: completedLogin.response.token,
@@ -1220,6 +1263,9 @@ export class AuthService {
       }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
+
+      // Save FCM Token for the User
+      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
       return {
         token: completedLogin.response.token,
@@ -1270,6 +1316,9 @@ export class AuthService {
         id: user.id,
       },
     }
+
+    // Save FCM Token
+    SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
     return data;
   }
 
@@ -2825,9 +2874,9 @@ export class AuthService {
             qb.orWhere((subQb) => {
               const subQuery = subQb
                 .subQuery()
-                .select('listUsers.id')
+                .select('listUsers.user.id')
                 .from(HostCustomUsersLists, 'customList')
-                .innerJoin('customList.users', 'listUsers')
+                .innerJoin('customList.usersLists', 'listUsers')
                 .where('customList.listName IN (:...customListNames)', { customListNames })
                 .andWhere('customList.host.id = :hostId', { hostId })
                 .getQuery();
@@ -2922,7 +2971,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-      listUserIds = customListUsers.map((listUser) => listUser.user.id);
+      listUserIds = customListUsers.map((listUser) => listUser.user?.id);
     }
 
     const users = await Promise.all(
@@ -3468,7 +3517,7 @@ export class AuthService {
             data: [
               { key: 'first_name', value: user.firstName },
               { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
-              { key: 'password_token', value: config.get('RUMOR_WEBSITE') + `token/${token}` },
+              { key: 'password_token', value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}` },
             ],
           });
         }
@@ -3715,7 +3764,7 @@ export class AuthService {
       'declinedBy',
       'vouch',
     ];
-    const focuses = (await PlatformService.getUserFocuses({ id: userId }));
+    const focuses = (await PlatformService.getFocuses());
 
     const categoryObj = {
       id: 'category',
@@ -3776,7 +3825,7 @@ export class AuthService {
       options: [],
       type: FilterTypeValues.age,
     };
-    const interests = (await PlatformService.getUserInterests({ id: userId }));
+    const interests = (await PlatformService.listInterests());
     const mappedInterests = interests?.map((interest) => ({
       name: interest.name,
       id: interest.id,
@@ -3818,8 +3867,15 @@ export class AuthService {
       type: FilterTypeValues.pastEvents,
     };
 
-    const ticketTypes = []
-    // const ticketTypes = await serviceMesh.eventService().getTicketTypes({ id: eventId });
+    let ticketTypes = []
+    if (eventId) {
+      try {
+        ticketTypes = (await serviceMesh.eventService().getTicketTypes(eventId)).data;
+      }
+      catch (e) {
+        ticketTypes = []
+      }
+    }
     const mappedticketTypes = ticketTypes?.map((ticketType) => ({
       name: ticketType.name,
       id: ticketType.id,

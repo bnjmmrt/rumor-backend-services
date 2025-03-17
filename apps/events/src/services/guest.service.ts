@@ -8,7 +8,7 @@ import {
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
 import { responses } from '../common/responses';
-import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual } from 'typeorm';
+import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
@@ -102,6 +102,11 @@ export class GuestService {
     // Extract relevant fields from payload
     const { hostId, ticketTypeId, maxAdditionalGuests, inviteMessage, privateGuestNote, sendNotification } = payload;
 
+    // Prevent sending invites if the event is not approved
+    if ((GuestStatus[guestStatus] === GuestStatus.CONFIRMED || GuestStatus[guestStatus] === GuestStatus.INVITED) && event.status !== EventStatusEnum.APPROVED_STATUS) {
+      throw new BadRequestError('You cannot send invites until the event has been approved by the Rumor admin');
+    }
+    
     // Handle different actions for managing guests
     switch (action) {
       case ManageGuestsAction.CREATE:
@@ -220,10 +225,10 @@ export class GuestService {
         }
         // Extract main guest IDs
         const usersData = (await serviceMesh.userService(token).getAllusers(payload.query)).data
-        if (usersData.users.length === 0 || usersData.totalCount === 0) {
+        if (usersData.result.length === 0 || usersData.totalCount === 0) {
           throw new NotFoundError('Users data not found');
         }
-        let userIds: string[] = usersData.users.map((user) => user.id);
+        let userIds: string[] = usersData.result.map((user) => user.id);
         if (exclusiveIds.length > 0) {
           userIds = userIds.filter((id) => !exclusiveIds.includes(id));
         }
@@ -655,7 +660,7 @@ export class GuestService {
     const ticketType = parsedQuery?.ticketType;
     const partySize = parsedQuery?.partySize;
     const vouch = parsedQuery?.vouch;
-    // const checkedInStatus = parsedQuery?.checkedInStatus
+    const checkedInStatus = parsedQuery?.checkedIn
     const userSource = parsedQuery?.userSource;
     const declinedBy = parsedQuery?.declinedBy;
     const spam = parsedQuery?.spam;
@@ -753,6 +758,7 @@ export class GuestService {
       followed,
       customListNames,
       userSource,
+      checkedInStatus
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -824,6 +830,7 @@ export class GuestService {
     followed,
     customListNames,
     userSource,
+    checkedInStatus
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -836,6 +843,15 @@ export class GuestService {
         }),
       );
     }
+
+    if (checkedInStatus) {
+      const checkedInFilters = typeof checkedInStatus === 'string' ? checkedInStatus.split(',') : checkedInStatus;
+      if (checkedInFilters.includes('checkedIn') && !checkedInFilters.includes('notCheckedIn')) {
+        queryBuilder.andWhere('guest.checkIn = :checkedIn', { checkedIn: true });
+      } else if (checkedInFilters.includes('notCheckedIn') && !checkedInFilters.includes('checkedIn')) {
+        queryBuilder.andWhere('guest.checkIn = :notCheckedIn', { notCheckedIn: false });
+      }
+    } 
 
     if (Object.keys(socialNetworkObject).length > 0) {
       const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
@@ -882,13 +898,13 @@ export class GuestService {
             qb.orWhere((subQb) => {
               const subQuery = subQb
                 .subQuery()
-                .select('listUsers.id')
+                .select('listUsers.user.id')
                 .from(HostCustomUsersLists, 'customList')
-                .innerJoin('customList.users', 'listUsers')
+                .innerJoin('customList.usersLists', 'listUsers')
                 .where('customList.listName IN (:...customListNames)', { customListNames })
                 .andWhere('customList.host.id = :hostId', { hostId: payload.hostId })
                 .getQuery();
-              return `user.id IN ${subQuery}`;
+              return `user.id IN ${subQuery}`;              
             });
           }
         }),
@@ -3160,8 +3176,12 @@ export class GuestService {
     return { attendeeCount: count }
   }
 
-  public static async hasGuestsAssignedToTicketTypes(ticketTypeIds: string[], eventId: string): Promise<boolean> {
-    const count = await this.dbConnection.getRepository(Guest).count({
+  public static async hasGuestsAssignedToTicketTypes(
+    ticketTypeIds: string[],
+    eventId: string,
+    queryRunner: QueryRunner
+  ): Promise<boolean> {
+    const count = await queryRunner.manager.getRepository(Guest).count({
       where: {
         event: { id: eventId },
         ticketType: { id: In(ticketTypeIds) },

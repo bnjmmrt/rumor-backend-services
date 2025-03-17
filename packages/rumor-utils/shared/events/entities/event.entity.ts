@@ -71,7 +71,7 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'is_private', default: false })
   isPrivate?: boolean;
 
-  @Column({ type: 'integer', nullable: true, name: 'capacity' })
+  @Column({ type: 'integer', nullable: true, name: 'capacity', default:0 })
   capacity?: number;
 
   @OneToMany(() => QuizQuestion, (question) => question.event, { cascade: true, onDelete: 'CASCADE' })
