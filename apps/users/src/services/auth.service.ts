@@ -27,6 +27,7 @@ import {
   ValidatePasswordTokenRequestDto,
   SetHostPasswordRequestDto,
   UpdateHostPasswordRequestDto,
+  UpdateAdminPasswordRequestDto,
   ContactsListRequestDto,
   GetUserWithRolesByEmailRequestDto,
   NonMemberSignUpRequestDto,
@@ -449,7 +450,8 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    let nonMember: UserRole | null;
+    payload.email = payload.email.toLowerCase();
+    let userRoleAsMemberOrNonMember: UserRole | null;
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -461,24 +463,24 @@ export class AuthService {
     });
 
     if (user) {
-      nonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member') return item;
+      userRoleAsMemberOrNonMember = user.roles.find((item) => {
+        if (item.role.name == 'non_member' || item.role.name == 'member') return item;
       });
-      if (!nonMember) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError("Phone number is already in use.");
-        }
 
-        if (user.email === payload.email) {
-          throw new BadRequestError("Email is already in use.");
-        }
-      }
+      // if (!nonMember) {
+      //   if (user.phoneNumber === payload.phoneNumber) {
+      //     throw new BadRequestError("Phone number is already in use.");
+      //   }
+
+      //   if (user.email === payload.email) {
+      //     throw new BadRequestError("Email is already in use.");
+      //   }
+      // }
     }
 
     let newUser = newHost(payload);
-    if (nonMember) {
+    if (userRoleAsMemberOrNonMember) {
       newUser.id = user.id;
-      await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
     }
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
@@ -615,6 +617,33 @@ export class AuthService {
     const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
     if (hostRole === undefined) {
       throw new NotFoundError("Host");
+    }
+
+    const request: ChangePasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: user.email,
+      password: payload.newPassword,
+    };
+
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+    return '';
+  }
+
+  public static async updateAdminPassword(payload: UpdateAdminPasswordRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: payload.id,
+      },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    const adminRole = user.roles.find((role) => role.role.name === 'admin');
+    if (adminRole === undefined) {
+      throw new NotFoundError("Admin");
     }
 
     const request: ChangePasswordRequest = {
