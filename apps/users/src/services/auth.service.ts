@@ -478,7 +478,7 @@ export class AuthService {
     }
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
 
     // Micro-service call
 
@@ -3743,7 +3743,7 @@ export class AuthService {
       'declinedBy',
       'vouch',
     ];
-    const focuses = (await PlatformService.getUserFocuses({ id: userId }));
+    const focuses = (await PlatformService.getFocuses());
 
     const categoryObj = {
       id: 'category',
@@ -3804,7 +3804,7 @@ export class AuthService {
       options: [],
       type: FilterTypeValues.age,
     };
-    const interests = (await PlatformService.getUserInterests({ id: userId }));
+    const interests = (await PlatformService.listInterests());
     const mappedInterests = interests?.map((interest) => ({
       name: interest.name,
       id: interest.id,
@@ -3846,8 +3846,15 @@ export class AuthService {
       type: FilterTypeValues.pastEvents,
     };
 
-    const ticketTypes = []
-    // const ticketTypes = await serviceMesh.eventService().getTicketTypes({ id: eventId });
+    let ticketTypes = []
+    if (eventId) {
+      try {
+        ticketTypes = (await serviceMesh.eventService().getTicketTypes(eventId)).data;
+      }
+      catch (e) {
+        ticketTypes = []
+      }
+    }
     const mappedticketTypes = ticketTypes?.map((ticketType) => ({
       name: ticketType.name,
       id: ticketType.id,
