@@ -451,7 +451,7 @@ export class AuthService {
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
     payload.email = payload.email.toLowerCase();
-    let userRoleAsMemberOrNonMember: UserRole | null;
+    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost:UserRole | null ;
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -464,27 +464,36 @@ export class AuthService {
 
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member' || item.role.name == 'member') return item;
+        if (item.role.name == "non_member" || item.role.name == "member")
+          return item;
       });
 
-      // if (!nonMember) {
-      //   if (user.phoneNumber === payload.phoneNumber) {
-      //     throw new BadRequestError("Phone number is already in use.");
-      //   }
+      userRoleExistsAsHost = user.roles.find((item) => {
+        if (item.role.name == "host") return item;
+      });
 
-      //   if (user.email === payload.email) {
-      //     throw new BadRequestError("Email is already in use.");
-      //   }
-      // }
+      if (userRoleExistsAsHost) {
+        if (user.phoneNumber === payload.phoneNumber) {
+          throw new BadRequestError("Phone number is already in use.");
+        }
+
+        if (user.email === payload.email) {
+          throw new BadRequestError("Email is already in use.");
+        }
+      }
     }
 
     let newUser = newHost(payload);
     if (userRoleAsMemberOrNonMember) {
       newUser.id = user.id;
     }
+
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
+    await RoleService.assignRoleToUser(
+      { userId: newUser.id, roleName: "host" },
+      UserSource.REQUEST_IN_APP
+    );
 
     // Micro-service call
 
