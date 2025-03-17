@@ -1061,6 +1061,15 @@ export class AuthService {
           }
         } catch (error) { }
         return { isValid: true, isGuest: true };
+      } else {
+        try {
+          if (isEmailLogin) {
+            await this.sendVerificationCodeByEmail({ email: payload.email });
+          } else {
+            serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+          }
+        } catch (error) { }
+        return { isValid: true, isGuest: false };
       }
     }
 
