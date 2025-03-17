@@ -261,10 +261,15 @@ export class CollaboratorService {
   public static async getCollaboratorRoles(): Promise<CollaboratorRoles[]> {
     const response = await this.dbConnection.getRepository(DefaultRoleSettings).find({
       relations: ['role'],
+      where: {
+        role: {
+          isActive: true,  // Ensure only active roles are retrieved
+        },
+      },
     });
     if (!response || response.length === 0) {
       throw new BadRequestError('Error at get default config');
-    }
+    }  
     const roles = response
       .map((setting) => setting.role)
       .filter((role) => !!role)
