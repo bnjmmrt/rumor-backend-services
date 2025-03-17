@@ -1,33 +1,31 @@
-import { FeaturedEventSectionResponse, FeaturedEventSectionsResponse, GenericResponse } from 'rumor-utils/shared/events/grpc/platform/platform.pb';
 import { FeaturedEventSectionsService } from '../services/featured-event-sections.service';
-import { CreateFeaturedEventSectionRequestDto } from 'rumor-utils/shared/events/dtos/featured-event-sections.dto';
-import { IdRequestDto } from 'rumor-utils/shared/users/dtos/platform.dto';
-import { GetResponse } from 'packages/rumor-utils/success';
+import { CreateResponse, DeleteResponse, GetResponse } from 'rumor-utils/success';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 export class FeaturedEventSectionsController {
   // constructor(private readonly service: FeaturedEventSectionsService) {}
 
-  public static async getFeaturedEventSections(): Promise<any> {
-    async (req, res): Promise<void> => {
-      const response: FeaturedEventSectionsResponse = await FeaturedEventSectionsService.getFeaturedEventSections();
-      const successResponse = new GetResponse(response);
-      res.status(successResponse.statusCode).json(successResponse);
-    }
-  }
 
-  public static async getFeaturedEventSection(payload: IdRequestDto): Promise<FeaturedEventSectionResponse> {
-    return FeaturedEventSectionsService.getFeaturedEventSection(payload);
+  public static featuredEventSections = asyncWrapper(async (req, res): Promise<void> => {
+    const response = await FeaturedEventSectionsService.featuredEventSections();
+    const successResponse = new GetResponse(response, "Feature event sections retreived");
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
 
-  // public static async createFeaturedEventSection(payload: CreateFeaturedEventSectionRequestDto): Promise<GenericResponse> {
-  //   async (req, res): Promise<void> => {
-  //     const response: FeaturedEventSectionsResponse = await FeaturedEventSectionsService.getFeaturedEventSections();
-  //     const successResponse = new GetResponse(response);
-  //     res.status(successResponse.statusCode).json(successResponse);
-  //   }
-  // }
-
-  public static async deleteFeaturedEventSection(payload: IdRequestDto): Promise<GenericResponse> {
-    return FeaturedEventSectionsService.deleteFeaturedEventSection(payload);
+  public static createFeaturedEventSection = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: any = req.body
+    const response = await FeaturedEventSectionsService.createFeaturedEventSection(payload);
+    const successResponse = new CreateResponse(response, "Succesfully created feature event section");
+    res.status(successResponse.statusCode).json(successResponse);
   }
+  );
+
+  public static deleteFeaturedEventSection = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params
+    const response = await FeaturedEventSectionsService.deleteFeaturedEventSection(id);
+    const successResponse = new DeleteResponse(response, "Succesfully created feature event section");
+    res.status(successResponse.statusCode).json(successResponse);
+  }
+  );
 }

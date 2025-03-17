@@ -11,7 +11,7 @@ import { TalentController } from "../controllers/talent.controller";
 import { TicketTypeController } from "../controllers/ticket-type.controller";
 import { CollaboratorController } from "../controllers/collaborator.controller";
 import { AdmissionTypeController } from "../controllers/admission-type.controller";
-import { FeaturedEventSectionsController } from "src/controllers/featured-event-sections.controller";
+import { FeaturedEventSectionsController } from "../controllers/featured-event-sections.controller";
 
 const router: Router = express.Router();
 
@@ -522,20 +522,22 @@ router.post(
 );
 
 
-// featured-events-section
 router.get(
   "/featured-events-sections",
-  FeaturedEventSectionsController.getFeaturedEventSections
+  AuthMiddleware.fusionAuthRequired,
+  FeaturedEventSectionsController.featuredEventSections
 )
 
-// router.post(
-//   "/featured-events-sections"
-//   FeaturedEventSectionsController.createFeaturedEventSection
-// )
+router.post(
+  "/event/featured-events-sections",
+  AuthMiddleware.fusionAuthRequired,
+  FeaturedEventSectionsController.createFeaturedEventSection
+)
 
-// router.delete(
-//   "/featured-events-sections/:id"
-//   FeaturedEventSectionsController.deleteFeaturedEventSection
-// )
+router.delete(
+  "/event/featured-events-sections/:id",
+  AuthMiddleware.fusionAuthRequired,
+  FeaturedEventSectionsController.deleteFeaturedEventSection
+)
 
 export default router;
