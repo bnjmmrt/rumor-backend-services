@@ -196,6 +196,11 @@ export interface SocialMediaStatsResponse {
   data: SocialMediaStatsData[];
 }
 
+export interface ScrapeInstagramFollowersResponse {
+  followers: number;
+  username: string
+}
+
 export const AUTH_PACKAGE_NAME = "auth";
 
 export interface SocialServiceClient {

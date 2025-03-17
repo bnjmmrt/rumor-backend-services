@@ -350,7 +350,8 @@ export class AuthService {
     if (payload.socialUrl) {
       newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
     }
-
+    
+    if(payload.instagramUserName) await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
     if (payload.instagramAccessToken) {
       await SocialService.getInstagramData(newUser.id, payload.instagramAccessToken, payload.platform);
     } else if (payload.linkedInAccessToken) {
