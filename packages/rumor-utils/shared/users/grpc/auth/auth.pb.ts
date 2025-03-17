@@ -158,6 +158,8 @@ export interface MemberSignUpRequest {
   instagramUserName?: string | undefined;
   interestsIds: string[];
   profilePicture?: string | undefined;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 /** HostSignUp */
@@ -170,12 +172,16 @@ export interface HostSignUpRequest {
   eventsPerYear: number;
   website?: string | undefined;
   referredBy?: string | undefined;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 /** Login */
 export interface LoginRequest {
   email: string;
   password: string;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 export interface LoginResponse {
@@ -201,6 +207,8 @@ export interface MemberLoginRequest {
   email?: string | undefined;
   isExist: boolean;
   isGuest: boolean;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 export interface TokenResponseAndRoles {
