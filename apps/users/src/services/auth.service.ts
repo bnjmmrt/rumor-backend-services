@@ -110,7 +110,8 @@ import {
   toUser,
   toMemberProfile,
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
-import * as fs from 'fs';
+import { SettingsService } from '../services/settings.service';
+
 
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
 import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
@@ -433,6 +434,9 @@ export class AuthService {
       throw new BadRequestError('Error retrieving user after sign-up.');
     }
 
+    // Save FCM Token for the user
+    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+
     return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
@@ -507,6 +511,9 @@ export class AuthService {
       );
     } catch (error) { }
 
+    // Save FCM Token for the user
+    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+
     return '';
   }
 
@@ -536,7 +543,6 @@ export class AuthService {
     let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
     return response
   }
-
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<string> {
     if (payload.password !== payload.repeatedPassword) {
@@ -1227,6 +1233,8 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
+      // Save FCM Token for the User
+      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
       return {
         id: user.id,
         token: completedLogin.response.token,
@@ -1254,6 +1262,9 @@ export class AuthService {
       }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
+
+      // Save FCM Token for the User
+      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
       return {
         token: completedLogin.response.token,
@@ -1304,6 +1315,9 @@ export class AuthService {
         id: user.id,
       },
     }
+
+    // Save FCM Token
+    SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
     return data;
   }
 
