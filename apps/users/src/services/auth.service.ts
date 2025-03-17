@@ -478,7 +478,7 @@ export class AuthService {
     }
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.SIGN_UP_FORM);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
 
     // Micro-service call
 
@@ -1061,6 +1061,15 @@ export class AuthService {
           }
         } catch (error) { }
         return { isValid: true, isGuest: true };
+      } else {
+        try {
+          if (isEmailLogin) {
+            await this.sendVerificationCodeByEmail({ email: payload.email });
+          } else {
+            serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
+          }
+        } catch (error) { }
+        return { isValid: true, isGuest: false };
       }
     }
 
