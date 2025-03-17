@@ -57,6 +57,7 @@ router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
+router.put('/auth/admin/password', AuthMiddleware.fusionAuthRequired, AuthController.updateAdminPassword);
 router.put('/auth/host/password', AuthMiddleware.fusionAuthRequired, AuthController.updateHostPassword);
 router.get('/auth/login-sso', AuthController.loginSSO);
 router.get('/auth/oauth-redirect', AuthController.oAuthRedirect);
