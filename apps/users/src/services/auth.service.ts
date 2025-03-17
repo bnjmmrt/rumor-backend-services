@@ -997,6 +997,9 @@ export class AuthService {
   }
 
   public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
+    if(payload.phoneNumber) {
+      payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
@@ -1110,6 +1113,9 @@ export class AuthService {
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
+    if(payload.phoneNumber) {
+      payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
