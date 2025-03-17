@@ -26,4 +26,7 @@ export class Role {
 
   @OneToMany(() => DefaultRoleSettings, (defaultRoleSetting) => defaultRoleSetting.role)
   defaultRoleSettings: DefaultRoleSettings[];
+
+  @Column({ type: 'boolean', default: true, name: 'is_active' })
+  isActive: boolean;
 }
