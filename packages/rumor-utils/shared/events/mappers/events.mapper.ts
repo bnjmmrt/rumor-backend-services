@@ -19,7 +19,10 @@ export const toEvent = (
   const invitationDeclinedBy = guest?.declinedBy?.id || '';
   const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest, memberUserId);
   const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
-  const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
+  // const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
+  const eventStatus: EventStatusEnum = predefinedStatuses.includes(EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum])
+    ? EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum]
+    : formatEventStatusToEventStatusEnum(event);
   const location = event.location ? { ...event.location, placeId: event.location.googlePlaceId } : undefined;
   const ownerDetails = {
     ...event.owner,
@@ -44,7 +47,7 @@ export const toEvent = (
     rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || '' : '',
     showLocation: event.showLocation || false,
     startDate: formatDateFromDB(event.startDate),
-    status: event.status,
+    status: eventStatus,
     talents: event.talents || [],
     ticketTypes: event.ticketTypes || [],
     useQr: event.useQr || false,
@@ -63,10 +66,10 @@ export const toEvent = (
     invitationDeclinedBy: invitationDeclinedBy,
     featuredEventSection: event.featuredEventSection
       ? {
-          id: event.featuredEventSection?.id,
-          name: event.featuredEventSection?.name,
-          index: event.featuredEventSection?.index,
-        }
+        id: event.featuredEventSection?.id,
+        name: event.featuredEventSection?.name,
+        index: event.featuredEventSection?.index,
+      }
       : null,
     isPublished: event.isPublished || false,
     totalCheckedInGuests: totalCheckedInGuests || 0,
@@ -187,4 +190,35 @@ export const formatEventStatus = (event: Event): EventStatus => {
 
   if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS) status = EventStatus[eventStatus];
   return status || EventStatus[eventStatus] || EventStatus.NO_EVENT_STATUS;
+};
+
+export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnum => {
+  const now = new Date();
+  const { isPublished, startDate, endDate, publishDate, status: eventStatus } = event;
+
+  const parsedStartDate = new Date(startDate);
+  const parsedEndDate = new Date(endDate);
+  const parsedPublishDate = new Date(publishDate);
+  let status: EventStatus;
+
+  if (!isPublished && eventStatus && eventStatus === EventStatusEnum.APPROVED_STATUS && parsedPublishDate <= parsedStartDate) {
+    status = EventStatus.SCHEDULED_STATUS;
+  }
+
+  if (isPublished) {
+    if (parsedStartDate >= now || parsedEndDate >= now) {
+      status = EventStatus.UPCOMING_STATUS;
+    } else if (parsedEndDate < now) {
+      status = EventStatus.PAST_STATUS;
+    }
+  }
+
+  if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS) {
+    status = EventStatus[eventStatus];
+  }
+
+  const finalStatus = status || EventStatus[eventStatus] || EventStatus.NO_EVENT_STATUS;
+
+  // Convert numeric status to its corresponding string from EventStatusEnum
+  return EventStatusEnum[EventStatus[finalStatus] as keyof typeof EventStatusEnum];
 };
