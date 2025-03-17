@@ -522,20 +522,20 @@ router.post(
 );
 
 
-//featured-events-section
-// router.get(
-//   "/featured-events-sections",
-//   FeaturedEventSectionsController.
-// )
+// featured-events-section
+router.get(
+  "/featured-events-sections",
+  FeaturedEventSectionsController.getFeaturedEventSections
+)
 
 // router.post(
 //   "/featured-events-sections"
-//   FeaturedEventSectionsController
+//   FeaturedEventSectionsController.createFeaturedEventSection
 // )
 
 // router.delete(
 //   "/featured-events-sections/:id"
-//   FeaturedEventSectionsController
+//   FeaturedEventSectionsController.deleteFeaturedEventSection
 // )
 
 export default router;
