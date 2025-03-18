@@ -62,7 +62,7 @@ export class GuestService {
     const maxDistance = 50; //50 miles
 
     return locations.filter((location) => {
-      const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);
+      const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);      
       return distance <= maxDistance;
     });
   }
@@ -1493,9 +1493,9 @@ export class GuestService {
         const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
         const locationsWhere = locations.map((item) => item.id_event);
 
-        if (locationsWhere.length > 0) {
+        // if (locationsWhere.length > 0) {
           return { id: In(locationsWhere) };
-        }
+        // }
       }
       return null;
     };
@@ -1633,8 +1633,8 @@ export class GuestService {
     let multipleGuestStatusFilter = String(parsedQuery.guestEventStatus? parsedQuery.guestEventStatus : '')
       .split(',')
       .map((status) => status.trim()).filter(node => node)
-    if (parsedQuery.guestEventStatus && multipleGuestStatusFilter.length === 1) {
-      switch (parsedQuery.guestEventStatus) {
+    if (parsedQuery.guestEventStatus && multipleGuestStatusFilter?.length === 1) {
+      switch (multipleGuestStatusFilter[0]) {
         case 'UPCOMING':
           addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.CONFIRMED];
@@ -1650,7 +1650,7 @@ export class GuestService {
           guestStatusFilter = [GuestStatus.APPLIED];
           break;
         case 'DECLINED':
-          guestStatusFilter = [GuestStatus.APPLIED];
+          guestStatusFilter = [GuestStatus.DECLINED];
           break;
       }
       userFilter.guests.status = In(guestStatusFilter);
@@ -1659,19 +1659,19 @@ export class GuestService {
       for (const status of multipleGuestStatusFilter) {
         switch (status) {
           case 'UPCOMING':
-            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId } } });
             break;
           case 'PAST':
-            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId }} });
             break;
           case 'INVITED':
-            orConditions.push({ guests: { status: GuestStatus.INVITED } });
+            orConditions.push({ guests: { status: GuestStatus.INVITED, user: { id: payload.userId }}});
             break;
           case 'APPLIED':
-            orConditions.push({ guests: { status: GuestStatus.APPLIED } });
+            orConditions.push({ guests: { status: GuestStatus.APPLIED, user: { id: payload.userId }} });
             break;
           case 'DECLINED':
-              guestStatusFilter = [GuestStatus.APPLIED];
+            orConditions.push({ guests: { status: GuestStatus.DECLINED, user: { id: payload.userId }} });
             break;
         }
       }

@@ -126,6 +126,10 @@ export const groupCollaborators = (
 };
 
 export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentUserId?: string): GuestEventData => {
+  const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+  const eventStatus: EventStatusEnum = predefinedStatuses.includes(EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum])
+  ? EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum]
+  : formatEventStatusToEventStatusEnum(event);
   return {
     description: event.description || '',
     enabled: event.enabled || false,
@@ -138,7 +142,7 @@ export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentU
     rsvpDeadline: event.rsvpDeadline ? formatDateFromDB(event.rsvpDeadline) : '',
     showLocation: event.showLocation || false,
     startDate: formatDateFromDB(event.startDate),
-    status: formatEventStatus(event),
+    status: eventStatus,
     id: event.id,
     name: event.name || '',
     ageLimit: event.ageLimit || undefined,
