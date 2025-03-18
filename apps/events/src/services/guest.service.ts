@@ -8,7 +8,7 @@ import {
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {VouchRequestService} from './vouch-request.service';
 import { responses } from '../common/responses';
-import { Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, QueryRunner } from 'typeorm';
+import { Between, Brackets, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { CsvUploadRecords, Event, Guest, RestrictedInvites, QuizQuestion, TicketType, User, UserAttendeeStats } from 'rumor-utils/shared/events/entities';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, ManageGuestsAction, UploadType } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { NotFoundError, BadRequestError, ValidationError } from "rumor-utils/errors";
@@ -1649,6 +1649,9 @@ export class GuestService {
         case 'APPLIED':
           guestStatusFilter = [GuestStatus.APPLIED];
           break;
+        case 'DECLINED':
+          guestStatusFilter = [GuestStatus.APPLIED];
+          break;
       }
       userFilter.guests.status = In(guestStatusFilter);
     }
@@ -1667,12 +1670,21 @@ export class GuestService {
           case 'APPLIED':
             orConditions.push({ guests: { status: GuestStatus.APPLIED } });
             break;
+          case 'DECLINED':
+              guestStatusFilter = [GuestStatus.APPLIED];
+            break;
         }
       }
     }
 
     if (parsedQuery.feed) {
-      addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events
+      if (parsedQuery.maxEndDate) {
+        addCondition({
+          endDate: Between(dateNow, new Date(String(parsedQuery.maxEndDate))), // Ensures both conditions are applied
+        }, 'AND');
+      } else {
+        addCondition({ endDate: MoreThan(dateNow) }, 'AND'); // Only applies if maxEndDate is not present
+      }
       addCondition(
         {
           status: EventStatusEnum.APPROVED_STATUS,
