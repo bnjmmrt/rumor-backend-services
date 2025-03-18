@@ -392,6 +392,7 @@ export interface Guest {
   gender: Gender;
   age?: number | undefined;
   additionalGuests: AdditionalGuest[];
+  phoneNumber?: string;
 }
 
 export interface AdditionalGuest {
