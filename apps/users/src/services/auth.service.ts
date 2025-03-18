@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In } from 'typeorm';
+import { FindOptionsWhere, ILike, In, QueryRunner } from 'typeorm';
 import database from '../database'
 import config from '../config';
 
@@ -180,6 +180,7 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
+import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -1178,8 +1179,10 @@ export class AuthService {
       });
     }
 
+    if (payload.isDeactivated && user.isDeactivated) {
+      this.reactivateUserAccount({ email: user.email })
+    }
     
-
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -4670,45 +4673,68 @@ export class AuthService {
     return new Date().getTime() - new Date(deactivatedAt).getTime() <= 30 * 24 * 60 * 60 * 1000;
   }
 
+
   public static async cleanupGuestOnAccountDeletion(payload: IdRequestDto): Promise<GenericResponse> {
-    const addedGuests = await this.dbConnection.getRepository(Guest).find({
-      where: { addedBy: { id: payload.id } },
-    });
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (addedGuests.length > 0) {
-      await this.dbConnection.getRepository(Guest).update({ addedBy: { id: payload.id } }, { status: GuestStatus.DECLINED, addedBy: null });
+    try {
+      const guestRepository = queryRunner.manager.getRepository(Guest);
+      const restrictedInvitesRepository = queryRunner.manager.getRepository(RestrictedInvites)
+
+      const addedGuests = await guestRepository.find({
+        where: { addedBy: { id: payload.id } },
+      });
+
+      if (addedGuests.length > 0) {
+        await guestRepository.update({ addedBy: { id: payload.id } }, { status: GuestStatus.DECLINED, addedBy: null });
+      }
+
+      await restrictedInvitesRepository.delete({ restrictedBy: {id: payload.id}})
+
+      await guestRepository.delete({ user: { id: payload.id } });
+
+      await this.removeUserRolesAndCleanup({ id: payload.id }, queryRunner);
+
+      await queryRunner.commitTransaction();
+
+      return responses.ok;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error(error);
+      return responses.badRequest('Error in cleaning up guests on account deletion');
+    } finally {
+      await queryRunner.release();
     }
-    await this.dbConnection.getRepository(Guest).delete({ user: { id: payload.id } });
-
-    await this.removeUserRolesAndCleanup({ id: payload.id });
-
-    return responses.ok;
-
   }
 
-  public static async permanantlyDeleteAccount(payload: IdRequestDto): Promise<GenericResponse> {
+  public static async permanantlyDeleteAccount(payload: IdRequestDto): Promise<string> {
     await this.cleanupGuestOnAccountDeletion({ id: payload.id });
-    return responses.ok;
+    return '';
   }
 
-  public static async removeUserRolesAndCleanup(payload: IdRequestDto): Promise<GenericResponse> {
-    const user = await this.dbConnection.getRepository(User).findOne({
+  public static async removeUserRolesAndCleanup(payload: IdRequestDto, queryRunner: QueryRunner): Promise<string> {
+    const userRepository = queryRunner.manager.getRepository(User);
+    const userRoleRepository = queryRunner.manager.getRepository(UserRole);
+
+    const user = await userRepository.findOne({
       where: { id: payload.id },
       relations: ['roles', 'roles.role'],
     });
 
     if (!user) {
-      return responses.badRequest('User not found');
+      throw new NotFoundError('User');
     }
 
-    const removableRoleNames = ['member', 'non-member'];
+    const removableRoleNames = ['member', 'non_member'];
     const removableRoles = user.roles.filter((role) => removableRoleNames.includes(role?.role?.name));
     const remainingRoles = user.roles.filter((role) => !removableRoleNames.includes(role?.role?.name));
     const hasHostRole = remainingRoles.some((role) => role?.role?.name === 'host');
 
     if (removableRoles.length > 0) {
       const removableRoleIds = removableRoles.map((role) => role.role.id);
-      await this.dbConnection.getRepository(User)
+      await userRoleRepository.createQueryBuilder()
         .createQueryBuilder()
         .delete()
         .from(UserRole)
@@ -4718,15 +4744,15 @@ export class AuthService {
     }
 
     if (remainingRoles.length === 0) {
-      await this.dbConnection.getRepository(User).delete({ id: payload.id });
+      await userRepository.delete({ id: payload.id });
     } else {
-      await this.dbConnection.getRepository(User).update(payload.id, {
+      await userRepository.update(payload.id, {
         additionalMemberInformation: null,
         profilePicture: null,
         ...(hasHostRole ? {} : { additionalHostInformation: null }),
       });
     }
 
-    return responses.ok;
+    return '';
   }
 }
