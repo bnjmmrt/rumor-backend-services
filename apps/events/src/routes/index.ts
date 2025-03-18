@@ -536,4 +536,10 @@ router.delete(
   FeaturedEventSectionsController.deleteFeaturedEventSection
 )
 
+router.get(
+  "/guest/event/:id/export",
+  AuthMiddleware.fusionAuthRequired,
+  GuestController.exportCsv
+);
+
 export default router;
