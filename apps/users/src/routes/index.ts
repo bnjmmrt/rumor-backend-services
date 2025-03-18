@@ -40,7 +40,7 @@ router.put('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.u
 router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
 router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
 router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
-router.get('/auth/admin/users/export/csv', AuthMiddleware.fusionAuthRequired, AdminController.exportUsersCsv);
+router.get('/auth/admin/users/export', AuthMiddleware.fusionAuthRequired, AdminController.exportUsersCsv);
 
 // Auth routes
 router.post('/auth/forgot-password', AuthController.forgotPassword);
