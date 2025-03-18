@@ -4775,7 +4775,6 @@ export class AuthService {
     // await this.removeHostRoleAndDeleteUserIfNeeded(user.id);
     //host will not be able to login again
     return responses.ok;
-
   }
 
   public static async deleteNonMemberUsersIfEligible(deletedHostId: string) {

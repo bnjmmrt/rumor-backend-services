@@ -3065,34 +3065,33 @@ export class EventsService {
   }
 
   public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    // Step 1: Fetch all events associated with the host
-    const listHostEventsPayload: ListHostEventsDto = { userId: payload.id, query: '' };
+    const listHostEventsPayload: ListHostEventsDto = { userId: payload.id, query: '{}' };
+    
     const eventsResponse = await this.listHostEvents(listHostEventsPayload);
     
-    console.log(eventsResponse)
 
-    // if (!eventsResponse || !eventsResponse.data.eventsResponse) {
-    //   return responses.ok; // No events found
-    // }
+    if (!eventsResponse || !eventsResponse.result) {
+       throw new NotFoundError("Events"); 
+    }
 
-    // const events = eventsResponse.data.eventsResponse;
+    const events = eventsResponse.result;
 
     // Step 2: Cancel all APPROVED events
-    // const approvedEvents = events.filter((event) => event.status === EventStatus.APPROVED_STATUS);
-    // for (const event of events) {
-    //   const cancelPayload: CancelEventAndNotifyRequestDto = {
-    //     ownerId: payload.id,
-    //     eventId: event.id,
-    //     customMessage: 'This event has been canceled as the host is no longer available.',
-    //   };
-    //   await this.cancelEventAndNotify(cancelPayload);
-    // }
+    const approvedEvents = events.filter((event) => event.status === EventStatus.APPROVED_STATUS);
+    for (const event of events) {
+      const cancelPayload: CancelEventAndNotifyRequestDto = {
+        ownerId: payload.id,
+        eventId: event.id,
+        customMessage: 'This event has been canceled as the host is no longer available.',
+      };
+      await this.cancelEventAndNotify(cancelPayload);
+    }
 
     // Step 3: Delete all events (regardless of status)
-    // for (const event of events) {
-    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-    //   await this.deleteEvent(deletePayload);
-    // }
+    for (const event of events) {
+      const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      await this.deleteEvent(deletePayload);
+    }
 
     return responses.ok;
   }

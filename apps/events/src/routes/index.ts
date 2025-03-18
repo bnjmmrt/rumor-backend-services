@@ -542,4 +542,8 @@ router.get(
   GuestController.exportCsv
 );
 
+router.delete(
+  "/delete-host-events",
+  EventsController.deleteHostEvents
+)
 export default router;
