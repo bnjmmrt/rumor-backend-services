@@ -108,6 +108,7 @@ export const groupCollaborators = (
           role: role,
           tickets: [],
           isFollowedByCurrentGuest,
+          isApproved: false
           //TODO:add the status if collaborator is approved or accepted the invite
         };
       }

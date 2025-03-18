@@ -29,7 +29,7 @@ export class ReferralCodeController {
 
   public static getReferralCodes = asyncWrapper(
     async (req, res): Promise<void> => {
-      const query = req.params;
+      const query = req.query;
       const payload: QueryParamRequestDto = { query };
       const response: ReferralCodeData[] =
         await ReferralCodeService.getReferralCodes(payload);

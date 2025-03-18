@@ -1786,19 +1786,37 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
-      const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
+      const userRole = userRoles.find((ur) => ur.user.id === user.id);
+      const nonMemberUserRole = userRoles.find(
+        (ur) => ur.user.id === user.id && ur.role.name === "non_member"
+      );
 
-      if (payload.status === UserStatus.WAITLISTED) {
-        if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
-          console.error(`User ${user.id} is active and cannot be waitlisted`);
-          failedUsers.push(user.id);
-          continue;
-        }
+      if (nonMemberUserRole) {
+        usersToUpdate.push({
+          userRole: nonMemberUserRole,
+          newStatus: payload.status,
+          newRole: memberRole,
+        });
       }
 
-      if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
-        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
+      if (userRole) {
+        usersToUpdate.push({ userRole, newStatus: payload.status });
       }
+
+      // if (payload.status === UserStatus.WAITLISTED) {
+      // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
+      //   console.error(`User ${user.id} is active and cannot be waitlisted`);
+      //   failedUsers.push(user.id);
+      //   continue;
+      // }
+      // }
+      // if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+      //   usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
+      // }
+
+      // if (payload.status === UserStatus.DEACTIVATED && userRole) {
+      //   usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
+      // }
     }
 
     // Perform bulk updates only for valid users
@@ -1808,6 +1826,14 @@ export class AuthService {
         update.userRole.role = update.newRole;
       }
       await this.dbConnection.getRepository(UserRole).save(update.userRole);
+
+      // Mark user as deactivated
+      if (update.newStatus === UserStatus.DEACTIVATED) {
+        await this.dbConnection.getRepository(User).update(update.userRole.user.id, {
+          isDeactivated: true,
+          deactivatedAt: new Date(),
+        });
+      }
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
@@ -3697,7 +3723,9 @@ export class AuthService {
       relations: ['user'],
     });
 
-    return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username));
+    const eventCount = await this.dbConnection.getRepository(Guest).count({where: {user: {id: user.id}}});
+
+    return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username, eventCount));
   }
 
   public static async applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes) {

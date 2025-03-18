@@ -14,7 +14,7 @@ class SendGridHandler {
                   : config.get("DEFAULT_SEND_EMAIL"),
               name: "Rumor",
             },
-            templateId: template.templateSendgridId,
+            templateId: template.templateSendgridId.trim(),
             dynamicTemplateData: dynamicData,
           });
         } catch (error) {
