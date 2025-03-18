@@ -988,11 +988,16 @@ export class EventsService {
     return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: RequestByIdDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.id, deletedAt: null } });
+  public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: payload.id, owner: { id: payload.userId } },
+      relations: ['quizQuestions', 'collaborators', 'ticketTypes', 'talents', 'tickets', 'guests', 'restrictedInvites'],
+    });
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status !== EventStatusEnum.PENDING_STATUS && event.status !== EventStatusEnum.DRAFT_STATUS) throw new ConflictError('Cannot delete an approved event');
-    await this.dbConnection.getRepository(Event).softDelete(event.id);
+    if (event.status === EventStatusEnum.APPROVED_STATUS) {
+      throw new ConflictError('Cannot delete an approved event');
+    }
+    await this.dbConnection.getRepository(Event).remove(event);
     return;
   }
 

@@ -2,6 +2,10 @@ import notificationService from "../services/notification.service";
 import asyncWrapper from "../server/helpers/asyncWrapper";
 
 export class NotificationController {
+  public static sendNotification = asyncWrapper(async (req, res): Promise<void> =>{
+
+  })
+
   public static createNotification = asyncWrapper(
     async (req, res): Promise<void> => {
       const {

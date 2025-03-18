@@ -65,14 +65,14 @@ export class FilesControllerHandler {
 
   //'GetFile'
   viewFile = asyncWrapper(async (req, res): Promise<any> => {
-    const payload: string = req.params.id;
+    const payload: string = req.params[0];
+
     const fileResponse:any =  await S3Service.getFileStream(payload)
 
     if (!fileResponse.Body) {
       return res.status(404).json({ error: "File not found" });
     }
 
-    // Set headers for the response
     res.setHeader("Content-Type", fileResponse.ContentType || "application/octet-stream");
     res.setHeader("Content-Disposition", `inline; filename="${payload}"`);
 
@@ -99,7 +99,6 @@ export class FilesControllerHandler {
   });
 
   getSignedUploadUrl = asyncWrapper(async (req, res): Promise<any> => {
-    
     const payload: GetSignedUploadUrlRequestDto = req.body;
     const { path, extension } = payload;
     let { contentType } = payload;
