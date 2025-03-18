@@ -52,6 +52,16 @@ function toCamelCase<T extends Record<string, unknown>>(obj: T): Record<string, 
   return newObj;
 }
 
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const isValidPhoneNumber = (phoneNumber: string): boolean => {
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/; // Supports international E.164 format
+  return phoneRegex.test(phoneNumber);
+};
+
 export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
   try {
     // Step 1: Fetch the file from the S3 pre-signed URL
@@ -72,42 +82,32 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
 
     // Step 4: Validate and separate records
     for (const record of records) {
-      if (!isUploadUser && record.firstName && record.lastName && record.email) {
-        validData.push(record);
-      } else if (!isUploadUser && (!record.firstName || !record.lastName || !record.email)) {
-        let reasons = [];
-        if (!record.firstName) {
-          reasons.push('First Name is required');
-        }
-        if (!record.lastName) {
-          reasons.push('Last Name is required');
-        }
-        if (!record.email) {
-          reasons.push('Email is required');
-        }
-        if (reasons.length > 0) {
-          record.reason = reasons.join(', ');
-          garbageData.push(record);
+      let reasons: string[] = [];
+
+      // Basic validation
+      if (!record.firstName) reasons.push('First Name is required');
+      if (!record.lastName) reasons.push('Last Name is required');
+
+      // Email & Phone Validation
+      if (!record.email) {
+        reasons.push('Email is required');
+      } else if (!isValidEmail(record.email)) {
+        reasons.push('Invalid Email format');
+      }
+
+      if (isUploadUser) {
+        if (!record.phoneNumber) {
+          reasons.push('Phone Number is required');
+        } else if (!isValidPhoneNumber(record.phoneNumber)) {
+          reasons.push('Invalid Phone Number format');
         }
       }
 
-      if (isUploadUser && record.firstName && record.lastName && record.email && record.phoneNumber) {
+      if (reasons.length > 0) {
+        record.reason = reasons.join(', ');
+        garbageData.push(record);
+      } else {
         validData.push(record);
-      } else if (isUploadUser && (!record.firstName || !record.lastName || !record.email || !record.phoneNumber)) {
-        let reasons = [];
-        if (!record.firstName) {
-          reasons.push('First Name is required');
-        }
-        if (!record.lastName) {
-          reasons.push('Last Name is required');
-        }
-        if (!record.email && !record.phoneNumber) {
-          reasons.push('Either Email or Phone Number are required');
-        }
-        if (reasons.length > 0) {
-          record.reason = reasons.join(', ');
-          garbageData.push(record);
-        }
       }
     }
 
