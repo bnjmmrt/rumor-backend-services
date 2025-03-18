@@ -57,6 +57,7 @@ router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
+router.put('/auth/admin/password', AuthMiddleware.fusionAuthRequired, AuthController.updateAdminPassword);
 router.put('/auth/host/password', AuthMiddleware.fusionAuthRequired, AuthController.updateHostPassword);
 router.get('/auth/login-sso', AuthController.loginSSO);
 router.get('/auth/oauth-redirect', AuthController.oAuthRedirect);
@@ -196,11 +197,13 @@ router.get("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, Referra
 router.get("/auth/list-referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
 
 //Referral Codes
-router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
-router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
-router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
+router.post("/auth/referral-code", ReferralCodeController.createReferralCode)
+router.get("/auth/referral-codes/:id", ReferralCodeController.getReferralCode)
+router.get("/auth/referral-codes", ReferralCodeController.getReferralCodes)
+router.put("/auth/referral-codes", ReferralCodeController.updateReferralCode)
+router.put("/auth/referral-codes/:id/deactivate", ReferralCodeController.deactivateReferralCode)
+router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralCode)
+
 //Referrals
 router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
 

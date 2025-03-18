@@ -315,7 +315,7 @@ export class GuestController {
   public static inviteNewUser = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: InviteNewUserRequestDto = {
-        eventId: req.params.eventId,
+        eventId: req.params.id,
         userId: (req as any).user,
         ...req.body
       }
