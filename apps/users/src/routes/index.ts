@@ -123,6 +123,10 @@ router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthC
 router.get('/auth/admin/reports', AuthController.getAllReports);
 router.post('/auth/switch-profile/:id', AuthController.switchProfile);
 router.post('/auth/user/:id/note', AuthController.addUserNote);
+router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
+router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
+router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
+
 
 //Role routes
 router.get('/auth/roles', RoleController.listRoles);

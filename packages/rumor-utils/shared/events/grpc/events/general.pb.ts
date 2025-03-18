@@ -541,7 +541,7 @@ export interface GuestEventData {
   imageCover?: string | undefined;
   location?: EventLocation | undefined;
   eventType?: EventTypeEvent | undefined;
-  status?: EventStatus | undefined;
+  status?: EventStatusEnum | undefined;
   showLocation?: boolean | undefined;
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
