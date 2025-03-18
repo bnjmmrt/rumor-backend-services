@@ -3691,13 +3691,20 @@ export class AuthService {
     });
 
     const memberRole = user.roles.find((role) => role?.role?.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) {
-      throw new NotFoundError('Member')
-    };
+    if (!memberRole && !nonMemberRole) {
+      throw new NotFoundError('Profile');
+    }
 
+    let userRole = null;
+    if (memberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id }, relations: { role: true } });
+    } else if (nonMemberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
+    }
+
+    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 

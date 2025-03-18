@@ -136,7 +136,6 @@ export class AdminController {
       const response: MemberProfileResponse = await AuthService.getMemberProfile(payload);
       const successResponse = new GetResponse(response.data);
       res.status(successResponse.statusCode).json(successResponse);
-      res.json(response);
     }
   );
   
