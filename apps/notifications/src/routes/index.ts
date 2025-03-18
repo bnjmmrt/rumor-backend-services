@@ -27,6 +27,12 @@ router.delete('/communication/template-email', CommunicationController.deleteEma
 router.get('/get-email-template', CommunicationController.getEmailTemplate);
 
 /**
+ * Route for Sending the Notification
+ */
+router.post('/notification/notify',NotificationController.sendNotification);
+
+
+/**
  * Route for Notification Creation - Will be used in service Mesh for interservice communication call
  */
 
