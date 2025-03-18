@@ -4780,7 +4780,7 @@ export class AuthService {
   public static async exportUsersCsv(payload: PaginatedRequestDto): Promise<string> {
     // Get the guest data
     const data = await this.getMembers(payload);
-    
+
     // Define the titles and keys for the CSV
     const titleMapping = [
       { id: 'name', title: 'Name' },
@@ -4806,12 +4806,16 @@ export class AuthService {
         if (field.id === 'isFavourite') {
           mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
         } else {
-          mappedColumn[field.title] = column[field.id];
+          // Handling special cases for certain fields like age, gender, and empty values
+          if (column[field.id] === 0 || column[field.id] === 'NOT_APPLICABLE' || !column[field.id]) {
+            mappedColumn[field.title] = '—'; // Use large dash if value is 0, 'NOT_APPLICABLE', or empty
+          } else {
+            mappedColumn[field.title] = column[field.id];
+          }
         }
       });
       return mappedColumn;
     });
-    
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
