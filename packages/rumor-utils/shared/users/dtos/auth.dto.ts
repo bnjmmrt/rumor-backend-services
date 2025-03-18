@@ -356,6 +356,9 @@ export class MemberLoginRequestDto implements MemberLoginRequest {
   @IsString()
   @IsOptional()
   deviceId?: string;
+
+  @IsOptional()
+  isDeactivated: boolean;
 }
 
 export class UpdateUserProfilePictureRequestDto implements UpdateUserProfilePictureRequest {

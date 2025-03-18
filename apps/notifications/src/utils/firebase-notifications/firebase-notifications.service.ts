@@ -3,17 +3,15 @@ import { PushNotificationPayload } from './firebase-notifications.interface';
 import config from '../../config'
 
 class FirebaseNotificationsService {
-  constructor() {
+  async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
     firebase.initializeApp({
       credential: firebase.credential.cert({
-        projectId: config.get('FIREBASE_PROJECT_ID'),
+        projectId: config.get('FIREBASE_PROJECT_ID'), 
         clientEmail: config.get('FIREBASE_CLIENT_EMAIL'),
         privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, "\n"),
       }),
     });
-  }
 
-  async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
     try {
       const response = await firebase.messaging().sendEachForMulticast({
         tokens: payload.tokens,

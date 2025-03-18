@@ -392,6 +392,7 @@ export interface Guest {
   gender: Gender;
   age?: number | undefined;
   additionalGuests: AdditionalGuest[];
+  phoneNumber?: string;
 }
 
 export interface AdditionalGuest {
@@ -540,7 +541,7 @@ export interface GuestEventData {
   imageCover?: string | undefined;
   location?: EventLocation | undefined;
   eventType?: EventTypeEvent | undefined;
-  status?: EventStatus | undefined;
+  status?: EventStatusEnum | undefined;
   showLocation?: boolean | undefined;
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;

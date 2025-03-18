@@ -9,6 +9,7 @@ import {
   ManyToMany,
   Index,
   ManyToOne,
+  DeleteDateColumn,
 } from "typeorm";
 import { RumorBaseEntity } from "../../entities/rumor-base.entity";
 import { SocialProvider } from "./social-provider.entity";
@@ -87,6 +88,12 @@ export class User extends RumorBaseEntity {
 
   @Column({ type: 'boolean', name: 'is_first_time_logged_in', default: false })
   isFirstTimeLoggedIn: boolean;
+
+  @Column({ type: 'boolean', name: 'isDeactivated', default: false })
+  isDeactivated: boolean;
+
+  @DeleteDateColumn({ type: 'timestamp', nullable: true, name: 'deactivated_at' })
+  deactivatedAt: Date | null;
 
   @OneToMany(() => SocialProvider, (socialProvider) => socialProvider.user)
   socialProviders: Relation<SocialProvider[]>;
