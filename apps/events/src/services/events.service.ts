@@ -992,7 +992,7 @@ export class EventsService {
   public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.id, owner: { id: payload.userId } },
-      relations: ['quizQuestions', 'collaborators', 'ticketTypes', 'talents', 'tickets', 'guests', 'restrictedInvites', 'vouches'],
+      relations: ['quizQuestions', 'collaborators', 'ticketTypes', 'talents', 'tickets', 'guests', 'restrictedInvites'],
     });
     if (!event) throw new NotFoundError('Event was not found!');
     if (event.status === EventStatusEnum.APPROVED_STATUS) {
@@ -3188,17 +3188,18 @@ export class EventsService {
     const listHostEventsPayload: ListHostEventsDto = { userId: payload.id, query: '{}' };
     
     const eventsResponse = await this.listHostEvents(listHostEventsPayload);
-    
 
     if (!eventsResponse || !eventsResponse.result) {
        throw new NotFoundError("Events"); 
     }
 
     const events = eventsResponse.result;
-
     // Step 2: Cancel all APPROVED events
-    const approvedEvents = events.filter((event) => event.status === EventStatus.APPROVED_STATUS);
-    for (const event of events) {
+    const eventsToCancel = events.filter((event) =>
+      [EventStatusEnum.APPROVED_STATUS, EventStatusEnum.SCHEDULED_STATUS, EventStatusEnum.UPCOMING_STATUS].includes(event.status)
+    );
+  
+    for (const event of eventsToCancel) {
       const cancelPayload: CancelEventAndNotifyRequestDto = {
         ownerId: payload.id,
         eventId: event.id,
@@ -3215,6 +3216,5 @@ export class EventsService {
 
     return responses.ok;
   }
-
 
 }

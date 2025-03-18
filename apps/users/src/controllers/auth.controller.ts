@@ -1071,4 +1071,15 @@ export class AuthController {
     res.status(deleteResponse.statusCode).json(deleteResponse);
   });
 
+  public static deleteHostAccount = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    // const userId = (req as any).user;
+    const payload: IdRequestDto = { id };
+    const response: any = await AuthService.deleteHostAccount(payload);
+    const deleteResponse = new DeleteResponse(
+      response,
+      "Host account permanantly deleted"
+    );
+    res.status(deleteResponse.statusCode).json(deleteResponse);
+  });
 }

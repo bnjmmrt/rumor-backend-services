@@ -4769,25 +4769,23 @@ export class AuthService {
     return '';
   }
 
-  public static async deleteHostAccount(payload: IdRequestDto): Promise<GenericResponse> {
-
+  public static async deleteHostAccount(payload: IdRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+    if (!user) throw new NotFoundError('User')
+    const isHost = user.roles?.some((role) => role.role.name === 'host');
+    if (!isHost) throw new NotFoundError('Host');
 
-    const isHost = user.roles.some((role) => role.role.name === 'host');
+    try {
+      await serviceMesh.eventService().deleteHostEvents(payload.id);
+    } catch (error) {}
 
-    if (!isHost) return responses.badRequest('Host not found');
-
-    //call cancel event api --------------> coming from eventservice
-    //call delete event api --------------> coming from eventservice
-    // const events = await this.eventsClient.deleteHostEvents({ id: user.id }, this.logger);
-
-
-    //delete additional host information
+    // delete additional host information
+    await this.deleteNonMemberUsersIfEligible(user.id)
+    // remove role from user role table
     // await this.clearAdditionalHostInfo(user.id);
-    //remove role from user role table
+    // host will not be able to login again
     // await this.removeHostRoleAndDeleteUserIfNeeded(user.id);
-    //host will not be able to login again
-    return responses.ok;
+    return '';
   }
 
   public static async deleteNonMemberUsersIfEligible(deletedHostId: string) {
@@ -4800,7 +4798,6 @@ export class AuthService {
     for (const mapping of nonMemberUsers) {
       const { user } = mapping;
 
-      // Check if the user is associated with multiple hosts
       const hostMappings = await this.dbConnection.getRepository(HostUserMapping).find({
         where: { user: { id: user.id } },
       });
@@ -4808,14 +4805,13 @@ export class AuthService {
       const isOnlyAssociatedWithDeletedHost = hostMappings.length === 1 && hostMappings[0].host.id === deletedHostId;
 
       if (!isOnlyAssociatedWithDeletedHost) {
-        continue; // Skip if the user is still associated with active hosts
+        continue; 
       }
 
-      // Check if the user has logged in via FusionAuth
       const hasLoggedIn = await this.hasUserLoggedIn(user.email);
 
       if (hasLoggedIn) {
-        continue; // Skip if the user has ever logged in
+        continue; 
       }
 
       // If all checks pass, delete the user
@@ -4825,21 +4821,17 @@ export class AuthService {
 
   public static async hasUserLoggedIn(email: string): Promise<boolean> {
     await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(email);
-    return true; // User exists in FusionAuth, meaning they have logged in
-
+    return true; 
   }
 
   public static async removeHostRoleAndDeleteUserIfNeeded(userId: string): Promise<void> {
     const hostRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'host' } });
     if (!hostRole) return;
 
-    // Delete only the "host" role from the user_roles table
     await this.dbConnection.getRepository(UserRole).delete({ user: { id: userId }, role: { id: hostRole.id } });
 
-    // Check if the user has any other roles left
     const remainingRoles = await this.dbConnection.getRepository(UserRole).count({ where: { user: { id: userId } } });
 
-    // If no roles left, delete the user completely
     if (remainingRoles === 0) {
       await this.dbConnection.getRepository(User).delete({ id: userId });
     }
@@ -4848,12 +4840,4 @@ export class AuthService {
   public static async clearAdditionalHostInfo(userId: string): Promise<void> {
     await this.dbConnection.getRepository(User).update(userId, { additionalHostInformation: null });
   }
-
-  public static async softDeleteUser(userId: string): Promise<void> {
-    await this.dbConnection.getRepository(User).update(userId, {
-      // isDeactivated: true,
-      // deactivatedAt: new Date(),
-    });
-  }
-
 }

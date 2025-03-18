@@ -472,7 +472,7 @@ export class EventsController {
 
   public static deleteHostEvents = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const payload = req.body;
+      const payload = { id: req.params.id } ;
       const response = await EventsService.deleteHostEvents(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);

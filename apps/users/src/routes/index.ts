@@ -126,6 +126,7 @@ router.post('/auth/user/:id/note', AuthController.addUserNote);
 router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
 router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
 router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
+router.delete('/auth/hosts/:id', AuthController.deleteHostAccount)
 
 
 //Role routes

@@ -543,7 +543,7 @@ router.get(
 );
 
 router.delete(
-  "/delete-host-events",
+  "/delete-host-events/:id",
   EventsController.deleteHostEvents
 )
 export default router;
