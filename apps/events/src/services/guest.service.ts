@@ -1318,7 +1318,9 @@ export class GuestService {
           },
           addedBy: true,
           declinedBy: true,
-          event: true,
+          event: {
+            owner: true,
+          },
         },
       })
     )[0];

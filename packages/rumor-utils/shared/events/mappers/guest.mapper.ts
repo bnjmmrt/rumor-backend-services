@@ -85,8 +85,8 @@ export const toGuest = (
   }
 
   const roles = guest?.user?.roles?.length > 0 ? guest.user.roles[0] : undefined;
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const addedBy = guest.addedBy ? `${guest.addedBy?.additionalHostInformation.companyName}` : '';
+  const addedByPicture = guest.addedBy ? guest.addedBy?.additionalHostInformation.companyLogo : '';
   const invitationSourceNumber =
     typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   return {
@@ -151,10 +151,18 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
 };
 
 export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
-  const declinedBy = guest.declinedBy ? `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}` : '';
-  const declinedByPicture = guest.declinedBy ? guest.declinedBy?.profilePicture : '';
+  let addedBy, addedByPicture, declinedBy, declinedByPicture;
+  if (guest.event.owner.id === guest.addedBy?.id) {
+    addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
+    addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
+    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
+    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
+    addedBy = `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`.trim();
+    addedByPicture = guest.addedBy?.profilePicture || '';
+    declinedBy = `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`.trim();
+    declinedByPicture = guest.declinedBy?.profilePicture || '';
+  }
   return {
     roles: user.roles.map((item) => {
       return {
