@@ -307,6 +307,7 @@ export interface CollaboratorsEvent {
   companyLogo?: string | undefined;
   companyName?: string | undefined;
   isFollowedByCurrentGuest?: boolean | undefined;
+  isApproved: boolean | undefined
 }
 
 export interface Collaborator {
