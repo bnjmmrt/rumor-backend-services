@@ -220,12 +220,11 @@ router.post("/files/generate-download-url", FilesController.getFile);
 
 router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
 
-router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
-
-router.get("/files/view/:id", FilesController.viewFile);
-
-router.put('/files/:id', FilesController.updateFile);
+router.get("/files/view/*", FilesController.viewFile);
 
 router.delete('/files:id', FilesController.removeFile);
+
+router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
+// router.put('/files/:id', FilesController.updateFile);
 
 export default router;
