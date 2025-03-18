@@ -55,6 +55,7 @@ import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/s
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
+import { stringify } from "csv-stringify";
 
 export class GuestService {
   public static dbConnection = database;
@@ -62,7 +63,7 @@ export class GuestService {
     const maxDistance = 50; //50 miles
 
     return locations.filter((location) => {
-      const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);
+      const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);      
       return distance <= maxDistance;
     });
   }
@@ -1495,9 +1496,9 @@ export class GuestService {
         const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
         const locationsWhere = locations.map((item) => item.id_event);
 
-        if (locationsWhere.length > 0) {
+        // if (locationsWhere.length > 0) {
           return { id: In(locationsWhere) };
-        }
+        // }
       }
       return null;
     };
@@ -1635,8 +1636,8 @@ export class GuestService {
     let multipleGuestStatusFilter = String(parsedQuery.guestEventStatus? parsedQuery.guestEventStatus : '')
       .split(',')
       .map((status) => status.trim()).filter(node => node)
-    if (parsedQuery.guestEventStatus && multipleGuestStatusFilter.length === 1) {
-      switch (parsedQuery.guestEventStatus) {
+    if (parsedQuery.guestEventStatus && multipleGuestStatusFilter?.length === 1) {
+      switch (multipleGuestStatusFilter[0]) {
         case 'UPCOMING':
           addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.CONFIRMED];
@@ -1652,7 +1653,7 @@ export class GuestService {
           guestStatusFilter = [GuestStatus.APPLIED];
           break;
         case 'DECLINED':
-          guestStatusFilter = [GuestStatus.APPLIED];
+          guestStatusFilter = [GuestStatus.DECLINED];
           break;
       }
       userFilter.guests.status = In(guestStatusFilter);
@@ -1661,19 +1662,19 @@ export class GuestService {
       for (const status of multipleGuestStatusFilter) {
         switch (status) {
           case 'UPCOMING':
-            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId } } });
             break;
           case 'PAST':
-            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId }} });
             break;
           case 'INVITED':
-            orConditions.push({ guests: { status: GuestStatus.INVITED } });
+            orConditions.push({ guests: { status: GuestStatus.INVITED, user: { id: payload.userId }}});
             break;
           case 'APPLIED':
-            orConditions.push({ guests: { status: GuestStatus.APPLIED } });
+            orConditions.push({ guests: { status: GuestStatus.APPLIED, user: { id: payload.userId }} });
             break;
           case 'DECLINED':
-              guestStatusFilter = [GuestStatus.APPLIED];
+            orConditions.push({ guests: { status: GuestStatus.DECLINED, user: { id: payload.userId }} });
             break;
         }
       }
@@ -3228,5 +3229,60 @@ export class GuestService {
       },
     });
     return count > 0;
+  }
+
+
+ 
+  public static async exportCsv(payload: GuestsQueryRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getGuests(payload);
+
+    // const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    // const timestamp = new Date().toISOString().slice(0, 19).replace("T", " "); 
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'ticketType', title: 'Ticket Type' },
+      { id: 'partySize', title: 'Party Size' },
+      { id: 'category', title: 'Category' },
+      { id: 'numFollowers', title: 'Followers' },
+      { id: 'baseCity', title: 'Base City' },
+      { id: 'addedBy', title: 'Added By' },
+      { id: 'status', title: 'Guest Status' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'age', title: 'Age' },
+      { id: 'interest', title: 'Interests' },
+      { id: 'source', title: 'Request Source' },
+      { id: 'vouched', title: 'Vouched' },
+      { id: 'checkIn', title: 'Check-In' },
+      { id: 'declinedBy', title: 'Declined By' },
+      { id: 'isBanned', title: 'Spam' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.result.map((column) => {
+      const mappedColumn = {};
+      titleMapping.forEach((field) => {
+        if (field.id === 'isBanned' || field.id === 'checkIn') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          mappedColumn[field.title] = column[field.id];
+        }
+      });
+      return mappedColumn;
+    });
+    
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(lineItems, { header: true, columns: titleMapping.map(item => item.title) }, (err, output) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(output);
+      });
+    });
   }
 }

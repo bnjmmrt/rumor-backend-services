@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In } from 'typeorm';
+import { FindOptionsWhere, ILike, In, QueryRunner } from 'typeorm';
 import database from '../database'
 import config from '../config';
 
@@ -82,6 +82,7 @@ import {
   BasicHostProfile,
   UserIdWithRolesAndToken,
   AddUserNote,
+  CheckEmaiLRequest,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -179,6 +180,7 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
+import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -1096,7 +1098,7 @@ export class AuthService {
       await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
     } catch (error) {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: user.id }, status: GuestStatus.INVITED },
+        where: { user: { id: user.id } },
       });
 
       if (guest) {
@@ -1107,7 +1109,7 @@ export class AuthService {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
         } catch (error) { }
-        return { isValid: true, isGuest: true };
+        return { isValid: true, isGuest: true, isDeactivated: user.isDeactivated };
       } else {
         try {
           if (isEmailLogin) {
@@ -1116,7 +1118,7 @@ export class AuthService {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
         } catch (error) { }
-        return { isValid: true, isGuest: false };
+        return { isValid: true, isGuest: false, isDeactivated: user.isDeactivated };
       }
     }
 
@@ -1153,7 +1155,7 @@ export class AuthService {
       }
     } catch (error) { }
 
-    return { isValid: true };
+    return { isValid: true, isDeactivated: user.isDeactivated };
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
@@ -1177,6 +1179,10 @@ export class AuthService {
       });
     }
 
+    if (payload.isDeactivated && user.isDeactivated) {
+      this.reactivateUserAccount({ email: user.email })
+    }
+    
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -1780,6 +1786,7 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
+      const userRole = userRoles.find((ur) => ur.user.id === user.id);
       const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
 
       if (payload.status === UserStatus.WAITLISTED) {
@@ -1793,6 +1800,10 @@ export class AuthService {
       if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
         usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
       }
+
+      if (payload.status === UserStatus.DEACTIVATED && userRole) {
+        usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
+      }
     }
 
     // Perform bulk updates only for valid users
@@ -1802,6 +1813,14 @@ export class AuthService {
         update.userRole.role = update.newRole;
       }
       await this.dbConnection.getRepository(UserRole).save(update.userRole);
+
+      // Mark user as deactivated
+      if (update.newStatus === UserStatus.DEACTIVATED) {
+        await this.dbConnection.getRepository(User).update(update.userRole.user.id, {
+          isDeactivated: true,
+          deactivatedAt: new Date(),
+        });
+      }
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
@@ -4639,5 +4658,114 @@ export class AuthService {
       note: userHostSettings.note,
       hostUserSettingsId: userHostSettings.id,
     };
+  }
+
+  public static async deactivateUserAccount(payload: IdRequestDto) {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } })
+    if (!user) throw new NotFoundError('User')
+
+    await this.dbConnection.getRepository(User).update(payload.id, {
+      isDeactivated: true,
+      deactivatedAt: new Date(),
+    });
+
+    return '';
+  }
+
+  public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, isDeactivated: true } });
+
+    if (user && this.isWithin30Days(user.deactivatedAt)) {
+      await this.dbConnection.getRepository(User).update(user.id, { isDeactivated: false, deactivatedAt: null });
+    }
+
+    return '';
+  }
+
+  public static async isWithin30Days(deactivatedAt: Date) {
+    return new Date().getTime() - new Date(deactivatedAt).getTime() <= 30 * 24 * 60 * 60 * 1000;
+  }
+
+
+  public static async cleanupGuestOnAccountDeletion(payload: IdRequestDto): Promise<GenericResponse> {
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const guestRepository = queryRunner.manager.getRepository(Guest);
+      const restrictedInvitesRepository = queryRunner.manager.getRepository(RestrictedInvites)
+
+      const addedGuests = await guestRepository.find({
+        where: { addedBy: { id: payload.id } },
+      });
+
+      if (addedGuests.length > 0) {
+        await guestRepository.update({ addedBy: { id: payload.id } }, { status: GuestStatus.DECLINED, addedBy: null });
+      }
+
+      await restrictedInvitesRepository.delete({ restrictedBy: {id: payload.id}})
+
+      await guestRepository.delete({ user: { id: payload.id } });
+
+      await this.removeUserRolesAndCleanup({ id: payload.id }, queryRunner);
+
+      await queryRunner.commitTransaction();
+
+      return responses.ok;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error(error);
+      return responses.badRequest('Error in cleaning up guests on account deletion');
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public static async permanantlyDeleteAccount(payload: IdRequestDto): Promise<string> {
+    await this.cleanupGuestOnAccountDeletion({ id: payload.id });
+    return '';
+  }
+
+  public static async removeUserRolesAndCleanup(payload: IdRequestDto, queryRunner: QueryRunner): Promise<string> {
+    const userRepository = queryRunner.manager.getRepository(User);
+    const userRoleRepository = queryRunner.manager.getRepository(UserRole);
+
+    const user = await userRepository.findOne({
+      where: { id: payload.id },
+      relations: ['roles', 'roles.role'],
+    });
+
+    if (!user) {
+      throw new NotFoundError('User');
+    }
+
+    const removableRoleNames = ['member', 'non_member'];
+    const removableRoles = user.roles.filter((role) => removableRoleNames.includes(role?.role?.name));
+    const remainingRoles = user.roles.filter((role) => !removableRoleNames.includes(role?.role?.name));
+    const hasHostRole = remainingRoles.some((role) => role?.role?.name === 'host');
+
+    if (removableRoles.length > 0) {
+      const removableRoleIds = removableRoles.map((role) => role.role.id);
+      await userRoleRepository.createQueryBuilder()
+        .createQueryBuilder()
+        .delete()
+        .from(UserRole)
+        .where('user_id = :userId', { userId: payload.id })
+        .andWhere('role_id IN (:...roleIds)', { roleIds: removableRoleIds })
+        .execute();
+    }
+
+    if (remainingRoles.length === 0) {
+      await userRepository.delete({ id: payload.id });
+    } else {
+      await userRepository.update(payload.id, {
+        additionalMemberInformation: null,
+        profilePicture: null,
+        ...(hasHostRole ? {} : { additionalHostInformation: null }),
+      });
+    }
+
+    return '';
   }
 }

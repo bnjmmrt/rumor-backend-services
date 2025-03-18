@@ -125,6 +125,7 @@ export const toGuest = (
     interest: interests ? interests.map((interest) => interest.name) : [],
     gender: entityToGender[guest.user.gender] ?? entityToGender.NOT_APPLICABLE,
     additionalGuests: [],
+    phoneNumber: guest?.user?.phoneNumber,
   };
 };
 
