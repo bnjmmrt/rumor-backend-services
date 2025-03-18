@@ -31,8 +31,7 @@ export class AdminController {
   public static getMembers = asyncWrapper(
     async (req, res): Promise<void> => {
       const userId = (req as any).user;
-      const query = JSON.stringify(req.query);
-      const payload: PaginatedRequestDto = {userId, query};
+      const payload: PaginatedRequestDto = {userId, query: req.query as string};
       const response: GetMembersResponse = await AuthService.getMembers(payload);
       const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
