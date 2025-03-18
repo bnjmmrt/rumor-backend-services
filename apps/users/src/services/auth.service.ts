@@ -1108,7 +1108,7 @@ export class AuthService {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
         } catch (error) { }
-        return { isValid: true, isGuest: true };
+        return { isValid: true, isGuest: true, isDeactivated: user.isDeactivated };
       } else {
         try {
           if (isEmailLogin) {
@@ -1117,7 +1117,7 @@ export class AuthService {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
         } catch (error) { }
-        return { isValid: true, isGuest: false };
+        return { isValid: true, isGuest: false, isDeactivated: user.isDeactivated };
       }
     }
 
@@ -1154,7 +1154,7 @@ export class AuthService {
       }
     } catch (error) { }
 
-    return { isValid: true };
+    return { isValid: true, isDeactivated: user.isDeactivated };
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
@@ -1177,6 +1177,8 @@ export class AuthService {
         relations: { roles: { role: true } },
       });
     }
+
+    
 
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
@@ -4643,6 +4645,9 @@ export class AuthService {
   }
 
   public static async deactivateUserAccount(payload: IdRequestDto) {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } })
+    if (!user) throw new NotFoundError('User')
+
     await this.dbConnection.getRepository(User).update(payload.id, {
       isDeactivated: true,
       deactivatedAt: new Date(),

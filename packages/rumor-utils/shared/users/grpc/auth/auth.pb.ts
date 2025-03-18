@@ -209,6 +209,7 @@ export interface MemberLoginRequest {
   isGuest: boolean;
   fcmToken?: string;
   deviceId?: string;
+  isDeactivated?: boolean;
 }
 
 export interface TokenResponseAndRoles {
@@ -275,6 +276,7 @@ export interface OAuthRedirectResponse {
 export interface Validity {
   isValid: boolean;
   isGuest?: boolean | undefined;
+  isDeactivated?: boolean
 }
 
 export interface ValidityResponse {
