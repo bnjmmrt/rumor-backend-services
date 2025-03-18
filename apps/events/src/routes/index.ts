@@ -331,10 +331,6 @@ router.put(
   EventsController.manualEventStatusUpdate
 ); /** working */
 
-router.get(
-  "/users/:id/events",
-  GuestController.listGuestEvents
-); /**TestStatus: working */
 // Admission types
 router.post(
   "/admission-types",
