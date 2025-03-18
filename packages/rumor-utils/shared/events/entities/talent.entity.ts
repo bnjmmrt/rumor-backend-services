@@ -23,7 +23,7 @@ export class Talent extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.talents, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })

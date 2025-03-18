@@ -12,6 +12,7 @@ export class Ticket extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.tickets, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })
