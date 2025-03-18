@@ -50,7 +50,6 @@ export class NotificationController {
   public static getNotificationDetail = asyncWrapper(
     async (req, res): Promise<void> => {
       const { notificationId } = req.params;
-      
       const response = await notificationService.getNotificationDetail(notificationId);
       res.json(response);
     }
@@ -92,13 +91,18 @@ export class NotificationController {
 
   public static listNotifications = asyncWrapper(
     async (req, res): Promise<void> => {
+      console.log('-----Hereee')
       const { take = 10, skip = 0, notificationByModule, notificationByType } = req.query;
       
+      const recipientId = req.user
+      console.log("🚀 ~ NotificationController ~ recipientId:", recipientId)
+
       const response = await notificationService.findAllNotifications(
+        recipientId,
         Number(take),
         Number(skip),
         notificationByModule as string,
-        notificationByType as string
+        notificationByType as string,
       );
       res.json(response);
     }

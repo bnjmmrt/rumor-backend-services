@@ -413,4 +413,31 @@ export class GuestController {
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
+
+  public static exportCsv = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const hostId = (req as any).user;
+      const query = req.query;
+      const payload: GuestsQueryRequestDto = {
+        hostId: hostId,
+        eventId: req.params.eventId,
+        query,
+      };
+  
+      try {
+        // Call the service to generate the CSV
+        const csvData = await GuestService.exportCsv(payload);
+  
+        // Set the headers to indicate the content type and prompt a download
+        res.header('Content-Type', 'text/csv');
+        res.attachment('guests_export.csv');
+  
+        // Send the generated CSV data to the client
+        res.send(csvData);
+      } catch (error) {
+        // If any error occurs, return a 500 status code
+        res.status(500).send('Error generating CSV');
+      }
+    }
+  );
 }

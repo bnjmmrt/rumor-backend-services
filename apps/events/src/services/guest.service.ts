@@ -55,6 +55,7 @@ import { HostCustomUsersLists, HostFavorite, HostFollowing } from 'rumor-utils/s
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
+import { stringify } from "csv-stringify";
 
 export class GuestService {
   public static dbConnection = database;
@@ -3226,5 +3227,60 @@ export class GuestService {
       },
     });
     return count > 0;
+  }
+
+
+ 
+  public static async exportCsv(payload: GuestsQueryRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getGuests(payload);
+
+    // const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    // const timestamp = new Date().toISOString().slice(0, 19).replace("T", " "); 
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'ticketType', title: 'Ticket Type' },
+      { id: 'partySize', title: 'Party Size' },
+      { id: 'category', title: 'Category' },
+      { id: 'numFollowers', title: 'Followers' },
+      { id: 'baseCity', title: 'Base City' },
+      { id: 'addedBy', title: 'Added By' },
+      { id: 'status', title: 'Guest Status' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'age', title: 'Age' },
+      { id: 'interest', title: 'Interests' },
+      { id: 'source', title: 'Request Source' },
+      { id: 'vouched', title: 'Vouched' },
+      { id: 'checkIn', title: 'Check-In' },
+      { id: 'declinedBy', title: 'Declined By' },
+      { id: 'isBanned', title: 'Spam' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.result.map((column) => {
+      const mappedColumn = {};
+      titleMapping.forEach((field) => {
+        if (field.id === 'isBanned' || field.id === 'checkIn') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          mappedColumn[field.title] = column[field.id];
+        }
+      });
+      return mappedColumn;
+    });
+    
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(lineItems, { header: true, columns: titleMapping.map(item => item.title) }, (err, output) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(output);
+      });
+    });
   }
 }
