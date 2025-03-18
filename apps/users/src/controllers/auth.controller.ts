@@ -56,6 +56,7 @@ import {
   ValidatePasswordTokenRequestDto,
   SetHostPasswordRequestDto,
   UpdateHostPasswordRequestDto,
+  UpdateAdminPasswordRequestDto,
   ContactsListRequestDto,
   GetUserWithRolesByEmailRequestDto,
   NonMemberSignUpRequestDto,
@@ -206,6 +207,19 @@ export class AuthController {
       const updateResponse = new UpdateResponse(
         response,
         "Host password updated successfully."
+      );
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
+
+  public static updateAdminPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UpdateAdminPasswordRequestDto = { ...req.body, id };
+      const response: string = await AuthService.updateAdminPassword(payload);
+      const updateResponse = new UpdateResponse(
+        response,
+        "Admin password updated successfully."
       );
       res.status(updateResponse.statusCode).json(updateResponse);
     }

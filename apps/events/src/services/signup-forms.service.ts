@@ -180,7 +180,7 @@ export class SignupFormsServices {
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
-      signupForm.name = body.name || companyName;
+      signupForm.name = body.name || `${companyName} 's`;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
@@ -560,17 +560,17 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      const count = await SignupFormSubmissions.count({
-        where: {
-          signupForm: { id: id },
-        },
-      });
+      // const count = await SignupFormSubmissions.count({
+      //   where: {
+      //     signupForm: { id: id },
+      //   },
+      // });
 
-      // const getCountQuery = database
-      //   .getRepository(SignupFormSubmissions)
-      //   .createQueryBuilder("sfs")
-      //   .innerJoin("sfs.attendees", "atd")
-      //   .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+      const getCountQuery = database
+        .getRepository(SignupFormSubmissions)
+        .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
@@ -588,15 +588,15 @@ export class SignupFormsServices {
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
-        // getCountQuery.andWhere(
-        //   new Brackets((qb) => {
-        //     searchWords.forEach((word) => {
-        //       qb.orWhere("atd.firstName ILIKE :word", {
-        //         word: `%${word}%`,
-        //       }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
-        //     });
-        //   })
-        // );
+        getCountQuery.andWhere(
+          new Brackets((qb) => {
+            searchWords.forEach((word) => {
+              qb.orWhere("atd.firstName ILIKE :word", {
+                word: `%${word}%`,
+              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+            });
+          })
+        );
         submissionsQuery.andWhere(
           new Brackets((qb) => {
             searchWords.forEach((word) => {
@@ -609,7 +609,7 @@ export class SignupFormsServices {
       }
       submissionsQuery.orderBy("sfs.id", "DESC").offset(skip).limit(take);
 
-      // const count = await getCountQuery.getCount();
+      const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
       const result = { count, result: submissionList };
       return result;
