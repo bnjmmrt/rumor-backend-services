@@ -140,4 +140,30 @@ export class AdminController {
       res.json(response);
     }
   );
+  
+  public static exportUsersCsv = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const hostId = (req as any).user;
+      const query = req.query;
+      const payload: PaginatedRequestDto = {
+        userId: hostId,
+        query,
+      };
+  
+      try {
+        // Call the service to generate the CSV
+        const csvData = await AuthService.exportUsersCsv(payload);
+  
+        // Set the headers to indicate the content type and prompt a download
+        res.header('Content-Type', 'text/csv');
+        res.attachment('users_export.csv');
+  
+        // Send the generated CSV data to the client
+        res.send(csvData);
+      } catch (error) {
+        // If any error occurs, return a 500 status code
+        res.status(500).send('Error generating CSV');
+      }
+    }
+  );
 }

@@ -181,6 +181,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
+import { stringify } from "csv-stringify";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -4767,5 +4768,52 @@ export class AuthService {
     }
 
     return '';
+  }
+
+  public static async exportUsersCsv(payload: PaginatedRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getMembers(payload);
+    
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'category', title: 'Category' },
+      { id: 'city', title: 'City' },
+      { id: 'followerCount', title: 'Follower Count' },
+      { id: 'categories', title: 'Categories' },
+      { id: 'types', title: 'Types' },
+      { id: 'status', title: 'Status' },
+      { id: 'instagramUsername', title: 'Instagram Username' },
+      { id: 'age', title: 'Age' },
+      { id: 'isFavourite', title: 'Favourite' },
+      { id: 'role', title: 'Role' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.data.map((column) => {
+      const mappedColumn = {};
+      titleMapping.forEach((field) => {
+        if (field.id === 'isFavourite') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          mappedColumn[field.title] = column[field.id];
+        }
+      });
+      return mappedColumn;
+    });
+    
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(lineItems, { header: true, columns: titleMapping.map(item => item.title) }, (err, output) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(output);
+      });
+    });
   }
 }
