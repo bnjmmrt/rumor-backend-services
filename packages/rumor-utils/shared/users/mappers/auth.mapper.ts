@@ -102,77 +102,52 @@ export const toCreateUser = (user: User): SimpleUser => {
   };
 };
 
-export const toCurrentUser = (user: User, focuses: FocusProto[], role: UserRole): CurrentUser => {
-  const roleData = {
-    roleId: role.id,
-    roleName: role.role.name,
-    status: entityToUserStatus[role.status],
-    source: role.source ? entityToUserSource[role.source] : null,
-  };
-  if (role.role.name === 'member') {
-    const member = {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      memberProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        gender: user.gender ? entityToGender[user.gender] : null,
-        dateOfBirth: user.dateOfBirth ? user.dateOfBirth : null,
-        address: user.address
-          ? {
-              address: user.address.address,
-              placeId: user.address.googlePlaceId,
-            }
-          : null,
-        focuses,
-        socialProviders: (user.socialProviders || []).map((provider) => {
-          return {
-            type: entityToProviderType[provider.type],
-            accessToken: provider.longLivedToken,
-            username: provider.username,
-          };
-        }),
-        imageUrl: user.profilePicture,
-        memberSince: formatSinceDate('Member', user.createdAt),
-      },
+export const toCurrentUser = (user: User, focuses: FocusProto[], roles: UserRole[]): CurrentUser => {
+  // Construct role data based on user roles
+  const roleData = roles.map(role => {
+    // Basic structure for each role
+    const baseRoleData = {
+      id: role.id,
+      userId: user.id,
+      roleName: role.role.name,
+      status: role.status,
+      source: role.source || null,
     };
 
-    return member;
-  } else if (role.role.name === 'host' || role.role.name === 'co_host') {
-    return {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      hostProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
+    // Add role-specific data based on roleName
+    if (role.role.name === 'member') {
+      return {
+        ...baseRoleData,
+        focuses: focuses,
+        socialProviders: user.socialProviders || [],
+        memberSince: formatSinceDate('Member', user.createdAt),
+      };
+    }
+
+    if (role.role.name === 'host' || role.role.name === 'co_host') {
+      return {
+        ...baseRoleData,
         hostSince: formatSinceDate('Host', user.createdAt),
         companyName: user.additionalHostInformation?.companyName || null,
         eventsPerYear: user.additionalHostInformation?.eventsPerYear || null,
         website: user.additionalHostInformation?.website || null,
         referredBy: user.additionalHostInformation?.referredBy || null,
-        imageUrl: user.additionalHostInformation?.companyLogo || null,
-      },
-    };
-  } else {
-    return {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      userProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        imageUrl: user.profilePicture,
-      },
-    };
-  }
+        companyLogo: user.additionalHostInformation?.companyLogo || null,
+      };
+    }
+
+    // For non-member or admin roles (UserRole)
+    return baseRoleData;
+  });
+  // Return the CurrentUser object with the roles data
+  return {
+    phoneNumber: user.phoneNumber,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    role: roleData,
+  };
 };
 
 export const toMember = (

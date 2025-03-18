@@ -20,11 +20,11 @@ export class CommunicationService {
   
   public static async sendEmailFromTemplate(payload: SendEmailFromTemplateRequestDto){
     const template = await this.dbConnection
-      .getRepository(EmailTemplate)
-      .findOne({
-        where: { templateName: payload.template },
-      });
-
+    .getRepository(EmailTemplate)
+    .findOne({
+      where: { templateName: payload.template },
+    });
+    
     if (!template) {
       throw new NotFoundError("Template for send email not found");
     }

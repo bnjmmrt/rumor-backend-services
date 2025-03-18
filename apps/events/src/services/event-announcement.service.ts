@@ -57,15 +57,15 @@ export class EventAnnouncementService {
       .leftJoinAndSelect("guest.addedBy", "addedBy")
       .where(guestQueryParams);
 
-      if (findByName) {
-        const searchTerm = `%${findByName.toLowerCase()}%`;
-        query.andWhere(
-          `(LOWER(user.firstName) LIKE :searchTerm OR 
+    if (findByName) {
+      const searchTerm = `%${findByName.toLowerCase()}%`;
+      query.andWhere(
+        `(LOWER(user.firstName) LIKE :searchTerm OR 
                 LOWER(user.lastName) LIKE :searchTerm OR 
                 LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :searchTerm)`,
-          { searchTerm }
-        );
-      }
+        { searchTerm }
+      );
+    }
 
     const totalCount = await query.getCount();
     const guests = await query.skip(skip).take(take).getMany();
@@ -155,22 +155,58 @@ export class EventAnnouncementService {
       .leftJoinAndSelect("announcement.event", "event")
       .leftJoinAndSelect("announcement.addedBy", "addedBy")
       .leftJoinAndSelect("announcement.ticketType", "ticketType")
+      .leftJoin("announcement.recipients", "recipients")
       .where("announcement.event_id = :eventId", { eventId })
       .andWhere("announcement.deletedAt IS NULL")
-      .orderBy("announcement.createdAt", "DESC");
+      .orderBy("announcement.createdAt", "DESC")
+      .addSelect("COUNT(recipients.id)", "recipientCount")
+      .groupBy(
+        "announcement.id, announcement.createdAt, user.id, event.id, addedBy.id, ticketType.id"
+      );
 
     const totalCount = await query.getCount();
 
-    const announcements = await query.skip(skip).take(take).getMany();
+    let announcements = await query.skip(skip).take(take).getRawAndEntities();
+
+    for (let i = 0; i < announcements.entities.length; i++) {
+      let announcement = announcements.entities[i];
+      let recipientCount = parseInt(announcements.raw[i].recipientCount) || 0;
+
+      if (recipientCount === 0) {
+        const ticketTypeIds = announcement.ticketType?.map((t) => t.id) || [];
+        const addedByIds = announcement.addedBy?.map((a) => a.id) || [];
+
+        recipientCount = await database
+          .getRepository(Guest)
+          .createQueryBuilder("guest")
+          .where("guest.event_id = :eventId", { eventId })
+          .andWhere(
+            ticketTypeIds.length > 0
+              ? "guest.ticket_type_id IN (:...ticketTypeIds)"
+              : "1=1",
+            { ticketTypeIds }
+          )
+          .andWhere(
+            addedByIds.length > 0
+              ? "guest.added_by_id IN (:...addedByIds)"
+              : "1=1",
+            { addedByIds }
+          )
+          .andWhere("guest.status = :status", { status: GuestStatus.CONFIRMED })
+          .getCount();
+      }
+      Object.assign(announcement, { recipientCount });
+    }
 
     return {
       totalCount,
-      result: announcements,
+      result: announcements.entities,
     };
   }
 
   public static async getAnnouncement(payload) {
     const { id, eventId } = payload;
+
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -179,13 +215,51 @@ export class EventAnnouncementService {
         deletedAt: IsNull(),
       },
     });
+
     if (!event) throw new NotFoundError("Event not found");
 
-    return await database.getRepository(EventAnnouncement).findOne({
-      where: { id, event: { id: eventId }, deletedAt: IsNull() },
-      order: { createdAt: "DESC" },
-      relations: ["user", "event", "addedBy", "ticketType"],
-    });
+    // Fetch the announcement along with relations
+    const announcement = await database
+      .getRepository(EventAnnouncement)
+      .findOne({
+        where: { id, event: { id: eventId }, deletedAt: IsNull() },
+        order: { createdAt: "DESC" },
+        relations: ["user", "event", "addedBy", "ticketType", "recipients"],
+      });
+
+    if (!announcement) throw new NotFoundError("Announcement not found");
+
+    // Get the recipient count
+    let recipientCount = announcement.recipients?.length || 0;
+
+    if (recipientCount === 0) {
+      const ticketTypeIds = announcement.ticketType?.map((t) => t.id) || [];
+      const addedByIds = announcement.addedBy?.map((a) => a.id) || [];
+
+      recipientCount = await database
+        .getRepository(Guest)
+        .createQueryBuilder("guest")
+        .where("guest.event_id = :eventId", { eventId })
+        .andWhere(
+          ticketTypeIds.length > 0
+            ? "guest.ticket_type_id IN (:...ticketTypeIds)"
+            : "1=1",
+          { ticketTypeIds }
+        )
+        .andWhere(
+          addedByIds.length > 0
+            ? "guest.added_by_id IN (:...addedByIds)"
+            : "1=1",
+          { addedByIds }
+        )
+        .andWhere("guest.status = :status", { status: GuestStatus.CONFIRMED })
+        .getCount();
+    }
+
+    return {
+      ...announcement,
+      recipientCount,
+    };
   }
 
   public static async updateAnnouncement(payload) {
@@ -230,7 +304,7 @@ export class EventAnnouncementService {
 
     if (!event) throw new NotFoundError("Event not found");
 
-    const announcement = await database
+    const announcement: any = await database
       .getRepository(EventAnnouncement)
       .findOne({
         where: {
@@ -238,7 +312,7 @@ export class EventAnnouncementService {
           event: { id: eventId },
           deletedAt: IsNull(),
         },
-        relations: ["recipients"],
+        relations: ["recipients", "ticketType", "addedBy"],
       });
 
     if (!announcement) throw new NotFoundError("Announcement not found");
@@ -246,12 +320,9 @@ export class EventAnnouncementService {
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
 
-    const recipientIds = announcement.recipients
-      ? announcement.recipients.map((r) => r.id)
-      : [];
-
-    // Create query 
-    //TO BE DONE - ADD Filter for recipients where the condition of announcement matches i.e ticketType and added By
+    let recipientIds = announcement.recipients?.map((r) => r.id) || [];
+    let ticketTypeIds = announcement.ticketType?.map((t) => t.id) || [];
+    let addedByIds = announcement.addedBy?.map((a) => a.id) || [];
 
     let query = database
       .getRepository(Guest)
@@ -262,7 +333,16 @@ export class EventAnnouncementService {
       .andWhere("guest.deletedAt IS NULL")
       .andWhere("guest.status = :status", { status: GuestStatus.CONFIRMED });
 
-    if (recipientIds.length > 0) {
+    if (recipientIds.length === 0) {
+      if (ticketTypeIds.length > 0) {
+        query.andWhere("guest.ticket_type_id IN (:...ticketTypeIds)", {
+          ticketTypeIds,
+        });
+      }
+      if (addedByIds.length > 0) {
+        query.andWhere("guest.added_by_id IN (:...addedByIds)", { addedByIds });
+      }
+    } else {
       query.andWhere("guest.id IN (:...recipientIds)", { recipientIds });
     }
 
@@ -277,7 +357,6 @@ export class EventAnnouncementService {
     }
 
     const totalCount = await query.getCount();
-
     const recipients = await query.skip(skip).take(take).getMany();
 
     return {

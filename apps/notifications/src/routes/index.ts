@@ -2,6 +2,8 @@ import { Router } from "express";
 import * as express from "express";
 import { CommunicationController } from "../controllers/communication.controller";
 import { NotificationController } from "../controllers/notification.controller";
+import AuthMiddleware from "../server/middleware/auth";
+
 const router: Router = express.Router();
 
 /**
@@ -27,6 +29,12 @@ router.delete('/communication/template-email', CommunicationController.deleteEma
 router.get('/get-email-template', CommunicationController.getEmailTemplate);
 
 /**
+ * Route for Sending the Notification
+ */
+router.post('/notification/notify',NotificationController.sendNotification);
+
+
+/**
  * Route for Notification Creation - Will be used in service Mesh for interservice communication call
  */
 
@@ -36,16 +44,16 @@ router.post('/notification', NotificationController.createNotification);
  * Routes for  - User Notifications - Host, Member
  */
 
-router.get('/notifications', NotificationController.getAllNotifications);
-router.get('/notification:notificationId', NotificationController.getNotificationDetail);
-router.delete('/notification/:notificationId',NotificationController.deleteNotificationById);
+router.get('/notifications', AuthMiddleware.fusionAuthRequired, NotificationController.getAllNotifications);
+router.get('/notification/:notificationId', AuthMiddleware.fusionAuthRequired, NotificationController.getNotificationDetail);
+router.delete('/notification/:notificationId', AuthMiddleware.fusionAuthRequired, NotificationController.deleteNotificationById);
 
 /**
  * Routes for  - Admin Notifications
  */
-router.get('/notifications-list', NotificationController.listNotifications);
-router.get('/notifications/summary', NotificationController.getNotificationSummary);
-router.delete('/notifications/bulk-delete', NotificationController.deleteMultipleNotifications);
+router.get('/notifications-list', AuthMiddleware.fusionAuthRequired, NotificationController.listNotifications);
+router.get('/notifications/summary', AuthMiddleware.fusionAuthRequired, NotificationController.getNotificationSummary);
+router.delete('/notifications/bulk-delete', AuthMiddleware.fusionAuthRequired, NotificationController.deleteMultipleNotifications);
 
 
 export default router;

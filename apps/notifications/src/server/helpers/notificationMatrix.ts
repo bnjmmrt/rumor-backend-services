@@ -6,9 +6,9 @@ let notificationMatrix = {
   },
   profileReferrals: {
     pushMessage:
-      "[User Full Name] has requested your referral to Rumor. Tap to refer them now! ",
+      "[Linked User Name] has requested your referral to Rumor. Tap to refer them now! ",
     appMessage:
-      "[Requested Name] has requested your referral to become a Rumor member. ",
+      "[Linked User Name] has requested your referral to become a Rumor member. ",
     appNotification: true,
     pushNotification: true,
     body: { userId: "" },
@@ -16,15 +16,15 @@ let notificationMatrix = {
   },
   eventReminder: {
     pushMessage:
-      "Just a reminder, you are scheduled to attend [event] tomorrow at [start time].",
+      "Just a reminder, you are scheduled to attend [Event Name] tomorrow at [Event Start Time].",
     appNotification: false,
     pushNotification: true,
     body: { eventId: "" },
     linkedEvent: "",
   },
   eventCancelled: {
-    pushMessage: "Hi [name], [event name] has been canceled.",
-    appMessage: "[Host Name] canceled [Event Name] ",
+    pushMessage: "Hi [Recipient Name], [Event Name] has been canceled.",
+    appMessage: "[Linked User Name] canceled [Event Name] ",
     pushNotification: true,
     appNotification: true,
     body: { eventId: "" },
@@ -32,8 +32,8 @@ let notificationMatrix = {
     linkedEvent: "",
   },
   eventInvitation: {
-    pushMessage: "You've received an invite to attend [event]! Tap to RSVP.",
-    appMessage: "[Host Name] invited you to attend [Event Name] ",
+    pushMessage: "You've received an invite to attend [Event Name]! Tap to RSVP.",
+    appMessage: "[Linked User Name] invited you to attend [Event Name] ",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -41,8 +41,8 @@ let notificationMatrix = {
     linkedEvent: "",
   },
   eventPosted: {
-    pushMessage: "[Host Name] just posted a new event. Check it out now. ",
-    appMessage: "[Host Name] just published a new event [Event Name]",
+    pushMessage: "[Linked User Name] just posted a new event. Check it out now. ",
+    appMessage: "[Linked User Name] just published a new event [Event Name]",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -51,9 +51,9 @@ let notificationMatrix = {
   },
   eventPostedCity: {
     pushMessage:
-      "[Host name] just posted a new event in [Base City]. Check it out now. ",
+      "[Linked User Name] just posted a new event in [Event City Name]. Check it out now. ",
     appMessage:
-      "A new event [Event Name] was just published in [User's Base City]",
+      "A new event [Event Name] was just published in [Event City Name]",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -63,18 +63,17 @@ let notificationMatrix = {
   },
   eventRequestDenied: {
     pushMessage:
-      "Your request for [event name] was declined. Check out other events on Rumor.",
+      "Your request for [Event Name] was declined. Check out other events on Rumor.",
     appMessage: "Your request to attend [Event Name] has been declined.",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
-    linkedUser: "",
     linkedEvent: "",
   },
   eventVouch: {
     pushMessage:
-      "[User Full Name] has requested your vouch to attend [Event Name]. Tap to refer them now!",
-    appMessage: "[Requested Name] has requested for you to vouch for them.",
+      "[Linked User Name] has requested your vouch to attend [Event Name]. Tap to refer them now!",
+    appMessage: "[Linked User Name] has requested for you to vouch for them.",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -83,8 +82,8 @@ let notificationMatrix = {
   },
   eventAnnouncement: {
     pushMessage:
-      "[Host] just posted a new event announcement for [Event]. Tap to view.",
-    appMessage: "[Host Name] posted a new announcement for [Event Name]",
+      "[Linked User Name] just posted a new event announcement for [Event Name]. Tap to view.",
+    appMessage: "[Linked User Name] posted a new announcement for [Event Name]",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -93,7 +92,7 @@ let notificationMatrix = {
   },
   signUpFormApproved: {
     pushMessage: "",
-    appMessage: "[Host Name] approved your request to attend [Event Name]",
+    appMessage: "[Linked User Name] approved your request to attend [Event Name]",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -102,7 +101,7 @@ let notificationMatrix = {
   },
   signUpFormRejected: {
     pushMessage: "",
-    appMessage: "[Host Name] declined your request to attend [Event Name]",
+    appMessage: "[Linked User Name] declined your request to attend [Event Name]",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -111,17 +110,16 @@ let notificationMatrix = {
   },
   eventSubmissionApproved: {
     pushMessage:
-      "Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)",
+      "[Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)",
     appMessage: "Rumor has approved your event [Event Name]",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
-    linkedUser: "",
     linkedEvent: "",
   },
   userApplication: {
     pushMessage: "",
-    appMessage: "[User Name] submitted a New User Application",
+    appMessage: "[Linked User Name] submitted a New User Application",
     appNotification: true,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -130,7 +128,7 @@ let notificationMatrix = {
   },
   hostApplication: {
     pushMessage: "",
-    appMessage: "[Host Company Name] submitted a New Host Application",
+    appMessage: "[Linked User Name] submitted a New Host Application",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -139,7 +137,7 @@ let notificationMatrix = {
   },
   eventSubmitted: {
     pushMessage: "",
-    appMessage: "[Host Company Name] submitted a new event [New Event Name]",
+    appMessage: "[Linked User Name] submitted a new event [Event Name]",
     appNotification: false,
     pushNotificaton: true,
     body: { eventId: "" },
@@ -148,7 +146,7 @@ let notificationMatrix = {
   },
   eventEdited: {
     pushMessage: "",
-    appMessage: "[Host Company name] made edits to [Event Name]",
+    appMessage: "[Linked User Name] made edits to [Event Name]",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -157,7 +155,7 @@ let notificationMatrix = {
   },
   hostReport: {
     pushMessage: "",
-    appMessage: "[Host Company Name] submitted a report against [Member Name]",
+    appMessage: "[Linked User Name] submitted a report against [Member Name]",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -166,7 +164,7 @@ let notificationMatrix = {
   },
   hostFeedback: {
     pushMessage: "",
-    appMessage: "[Host Company Name] submitted feedback",
+    appMessage: "[Linked User Name] submitted feedback",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -175,7 +173,7 @@ let notificationMatrix = {
   },
   userReport: {
     pushMessage: "",
-    appMessage: "[Member Name] submitted a report against [Host Company Name]",
+    appMessage: "[Linked User Name] submitted a report against [Host Name]",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -184,7 +182,7 @@ let notificationMatrix = {
   },
   userFeedback: {
     pushMessage: "",
-    appMessage: "[User Name] submitted feedback",
+    appMessage: "[Linked User Name] submitted feedback",
     appNotification: true,
     pushNotificaton: false,
     body: { eventId: "" },
@@ -194,7 +192,7 @@ let notificationMatrix = {
 };
 
 
-function getNotificationDetails(notificationType: string) {
+function getNotificationDetails(notificationType: string):any {
     const notification = notificationMatrix[notificationType as keyof typeof notificationMatrix];
   
     if (!notification) {
@@ -203,5 +201,7 @@ function getNotificationDetails(notificationType: string) {
   
     return { notificationType, ...notification };
 }
+
+export default getNotificationDetails
 
 

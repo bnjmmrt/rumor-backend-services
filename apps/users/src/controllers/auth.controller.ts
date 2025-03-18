@@ -56,6 +56,7 @@ import {
   ValidatePasswordTokenRequestDto,
   SetHostPasswordRequestDto,
   UpdateHostPasswordRequestDto,
+  UpdateAdminPasswordRequestDto,
   ContactsListRequestDto,
   GetUserWithRolesByEmailRequestDto,
   NonMemberSignUpRequestDto,
@@ -211,6 +212,19 @@ export class AuthController {
     }
   );
 
+  public static updateAdminPassword = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UpdateAdminPasswordRequestDto = { ...req.body, id };
+      const response: string = await AuthService.updateAdminPassword(payload);
+      const updateResponse = new UpdateResponse(
+        response,
+        "Admin password updated successfully."
+      );
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
+
   public static loginSSO = asyncWrapper(async (req, res): Promise<void> => {
     const response: LoginSSOResponse = await AuthService.loginSSO();
     const successResponse = new GetResponse(response);
@@ -319,11 +333,11 @@ export class AuthController {
     res.status(successResponse.statusCode).json(successResponse);
   });
 
-  public static getCurrentUser = asyncWrapper(
+  public static getMe = asyncWrapper(
     async (req, res): Promise<void> => {
       const id = (req as any).user;
       const payload: IdRequestDto = { id };
-      const response: CurrentUser[] = await AuthService.getCurrentUser(payload);
+      const response: CurrentUser = await AuthService.getMe(payload);
       const successResponse = new GetResponse(
         response,
         "Successfully retrieved current user."
@@ -533,8 +547,8 @@ export class AuthController {
 
   public static manageFollowHost = asyncWrapper(
     async (req, res): Promise<void> => {
-      const id = req.params.id;
-      const payload: ManageFollowHostRequestDto = { ...req.body, userId: id };
+      const hostId = req.params.id;
+      const payload: ManageFollowHostRequestDto = { ...req.body, hostId };
       const response: string = await AuthService.manageFollowHost(payload);
       const successResponse = new CreateResponse(
         response,
@@ -1021,4 +1035,40 @@ export class AuthController {
     );
     res.status(createResponse.statusCode).json(createResponse);
   });
+
+  public static deactivateUserAccount = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    // const userId = (req as any).user;
+    const payload: IdRequestDto = { id };
+    const response: any = await AuthService.deactivateUserAccount(payload);
+    const deleteResponse = new DeleteResponse(
+      response,
+      "User account deactivated successfully"
+    );
+    res.status(deleteResponse.statusCode).json(deleteResponse);
+  });
+
+  public static reactivateUserAccount = asyncWrapper(async (req, res): Promise<void> => {
+    // const userId = (req as any).user;
+    const payload: CheckEmailRequestDto = req.body;
+    const response: any = await AuthService.reactivateUserAccount(payload);
+    const createResponse = new CreateResponse(
+      response,
+      "User account reactivated successfully"
+    );
+    res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static permanantlyDeleteAccount = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    // const userId = (req as any).user;
+    const payload: IdRequestDto = { id };
+    const response: any = await AuthService.permanantlyDeleteAccount(payload);
+    const deleteResponse = new DeleteResponse(
+      response,
+      "User account permanantly deleted"
+    );
+    res.status(deleteResponse.statusCode).json(deleteResponse);
+  });
+
 }

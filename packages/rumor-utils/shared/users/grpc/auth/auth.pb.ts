@@ -34,6 +34,53 @@ export enum Gender {
   UNRECOGNIZED = 'UNRECOGNIZED',
 }
 
+export interface CurrentUser {
+  phoneNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  profilePicture?: string | undefined;
+  role: Role[] | undefined
+}
+
+export interface HostRole {
+  id: string;
+  userId: string;
+  roleName: string;
+  status?: string | undefined;
+  source?: string | undefined;
+  hostSince?: string | undefined;
+  companyName?: string | undefined;
+  eventsPerYear?: number | undefined;
+  website?: string | undefined;
+  referredBy?: string | undefined;
+  companyLogo?: string | undefined;
+}
+
+  export interface MemberRole {
+    id: string;
+    userId: string;
+    roleName: string;
+    status?: string | undefined;
+    source?: string | undefined;
+    gender?: Gender | undefined;
+    dateOfBirth?: string | undefined;
+    address?: MemberAddress | undefined;
+    focuses: Focus[];
+    socialProviders: SocialProvider[];
+    socialStats?: SocialMediaStats | undefined;
+    memberSince?: string | undefined;
+  }
+
+export interface UserRole {
+  id: string;
+  userId: string;
+  roleName: string;
+  status?: string | undefined;
+  source?: string | undefined;
+}
+
+export type Role = HostRole | MemberRole | UserRole;
 export interface ContactsListRequest {
   contacts: string[];
 }
@@ -111,6 +158,8 @@ export interface MemberSignUpRequest {
   instagramUserName?: string | undefined;
   interestsIds: string[];
   profilePicture?: string | undefined;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 /** HostSignUp */
@@ -123,12 +172,16 @@ export interface HostSignUpRequest {
   eventsPerYear: number;
   website?: string | undefined;
   referredBy?: string | undefined;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 /** Login */
 export interface LoginRequest {
   email: string;
   password: string;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 export interface LoginResponse {
@@ -154,6 +207,9 @@ export interface MemberLoginRequest {
   email?: string | undefined;
   isExist: boolean;
   isGuest: boolean;
+  fcmToken?: string;
+  deviceId?: string;
+  isDeactivated?: boolean;
 }
 
 export interface TokenResponseAndRoles {
@@ -220,6 +276,7 @@ export interface OAuthRedirectResponse {
 export interface Validity {
   isValid: boolean;
   isGuest?: boolean | undefined;
+  isDeactivated?: boolean
 }
 
 export interface ValidityResponse {
@@ -361,16 +418,6 @@ export interface CurrentUserProfile {
   imageUrl?: string | undefined;
 }
 
-export interface CurrentUser {
-  roleId: string;
-  roleName: string;
-  status?: UserStatus | undefined;
-  source?: UserSource | undefined;
-  hostProfile?: CurrentHostProfile | undefined;
-  memberProfile?: CurrentMemberProfile | undefined;
-  userProfile?: CurrentUserProfile | undefined;
-  profileSetupCompleted: boolean;
-}
 
 export interface CurrentUserResponse {
   status: number;

@@ -1,5 +1,5 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Event } from './event.entity';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity'; import { Event } from './event.entity';
 import { Guest } from './guest.entity';
 import { Ticket } from './ticket.entity';
 import { Collaborator } from './collaborator.entity';
@@ -12,7 +12,7 @@ export class TicketType extends RumorBaseEntity {
   @Column({ type: 'varchar', name: 'description' })
   description: string;
 
-  @Column({ type: 'integer', name: 'capacity' })
+  @Column({ type: 'integer', name: 'capacity', default: 0 })
   capacity: number;
 
   @Column({ type: 'boolean', default: true, name: 'enabled' })
@@ -20,7 +20,7 @@ export class TicketType extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.ticketTypes, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })

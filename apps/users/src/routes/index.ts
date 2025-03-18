@@ -14,7 +14,7 @@ const multer = require('multer');
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 5 * 1024 * 1024, // limit file size to 5MB
+        fileSize: 5 * 1024 * 1024,
     },
 });
 
@@ -26,11 +26,17 @@ router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminControll
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
 router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
-router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id
+router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id (Here we might get one uissue)
 router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
-router.get('/auth/host/:id/profile', AdminController.getBasicHostProfile);         // get basic host profile by id
 router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
-router.put('/auth/host/:id/profile', AdminController.updateHostProfile);           // update host profile 
+
+/**
+ * Added Authorization in these 2 APIs & updated the endpoints
+ */
+
+router.get('/host/profile',AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);         // get basic host profile by id
+router.put('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);           // update host profile 
+
 router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
 router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
 router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
@@ -51,6 +57,7 @@ router.post('/auth/host-sign-up', AuthController.hostSignUp);
 router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
+router.put('/auth/admin/password', AuthMiddleware.fusionAuthRequired, AuthController.updateAdminPassword);
 router.put('/auth/host/password', AuthMiddleware.fusionAuthRequired, AuthController.updateHostPassword);
 router.get('/auth/login-sso', AuthController.loginSSO);
 router.get('/auth/oauth-redirect', AuthController.oAuthRedirect);
@@ -62,7 +69,8 @@ router.post('/auth/member-login', AuthController.memberLogin);
 router.post('/auth/host-login', AuthController.hostLogin);
 router.get('/auth/get-current-member', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentMember);
 router.get('/auth/user/:id/get-user', AuthController.getUser);
-router.get('/auth/current-user', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentUser);
+router.get('/auth/me', AuthMiddleware.fusionAuthRequired,AuthMiddleware.checkHostRole, AuthController.getMe);
+router.get('/auth/admin/me', AuthMiddleware.fusionAuthRequired,AuthMiddleware.checkAdminRole, AuthController.getMe);
 router.post('/auth/save-or-update-provider', AuthController.saveOrUpdateProvider);
 router.post('/auth/send-invitations', AuthMiddleware.fusionAuthRequired, AuthController.sendInvitations);
 router.post('/auth/save-invitations', AuthMiddleware.fusionAuthRequired, AuthController.saveInvitations);
@@ -113,8 +121,12 @@ router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRe
 router.post('/auth/users/:id/hosts/:hostId/report-and-block', AuthMiddleware.fusionAuthRequired, AuthController.reportAndBlockHost);
 router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthController.sendSupportEmail);
 router.get('/auth/admin/reports', AuthController.getAllReports);
-router.get('/auth/switch-profile/:id', AuthController.switchProfile);
+router.post('/auth/switch-profile/:id', AuthController.switchProfile);
 router.post('/auth/user/:id/note', AuthController.addUserNote);
+router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
+router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
+router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
+
 
 //Role routes
 router.get('/auth/roles', RoleController.listRoles);
@@ -189,11 +201,13 @@ router.get("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, Referra
 router.get("/auth/list-referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
 
 //Referral Codes
-router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
-router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
-router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
+router.post("/auth/referral-code", ReferralCodeController.createReferralCode)
+router.get("/auth/referral-codes/:id", ReferralCodeController.getReferralCode)
+router.get("/auth/referral-codes", ReferralCodeController.getReferralCodes)
+router.put("/auth/referral-codes", ReferralCodeController.updateReferralCode)
+router.put("/auth/referral-codes/:id/deactivate", ReferralCodeController.deactivateReferralCode)
+router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralCode)
+
 //Referrals
 router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
 
@@ -213,12 +227,11 @@ router.post("/files/generate-download-url", FilesController.getFile);
 
 router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
 
-router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
-
-router.get("/files/view/:id", FilesController.viewFile);
-
-router.put('/files/:id', FilesController.updateFile);
+router.get("/files/view/*", FilesController.viewFile);
 
 router.delete('/files:id', FilesController.removeFile);
+
+router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
+// router.put('/files/:id', FilesController.updateFile);
 
 export default router;

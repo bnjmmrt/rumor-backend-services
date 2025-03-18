@@ -82,6 +82,23 @@ export class PlatformService {
   public static async saveFocusesForUser(
     payload: SaveFocusesForUserRequestoDto
   ): Promise<GenericResponse> {
+
+    const focuses = await this.dbConnection.getRepository(Focus).find({
+      where: {
+        users: { id: payload.userId },
+        deletedAt: IsNull(),
+      },
+      relations: ['users'],
+    });
+
+    if (focuses.length > 0) {
+      await Promise.all(
+        focuses.map(async (focus) => {
+          focus.users = focus.users.filter((user) => user.id !== payload.userId);
+          return this.dbConnection.getRepository(Focus).save(focus);
+        }),
+      );
+    }
     await Promise.all(
       payload.focusIds.map(async (focusId) => {
         const focus = await this.dbConnection.getRepository(Focus).findOne({
@@ -94,11 +111,11 @@ export class PlatformService {
           },
         });
 
-        if (!focus) return;
-
-        if (focus.users.find((u) => u.id === payload.userId) === undefined) {
-          focus.users = [...focus.users, { id: payload.userId } as User];
-          await this.dbConnection.getRepository(Focus).save(focus);
+        if (focus) {
+          if (!focus.users.find((u) => u.id === payload.userId)) {
+            focus.users = [...focus.users, { id: payload.userId } as User];
+            await this.dbConnection.getRepository(Focus).save(focus);
+          }
         }
       })
     );

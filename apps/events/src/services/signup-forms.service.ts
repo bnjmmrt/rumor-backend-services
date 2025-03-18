@@ -25,7 +25,7 @@ import {
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource, QueryRunner } from "typeorm";
+import { Brackets, DataSource, QueryRunner, UpdateResult } from "typeorm";
 import { isUUID } from "class-validator";
 import {
   EventStatusEnum,
@@ -180,7 +180,7 @@ export class SignupFormsServices {
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
-      signupForm.name = body.name || companyName;
+      signupForm.name = body.name || `${companyName} 's`;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
@@ -242,7 +242,9 @@ export class SignupFormsServices {
       .getMany();
 
     const questionsMap = new Map<string, boolean>();
-    existingQuestions.forEach((q) => questionsMap.set(q.id.toString(), q.isDefault));
+    existingQuestions.forEach((q) =>
+      questionsMap.set(q.id.toString(), q.isDefault)
+    );
 
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
@@ -464,7 +466,11 @@ export class SignupFormsServices {
    * @param id
    */
   public static async deactivate(id: string) {
-    await EventSignupForms.update(id, { isPublished: false, isActive: false });
+    const data: UpdateResult = await EventSignupForms.update(id, {
+      isPublished: false,
+      isActive: false,
+    });
+    return data;
   }
 
   /**
@@ -554,7 +560,17 @@ export class SignupFormsServices {
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      const count = await SignupFormSubmissions.count();
+      // const count = await SignupFormSubmissions.count({
+      //   where: {
+      //     signupForm: { id: id },
+      //   },
+      // });
+
+      const getCountQuery = database
+        .getRepository(SignupFormSubmissions)
+        .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
@@ -564,6 +580,7 @@ export class SignupFormsServices {
         .select([])
         .addSelect("sfs.id", "id")
         .addSelect("atd.firstName", "firstName")
+        .addSelect("atd.profilePicture", "profilePicture")
         .addSelect("atd.lastName", "lastName")
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
@@ -571,6 +588,15 @@ export class SignupFormsServices {
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
+        getCountQuery.andWhere(
+          new Brackets((qb) => {
+            searchWords.forEach((word) => {
+              qb.orWhere("atd.firstName ILIKE :word", {
+                word: `%${word}%`,
+              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+            });
+          })
+        );
         submissionsQuery.andWhere(
           new Brackets((qb) => {
             searchWords.forEach((word) => {
@@ -581,9 +607,9 @@ export class SignupFormsServices {
           })
         );
       }
-
       submissionsQuery.orderBy("sfs.id", "DESC").offset(skip).limit(take);
 
+      const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
       const result = { count, result: submissionList };
       return result;
@@ -592,18 +618,18 @@ export class SignupFormsServices {
     }
   }
 
-  public static async setName(id: string, name: string) {
-    try {
-      const signupForm: EventSignupForms = await EventSignupForms.findOne({
-        where: { id: id },
-      });
-      if (!signupForm) {
-        throw new ForbiddenError("Signup Forms does not exists.");
-      }
-      signupForm.name = name;
-      await signupForm.save();
-    } catch (err) {
-      throw err;
-    }
-  }
+  // public static async setName(id: string, name: string) {
+  //   try {
+  //     const signupForm: EventSignupForms = await EventSignupForms.findOne({
+  //       where: { id: id },
+  //     });
+  //     if (!signupForm) {
+  //       throw new ForbiddenError("Signup Forms does not exists.");
+  //     }
+  //     signupForm.name = name;
+  //     await signupForm.save();
+  //   } catch (err) {
+  //     throw err;
+  //   }
+  // }
 }

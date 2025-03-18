@@ -84,6 +84,13 @@ export const validateFilters = (query: string): { error: boolean; response: stri
  */
 export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventRequestDto): { error: boolean; response?: string } => {
   const currentDate = new Date();
+  /**added console to debug the dates issue if any on live server*/
+  console.log('\n',"validateEventDates --> user Time zone: ", payload.timeZone)
+  console.log('\n', "validateEventDates --> currentDate:   ", currentDate)
+  console.log(" validateEventDates --> payload.startDate:  ", payload.startDate)
+  console.log("validateEventDates --> payload.endDate:     ", payload.endDate)
+  console.log("validateEventDates --> payload.publishDate: ", payload.publishDate )
+ 
   if (!payload.startDate || !isUtcDate(payload.startDate)) {
     return { error: true, response: 'Start Date must be valid and in UTC standard' };
   }
@@ -220,3 +227,20 @@ export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, exist
   }
   return { changed: changes.length > 0, changes };
 }
+export function extractDate(date: Date): { year: string; month: string; day: string; dayOfWeek: string, hour: string, minutes: string } {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error("Invalid date object provided");
+  }
+  const updatedDate = new Date(date);
+  const hour= updatedDate.getUTCHours() > 0 ? updatedDate.getUTCHours().toString() : '00'
+  const minutes= updatedDate.getUTCMinutes() > 0  ? updatedDate.getUTCMinutes().toString() : '00' 
+  return {
+    year: updatedDate.getUTCFullYear().toString(),
+    month: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"][updatedDate.getUTCMonth()], // Months are 0-based
+    day: updatedDate.getUTCDate().toString(),
+    dayOfWeek: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][date.getUTCDay()],
+    hour,
+    minutes
+  };
+}
+

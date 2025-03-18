@@ -15,7 +15,7 @@ const start = async () => {
         }
         // await Seeders.seedEventTypes()
         // await Seeders.seedEventAgeLimits()
-        await Seeders.seedDefaultRoleSettings()
+        //  await Seeders.seedDefaultRoleSettings()
         if (config.get('runSeeds')) {
             await connectionManager.runSeeders();
         }

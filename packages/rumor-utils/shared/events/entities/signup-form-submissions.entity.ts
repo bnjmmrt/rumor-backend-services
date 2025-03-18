@@ -3,9 +3,7 @@ import {
   Entity,
   Column,
   ManyToOne,
-  JoinColumn,
-  OneToMany,
-  OneToOne,
+  JoinColumn, OneToOne
 } from "typeorm";
 import { EventSignupForms } from "./event-signup-forms.entity";
 import { User } from "../../users/entities/user.entity";

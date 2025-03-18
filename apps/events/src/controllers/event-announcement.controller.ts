@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { EventAnnouncementService } from '../services/event-announcement.service';
 import asyncWrapper from "../server/helpers/asyncWrapper";
-import { GetResponse, CreateResponse, UpdateResponse } from "rumor-utils/success";
+import { GetResponse, CreateResponse, UpdateResponse, DeleteResponse } from "rumor-utils/success";
 
 export class EventAnnouncementController {
 
@@ -15,7 +15,8 @@ export class EventAnnouncementController {
       findByName: req.query.findByName
     }
     const announcementGuestList = await EventAnnouncementService.getAnnouncementGuestList(payload)
-    res.json(new GetResponse(announcementGuestList));
+    const successResponse = new GetResponse(announcementGuestList);
+    res.status(successResponse.statusCode).json(successResponse);
   })        
   
   public static postAnnouncement = asyncWrapper(async (req:Request, res:Response) => {
@@ -28,10 +29,9 @@ export class EventAnnouncementController {
       attachments: req.body.attachments,
       createdBy: (req as any).user
     }
-    console.log("🚀 ~ EventAnnouncementController ~ postAnnouncement=asyncWrapper ~ payload:", payload)
-    
     const announcement = await EventAnnouncementService.postAnnouncement(payload)
-    res.json(new CreateResponse(announcement));
+    const successResponse = new CreateResponse(announcement);
+    res.status(successResponse.statusCode).json(successResponse);
   })
 
   public static updateAnnouncement = asyncWrapper(async(req:Request, res:Response)=> {
@@ -41,16 +41,20 @@ export class EventAnnouncementController {
       announcement: req.body.announcement,
       attachments: req.body.attachments,
     }
+
     const updatedAnnouncement = await EventAnnouncementService.updateAnnouncement(payload)
-    res.json(new UpdateResponse(""));
+    const successResponse = new UpdateResponse(updatedAnnouncement);
+    res.status(successResponse.statusCode).json(successResponse);
   })
 
   public static getAnnouncements = asyncWrapper(async(req:Request, res:Response) => {
     const payload: any = {
       eventId: req.params.eventId,
     }
-    const announcements = await EventAnnouncementService.getAnnouncements(payload)
-    res.json(new GetResponse(announcements));
+    const announcements = await EventAnnouncementService.getAnnouncements(payload);
+    
+    const successResponse = new GetResponse(announcements);
+    res.status(successResponse.statusCode).json(successResponse);
   })
 
   public static getAnnouncement = asyncWrapper(async(req:Request, res:Response) => {
@@ -59,7 +63,9 @@ export class EventAnnouncementController {
       id :req.params.announcementId
     }
     const announcement = await EventAnnouncementService.getAnnouncement(payload)
-    res.json(new GetResponse(announcement));
+
+    const successResponse = new GetResponse(announcement);
+    res.status(successResponse.statusCode).json(successResponse);
   })
 
   public static deleteAnnouncement = asyncWrapper(async(req:Request, res:Response) => {
@@ -68,8 +74,9 @@ export class EventAnnouncementController {
       eventId: req.params.eventId,
     }
 
-    const deletedAnnouncement = await EventAnnouncementService.deleteAnnouncement(payload)
-    res.json(new UpdateResponse(""));
+    const deletedAnnouncement = await EventAnnouncementService.deleteAnnouncement(payload)    
+    const successResponse = new DeleteResponse(deletedAnnouncement);
+    res.status(successResponse.statusCode).json(successResponse);
   })
 
   public static getRecipientListForAnnoucement = asyncWrapper(async(req:Request, res:Response) => {
@@ -82,7 +89,8 @@ export class EventAnnouncementController {
     }
 
     const recipientList = await EventAnnouncementService.getRecipientList(payload)
-    res.json(new GetResponse(recipientList));
+    const successResponse = new GetResponse(recipientList);
+    res.status(successResponse.statusCode).json(successResponse);
   })
   
 }

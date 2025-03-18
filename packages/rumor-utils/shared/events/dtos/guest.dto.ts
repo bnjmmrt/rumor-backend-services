@@ -315,7 +315,7 @@ export class BulkUploadGuestsRequestDto implements BulkUploadGuestsRequest {
   hostId: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   eventId: string;
 
   @IsString()

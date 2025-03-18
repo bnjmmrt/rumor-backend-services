@@ -223,7 +223,6 @@ export class GuestController {
     async (req, res): Promise<void> => {
       const payload: BulkUploadGuestsRequestDto = {
         hostId: (req as any).user,
-        eventId: req.params.id,
         ...req.body
       }
       const response: BulkUserData = await GuestService.bulkUploadGuests(payload);
@@ -261,7 +260,7 @@ export class GuestController {
   public static declineEventInvitation = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: DeclineEventInvitationRequestDto = {
-        id: req.params.id,
+        userId: req.params.id,
         eventId: req.params.eventId,
         ...req.body
       }
@@ -316,7 +315,7 @@ export class GuestController {
   public static inviteNewUser = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: InviteNewUserRequestDto = {
-        eventId: req.params.eventId,
+        eventId: req.params.id,
         userId: (req as any).user,
         ...req.body
       }
@@ -412,6 +411,33 @@ export class GuestController {
       const response: Attendees = await GuestService.getEventAttendeeCountByTicketType(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static exportCsv = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const hostId = (req as any).user;
+      const query = req.query;
+      const payload: GuestsQueryRequestDto = {
+        hostId: hostId,
+        eventId: req.params.eventId,
+        query,
+      };
+  
+      try {
+        // Call the service to generate the CSV
+        const csvData = await GuestService.exportCsv(payload);
+  
+        // Set the headers to indicate the content type and prompt a download
+        res.header('Content-Type', 'text/csv');
+        res.attachment('guests_export.csv');
+  
+        // Send the generated CSV data to the client
+        res.send(csvData);
+      } catch (error) {
+        // If any error occurs, return a 500 status code
+        res.status(500).send('Error generating CSV');
+      }
     }
   );
 }

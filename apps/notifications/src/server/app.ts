@@ -15,17 +15,19 @@ app.use(helmet());
 app.use(
   cors({
     origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.get("/notifications/v1/health", (req: Request, res: Response) => {
-  res.json({ status: "UP" , timestamp:new Date()}).status(200);
+  res.json({ status: "UP", timestamp: new Date() }).status(200);
 });
 
 app.use("/notifications/v1", router);
-app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundError(req.path)));
+app.get("*", (req: Request, res: Response, next: NextFunction) =>
+  next(new NotFoundError(req.path))
+);
 app.use(errorHandler);
 
 export default app;

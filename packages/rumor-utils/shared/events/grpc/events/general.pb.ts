@@ -307,6 +307,7 @@ export interface CollaboratorsEvent {
   companyLogo?: string | undefined;
   companyName?: string | undefined;
   isFollowedByCurrentGuest?: boolean | undefined;
+  isApproved: boolean | undefined
 }
 
 export interface Collaborator {
@@ -392,6 +393,7 @@ export interface Guest {
   gender: Gender;
   age?: number | undefined;
   additionalGuests: AdditionalGuest[];
+  phoneNumber?: string;
 }
 
 export interface AdditionalGuest {
@@ -540,7 +542,7 @@ export interface GuestEventData {
   imageCover?: string | undefined;
   location?: EventLocation | undefined;
   eventType?: EventTypeEvent | undefined;
-  status?: EventStatus | undefined;
+  status?: EventStatusEnum | undefined;
   showLocation?: boolean | undefined;
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
@@ -648,7 +650,7 @@ export interface GenerateTicketForGuestData {
 
 export interface ToggleGuestCheckStatusData {
   guestId?: string | undefined;
-  ticketStatus?: TicketStatus | undefined;
+  ticketStatus?: string | undefined;
   checkInStatus: boolean;
   totalConfirmedGuests?: number | undefined;
   totalCheckedInGuests?: number | undefined;

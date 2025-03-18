@@ -83,6 +83,12 @@ export class LoginRequestDto implements LoginRequest {
   @IsString()
   @IsNotEmpty()
   password: string;
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class ValidateRequestDto implements ValidateRequest {
@@ -206,6 +212,12 @@ export class MemberSignUpRequestDto implements MemberSignUpRequest {
   @IsUUID('4', { each: true })
   @IsNotEmpty()
   interestsIds: string[];
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class HostSignUpRequestDto implements HostSignUpRequest {
@@ -236,6 +248,12 @@ export class HostSignUpRequestDto implements HostSignUpRequest {
   @IsString()
   @IsOptional()
   bio?: string;
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
 }
 
 export class UserInvitationsRequestDto implements UserInvitationsRequest {
@@ -331,6 +349,16 @@ export class MemberLoginRequestDto implements MemberLoginRequest {
 
   @IsNotEmpty()
   isGuest: boolean;
+
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
+
+  @IsOptional()
+  isDeactivated: boolean;
 }
 
 export class UpdateUserProfilePictureRequestDto implements UpdateUserProfilePictureRequest {
@@ -556,6 +584,16 @@ export class SetHostPasswordRequestDto implements SetHostPasswordRequest {
 }
 
 export class UpdateHostPasswordRequestDto implements UpdateHostPasswordRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  newPassword: string;
+}
+
+export class UpdateAdminPasswordRequestDto implements UpdateHostPasswordRequest {
   @IsUUID()
   @IsNotEmpty()
   id: string;
