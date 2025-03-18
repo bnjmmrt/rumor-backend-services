@@ -1659,19 +1659,19 @@ export class GuestService {
       for (const status of multipleGuestStatusFilter) {
         switch (status) {
           case 'UPCOMING':
-            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: MoreThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId } } });
             break;
           case 'PAST':
-            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED } });
+            orConditions.push({ endDate: LessThan(dateNow), guests: { status: GuestStatus.CONFIRMED, user: { id: payload.userId }} });
             break;
           case 'INVITED':
-            orConditions.push({ guests: { status: GuestStatus.INVITED } });
+            orConditions.push({ guests: { status: GuestStatus.INVITED, user: { id: payload.userId }}});
             break;
           case 'APPLIED':
-            orConditions.push({ guests: { status: GuestStatus.APPLIED } });
+            orConditions.push({ guests: { status: GuestStatus.APPLIED, user: { id: payload.userId }} });
             break;
           case 'DECLINED':
-            orConditions.push({ guests: { status: GuestStatus.DECLINED } });
+            orConditions.push({ guests: { status: GuestStatus.DECLINED, user: { id: payload.userId }} });
             break;
         }
       }
