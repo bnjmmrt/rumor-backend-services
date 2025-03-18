@@ -241,14 +241,21 @@ class NotificationService {
   }
 
   async findAllNotifications(
+    recipientId:string,
     take = 10,
     skip = 0,
     notificationByModule?: string,
-    notificationByType?: string
+    notificationByType?: string,
   ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
       .createQueryBuilder("notification")
+      .innerJoin(
+        "notification.recipients",
+        "recipient",
+        "recipient.id = :recipientId",
+        { recipientId }
+      )
       .select([
         "notification.id",
         "notification.title AS description",
