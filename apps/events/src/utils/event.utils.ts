@@ -84,6 +84,13 @@ export const validateFilters = (query: string): { error: boolean; response: stri
  */
 export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventRequestDto): { error: boolean; response?: string } => {
   const currentDate = new Date();
+  /**added console to debug the dates issue if any on live server*/
+  console.log('\n',"validateEventDates --> user Time zone: ", payload.timeZone)
+  console.log('\n', "validateEventDates --> currentDate:   ", currentDate)
+  console.log(" validateEventDates --> payload.startDate:  ", payload.startDate)
+  console.log("validateEventDates --> payload.endDate:     ", payload.endDate)
+  console.log("validateEventDates --> payload.publishDate: ", payload.publishDate )
+ 
   if (!payload.startDate || !isUtcDate(payload.startDate)) {
     return { error: true, response: 'Start Date must be valid and in UTC standard' };
   }
