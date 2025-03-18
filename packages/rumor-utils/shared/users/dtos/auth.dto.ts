@@ -590,6 +590,16 @@ export class UpdateHostPasswordRequestDto implements UpdateHostPasswordRequest {
   newPassword: string;
 }
 
+export class UpdateAdminPasswordRequestDto implements UpdateHostPasswordRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  newPassword: string;
+}
+
 export class ContactsListRequestDto implements ContactsListRequest {
   @IsArray()
   @IsString({ each: true })

@@ -470,7 +470,7 @@ export class GuestService {
 
                 case GuestStatus.CONFIRMED:
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
-                  if ([GuestStatus.INVITED, GuestStatus.DRAFT, GuestStatus.APPLIED].includes(guest.status)) {
+                  if ([GuestStatus.APPLIED].includes(guest.status)) {
                     confirmedGuestsEmails.push(guest.user.email);
                   } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
@@ -2285,24 +2285,25 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     }
 
+     // NOTE: Not needed now as we are not sending any email or SMS on CONFIRMED GUEST
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
-    if (payload.email) {
-      await serviceMesh
-        .notificationService()
-        .sendEmailFromTemplate(
-          [{ key: "first_name", value: payload?.firstName || "" }],
-          "Host Application Submitted",
-          [payload.email],
-          null
-        );
-    } else if (payload.phoneNumber) {
-      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-      if (!success) {
-        throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
-      }
-    }
+    // if (payload.email) {
+    //   await serviceMesh
+    //     .notificationService()
+    //     .sendEmailFromTemplate(
+    //       [{ key: "first_name", value: payload?.firstName || "" }],
+    //       "Host Application Submitted",
+    //       [payload.email],
+    //       null
+    //     );
+    // } else if (payload.phoneNumber) {
+    //   const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+    //   const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+    //   if (!success) {
+    //     throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+    //   }
+    // }
 
     return [guest].map((guest) => toGuestDataSimple(guest, []));
   }
@@ -2793,20 +2794,22 @@ export class GuestService {
 
     // Step 9: Send invite email or sms if required
     // TO DO: Change email and sms template
-    if (payload.email) {
-      await serviceMesh
-        .notificationService()
-        .sendEmailFromTemplate(
-          [{ key: "first_name", value: payload?.firstName || "" }],
-          "Host Application Submitted",
-          [payload.email],
-          null
-        );
-    } else if (payload.phoneNumber) {
-      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-      if (!success) {
-        throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+    if(GuestStatus[guestStatus] === GuestStatus.INVITED) {
+      if (payload.email) {
+        await serviceMesh
+          .notificationService()
+          .sendEmailFromTemplate(
+            [{ key: "first_name", value: payload?.firstName || "" }],
+            "Host Application Submitted",
+            [payload.email],
+            null
+          );
+      } else if (payload.phoneNumber) {
+        const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+        const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        if (!success) {
+          throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+        }
       }
     }
 
