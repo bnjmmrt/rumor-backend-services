@@ -59,6 +59,7 @@ import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 
 const responses = {
   conflict: (message: string) => ({
@@ -991,7 +992,7 @@ export class EventsService {
   public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.id, owner: { id: payload.userId } },
-      relations: ['quizQuestions', 'collaborators', 'ticketTypes', 'talents', 'tickets', 'guests', 'restrictedInvites'],
+      relations: ['quizQuestions', 'collaborators', 'ticketTypes', 'talents', 'tickets', 'guests', 'restrictedInvites', 'vouches'],
     });
     if (!event) throw new NotFoundError('Event was not found!');
     if (event.status === EventStatusEnum.APPROVED_STATUS) {
@@ -3062,4 +3063,39 @@ export class EventsService {
       totalCount: parseInt(guestCounts.totalcount) || 0,
     }
   }
+
+  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
+    // Step 1: Fetch all events associated with the host
+    const listHostEventsPayload: ListHostEventsDto = { userId: payload.id, query: '' };
+    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+    
+    console.log(eventsResponse)
+
+    // if (!eventsResponse || !eventsResponse.data.eventsResponse) {
+    //   return responses.ok; // No events found
+    // }
+
+    // const events = eventsResponse.data.eventsResponse;
+
+    // Step 2: Cancel all APPROVED events
+    // const approvedEvents = events.filter((event) => event.status === EventStatus.APPROVED_STATUS);
+    // for (const event of events) {
+    //   const cancelPayload: CancelEventAndNotifyRequestDto = {
+    //     ownerId: payload.id,
+    //     eventId: event.id,
+    //     customMessage: 'This event has been canceled as the host is no longer available.',
+    //   };
+    //   await this.cancelEventAndNotify(cancelPayload);
+    // }
+
+    // Step 3: Delete all events (regardless of status)
+    // for (const event of events) {
+    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+    //   await this.deleteEvent(deletePayload);
+    // }
+
+    return responses.ok;
+  }
+
+
 }

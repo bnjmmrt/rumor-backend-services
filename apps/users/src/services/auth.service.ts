@@ -4755,4 +4755,93 @@ export class AuthService {
 
     return '';
   }
+
+  public static async deleteHostAccount(payload: IdRequestDto): Promise<GenericResponse> {
+
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+
+    const isHost = user.roles.some((role) => role.role.name === 'host');
+
+    if (!isHost) return responses.badRequest('Host not found');
+
+    //call cancel event api --------------> coming from eventservice
+    //call delete event api --------------> coming from eventservice
+    // const events = await this.eventsClient.deleteHostEvents({ id: user.id }, this.logger);
+
+
+    //delete additional host information
+    // await this.clearAdditionalHostInfo(user.id);
+    //remove role from user role table
+    // await this.removeHostRoleAndDeleteUserIfNeeded(user.id);
+    //host will not be able to login again
+    return responses.ok;
+
+  }
+
+  public static async deleteNonMemberUsersIfEligible(deletedHostId: string) {
+    // Fetch all non-member users created by the deleted host
+    const nonMemberUsers = await this.dbConnection.getRepository(HostUserMapping).find({
+      where: { host: { id: deletedHostId } },
+      relations: ['user', 'user.roles', 'user.createdByHost'],
+    });
+
+    for (const mapping of nonMemberUsers) {
+      const { user } = mapping;
+
+      // Check if the user is associated with multiple hosts
+      const hostMappings = await this.dbConnection.getRepository(HostUserMapping).find({
+        where: { user: { id: user.id } },
+      });
+
+      const isOnlyAssociatedWithDeletedHost = hostMappings.length === 1 && hostMappings[0].host.id === deletedHostId;
+
+      if (!isOnlyAssociatedWithDeletedHost) {
+        continue; // Skip if the user is still associated with active hosts
+      }
+
+      // Check if the user has logged in via FusionAuth
+      const hasLoggedIn = await this.hasUserLoggedIn(user.email);
+
+      if (hasLoggedIn) {
+        continue; // Skip if the user has ever logged in
+      }
+
+      // If all checks pass, delete the user
+      await this.dbConnection.getRepository(User).delete({ id: user.id });
+    }
+  }
+
+  public static async hasUserLoggedIn(email: string): Promise<boolean> {
+    await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(email);
+    return true; // User exists in FusionAuth, meaning they have logged in
+
+  }
+
+  public static async removeHostRoleAndDeleteUserIfNeeded(userId: string): Promise<void> {
+    const hostRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'host' } });
+    if (!hostRole) return;
+
+    // Delete only the "host" role from the user_roles table
+    await this.dbConnection.getRepository(UserRole).delete({ user: { id: userId }, role: { id: hostRole.id } });
+
+    // Check if the user has any other roles left
+    const remainingRoles = await this.dbConnection.getRepository(UserRole).count({ where: { user: { id: userId } } });
+
+    // If no roles left, delete the user completely
+    if (remainingRoles === 0) {
+      await this.dbConnection.getRepository(User).delete({ id: userId });
+    }
+  }
+
+  public static async clearAdditionalHostInfo(userId: string): Promise<void> {
+    await this.dbConnection.getRepository(User).update(userId, { additionalHostInformation: null });
+  }
+
+  public static async softDeleteUser(userId: string): Promise<void> {
+    await this.dbConnection.getRepository(User).update(userId, {
+      // isDeactivated: true,
+      // deactivatedAt: new Date(),
+    });
+  }
+
 }
