@@ -181,6 +181,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
+import { stringify } from "csv-stringify";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -3075,7 +3076,7 @@ export class AuthService {
   // ADMIN Sevice Code
 
   public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
-    const parsedQuery = JSON.parse(payload.query);
+    const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
@@ -3703,13 +3704,20 @@ export class AuthService {
     });
 
     const memberRole = user.roles.find((role) => role?.role?.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) {
-      throw new NotFoundError('Member')
-    };
+    if (!memberRole && !nonMemberRole) {
+      throw new NotFoundError('Profile');
+    }
 
+    let userRole = null;
+    if (memberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id }, relations: { role: true } });
+    } else if (nonMemberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
+    }
+
+    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4867,5 +4875,56 @@ export class AuthService {
 
   public static async clearAdditionalHostInfo(userId: string, queryRunner: QueryRunner): Promise<void> {
     await queryRunner.manager.getRepository(User).update(userId, { additionalHostInformation: null });
-  } 
+  }
+   
+  public static async exportUsersCsv(payload: PaginatedRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getMembers(payload);
+
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'category', title: 'Category' },
+      { id: 'city', title: 'City' },
+      { id: 'followerCount', title: 'Follower Count' },
+      { id: 'categories', title: 'Categories' },
+      { id: 'types', title: 'Types' },
+      { id: 'status', title: 'Status' },
+      { id: 'instagramUsername', title: 'Instagram Username' },
+      { id: 'age', title: 'Age' },
+      { id: 'isFavourite', title: 'Favourite' },
+      { id: 'role', title: 'Role' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.data.map((column) => {
+      const mappedColumn = {};
+      titleMapping.forEach((field) => {
+        if (field.id === 'isFavourite') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          // Handling special cases for certain fields like age, gender, and empty values
+          if (column[field.id] === 0 || column[field.id] === 'NOT_APPLICABLE' || !column[field.id]) {
+            mappedColumn[field.title] = '—'; // Use large dash if value is 0, 'NOT_APPLICABLE', or empty
+          } else {
+            mappedColumn[field.title] = column[field.id];
+          }
+        }
+      });
+      return mappedColumn;
+    });
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(lineItems, { header: true, columns: titleMapping.map(item => item.title) }, (err, output) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(output);
+      });
+    });
+  }
 }

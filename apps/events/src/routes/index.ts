@@ -291,6 +291,7 @@ router.get(
 ); /**TestStatus: working */
 router.get(
   "/events/:eventId/guest-status-counts",
+  AuthMiddleware.fusionAuthRequired,
   EventsController.GetGuestCountForGuestStatuses
 ); /**TODO: TestStatus: not working */
 

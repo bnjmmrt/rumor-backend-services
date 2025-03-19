@@ -3163,15 +3163,19 @@ export class EventsService {
         `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
         `COUNT(guest.id) AS totalCount`,
       ])
-      .where('guest.event_id = :eventId', {
-        eventId,
-        invited: GuestStatus.INVITED,
-        requested: GuestStatus.APPLIED,
-        confirmed: GuestStatus.CONFIRMED,
-        declined: GuestStatus.DECLINED,
-        refused: GuestStatus.REFUSED,
-        draft: GuestStatus.DRAFT,
-      })
+      .where(
+        "(guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.added_by_id IS NULL))",
+        {
+          eventId,
+          userId,
+          invited: GuestStatus.INVITED,
+          requested: GuestStatus.APPLIED,
+          confirmed: GuestStatus.CONFIRMED,
+          declined: GuestStatus.DECLINED,
+          refused: GuestStatus.REFUSED,
+          draft: GuestStatus.DRAFT,
+        }
+      )
       .getRawOne();
 
     return {

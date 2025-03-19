@@ -80,7 +80,7 @@ export interface UserAndIdRequest {
 /** Paginated Request */
 export interface PaginatedRequest {
   userId?: string | undefined;
-  query: string;
+  query?: string;
 }
 
 export interface RequestByUserAndEventRequest {
