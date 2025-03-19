@@ -4785,27 +4785,37 @@ export class AuthService {
   }
 
   public static async deleteHostAccount(payload: IdRequestDto): Promise<string> {
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
-    if (!user) throw new NotFoundError('User')
-    const isHost = user.roles?.some((role) => role.role.name === 'host');
-    if (!isHost) throw new NotFoundError('Host');
+    const queryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
     try {
-      await serviceMesh.eventService().deleteHostEvents(payload.id);
-    } catch (error) {}
+      const user = await queryRunner.manager.getRepository(User).findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+      if (!user) throw new NotFoundError('User')
+      const isHost = user.roles?.some((role) => role.role.name === 'host');
+      if (!isHost) throw new NotFoundError('Host');
 
-    // delete additional host information
-    await this.deleteNonMemberUsersIfEligible(user.id)
-    // remove role from user role table
-    // await this.clearAdditionalHostInfo(user.id);
-    // host will not be able to login again
-    // await this.removeHostRoleAndDeleteUserIfNeeded(user.id);
-    return '';
+      try {
+        await serviceMesh.eventService().deleteHostEvents(payload.id);
+      } catch (error) { }
+
+      await this.deleteNonMemberUsersIfEligible(user.id, queryRunner)
+      await this.clearAdditionalHostInfo(user.id, queryRunner);
+      await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
+
+      await queryRunner.commitTransaction();
+      return '';
+    } catch (error) { 
+      await queryRunner.rollbackTransaction();
+      throw error;
+    }finally{
+      await queryRunner.release();
+    }
   }
 
-  public static async deleteNonMemberUsersIfEligible(deletedHostId: string) {
+  public static async deleteNonMemberUsersIfEligible(deletedHostId: string, queryRunner: QueryRunner) {
     // Fetch all non-member users created by the deleted host
-    const nonMemberUsers = await this.dbConnection.getRepository(HostUserMapping).find({
+    const nonMemberUsers = await queryRunner.manager.getRepository(HostUserMapping).find({
       where: { host: { id: deletedHostId } },
       relations: ['user', 'user.roles', 'user.createdByHost'],
     });
@@ -4813,24 +4823,27 @@ export class AuthService {
     for (const mapping of nonMemberUsers) {
       const { user } = mapping;
 
-      const hostMappings = await this.dbConnection.getRepository(HostUserMapping).find({
+      const hostMappings = await queryRunner.manager.getRepository(HostUserMapping).find({
         where: { user: { id: user.id } },
+        relations: {
+          host: true
+        }
       });
 
-      const isOnlyAssociatedWithDeletedHost = hostMappings.length === 1 && hostMappings[0].host.id === deletedHostId;
+      const isOnlyAssociatedWithDeletedHost = hostMappings.length === 1 && hostMappings[0].host?.id === deletedHostId;
+      if (isOnlyAssociatedWithDeletedHost) {
+        let hasLoggedIn = false;
 
-      if (!isOnlyAssociatedWithDeletedHost) {
-        continue; 
+        try {
+          hasLoggedIn = await this.hasUserLoggedIn(user.email);
+        } catch (error) {
+          hasLoggedIn = false;
+        }
+
+        if (!hasLoggedIn) {
+          await queryRunner.manager.getRepository(User).delete({ id: user.id });
+        }
       }
-
-      const hasLoggedIn = await this.hasUserLoggedIn(user.email);
-
-      if (hasLoggedIn) {
-        continue; 
-      }
-
-      // If all checks pass, delete the user
-      await this.dbConnection.getRepository(User).delete({ id: user.id });
     }
   }
 
@@ -4839,20 +4852,20 @@ export class AuthService {
     return true; 
   }
 
-  public static async removeHostRoleAndDeleteUserIfNeeded(userId: string): Promise<void> {
-    const hostRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'host' } });
+  public static async removeHostRoleAndDeleteUserIfNeeded(userId: string, queryRunner: QueryRunner): Promise<void> {
+    const hostRole = await queryRunner.manager.getRepository(Role).findOne({ where: { name: 'host' } });
     if (!hostRole) return;
 
-    await this.dbConnection.getRepository(UserRole).delete({ user: { id: userId }, role: { id: hostRole.id } });
+    await queryRunner.manager.getRepository(UserRole).delete({ user: { id: userId }, role: { id: hostRole.id } });
 
-    const remainingRoles = await this.dbConnection.getRepository(UserRole).count({ where: { user: { id: userId } } });
+    const remainingRoles = await queryRunner.manager.getRepository(UserRole).count({ where: { user: { id: userId } } });
 
     if (remainingRoles === 0) {
-      await this.dbConnection.getRepository(User).delete({ id: userId });
+      await queryRunner.manager.getRepository(User).delete({ id: userId });
     }
   }
 
-  public static async clearAdditionalHostInfo(userId: string): Promise<void> {
-    await this.dbConnection.getRepository(User).update(userId, { additionalHostInformation: null });
-  }
+  public static async clearAdditionalHostInfo(userId: string, queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.manager.getRepository(User).update(userId, { additionalHostInformation: null });
+  } 
 }

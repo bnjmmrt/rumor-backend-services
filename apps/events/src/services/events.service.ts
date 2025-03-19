@@ -3209,11 +3209,17 @@ export class EventsService {
     }
 
     // Step 3: Delete all events (regardless of status)
-    for (const event of events) {
-      const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-      await this.deleteEvent(deletePayload);
-    }
+    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+    // for (const event of events) {
+    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+    //   await this.deleteEvent(deletePayload);
+    // }
 
+    const eventIds = events.map(event => event.id);
+
+    if (eventIds.length > 0) {
+      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+    }
     return responses.ok;
   }
 
