@@ -11,7 +11,7 @@ export class Notification extends RumorBaseEntity {
     @Column({ type: 'text', name: 'message', nullable: false })
     message: string;
 
-    @Column({ type: 'jsonb', name: 'body', nullable: false })
+    @Column({ type: 'jsonb', name: 'body', nullable: true })
     body: object;
 
     @Column({ type: 'date', name: 'date', nullable: true })
@@ -23,7 +23,7 @@ export class Notification extends RumorBaseEntity {
     @Column({ type: 'varchar', name: 'notification_type', nullable: false })
     notificationType: string;
 
-    @Column({ type: 'varchar', name: 'notification_module', nullable: false })
+    @Column({ type: 'varchar', name: 'notification_module', nullable: true })
     notificationModule: string;
 
     @Column({ type: 'boolean', name: 'is_seen', default: false })

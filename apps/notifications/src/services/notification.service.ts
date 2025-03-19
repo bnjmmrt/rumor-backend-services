@@ -14,9 +14,138 @@ class NotificationService {
 
   async sendNotification(
     notificationType: string,
-    recipients: User | User[],
-    linkedUser?: User,
-    linkedEvent?: Event
+    recipients: string | string[],
+    linkedUserId?: string,
+    linkedEventId?: string
+  ) {
+    const recipientList = Array.isArray(recipients) ? recipients : [recipients];
+  
+    // Fetch notification template
+    const notificationTemplate = getNotificationDetails(notificationType);
+    if (!notificationTemplate) {
+      throw new Error(`Invalid notification type: ${notificationType}`);
+    }
+  
+    // Fetch linked entities if needed
+    const linkedUser = linkedUserId
+      ? await User.getRepository().findOne({ where: { id: linkedUserId } })
+      : null;
+    if (notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser) {
+      throw new NotFoundError("Linked user not found");
+    }
+  
+    const linkedEvent = linkedEventId
+      ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
+      : null;
+    if (notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent) {
+      throw new NotFoundError("Linked event not found");
+    }
+  
+    // Initialize variables
+    const notificationsToSave = [];
+    const fcmTokens: string[] = [];
+    let notificationImage: string = "";
+  
+    // Fetch recipient users
+    const recipientUsers = await User.getRepository().findByIds(recipientList);
+  
+    for (const recipientUser of recipientUsers) {
+      let pushMessage = notificationTemplate.pushMessage || "";
+      let appMessage = notificationTemplate.appMessage || "";
+      let body: any = notificationTemplate.body || {};
+  
+      // Replace placeholders in messages
+      let message = pushMessage || appMessage;
+      message = message
+        .replace("[Event Start Time]", linkedEvent?.startDate || "")
+        .replace(
+          "[Recipient Name]",
+          recipientUser?.firstName
+            ? `${recipientUser.firstName} ${recipientUser.lastName}`
+            : ""
+        )
+        .replace(
+          "[Linked User Name]",
+          linkedUser?.firstName
+            ? `${linkedUser.firstName} ${linkedUser.lastName}`
+            : ""
+        )
+        .replace("[Event Name]", linkedEvent?.name || "")
+        .replace("[Event City Name]", linkedEvent?.location?.city || "")
+        .replace("[Member Name]", body?.name || "")
+        .replace("[Host Name]", body?.name || "");
+  
+      if (pushMessage) pushMessage = message;
+      if (appMessage) appMessage = message;
+  
+      notificationImage = notificationTemplate.hasOwnProperty("linkedUser")
+        ? linkedUser?.profilePicture || ""
+        : linkedEvent?.imageFlyer || "";
+  
+      // Fetch user notification preferences
+      const userPreferences = await UserSettings.getRepository().findOne({
+        where: { user: recipientUser },
+      });
+      const canSendPush =
+        notificationTemplate.pushNotification &&
+        userPreferences?.enableAppNotifications;
+  
+      const canSendApp = notificationTemplate.appNotification;
+  
+      // Prepare notification object
+      const notification = this.dbConnection.getRepository(Notification).create({
+        title: "Rumor",
+        message,
+        body,
+        notificationType,
+        isSeen: false,
+        pushNotification: canSendPush,
+        appNotification: canSendApp,
+        linkedUser,
+        linkedEvent,
+      });
+  
+      // Save notification (without relations first)
+      const savedNotification = await this.dbConnection
+        .getRepository(Notification)
+        .save(notification);
+  
+      // Attach recipients using Many-to-Many relation
+      await this.dbConnection
+        .createQueryBuilder()
+        .relation(Notification, "recipients")
+        .of(savedNotification)
+        .add(recipientUser);
+  
+      // Collect FCM tokens for push notifications
+      if (canSendPush) {
+        const tokens = await PushNotificationToken.getRepository().find({
+          where: { user: recipientUser },
+          select: ["notificationToken"],
+        });
+        fcmTokens.push(...tokens.map((data) => data.notificationToken));
+      }
+    }
+  
+    // Send push notifications if there are tokens
+    if (fcmTokens.length > 0) {
+      await firebaseNotificationsService.sendPushNotification({
+        tokens: fcmTokens,
+        body: notificationsToSave[0]?.message,
+        title: notificationsToSave[0]?.title,
+        image: notificationImage,
+      });
+    }
+  
+    return { success: true, message: "Notifications sent successfully." };
+  }
+  
+
+  async sendNotificationv1(
+    notificationType: string,
+    recipients: string | string[],
+    linkedUserId?: string,
+    linkedEventId?: string
   ) {
     const recipientList = Array.isArray(recipients) ? recipients : [recipients];
 
@@ -26,11 +155,24 @@ class NotificationService {
       throw new Error(`Invalid notification type: ${notificationType}`);
     }
 
+    const linkedUser: User = await User.getRepository().findOne({where: {id: linkedUserId}});
+    if(notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser){
+      throw new NotFoundError("Linked user not found");
+    }
+
+    const linkedEvent: Event = await Event.getRepository().findOne({where: {id: linkedEventId}});
+    if(notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent){
+      throw new NotFoundError("Linked event not found");
+    }
+
     const notificationsToSave = [];
     const fcmTokens: string[] = [];
     let notificationImage: string = "";
 
     for (const recipient of recipientList) {
+      
+      let recipientUser: User = await User.getRepository().findOne({where: {id: recipient}});
+
       let pushMessage = notificationTemplate.pushMessage || "";
       let appMessage = notificationTemplate.appMessage || "";
       let body: any = notificationTemplate.body;
@@ -40,8 +182,8 @@ class NotificationService {
         .replace("[Event Start Time]", linkedEvent?.startDate || "")
         .replace(
           "[Recipient Name]",
-          recipient?.firstName
-            ? `${recipient.firstName} ${recipient.lastName}`
+          recipientUser?.firstName
+            ? `${recipientUser.firstName} ${recipientUser.lastName}`
             : ""
         )
         .replace(
@@ -70,17 +212,21 @@ class NotificationService {
       }
 
       const userPreferences = await UserSettings.getRepository().findOne({
-        where: { user: recipient },
+        where: { user: recipientUser },
       });
       const canSendPush =
         notificationTemplate.pushNotification &&
         userPreferences.enableAppNotifications;
+        
+        console.log("🚀 ~ NotificationService ~ canSendPush:", canSendPush)
+
       const canSendApp = notificationTemplate.appNotification;
+      console.log("🚀 ~ NotificationService ~ canSendApp:", canSendApp)
 
       // Save notification data for batch insert
       if (canSendApp) {
         notificationsToSave.push({
-          recipient,
+          recipients: recipientUser,
           title: "Rumor",
           message,
           body,
@@ -96,12 +242,14 @@ class NotificationService {
       // Collect FCM tokens for push notifications
       if (canSendPush) {
         const tokens = await PushNotificationToken.getRepository().find({
-          where: { user: recipient },
+          where: { user: recipientUser },
           select: ["notificationToken"],
         });
         fcmTokens.push(...tokens.map((data) => data.notificationToken));
       }
     }
+
+    console.log("🚀 ~ NotificationService ~ notificationsToSave:", notificationsToSave)
 
     // Save all notifications in a single DB operation (batch insert)
     const notificationRepository =
@@ -299,6 +447,7 @@ class NotificationService {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
       .createQueryBuilder("notification")
+      .where('notification.isSeen = false')
       .innerJoin(
         "notification.recipients",
         "recipient",

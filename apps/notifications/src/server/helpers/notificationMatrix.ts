@@ -1,3 +1,5 @@
+import { app } from "firebase-admin";
+
 let notificationMatrix = {
   applicationAppoved: {
     pushMessage: "Welcome to Rumor. Your application has been approved!",
@@ -187,6 +189,13 @@ let notificationMatrix = {
     pushNotificaton: false,
     body: { eventId: "" },
     linkedUser: "",
+    linkedEvent: "",
+  },
+  eventApproved: {
+    pushMessage: "[Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)",
+    appMessage: "Rumor has approved your event [Event Name]",
+    appNotification: true,
+    pushNotificaton: true,
     linkedEvent: "",
   }
 };
