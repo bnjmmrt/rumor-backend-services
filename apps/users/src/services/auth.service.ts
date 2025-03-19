@@ -181,6 +181,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
+import { stringify } from "csv-stringify";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -950,11 +951,11 @@ export class AuthService {
 
     if (existingUser) {
       if (payload.phoneNumber && existingUser.phoneNumber === payload.phoneNumber) {
-        throw new BadRequestError('Phone number is already in use')
+        throw new ForbiddenError('This user is already a part of our database.')
       }
 
       if (existingUser.email === payload.email) {
-        throw new BadRequestError('Email is already in use')
+        throw new ForbiddenError('This user is already a part of our database.')
       }
     }
 
@@ -3075,7 +3076,7 @@ export class AuthService {
   // ADMIN Sevice Code
 
   public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
-    const parsedQuery = JSON.parse(payload.query);
+    const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
@@ -3259,7 +3260,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User not found')
+      throw new ForbiddenError('The email address you provided doesn’t match any account in our system. Please check for any typos or try a different email.')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3269,13 +3270,13 @@ export class AuthService {
 
     const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
     if (isAllowed === undefined) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError('We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.')
     }
 
     const loginResponse = await fusionAuthClientHandler.fusionAuthClient().login({ loginId: payload.email, password: payload.password });
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError('We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.')
     }
 
     if (loginResponse?.response?.user?.passwordChangeRequired) {
@@ -3703,13 +3704,20 @@ export class AuthService {
     });
 
     const memberRole = user.roles.find((role) => role?.role?.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    const nonMemberRole = user.roles.find((role) => role.role.name === 'non_member');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) {
-      throw new NotFoundError('Member')
-    };
+    if (!memberRole && !nonMemberRole) {
+      throw new NotFoundError('Profile');
+    }
 
+    let userRole = null;
+    if (memberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id }, relations: { role: true } });
+    } else if (nonMemberRole) {
+      userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
+    }
+
+    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4782,5 +4790,141 @@ export class AuthService {
     }
 
     return '';
+  }
+
+  public static async deleteHostAccount(payload: IdRequestDto): Promise<string> {
+    const queryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const user = await queryRunner.manager.getRepository(User).findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+      if (!user) throw new NotFoundError('User')
+      const isHost = user.roles?.some((role) => role.role.name === 'host');
+      if (!isHost) throw new NotFoundError('Host');
+
+      try {
+        await serviceMesh.eventService().deleteHostEvents(payload.id);
+      } catch (error) { }
+
+      await this.deleteNonMemberUsersIfEligible(user.id, queryRunner)
+      await this.clearAdditionalHostInfo(user.id, queryRunner);
+      await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
+
+      await queryRunner.commitTransaction();
+      return '';
+    } catch (error) { 
+      await queryRunner.rollbackTransaction();
+      throw error;
+    }finally{
+      await queryRunner.release();
+    }
+  }
+
+  public static async deleteNonMemberUsersIfEligible(deletedHostId: string, queryRunner: QueryRunner) {
+    // Fetch all non-member users created by the deleted host
+    const nonMemberUsers = await queryRunner.manager.getRepository(HostUserMapping).find({
+      where: { host: { id: deletedHostId } },
+      relations: ['user', 'user.roles', 'user.createdByHost'],
+    });
+
+    for (const mapping of nonMemberUsers) {
+      const { user } = mapping;
+
+      const hostMappings = await queryRunner.manager.getRepository(HostUserMapping).find({
+        where: { user: { id: user.id } },
+        relations: {
+          host: true
+        }
+      });
+
+      const isOnlyAssociatedWithDeletedHost = hostMappings.length === 1 && hostMappings[0].host?.id === deletedHostId;
+      if (isOnlyAssociatedWithDeletedHost) {
+        let hasLoggedIn = false;
+
+        try {
+          hasLoggedIn = await this.hasUserLoggedIn(user.email);
+        } catch (error) {
+          hasLoggedIn = false;
+        }
+
+        if (!hasLoggedIn) {
+          await queryRunner.manager.getRepository(User).delete({ id: user.id });
+        }
+      }
+    }
+  }
+
+  public static async hasUserLoggedIn(email: string): Promise<boolean> {
+    await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(email);
+    return true; 
+  }
+
+  public static async removeHostRoleAndDeleteUserIfNeeded(userId: string, queryRunner: QueryRunner): Promise<void> {
+    const hostRole = await queryRunner.manager.getRepository(Role).findOne({ where: { name: 'host' } });
+    if (!hostRole) return;
+
+    await queryRunner.manager.getRepository(UserRole).delete({ user: { id: userId }, role: { id: hostRole.id } });
+
+    const remainingRoles = await queryRunner.manager.getRepository(UserRole).count({ where: { user: { id: userId } } });
+
+    if (remainingRoles === 0) {
+      await queryRunner.manager.getRepository(User).delete({ id: userId });
+    }
+  }
+
+  public static async clearAdditionalHostInfo(userId: string, queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.manager.getRepository(User).update(userId, { additionalHostInformation: null });
+  }
+   
+  public static async exportUsersCsv(payload: PaginatedRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getMembers(payload);
+
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'category', title: 'Category' },
+      { id: 'city', title: 'City' },
+      { id: 'followerCount', title: 'Follower Count' },
+      { id: 'categories', title: 'Categories' },
+      { id: 'types', title: 'Types' },
+      { id: 'status', title: 'Status' },
+      { id: 'instagramUsername', title: 'Instagram Username' },
+      { id: 'age', title: 'Age' },
+      { id: 'isFavourite', title: 'Favourite' },
+      { id: 'role', title: 'Role' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.data.map((column) => {
+      const mappedColumn = {};
+      titleMapping.forEach((field) => {
+        if (field.id === 'isFavourite') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          // Handling special cases for certain fields like age, gender, and empty values
+          if (column[field.id] === 0 || column[field.id] === 'NOT_APPLICABLE' || !column[field.id]) {
+            mappedColumn[field.title] = '—'; // Use large dash if value is 0, 'NOT_APPLICABLE', or empty
+          } else {
+            mappedColumn[field.title] = column[field.id];
+          }
+        }
+      });
+      return mappedColumn;
+    });
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(lineItems, { header: true, columns: titleMapping.map(item => item.title) }, (err, output) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(output);
+      });
+    });
   }
 }

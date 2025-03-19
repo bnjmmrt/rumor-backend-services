@@ -482,6 +482,8 @@ export interface Member {
   age?: number | undefined;
   isFavourite?: boolean | undefined;
   role?: string | undefined;
+  phoneNumber?: string | undefined;
+  dateOfBirth?: string | undefined
 }
 
 export interface GetMembersResponse {

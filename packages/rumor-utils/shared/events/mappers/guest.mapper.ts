@@ -85,8 +85,8 @@ export const toGuest = (
   }
 
   const roles = guest?.user?.roles?.length > 0 ? guest.user.roles[0] : undefined;
-  const addedBy = guest.addedBy ? `${guest.addedBy?.additionalHostInformation.companyName}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.additionalHostInformation.companyLogo : '';
+  const addedBy = guest.addedBy ? `${guest.addedBy?.additionalHostInformation?.companyName}` : '';
+  const addedByPicture = guest.addedBy ? guest.addedBy?.additionalHostInformation?.companyLogo : '';
   const invitationSourceNumber =
     typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   return {
