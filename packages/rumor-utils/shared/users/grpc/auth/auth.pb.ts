@@ -572,6 +572,7 @@ export interface MemberProfile {
   focuses: FocusProto[];
   roleId?: string | undefined;
   placeId?: string | undefined;
+  eventCount: number;
 }
 
 export interface FocusProto {
