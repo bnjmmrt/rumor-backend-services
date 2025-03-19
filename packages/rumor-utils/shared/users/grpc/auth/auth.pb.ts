@@ -482,6 +482,7 @@ export interface Member {
   age?: number | undefined;
   isFavourite?: boolean | undefined;
   role?: string | undefined;
+  phoneNumber?: string | undefined;
 }
 
 export interface GetMembersResponse {

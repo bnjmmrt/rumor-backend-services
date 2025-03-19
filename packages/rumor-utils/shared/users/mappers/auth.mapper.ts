@@ -297,7 +297,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interest
     pastEvents: [],
     invitedEvents: [],
     requestedEvents: [],
-    status: role.status,
+    status: role?.status,
     role: role?.role?.name,
     roleId: role?.role?.id,
     interest: interests.map((interest) => interest.name).join(', '),
