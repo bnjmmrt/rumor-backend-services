@@ -1318,7 +1318,9 @@ export class GuestService {
           },
           addedBy: true,
           declinedBy: true,
-          event: true,
+          event: {
+            owner: true,
+          },
         },
       })
     )[0];
@@ -3235,8 +3237,6 @@ export class GuestService {
     // Get the guest data
     const data = await this.getGuests(payload);
 
-    // const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
-    // const timestamp = new Date().toISOString().slice(0, 19).replace("T", " "); 
     // Define the titles and keys for the CSV
     const titleMapping = [
       { id: 'name', title: 'Name' },
@@ -3263,10 +3263,16 @@ export class GuestService {
     const lineItems = data.result.map((column) => {
       const mappedColumn = {};
       titleMapping.forEach((field) => {
-        if (field.id === 'isBanned' || field.id === 'checkIn') {
+        if (field.id === 'isBanned') {
           mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else if (field.id === 'checkIn') {
+          mappedColumn[field.title] = column[field.id] ? 'Checked In' : 'Not Checked In';
         } else {
-          mappedColumn[field.title] = column[field.id];
+          if (column[field.id] == 0 || column[field.id] === 'NOT_APPLICABLE' || !column[field.id]) {
+            mappedColumn[field.title] = '—';
+          } else {
+            mappedColumn[field.title] = column[field.id];
+          }
         }
       });
       return mappedColumn;

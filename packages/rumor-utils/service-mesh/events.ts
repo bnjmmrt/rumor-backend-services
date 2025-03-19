@@ -9,3 +9,5 @@ export const syncUserTopAttendee = (baseURL:string) => apiService.getApi().post(
 export const announcementDetail = (eventId:string, announcementId:string) => apiService.getApi().get(`/event/${eventId}/event-announcement/${announcementId}`);
 
 export const getTicketTypes = (eventId: string) => apiService.getApi().get(`/ticket-types/${eventId}`);
+
+export const deleteHostEvents = (id: string) => apiService.getApi().delete(`/delete-host-events/${id}`);

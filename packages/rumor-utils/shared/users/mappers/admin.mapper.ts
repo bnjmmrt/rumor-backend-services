@@ -107,7 +107,7 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string): MemberProfile => {
+export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string, eventCount?: number): MemberProfile => {
   return {
     id: user.id,
     firstName: user.firstName,
@@ -138,5 +138,6 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     instagramUsername: instagramUsername,
     customLists: [],
     focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
+    eventCount
   };
 };

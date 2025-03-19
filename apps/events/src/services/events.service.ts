@@ -41,7 +41,7 @@ import { normalizeCatalogName } from '../common/helpers';
 import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
-import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates } from '../utils/event.utils';
+import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates, extractDate } from '../utils/event.utils';
 import { EventLocationInterface, EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
@@ -59,6 +59,7 @@ import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 
 const responses = {
   conflict: (message: string) => ({
@@ -2210,11 +2211,63 @@ export class EventsService {
   }
 
   public static async publishEvent(eventId: string): Promise<EventResponse> {
-
-    // this.logger.log(`Attempting to publish event with ID: ${eventId}`);
-    const updateResult = await this.dbConnection.getRepository(Event).update(eventId, { isPublished: true });
-    // this.logger.log(`Update result: ${JSON.stringify(updateResult)}`);
-    // TODO: Add functionality send notifications
+    await this.dbConnection.getRepository(Event).update({id: eventId}, { isPublished: true });
+    const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId },
+      relations: ['owner', 'admissionType', 'location', 'eventType', 'guests', 'ticketTypes', 'ageLimit']
+    });    
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
+    });
+    if(updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]){
+      const {month, day, dayOfWeek, hour, minutes} = extractDate(updatedEvent.startDate);
+      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
+      const params = [
+        {
+          key: 'event_name',
+          value: updatedEvent.name,
+        },
+        {
+          key: 'company_name',
+          value: host.additionalHostInformation.companyName,
+        },
+        {
+          key: 'image_url',
+          value: updatedEvent.imageFlyer,
+        },
+        {
+          key: 'month',
+          value: month,
+        },
+        {
+          key: 'day',
+          value: day,
+        },
+        {
+          key: 'dayOfWeek',
+          value: dayOfWeek,
+        },
+        {
+          key: 'hour',
+          value: hour,
+        },
+        {
+          key: 'minutes',
+          value: minutes,
+        },
+        {
+          key: 'address',
+          value: updatedEvent.location.location,
+        },
+        {
+          key: 'view_event',
+          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+        },
+      ];
+      if (updatedEvent.isPublished) {
+        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+      }
+    }
     return;
   }
 
@@ -2349,7 +2402,75 @@ export class EventsService {
     await this.dbConnection.getRepository(Event).save(event);
     const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
       where: { id: event.id },
+      relations: ['owner', 'admissionType', 'location', 'eventType', 'guests', 'ticketTypes', 'ageLimit']
+    });    
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
+    if(updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]){
+      const {month, day, dayOfWeek, hour, minutes} = extractDate(updatedEvent.startDate);
+      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
+      const params = [
+        {
+          key: 'event_name',
+          value: updatedEvent.name,
+        },
+        {
+          key: 'company_name',
+          value: host.additionalHostInformation.companyName,
+        },
+        {
+          key: 'image_url',
+          value: updatedEvent.imageFlyer,
+        },
+        {
+          key: 'month',
+          value: month,
+        },
+        {
+          key: 'day',
+          value: day,
+        },
+        {
+          key: 'dayOfWeek',
+          value: dayOfWeek,
+        },
+        {
+          key: 'hour',
+          value: hour,
+        },
+        {
+          key: 'minutes',
+          value: minutes,
+        },
+        {
+          key: 'address',
+          value: updatedEvent.location.location,
+        },
+        {
+          key: 'view_event',
+          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+        },
+      ];
+      if (updatedEvent.isPublished) {
+        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+      }
+      else {
+        const {month, day, dayOfWeek, hour, minutes} = extractDate(updatedEvent.publishDate);
+        params.push({
+          key: 'publish_date',
+          value: `${dayOfWeek}, ${month} ${day} `,
+        },
+        {
+          key: 'publish_time',
+          value: `${hour}: ${minutes}`,
+        },
+      )
+        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
+      }
+    } else if(payload.status === EventStatus[EventStatus.REJECTED_STATUS]){
+      await serviceMesh.notificationService().sendEmailFromTemplate( [{ key: "event_name", value: updatedEvent.name }, { key: "host_name", value: host.firstName }],"Host Event Rejected by Admin", [updatedEvent.owner.email],null)
+    }    
     return responses.data(toEvent(updatedEvent, null));
   }
 
@@ -3042,15 +3163,19 @@ export class EventsService {
         `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
         `COUNT(guest.id) AS totalCount`,
       ])
-      .where('guest.event_id = :eventId', {
-        eventId,
-        invited: GuestStatus.INVITED,
-        requested: GuestStatus.APPLIED,
-        confirmed: GuestStatus.CONFIRMED,
-        declined: GuestStatus.DECLINED,
-        refused: GuestStatus.REFUSED,
-        draft: GuestStatus.DRAFT,
-      })
+      .where(
+        "(guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.added_by_id IS NULL))",
+        {
+          eventId,
+          userId,
+          invited: GuestStatus.INVITED,
+          requested: GuestStatus.APPLIED,
+          confirmed: GuestStatus.CONFIRMED,
+          declined: GuestStatus.DECLINED,
+          refused: GuestStatus.REFUSED,
+          draft: GuestStatus.DRAFT,
+        }
+      )
       .getRawOne();
 
     return {
@@ -3062,4 +3187,44 @@ export class EventsService {
       totalCount: parseInt(guestCounts.totalcount) || 0,
     }
   }
+
+  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
+    const listHostEventsPayload: ListHostEventsDto = { userId: payload.id, query: '{}' };
+    
+    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+    if (!eventsResponse || !eventsResponse.result) {
+       throw new NotFoundError("Events"); 
+    }
+
+    const events = eventsResponse.result;
+    // Step 2: Cancel all APPROVED events
+    const eventsToCancel = events.filter((event) =>
+      [EventStatusEnum.APPROVED_STATUS, EventStatusEnum.SCHEDULED_STATUS, EventStatusEnum.UPCOMING_STATUS].includes(event.status)
+    );
+  
+    for (const event of eventsToCancel) {
+      const cancelPayload: CancelEventAndNotifyRequestDto = {
+        ownerId: payload.id,
+        eventId: event.id,
+        customMessage: 'This event has been canceled as the host is no longer available.',
+      };
+      await this.cancelEventAndNotify(cancelPayload);
+    }
+
+    // Step 3: Delete all events (regardless of status)
+    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+    // for (const event of events) {
+    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+    //   await this.deleteEvent(deletePayload);
+    // }
+
+    const eventIds = events.map(event => event.id);
+
+    if (eventIds.length > 0) {
+      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+    }
+    return responses.ok;
+  }
+
 }
