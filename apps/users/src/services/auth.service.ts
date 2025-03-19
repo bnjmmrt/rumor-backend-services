@@ -1096,7 +1096,7 @@ export class AuthService {
     }
 
     try {
-      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(user.email);
     } catch (error) {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: { user: { id: user.id } },
