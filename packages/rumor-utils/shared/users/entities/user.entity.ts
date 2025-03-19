@@ -108,7 +108,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => Invitation, (invitation) => invitation.inviteeUser)
   invitations: Relation<Invitation[]>;
 
-  @OneToMany(() => UserRole, (userRole) => userRole.user)
+  @OneToMany(() => UserRole, (userRole) => userRole.user, { cascade: true })
   roles: Relation<UserRole[]>;
 
   @OneToMany(() => Event, (event) => event.owner)

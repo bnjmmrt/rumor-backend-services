@@ -18,7 +18,7 @@ export class UserRole extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'profile_setup_completed', default: false })
   profileSetupCompleted: boolean;
 
-  @ManyToOne(() => User, (user) => user.roles)
+  @ManyToOne(() => User, (user) => user.roles , {onDelete: 'CASCADE'})
   @JoinColumn({ name: 'user_id' })
   user: User;
 
