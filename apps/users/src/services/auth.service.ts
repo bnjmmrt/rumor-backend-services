@@ -951,11 +951,11 @@ export class AuthService {
 
     if (existingUser) {
       if (payload.phoneNumber && existingUser.phoneNumber === payload.phoneNumber) {
-        throw new BadRequestError('Phone number is already in use')
+        throw new ForbiddenError('This user is already a part of our database.')
       }
 
       if (existingUser.email === payload.email) {
-        throw new BadRequestError('Email is already in use')
+        throw new ForbiddenError('This user is already a part of our database.')
       }
     }
 
@@ -3260,7 +3260,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User not found')
+      throw new ForbiddenError('The email address you provided doesn’t match any account in our system. Please check for any typos or try a different email.')
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3270,13 +3270,13 @@ export class AuthService {
 
     const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
     if (isAllowed === undefined) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError('We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.')
     }
 
     const loginResponse = await fusionAuthClientHandler.fusionAuthClient().login({ loginId: payload.email, password: payload.password });
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError('We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.')
     }
 
     if (loginResponse?.response?.user?.passwordChangeRequired) {

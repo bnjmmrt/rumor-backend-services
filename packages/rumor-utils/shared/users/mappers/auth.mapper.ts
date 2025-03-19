@@ -189,6 +189,8 @@ export const toMember = (
     instagramUsername,
     role: role.role.name,
     age: calculateAge(user.dateOfBirth),
+    phoneNumber: user.phoneNumber,
+    dateOfBirth: user.dateOfBirth
   };
 };
 
