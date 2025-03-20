@@ -40,6 +40,7 @@ router.put('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.u
 router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
 router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
 router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
+router.get('/users/export', AuthMiddleware.fusionAuthRequired, AdminController.exportUsersCsv);
 
 // Auth routes
 router.post('/auth/forgot-password', AuthController.forgotPassword);
@@ -126,6 +127,7 @@ router.post('/auth/user/:id/note', AuthController.addUserNote);
 router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
 router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
 router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
+router.delete('/auth/hosts/:id', AuthMiddleware.fusionAuthRequired, AuthController.deleteHostAccount)
 
 
 //Role routes
@@ -212,8 +214,8 @@ router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralC
 router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
 
 
-router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings);
-router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings);
+router.get('/notification-preferences', SettingsController.getNotificationSettings);
+router.put('/notification-preferences', SettingsController.updateNotificationSettings);
 
 //collaborator user routes
 router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)

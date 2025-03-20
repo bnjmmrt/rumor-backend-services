@@ -291,6 +291,7 @@ router.get(
 ); /**TestStatus: working */
 router.get(
   "/events/:eventId/guest-status-counts",
+  AuthMiddleware.fusionAuthRequired,
   EventsController.GetGuestCountForGuestStatuses
 ); /**TODO: TestStatus: not working */
 
@@ -542,4 +543,8 @@ router.get(
   GuestController.exportCsv
 );
 
+router.delete(
+  "/delete-host-events/:id",
+  EventsController.deleteHostEvents
+)
 export default router;

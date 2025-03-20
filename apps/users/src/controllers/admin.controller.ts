@@ -31,8 +31,7 @@ export class AdminController {
   public static getMembers = asyncWrapper(
     async (req, res): Promise<void> => {
       const userId = (req as any).user;
-      const query = JSON.stringify(req.query);
-      const payload: PaginatedRequestDto = {userId, query};
+      const payload: PaginatedRequestDto = {userId, query: req.query as string};
       const response: GetMembersResponse = await AuthService.getMembers(payload);
       const getResponse = new GetResponse(response.data);
       res.status(getResponse.statusCode).json(getResponse);
@@ -137,7 +136,32 @@ export class AdminController {
       const response: MemberProfileResponse = await AuthService.getMemberProfile(payload);
       const successResponse = new GetResponse(response.data);
       res.status(successResponse.statusCode).json(successResponse);
-      res.json(response);
+    }
+  );
+  
+  public static exportUsersCsv = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const hostId = (req as any).user;
+      const query = req.query;
+      const payload: PaginatedRequestDto = {
+        userId: hostId,
+        query,
+      };
+  
+      try {
+        // Call the service to generate the CSV
+        const csvData = await AuthService.exportUsersCsv(payload);
+  
+        // Set the headers to indicate the content type and prompt a download
+        res.header('Content-Type', 'text/csv');
+        res.attachment('users_export.csv');
+  
+        // Send the generated CSV data to the client
+        res.send(csvData);
+      } catch (error) {
+        // If any error occurs, return a 500 status code
+        res.status(500).send('Error generating CSV');
+      }
     }
   );
 }

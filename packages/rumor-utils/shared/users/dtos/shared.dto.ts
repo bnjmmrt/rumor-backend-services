@@ -40,8 +40,8 @@ export class PaginatedRequestDto implements PaginatedRequest {
   @IsOptional()
   userId: string;
   @IsString()
-  @IsNotEmpty()
-  query: string;
+  @IsOptional()
+  query?: string;
 }
 
 export class ReportAndFeedbackRequestDto {

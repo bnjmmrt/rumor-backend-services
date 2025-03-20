@@ -33,6 +33,7 @@ import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from '../
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { EventData, EventTypeData, GenerateTicketForGuestData, ToggleGuestCheckStatusData } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
+import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 export class EventsController {
 
   public static listEventStatus = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
@@ -464,6 +465,15 @@ export class EventsController {
         id: req.params.eventId
       }
       const response: GuestCountByStatuses = await EventsService.getGuestCountForGuestStatuses(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  );
+
+  public static deleteHostEvents = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const payload = { id: req.params.id } ;
+      const response = await EventsService.deleteHostEvents(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     }
