@@ -3108,6 +3108,7 @@ export class AuthService {
       .leftJoinAndSelect('user.address', 'address')
       .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
       .andWhere('user.deletedAt IS NULL')
+      .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
       .addGroupBy('role.id')
