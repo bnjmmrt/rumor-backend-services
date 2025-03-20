@@ -3223,6 +3223,7 @@ export class AuthService {
       .addSelect('draft_events.count', 'draft_events_count')
       .leftJoin(`(${pendingEventsQuery})`, 'pending_events', 'user.id = pending_events.owner_id')
       .addSelect('pending_events.count', 'pending_events_count')
+      .orderBy('user.created_at', 'DESC')
       .offset(skip)
       .limit(take);
 
