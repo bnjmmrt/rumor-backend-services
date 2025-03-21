@@ -483,6 +483,7 @@ export interface Member {
   isFavourite?: boolean | undefined;
   role?: string | undefined;
   phoneNumber?: string | undefined;
+  dateOfBirth?: string | undefined
 }
 
 export interface GetMembersResponse {
