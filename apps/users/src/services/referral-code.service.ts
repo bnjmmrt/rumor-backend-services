@@ -160,6 +160,26 @@ export class ReferralCodeService {
     return toReferralCode(referralCode);
   }
 
+  public static async activateReferralCode(
+    payload: IdRequestDto
+  ): Promise<ReferralCodeData> {
+    const referralCode = await this.dbConnection.getRepository(ReferralCode).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
+
+    if (!referralCode) {
+      throw new BadRequestError('Referral code not found')
+    }
+
+    referralCode.isManuallyDeactivated = false;
+    await this.dbConnection.getRepository(ReferralCode).save(referralCode);
+
+    return toReferralCode(referralCode);
+  }
+
   public static async deleteReferralCode(
     payload: IdRequestDto
   ): Promise<ReferralCodeData> {
