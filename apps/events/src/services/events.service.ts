@@ -61,6 +61,7 @@ import { GuestService } from './guest.service';
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 const responses = {
   conflict: (message: string) => ({
@@ -2421,7 +2422,8 @@ export class EventsService {
         },
       ];
       if (updatedEvent.isPublished) {
-        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendNotification(NotificationType.EVENT_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
       else {
         const {month, day, dayOfWeek, hour, minutes} = extractDate(updatedEvent.publishDate);
@@ -2434,10 +2436,11 @@ export class EventsService {
           value: `${hour}: ${minutes}`,
         },
       )
-        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendNotification(NotificationType.EVENT_SUBMISSION_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
     } else if([EventStatus[EventStatus.REJECTED_STATUS], EventStatus[EventStatus.DECLINED_STATUS] ].includes(updatedEvent.status) ){
-      await serviceMesh.notificationService().sendEmailFromTemplate( [{ key: "event_name", value: updatedEvent.name }, { key: "host_name", value: host.firstName }],"Host Event Rejected by Admin", [updatedEvent.owner.email],null)
+      serviceMesh.notificationService().sendEmailFromTemplate( [{ key: "event_name", value: updatedEvent.name }, { key: "host_name", value: host.firstName }],"Host Event Rejected by Admin", [updatedEvent.owner.email],null)
     }    
     return responses.data(toEvent(updatedEvent, null));
   }

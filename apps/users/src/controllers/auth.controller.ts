@@ -76,6 +76,7 @@ import {
   SwitchProfileDto,
   GetUserWithRolesByPhoneRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from "rumor-utils/shared/users/dtos/auth.dto";
 import {
   GenericResponse,
@@ -927,6 +928,22 @@ export class AuthController {
       const createResponse = new CreateResponse(
         response,
         "User spam status updated successfully."
+      );
+      res.status(createResponse.statusCode).json(createResponse);
+    }
+  );
+
+  public static manageMultipleUsersSpam = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const hostId = (req as any).user;
+      const payload: ManageMulipleUsersRequestDto = {
+        ...req.body,
+        id: hostId,
+      };
+      const response: string = await AuthService.manageMultipleUsersSpam(payload);
+      const createResponse = new CreateResponse(
+        response,
+        "Users spam status updated successfully."
       );
       res.status(createResponse.statusCode).json(createResponse);
     }

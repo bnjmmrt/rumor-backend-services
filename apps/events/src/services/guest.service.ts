@@ -57,6 +57,8 @@ import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
 import { stringify } from "csv-stringify";
 import { sendEventInviteMember, sendEventInviteNonMember } from '../utils/emails.utils';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+
 export class GuestService {
   public static dbConnection = database;
   public static filterLocationsByDistance(currentLat: number, currentLng: number, locations: EventLocationInterface[]): EventLocationInterface[] {
@@ -1963,6 +1965,8 @@ export class GuestService {
       await this.dbConnection.getRepository(Guest).save(guest);
     }
 
+    // Send Notification to Host
+    serviceMesh.notificationService().sendNotification(NotificationType.NEW_GUEST_REQUEST, event.owner.id, event.id, user.id);
     return '';
   }
 
@@ -3206,7 +3210,7 @@ export class GuestService {
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
       .leftJoinAndSelect('guest.event', 'event')
-      .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+      .select(['guest.id', 'user.email','user.id', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
       .where({ event: { id: eventId } })
       .andWhere('guest.status IN (:...statuses)', { statuses })
       .getMany();
