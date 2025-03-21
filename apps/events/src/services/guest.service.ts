@@ -56,7 +56,7 @@ import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-map
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
 import { stringify } from "csv-stringify";
-import { sendEventInviteMember, sendEventInviteNonMember } from '../utils/emails.utils';
+import { sendEventInviteMember, sendEventInviteNonMember, sendEventInvitePlusOnes } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 export class GuestService {
@@ -307,7 +307,7 @@ export class GuestService {
    */
   public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<Guests> {
     // Fetch event details based on the provided event ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId }, relations: {location: true} });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
@@ -406,7 +406,12 @@ export class GuestService {
               location: event.location.location,
               city: event.location.city,
               hostName: host.firstName,
-              emailsData: data,
+              emailsData: {
+                eventId: data.eventId,
+                id: data.id,
+                firstName: data.firstName,
+                email: data.email
+              },
             }
             sendEventInviteMember(createMailPayload)
           } else if (data.role.includes('non_member')) {
@@ -417,7 +422,12 @@ export class GuestService {
               location: event.location.location,
               city: event.location.city,
               hostName: host.firstName,
-              emailsData: data,
+              emailsData: {
+                eventId: data.eventId,
+                id: data.id,
+                firstName: data.firstName,
+                email: data.email
+              },
             }
             sendEventInviteNonMember(createMailPayload)
           }
@@ -504,7 +514,7 @@ export class GuestService {
               switch (guestStatus) {
                 case GuestStatus.INVITED:
                   // Only allow invitation if the current status is DRAFT or DECLINED
-                  if ([GuestStatus.DRAFT, GuestStatus.DECLINED].includes(guest.status)) {
+                  if ([GuestStatus.DRAFT, GuestStatus.DECLINED, GuestStatus.INVITED].includes(guest.status)) {
                     invitedGuestsEmails.push(emailData);
                   } else if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED, GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to INVITED from ${guest.status}`);
@@ -514,7 +524,7 @@ export class GuestService {
 
                 case GuestStatus.CONFIRMED:
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
-                  if ([GuestStatus.APPLIED].includes(guest.status)) {
+                  if ([GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(guest.status)) {
                     confirmedGuestsEmails.push(emailData);
                   } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
@@ -524,7 +534,7 @@ export class GuestService {
 
                 case GuestStatus.DECLINED:
                   // Only allow declining if the current status is CONFIRMED or APPLIED
-                  if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED].includes(guest.status)) {
+                  if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED, GuestStatus.DECLINED].includes(guest.status)) {
                     declinedGuestsEmails.push(emailData);
                   } else if ([GuestStatus.DRAFT, GuestStatus.INVITED, GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to DECLINED from ${guest.status}`);
@@ -564,7 +574,7 @@ export class GuestService {
 
       // Send invitation emails if guests were updated and invitations are enabled
       if (updatedGuests.length > 0 && invitedGuestsEmails.length > 0 && payload.sendInvite) {
-        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: invitedGuestsEmails[0].eventId }, relations: ['location', 'user'] });
+        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: invitedGuestsEmails[0].eventId }, relations: {location: true, owner: true} });
         // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map((data) => {
@@ -576,10 +586,16 @@ export class GuestService {
               location: event.location.location,
               city: event.location.city,
               hostName: event.owner.firstName,
-              emailsData: data,
+              emailsData: {
+                eventId: data.eventId,
+                id: data.id,
+                firstName: data.firstName,
+                email: data.email
+              },
             }
             sendEventInviteMember(createMailPayload)
             } else if (data.role.includes('non_member')) {
+              console.log("🚀 ~ GuestService ~ invitedGuestsEmails.map ~ data.role:", data.role)
               const createMailPayload = {
                 eventDate: event.startDate,
                 eventName: event.name,
@@ -587,7 +603,12 @@ export class GuestService {
                 location: event.location.location,
                 city: event.location.city,
                 hostName: event.owner.firstName,
-                emailsData: data,
+                emailsData: {
+                  eventId: data.eventId,
+                  id: data.id,
+                  firstName: data.firstName,
+                  email: data.email
+                },
               }
               sendEventInviteNonMember(createMailPayload)
             }
@@ -630,6 +651,7 @@ export class GuestService {
       // Return transformed guest data
       return guestsTransform;
     } catch (err) {
+      console.log("🚀 ~ GuestService ~ updateGuests ~ err:", err)
       // Log and return error response in case of failure
       throw new BadRequestError('Error updating guests');
     }
@@ -2221,7 +2243,7 @@ export class GuestService {
  */
   public static async inviteGuest(payload: InvitedGuestRequestDto): Promise<GuestDataSimple[]> {
     // Step 1: Check if the event exists
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() }, relations: {location: true, owner: true} });
     if (!event) throw new NotFoundError('Event not found');
 
     // Step 2: Verify the lead guest's presence and CONFIRMED status
@@ -2232,6 +2254,9 @@ export class GuestService {
         status: GuestStatus.CONFIRMED,
         deletedAt: IsNull(),
       },
+      relations: {
+        user: true
+      }
     });
     if (!leadGuest) throw new NotFoundError('Lead Guest not found');
 
@@ -2332,25 +2357,32 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     }
 
-    // NOTE: Not needed now as we are not sending any email or SMS on CONFIRMED GUEST
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
-    // if (payload.email) {
-    //   await serviceMesh
-    //     .notificationService()
-    //     .sendEmailFromTemplate(
-    //       [{ key: "first_name", value: payload?.firstName || "" }],
-    //       "Host Application Submitted",
-    //       [payload.email],
-    //       null
-    //     );
-    // } else if (payload.phoneNumber) {
-    //   const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-    //   const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-    //   if (!success) {
-    //     throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
-    //   }
-    // }
+    if (payload.email) {
+      const createMailPayload = {
+        eventDate: event.startDate,
+        eventName: event.name,
+        imageFlyer: event.imageFlyer,
+        location: event.location.location,
+        city: event.location.city,
+        hostName: event.owner.firstName,
+      }
+      const addOnMailPayload = {
+        email: payload.email,
+        userId: guest.user.id,
+        firstName: guest.user.firstName,
+        eventId: event.id,
+        leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}` ,
+      }
+      await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload)
+    } else if (payload.phoneNumber) {
+      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+      if (!success) {
+        throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+      }
+    }
 
     return [guest].map((guest) => toGuestDataSimple(guest, []));
   }
@@ -2387,7 +2419,7 @@ export class GuestService {
 
       // Step 1: Fetch event and validate
       const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: guestPayload.eventId, deletedAt: IsNull() },
+        where: { id: guestPayload.eventId, deletedAt: IsNull() }, relations: {location: true, owner: true}
       });
       if (!event) throw new NotFoundError('Event not found');
 
@@ -2399,6 +2431,9 @@ export class GuestService {
           status: GuestStatus.CONFIRMED,
           deletedAt: IsNull(),
         },
+        relations: {
+          user: true
+        }
       });
       if (!leadGuest) throw new NotFoundError('Lead Guest not found');
 
@@ -2472,30 +2507,36 @@ export class GuestService {
 
       guest = await this.dbConnection.getRepository(Guest).save(guest);
 
-      // Step 8: Send invitation (email or SMS)
-      // TO DO: Change email and sms template
-      // if (guestPayload.email) {
-      //   await serviceMesh
-      //     .notificationService()
-      //     .sendEmailFromTemplate(
-      //       [{ key: "first_name", value: guestPayload?.firstName || "" }],
-      //       "Host Application Submitted",
-      //       [guestPayload.email],
-      //       null
-      //     );
-      // } else if (guestPayload.phoneNumber) {
-      //   const message = `Hi, ${guestPayload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      //   const success = await serviceMesh.notificationService().sendTextMessage(guestPayload.phoneNumber, message);
-      //   if (!success) throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
-      // }
-
+      if (guest) {
+        if(guest.user.email) {
+        const createMailPayload = {
+          eventDate: event.startDate,
+          eventName: event.name,
+          imageFlyer: event.imageFlyer,
+          location: event.location.location,
+          city: event.location.city,
+          hostName: event.owner.firstName,
+        }
+        const addOnMailPayload = {
+          email: guest.user.email,
+          userId: guest.user.id,
+          firstName: guest.user.firstName,
+          eventId: event.id,
+          leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}` ,
+        }
+        await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload)
+      } else if (guest.user.phoneNumber) {
+        const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+        const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
+        if (!success) throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+      }
       return toGuestDataSimple(guest, []);
+    }
     });
 
     // Execute all guest invites concurrently
     const invitedGuestsResults = await Promise.all(invites);
     const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
-
     return invitedGuests;
   }
 
@@ -2766,7 +2807,7 @@ export class GuestService {
    */
   public static async inviteNewUser(payload: InviteNewUserRequestDto, token: string): Promise<GuestDataSimple> {
     // Step 1: Check if the event exists and is not deleted
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() } });
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() }, relations: {location: true} });
     if (!event) throw new NotFoundError('Event not found');
 
     // Step 2: Verify the existence of the host
@@ -2811,6 +2852,7 @@ export class GuestService {
 
     // Step 7: Register a new guest user
     let guest = new Guest();
+    let emailData;
     try {
       // Extract relevant fields for non-member registration
       const memberPayload = (({ eventId, userId, firstName, lastName, email, phoneNumber }) => ({
@@ -2822,6 +2864,13 @@ export class GuestService {
         phoneNumber: phoneNumber || '',
       }))(payload);
       const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
+      // Extract user data and email
+      emailData = {
+        eventId: event.id,
+        email: member.email,
+        firstName: member.firstName,
+        id: member.id,
+      };
       // Step 8: Create and save the guest record
       guest = this.dbConnection.getRepository(Guest).create({
         id: uuidv4(),
@@ -2843,14 +2892,16 @@ export class GuestService {
     // TO DO: Change email and sms template
     if (GuestStatus[guestStatus] === GuestStatus.INVITED) {
       if (payload.email) {
-        await serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            [{ key: "first_name", value: payload?.firstName || "" }],
-            "Host Application Submitted",
-            [payload.email],
-            null
-          );
+        const createPayload = {
+          eventDate: event.startDate,
+          eventName: event.name,
+          imageFlyer: event.imageFlyer,
+          location: event.location.location,
+          city: event.location.city,
+          hostName: host.firstName,
+          emailsData: emailData
+        }
+       await sendEventInviteNonMember(createPayload)
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
         const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);

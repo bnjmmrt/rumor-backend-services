@@ -13,7 +13,6 @@ interface MailComponent {
     emailsData?: {
         eventId?: string | undefined;
         id: string;
-        role: string[];
         firstName: string;
         email: string;
     } | undefined;
@@ -58,16 +57,14 @@ export const sendEventInviteMember = async (mailComponents: MailComponent): Prom
         { key: 'host_name', value: hostName },
     ];
     const data = emailsData;
-    const redirectPath = `/users/${data.id}/events/${data.eventId}`;
-    if (data.role.includes('member')) {
-        params.push({ key: 'first_name', value: data.firstName }, {
+    const redirectPath = `users/${data.id}/events/${data.eventId}`;
+    params.push({ key: 'first_name', value: data.firstName }, {
             key: 'view_event',
             value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
-        });
+    });
         try {
            return await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Member: Event Invite Recieved', [data.email], null)
         } catch (error) { }
-    }
 };
 
 export const sendEventInviteNonMember = async (mailComponents: MailComponent): Promise<AxiosResponse<any, any>> => {
@@ -109,8 +106,7 @@ export const sendEventInviteNonMember = async (mailComponents: MailComponent): P
         { key: 'host_name', value: hostName },
     ];
     const data = emailsData;
-    const redirectPath = `/users/${data.id}/events/${data.eventId}`;
-    if (data.role.includes('non_member')) {
+    const redirectPath = `users/${data.id}/events/${data.eventId}`;
         params.push({ key: 'first_name', value: data.firstName }, {
             key: 'link_to_application',
             value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
@@ -118,7 +114,6 @@ export const sendEventInviteNonMember = async (mailComponents: MailComponent): P
         try {
            return await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Non-Member: Event Invite Recieved', [data.email], null)
         } catch (error) { }
-    }
 }
 
 export const sendEventCancellation = async (mailComponents: MailComponent, email: string, guestName: string, message: string): Promise<AxiosResponse<any, any>> => {
@@ -176,7 +171,7 @@ export const sendEventCancellation = async (mailComponents: MailComponent, email
 }
 
 export const sendEventUpdation = async (mailComponents: MailComponent, email: string, userId: string, eventId: string): Promise<AxiosResponse<any, any>> => {
-    const redirectPath = `/users/${userId}/events/${eventId}`;
+    const redirectPath = `users/${userId}/events/${eventId}`;
     const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
 
     const { month, day, dayOfWeek, hour, minutes } = extractDate(eventDate);
@@ -221,5 +216,66 @@ export const sendEventUpdation = async (mailComponents: MailComponent, email: st
 
     try {
         return await serviceMesh.notificationService().sendEmailFromTemplate(params, "Event Info Updated", [email], null)
+    } catch (err) { }
+}
+
+export const sendEventInvitePlusOnes = async (mailComponents: MailComponent, addOnData: any): Promise<AxiosResponse<any, any>> => {
+    const {email, userId, firstName, eventId, leadGuestName} = addOnData
+    const redirectPath = `users/${userId}/events/${eventId}`;
+    const { eventDate, eventName, imageFlyer, location, city, hostName } = mailComponents;
+    const { month, day, dayOfWeek, hour, minutes } = extractDate(eventDate);
+    const params = [
+        {
+            key: 'event_name',
+            value: eventName,
+        },
+        {
+            key: 'first_name',
+            value: firstName,
+        },
+        {
+            key: 'host_name',
+            value: hostName,
+        },
+        {
+            key: 'lead_guest_name',
+            value: leadGuestName,
+        },
+        {
+            key: 'image_url',
+            value: imageFlyer,
+        },
+        {
+            key: 'month',
+            value: month,
+        },
+        {
+            key: 'day',
+            value: day,
+        },
+        {
+            key: 'day_of_week',
+            value: dayOfWeek,
+        },
+        {
+            key: 'hour',
+            value: hour,
+        },
+        {
+            key: 'minutes',
+            value: minutes,
+        },
+        {
+            key: 'address',
+            value: `${location}, ${city}`,
+        },
+        {
+            key: 'link_to_application',
+            value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+        },
+    ];
+
+    try {
+        return await serviceMesh.notificationService().sendEmailFromTemplate(params, "Non-Member: Invited as Plus ones by Member", [email], null)
     } catch (err) { }
 }
