@@ -40,7 +40,6 @@ export enum NotificationType {
   EVENT_ANNOUNCEMENT = "eventAnnouncement",
   SIGNUP_FORM_APPROVED = "signUpFormApproved",
   SIGNUP_FORM_REJECTED = "signUpFormRejected",
-  EVENT_SUBMISSION_APPROVED = "eventSubmissionApproved",
   USER_APPLICATION = "userApplication",
   HOST_APPLICATION = "hostApplication",
   EVENT_SUBMITTED = "eventSubmitted",
@@ -49,7 +48,10 @@ export enum NotificationType {
   HOST_FEEDBACK = "hostFeedback",
   USER_REPORT = "userReport",
   USER_FEEDBACK = "userFeedback",
-  EVENT_APPROVED = "eventApproved"
+  EVENT_SUBMISSION_APPROVED = "eventSubmissionApproved",
+  EVENT_APPROVED = "eventApproved",
+  NEW_GUEST_REQUEST="newGuestRequest",
+  RSVP_SIGNUP_FORM_REQUEST= "rsvpSignupFormRequest"
 }
 
 /** Generic Response */

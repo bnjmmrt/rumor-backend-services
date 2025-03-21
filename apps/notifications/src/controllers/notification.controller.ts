@@ -20,39 +20,9 @@ export class NotificationController {
     }
   );
 
-  public static createNotification = asyncWrapper(
-    async (req, res): Promise<void> => {
-      const {
-        title,
-        message,
-        body,
-        notificationType,
-        notificationModule,
-        recipientIds,
-        linkedUserId,
-        linkedEventId,
-      } = req.body;
-
-      const createReponse = await notificationService.createNotification(
-        title,
-        message,
-        body,
-        notificationType,
-        notificationModule,
-        recipientIds,
-        linkedUserId,
-        linkedEventId
-      );
-
-      const successResponse = new CreateResponse(createReponse, "Notification sent successfully");
-      res.status(successResponse.statusCode).json(successResponse);
-    }
-  );
-
   public static getAllNotifications = asyncWrapper(
     async (req, res): Promise<void> => {
       const recipientId = req.user;
-      console.log("🚀 ~ NotificationController ~ recipientId:", recipientId)
       const { take = 10, skip = 0 } = req.query;
 
       const response = await notificationService.getAllNotifications(
@@ -141,6 +111,35 @@ export class NotificationController {
       
       const getResponse = new GetResponse(response);
       res.status(getResponse.statusCode).json(getResponse);
+    }
+  );
+  
+  public static createNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const {
+        title,
+        message,
+        body,
+        notificationType,
+        notificationModule,
+        recipientIds,
+        linkedUserId,
+        linkedEventId,
+      } = req.body;
+
+      const createReponse = await notificationService.createNotification(
+        title,
+        message,
+        body,
+        notificationType,
+        notificationModule,
+        recipientIds,
+        linkedUserId,
+        linkedEventId
+      );
+
+      const successResponse = new CreateResponse(createReponse, "Notification sent successfully");
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 }

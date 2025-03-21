@@ -56,6 +56,7 @@ import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-map
 import { processCsvFile, generateErrorCsv } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
 import { stringify } from "csv-stringify";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 export class GuestService {
   public static dbConnection = database;
@@ -1923,6 +1924,8 @@ export class GuestService {
       await this.dbConnection.getRepository(Guest).save(guest);
     }
 
+    // Send Notification to Host
+    serviceMesh.notificationService().sendNotification(NotificationType.NEW_GUEST_REQUEST, event.owner.id, event.id, user.id);
     return '';
   }
 

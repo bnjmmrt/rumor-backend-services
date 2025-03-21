@@ -14,6 +14,9 @@ export class Notification extends RumorBaseEntity {
     @Column({ type: 'jsonb', name: 'body', nullable: true })
     body: object;
 
+    @Column({ type: 'varchar', name: 'notification_image', default: "" })
+    notificationImage: string;
+
     @Column({ type: 'date', name: 'date', nullable: true })
     date?: string;
 
