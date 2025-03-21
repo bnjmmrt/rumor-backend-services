@@ -1096,7 +1096,7 @@ export class AuthService {
     }
 
     try {
-      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(user.email);
     } catch (error) {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: { user: { id: user.id } },
@@ -3108,6 +3108,7 @@ export class AuthService {
       .leftJoinAndSelect('user.address', 'address')
       .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
       .andWhere('user.deletedAt IS NULL')
+      .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
       .addGroupBy('role.id')
@@ -3223,6 +3224,7 @@ export class AuthService {
       .addSelect('draft_events.count', 'draft_events_count')
       .leftJoin(`(${pendingEventsQuery})`, 'pending_events', 'user.id = pending_events.owner_id')
       .addSelect('pending_events.count', 'pending_events_count')
+      .orderBy('user.created_at', 'DESC')
       .offset(skip)
       .limit(take);
 
