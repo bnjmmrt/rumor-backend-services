@@ -3169,7 +3169,7 @@ export class GuestService {
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
       .leftJoinAndSelect('guest.event', 'event')
-      .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+      .select(['guest.id', 'user.email','user.id', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
       .where({ event: { id: eventId } })
       .andWhere('guest.status IN (:...statuses)', { statuses })
       .getMany();

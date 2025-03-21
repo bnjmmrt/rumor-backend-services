@@ -21,6 +21,7 @@ function toNotificationslisting(
     type: notification.notificationType,
     image: eval(`notification.${notification.notificationImage}`),
     isSeen: notification.isSeen,
+    body: notification.body,
     createdDate: notification.createdAt,
   }));
 }
