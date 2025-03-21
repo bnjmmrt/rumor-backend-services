@@ -48,6 +48,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -3719,7 +3720,6 @@ export class AuthService {
       userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
     }
 
-    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4358,6 +4358,29 @@ export class AuthService {
       hostUserSettings.isSpam = payload.isSpam;
     }
     await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    return '';
+  }
+
+  public static async manageMultipleUsersSpam(payload: ManageMulipleUsersRequestDto): Promise<string> {
+    const { id: hostId, isSpam, userIds } = payload;
+
+    // Validate Host Exists
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: hostId } });
+    if (!host) {
+      throw new NotFoundError('Host');
+    }
+
+    // Prepare settings for upsert
+    const settings = userIds.map((userId) => ({
+      host: { id: hostId },
+      user: { id: userId },
+      isSpam,
+    }));
+
+    // Perform upsert operation
+    await this.dbConnection.getRepository(HostUserSettings)
+      .upsert(settings, ['host', 'user']);
+
     return '';
   }
 
