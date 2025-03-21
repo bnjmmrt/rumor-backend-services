@@ -209,6 +209,7 @@ router.get("/auth/referral-codes/:id", ReferralCodeController.getReferralCode)
 router.get("/auth/referral-codes", ReferralCodeController.getReferralCodes)
 router.put("/auth/referral-codes", ReferralCodeController.updateReferralCode)
 router.put("/auth/referral-codes/:id/deactivate", ReferralCodeController.deactivateReferralCode)
+router.put("/auth/referral-codes/:id/activate", ReferralCodeController.activateReferralCode)
 router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralCode)
 
 //Referrals

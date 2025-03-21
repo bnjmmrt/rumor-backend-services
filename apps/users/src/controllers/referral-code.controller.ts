@@ -58,6 +58,16 @@ export class ReferralCodeController {
     }
   );
 
+  public static activateReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: IdRequestDto = req.body;
+      const response: ReferralCodeData =
+      await ReferralCodeService.activateReferralCode(payload);
+      const updateResponse = new CreateResponse(response, 'Referral code activated successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
+
   public static deleteReferralCode = asyncWrapper(
     async (req, res): Promise<void> => {
       const {id} = req.params;
