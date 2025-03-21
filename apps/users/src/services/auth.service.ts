@@ -1183,7 +1183,7 @@ export class AuthService {
     if (payload.isDeactivated && user.isDeactivated) {
       this.reactivateUserAccount({ email: user.email })
     }
-    
+
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -1343,11 +1343,20 @@ export class AuthService {
       throw new NotFoundError('Host');
     }
 
+    let authenticatedUser = null
     const request: LoginRequest = {
       loginId: user.email,
       password: payload.password,
     };
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    try {
+      authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    }
+    catch (e) {
+      throw new BadRequestError('Invalid email or password');
+    }
+    if (!authenticatedUser) {
+      throw new BadRequestError('Invalid email or password');
+    }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
