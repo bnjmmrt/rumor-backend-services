@@ -496,7 +496,7 @@ export class AuthService {
 
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: "host" },
-      UserSource.REQUEST_IN_APP
+      UserSource.HOST_APPLICATION
     );
 
     // Micro-service call
