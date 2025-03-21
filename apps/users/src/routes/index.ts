@@ -116,6 +116,7 @@ router.delete('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthControlle
 router.get('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.getUserProfile);
 router.get('/auth/hosts/followers', AuthMiddleware.fusionAuthRequired, AuthController.getFollowedUsers);
 router.post('/auth/user/:id/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageUserSpam);
+router.post('/auth/users/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageMultipleUsersSpam);
 router.post('/auth/user/:id/report', AuthMiddleware.fusionAuthRequired, AuthController.reportUser);
 router.post('/auth/users/:id/hosts/:hostId/block', AuthMiddleware.fusionAuthRequired, AuthController.blockHost);
 router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRequired, AuthController.unblockHost);
