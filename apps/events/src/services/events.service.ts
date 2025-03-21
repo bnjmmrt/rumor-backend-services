@@ -2454,7 +2454,7 @@ export class EventsService {
         },
       ];
       if (updatedEvent.isPublished) {
-        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+        // await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
         serviceMesh.notificationService().sendNotification(NotificationType.EVENT_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
       else {
@@ -2468,7 +2468,7 @@ export class EventsService {
           value: `${hour}: ${minutes}`,
         },
       )
-        await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
+        // await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
         serviceMesh.notificationService().sendNotification(NotificationType.EVENT_SUBMISSION_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
     } else if(payload.status === EventStatus[EventStatus.REJECTED_STATUS]){
