@@ -108,15 +108,6 @@ let notificationMatrix = {
     linkedUser: "",
     linkedEvent: "",
   },
-  eventSubmissionApproved: {
-    pushMessage:
-      "[Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)",
-    appMessage: "Rumor has approved your event [Event Name]",
-    appNotification: true,
-    pushNotificaton: true,
-    body: { eventId: "" },
-    linkedEvent: "",
-  },
   userApplication: {
     pushMessage: "",
     appMessage: "[Linked User Name] submitted a New User Application",
@@ -188,7 +179,52 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
-  }
+  },
+  eventApproved: {
+    pushMessage: "[Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)",
+    appMessage: "Rumor has approved your event [Event Name]",
+    appNotification: true,
+    pushNotificaton: true,
+    linkedEvent: "",
+    body:{eventId:""},
+    notificationModule: "event",
+    action:"Event Submission Approved",
+    image: "linkedEvent.imageFlyer"
+  },
+  newGuestRequest:{
+    pushMessage: "[Linked User Name] requested access to [Event Name].",
+    appMessage: "[Linked User Name] requested access to [Event Name].",
+    appNotification: true,
+    pushNotificaton: true,
+    linkedEvent: "",
+    linkedUser: "",
+    body:{eventId:""},
+    notificationModule: "event",
+    action:"New Guest Request",
+    image: "linkedUser.profileImage"
+  },
+  rsvpSignupFormRequest:{
+    pushMessage: "[Linked User Name] requested access to [Event Name]. ",
+    appMessage: "[User Name] requested access to [Event Name].",
+    appNotification: true,
+    pushNotificaton: true,
+    linkedEvent: "",
+    linkedUser: "",
+    body:{eventId:"", signupFormId:""},
+    notificationModule: "event",
+    action:"New RSVP Sign up Form Request",
+    image: "linkedEvent.imageFlyer"
+  },
+  eventSubmissionApproved: {
+    pushMessage:"",
+    appMessage: "Rumor has approved your event [Event Name]",
+    appNotification: true,
+    pushNotificaton: false,
+    body: { eventId: "" },
+    linkedEvent: "",
+    action:"Event Submission Approved (Publish Date After Approval Date)",
+    image: "linkedEvent.imageFlyer"
+  },
 };
 
 

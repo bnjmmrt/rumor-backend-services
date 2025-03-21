@@ -48,6 +48,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -1183,7 +1184,7 @@ export class AuthService {
     if (payload.isDeactivated && user.isDeactivated) {
       this.reactivateUserAccount({ email: user.email })
     }
-    
+
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -1343,11 +1344,20 @@ export class AuthService {
       throw new NotFoundError('Host');
     }
 
+    let authenticatedUser = null
     const request: LoginRequest = {
       loginId: user.email,
       password: payload.password,
     };
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    try {
+      authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    }
+    catch (e) {
+      throw new BadRequestError('Invalid email or password');
+    }
+    if (!authenticatedUser) {
+      throw new BadRequestError('Invalid email or password');
+    }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
@@ -3719,7 +3729,6 @@ export class AuthService {
       userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
     }
 
-    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4358,6 +4367,29 @@ export class AuthService {
       hostUserSettings.isSpam = payload.isSpam;
     }
     await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    return '';
+  }
+
+  public static async manageMultipleUsersSpam(payload: ManageMulipleUsersRequestDto): Promise<string> {
+    const { id: hostId, isSpam, userIds } = payload;
+
+    // Validate Host Exists
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: hostId } });
+    if (!host) {
+      throw new NotFoundError('Host');
+    }
+
+    // Prepare settings for upsert
+    const settings = userIds.map((userId) => ({
+      host: { id: hostId },
+      user: { id: userId },
+      isSpam,
+    }));
+
+    // Perform upsert operation
+    await this.dbConnection.getRepository(HostUserSettings)
+      .upsert(settings, ['host', 'user']);
+
     return '';
   }
 

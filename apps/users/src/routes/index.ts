@@ -116,6 +116,7 @@ router.delete('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthControlle
 router.get('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.getUserProfile);
 router.get('/auth/hosts/followers', AuthMiddleware.fusionAuthRequired, AuthController.getFollowedUsers);
 router.post('/auth/user/:id/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageUserSpam);
+router.post('/auth/users/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageMultipleUsersSpam);
 router.post('/auth/user/:id/report', AuthMiddleware.fusionAuthRequired, AuthController.reportUser);
 router.post('/auth/users/:id/hosts/:hostId/block', AuthMiddleware.fusionAuthRequired, AuthController.blockHost);
 router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRequired, AuthController.unblockHost);
@@ -208,6 +209,7 @@ router.get("/auth/referral-codes/:id", ReferralCodeController.getReferralCode)
 router.get("/auth/referral-codes", ReferralCodeController.getReferralCodes)
 router.put("/auth/referral-codes", ReferralCodeController.updateReferralCode)
 router.put("/auth/referral-codes/:id/deactivate", ReferralCodeController.deactivateReferralCode)
+router.put("/auth/referral-codes/:id/activate", ReferralCodeController.activateReferralCode)
 router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralCode)
 
 //Referrals
