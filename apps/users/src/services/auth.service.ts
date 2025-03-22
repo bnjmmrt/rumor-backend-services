@@ -2562,9 +2562,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = true;
+        return userData;
       }),
     );
     return { result: users, totalCount };
