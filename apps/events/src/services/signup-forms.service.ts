@@ -458,9 +458,13 @@ export class SignupFormsServices {
       await queryRunner.manager.save(submissions);
       await queryRunner.commitTransaction();
 
-      // Send Notification
-      serviceMesh.notificationService().sendNotification(NotificationType.RSVP_SIGNUP_FORM_REQUEST, signupForm.event.owner.id, signupForm.event.id, userPayload.id);
-
+      try {
+         // Send Notification
+          serviceMesh.notificationService().sendNotification(NotificationType.RSVP_SIGNUP_FORM_REQUEST, signupForm.event.owner.id, signupForm.event.id, userPayload.id);
+      } catch (error) {
+        console.log("🚀 ~ SignupFormsServices ~ error:", error)
+      }
+     
       return submissions;
     } catch (err) {
       throw err;
