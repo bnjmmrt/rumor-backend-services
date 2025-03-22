@@ -39,6 +39,7 @@ import {
 } from "rumor-utils/shared/events/grpc/events/events.pb";
 import {
   DataSource,
+  FindOptionsOrder,
   ILike,
   In,
   IsNull,
@@ -1281,13 +1282,11 @@ export class EventsService {
       );
     }
 
-    const order = parsedQuery.sortBy
+    const order: FindOptionsOrder<Event> = parsedQuery.sortBy
       ? {
-          [String(parsedQuery.sortBy)]: String(
-            parsedQuery.order || "ASC"
-          ).toUpperCase(),
-        }
-      : undefined;
+        [String(parsedQuery.sortBy)]: parsedQuery.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
+      }
+      : { createdAt: 'DESC' };
 
     let relations = includeRelations
       ? [
