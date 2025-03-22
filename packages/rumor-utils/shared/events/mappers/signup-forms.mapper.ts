@@ -49,6 +49,7 @@ export const buildSignupFormsResponse = (
     eventStatus: event.status,
     eventName: event.name,
     eventId: event.id,
+    limitOnePlus: event.limitOnePlus || 0
   };
   result.questions &&
     result.questions.sort((a, b) => {

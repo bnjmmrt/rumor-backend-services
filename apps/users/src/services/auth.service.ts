@@ -183,6 +183,7 @@ import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interfac
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from "csv-stringify";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -442,6 +443,32 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ memberSignUp ~ error:", error)
+    }
+
     return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
@@ -529,6 +556,31 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ hostSignUp ~ error:", error)
+    }
     return '';
   }
 
@@ -1749,6 +1801,13 @@ export class AuthService {
       );
     } catch (error) { }
 
+    try {
+      // Send Notification
+      serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ approveMember ~ error:", error)
+    }
+    
     return responses.ok;
   }
 
@@ -2503,9 +2562,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = true;
+        return userData;
       }),
     );
     return { result: users, totalCount };
@@ -2657,6 +2718,13 @@ export class AuthService {
     }
     user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
 
+    let existingMapping = null;
+    if (user) {
+      existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { host: { id: payload.id }, user: { id: user.id } },
+      });
+    }
+
     const newUser: User | null = new User();
     if (!user) {
       newUser.email = payload.email ?? '';
@@ -2666,6 +2734,18 @@ export class AuthService {
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const newMapping = new HostUserMapping();
+      newMapping.user = user;
+      newMapping.host = { id: payload.id } as User;
+      await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+    } else {
+      if (!existingMapping) {
+        const newMapping = new HostUserMapping();
+        newMapping.user = user;
+        newMapping.host = { id: payload.id } as User;
+        await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+      }
     }
 
     return toSimpleUser(user);
@@ -4432,6 +4512,8 @@ export class AuthService {
       reportedByRoleId: reportedByRole.id,
       reportedToRoleId: reportedToRole.id,
     };
+
+    
 
     return data;
   }

@@ -697,6 +697,7 @@ export interface SignupFormsResponse {
   eventStatus: EventStatusEnum;
   eventName: string;
   eventId: string;
+  limitOnePlus: number;
 }
 
 export interface ISignupFormQuestionsRequest {

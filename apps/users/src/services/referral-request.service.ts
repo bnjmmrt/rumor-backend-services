@@ -7,6 +7,8 @@ import { toReferralRequest } from 'rumor-utils/shared/users/mappers/referral-req
 import { responses } from '../common/responses.common';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import database from "../database";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class ReferralRequestService {
     public static dbConnection = database;
@@ -30,6 +32,12 @@ export class ReferralRequestService {
 
       await this.dbConnection
         .getRepository(ReferralRequest).save(referralRequest);
+      
+        try {
+          serviceMesh.notificationService().sendNotification(NotificationType.PROFILE_REFERRALS, payload.userId, null, payload.requesterId);
+        } catch (error) {
+          console.log("🚀 ~ ReferralRequestService ~ createReferralRequest ~ error:", error)
+        }
 
       return responses.ok;
     } catch (err) {
