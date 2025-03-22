@@ -33,6 +33,7 @@ export enum NotificationType {
   EVENT_REMINDER = "eventReminder",
   EVENT_CANCELLED = "eventCancelled",
   EVENT_INVITATION = "eventInvitation",
+  EVENT_INVITATION_NON_MEMBER = "eventInvitationNonMember",
   EVENT_POSTED = "eventPosted",
   EVENT_POSTED_CITY = "eventPostedCity",
   EVENT_REQUEST_APPROVED = "eventRequestApproved",

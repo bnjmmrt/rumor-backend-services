@@ -123,7 +123,11 @@ import { processCsvFile, generateErrorCsv } from "rumor-utils/utils/file-utils";
 import S3Service from "../utils/aws/s3";
 import { stringify } from "csv-stringify";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
-import { sendEventInviteMember, sendEventInviteNonMember, sendEventInvitePlusOnes } from '../utils/emails.utils';
+import {
+  sendEventInviteMember,
+  sendEventInviteNonMember,
+  sendEventInvitePlusOnes,
+} from "../utils/emails.utils";
 
 export class GuestService {
   public static dbConnection = database;
@@ -527,13 +531,19 @@ export class GuestService {
           // Fetch user details using the auth client
           const user = await this.dbConnection.getRepository(User).findOne({
             where: [{ id: userId }],
-            relations: { roles: { role: true } }
-          })
+            relations: { roles: { role: true } },
+          });
           // const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
 
           // Extract user data and email
-          let emailData: { eventId: string; email: string; firstName: string; role: string[]; id?: string } = {
+          let emailData: {
+            eventId: string;
+            email: string;
+            firstName: string;
+            role: string[];
+            id?: string;
+          } = {
             eventId: event.id,
             email: user.email,
             firstName: user.firstName,
@@ -583,11 +593,11 @@ export class GuestService {
 
     // If guest status is "INVITED" and sendInvite is true, send invitation emails
     // TO DO: Change email and sms template
-    if ((guestStatus === GuestStatus.INVITED) && payload.sendInvite) {
+    if (guestStatus === GuestStatus.INVITED && payload.sendInvite) {
       //To Do: Change email and sms template
       await Promise.all(
         emailsData.map((data) => {
-          if (data.role.includes('member')) {
+          if (data.role.includes("member")) {
             const createMailPayload = {
               eventDate: event.startDate,
               eventName: event.name,
@@ -599,14 +609,22 @@ export class GuestService {
                 eventId: data.eventId,
                 id: data.id,
                 firstName: data.firstName,
-                email: data.email
+                email: data.email,
               },
-            }
+            };
 
-            // Send Push for Member
+            // Send Push for Member Invitation
+            serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.EVENT_INVITATION,
+                data.id,
+                payload.eventId,
+                payload.hostId
+              );
 
-            sendEventInviteMember(createMailPayload)
-          } else if (data.role.includes('non_member')) {
+            sendEventInviteMember(createMailPayload);
+          } else if (data.role.includes("non_member")) {
             const createMailPayload = {
               eventDate: event.startDate,
               eventName: event.name,
@@ -618,16 +636,23 @@ export class GuestService {
                 eventId: data.eventId,
                 id: data.id,
                 firstName: data.firstName,
-                email: data.email
+                email: data.email,
               },
-            }
+            };
 
-            // Send Push for Non Member
+            // Send Push for Non Member Invitation
+            serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.EVENT_INVITATION,
+                data.id,
+                payload.eventId,
+                payload.hostId
+              );
 
-            sendEventInviteNonMember(createMailPayload)
+            sendEventInviteNonMember(createMailPayload);
           }
-        }
-        ),
+        })
       );
     }
 
@@ -688,22 +713,27 @@ export class GuestService {
         payload.guests.map(async (guestId) => {
           try {
             // Fetch the guest details along with associated user information
-            const guest = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guestId }, relations: ['user', 'addedBy', 'declinedBy', 'event'] });
+            const guest = await this.dbConnection
+              .getRepository(Guest)
+              .findOne({
+                where: { id: guestId },
+                relations: ["user", "addedBy", "declinedBy", "event"],
+              });
             // If guest does not exist, log a warning and return null
             if (!guest) {
               return null;
             }
             const user = await this.dbConnection.getRepository(User).findOne({
               where: [{ id: guest.user.id }],
-              relations: { roles: { role: true } }
-            })
+              relations: { roles: { role: true } },
+            });
             let emailData = {
               eventId: guest.event.id,
               id: guest.user.id,
               email: guest.user.email,
               firstName: guest.user.firstName,
               role: user.roles.flatMap((role) => role.role.name),
-            }
+            };
             // Update max additional guests and private notes if provided
             guest.maxAdditionalGuests =
               payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
@@ -717,30 +747,68 @@ export class GuestService {
               switch (guestStatus) {
                 case GuestStatus.INVITED:
                   // Only allow invitation if the current status is DRAFT or DECLINED
-                  if ([GuestStatus.DRAFT, GuestStatus.DECLINED, GuestStatus.INVITED].includes(guest.status)) {
+                  if (
+                    [
+                      GuestStatus.DRAFT,
+                      GuestStatus.DECLINED,
+                      GuestStatus.INVITED,
+                    ].includes(guest.status)
+                  ) {
                     invitedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED, GuestStatus.REFUSED].includes(guest.status)) {
-                    throw new Error(`Cannot set status to INVITED from ${guest.status}`);
+                  } else if (
+                    [
+                      GuestStatus.CONFIRMED,
+                      GuestStatus.APPLIED,
+                      GuestStatus.REFUSED,
+                    ].includes(guest.status)
+                  ) {
+                    throw new Error(
+                      `Cannot set status to INVITED from ${guest.status}`
+                    );
                   }
                   guest.status = GuestStatus.INVITED;
                   break;
 
                 case GuestStatus.CONFIRMED:
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
-                  if ([GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(guest.status)) {
+                  if (
+                    [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(
+                      guest.status
+                    )
+                  ) {
                     confirmedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
-                    throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
+                  } else if (
+                    [GuestStatus.DECLINED, GuestStatus.REFUSED].includes(
+                      guest.status
+                    )
+                  ) {
+                    throw new Error(
+                      `Cannot set status to CONFIRMED from ${guest.status}`
+                    );
                   }
                   guest.status = GuestStatus.CONFIRMED;
                   break;
 
                 case GuestStatus.DECLINED:
                   // Only allow declining if the current status is CONFIRMED or APPLIED
-                  if ([GuestStatus.CONFIRMED, GuestStatus.APPLIED, GuestStatus.DECLINED].includes(guest.status)) {
+                  if (
+                    [
+                      GuestStatus.CONFIRMED,
+                      GuestStatus.APPLIED,
+                      GuestStatus.DECLINED,
+                    ].includes(guest.status)
+                  ) {
                     declinedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.DRAFT, GuestStatus.INVITED, GuestStatus.REFUSED].includes(guest.status)) {
-                    throw new Error(`Cannot set status to DECLINED from ${guest.status}`);
+                  } else if (
+                    [
+                      GuestStatus.DRAFT,
+                      GuestStatus.INVITED,
+                      GuestStatus.REFUSED,
+                    ].includes(guest.status)
+                  ) {
+                    throw new Error(
+                      `Cannot set status to DECLINED from ${guest.status}`
+                    );
                   }
                   guest.status = GuestStatus.DECLINED;
                   break;
@@ -771,7 +839,9 @@ export class GuestService {
             }
 
             // Save the updated guest data
-            const data = await this.dbConnection.getRepository(Guest).save(guest);
+            const data = await this.dbConnection
+              .getRepository(Guest)
+              .save(guest);
             return data;
           } catch (err) {
             // Log error and return null in case of failure
@@ -784,29 +854,21 @@ export class GuestService {
       const updatedGuests = guests.filter((guest) => guest !== null);
 
       // Send invitation emails if guests were updated and invitations are enabled
-      if (updatedGuests.length > 0 && invitedGuestsEmails.length > 0 && payload.sendInvite) {
-        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: invitedGuestsEmails[0].eventId }, relations: {location: true, owner: true} });
+      if (
+        updatedGuests.length > 0 &&
+        invitedGuestsEmails.length > 0 &&
+        payload.sendInvite
+      ) {
+        const event = await this.dbConnection
+          .getRepository(Event)
+          .findOne({
+            where: { id: invitedGuestsEmails[0].eventId },
+            relations: { location: true, owner: true },
+          });
         // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map((data) => {
-            if (data.role.includes('member')) {
-            const createMailPayload = {
-              eventDate: event.startDate,
-              eventName: event.name,
-              imageFlyer: event.imageFlyer,
-              location: event.location.location,
-              city: event.location.city,
-              hostName: event.owner.firstName,
-              emailsData: {
-                eventId: data.eventId,
-                id: data.id,
-                firstName: data.firstName,
-                email: data.email
-              },
-            }
-            // Send Push for Non Member
-            sendEventInviteMember(createMailPayload)
-            } else if (data.role.includes('non_member')) {
+            if (data.role.includes("member")) {
               const createMailPayload = {
                 eventDate: event.startDate,
                 eventName: event.name,
@@ -818,16 +880,49 @@ export class GuestService {
                   eventId: data.eventId,
                   id: data.id,
                   firstName: data.firstName,
-                  email: data.email
+                  email: data.email,
                 },
-              }
-              sendEventInviteNonMember(createMailPayload)
+              };
+              // Send Push for Member
+              serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.EVENT_INVITATION,
+                data.id,
+                data.eventId,
+                payload.hostId
+              );
+              
+              sendEventInviteMember(createMailPayload);
+            } else if (data.role.includes("non_member")) {
+              const createMailPayload = {
+                eventDate: event.startDate,
+                eventName: event.name,
+                imageFlyer: event.imageFlyer,
+                location: event.location.location,
+                city: event.location.city,
+                hostName: event.owner.firstName,
+                emailsData: {
+                  eventId: data.eventId,
+                  id: data.id,
+                  firstName: data.firstName,
+                  email: data.email,
+                },
+              };
+              sendEventInviteNonMember(createMailPayload);
               // Send Push for Non Member
-
+              serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.EVENT_INVITATION_NON_MEMBER,
+                data.id,
+                data.eventId,
+                payload.hostId
+              );
             }
-          }))
+          })
+        );
       }
-
 
       // Send declined emails if guests were updated and declines are enabled
       if (
@@ -870,7 +965,7 @@ export class GuestService {
       // Return transformed guest data
       return guestsTransform;
     } catch (err) {
-      console.log("🚀 ~ GuestService ~ updateGuests ~ err:", err)
+      console.log("🚀 ~ GuestService ~ updateGuests ~ err:", err);
       // Log and return error response in case of failure
       throw new BadRequestError("Error updating guests");
     }
@@ -2962,8 +3057,13 @@ export class GuestService {
     payload: InvitedGuestRequestDto
   ): Promise<GuestDataSimple[]> {
     // Step 1: Check if the event exists
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() }, relations: {location: true, owner: true} });
-    if (!event) throw new NotFoundError('Event not found');
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({
+        where: { id: payload.eventId, deletedAt: IsNull() },
+        relations: { location: true, owner: true },
+      });
+    if (!event) throw new NotFoundError("Event not found");
 
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -2974,8 +3074,8 @@ export class GuestService {
         deletedAt: IsNull(),
       },
       relations: {
-        user: true
-      }
+        user: true,
+      },
     });
     if (!leadGuest) throw new NotFoundError("Lead Guest not found");
 
@@ -3118,20 +3218,24 @@ export class GuestService {
         location: event.location.location,
         city: event.location.city,
         hostName: event.owner.firstName,
-      }
+      };
       const addOnMailPayload = {
         email: payload.email,
         userId: guest.user.id,
         firstName: guest.user.firstName,
         eventId: event.id,
-        leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}` ,
-      }
-      await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload)
+        leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
+      };
+      await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
     } else if (payload.phoneNumber) {
       const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+      const success = await serviceMesh
+        .notificationService()
+        .sendTextMessage(payload.phoneNumber, message);
       if (!success) {
-        throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+        throw new BadRequestError(
+          "An error occurred while sending SMS invitation, please try again."
+        );
       }
     }
 
@@ -3171,7 +3275,8 @@ export class GuestService {
     const invites = guests.map(async (guestPayload) => {
       // Step 1: Fetch event and validate
       const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: guestPayload.eventId, deletedAt: IsNull() }, relations: {location: true, owner: true}
+        where: { id: guestPayload.eventId, deletedAt: IsNull() },
+        relations: { location: true, owner: true },
       });
       if (!event) throw new NotFoundError("Event not found");
 
@@ -3184,8 +3289,8 @@ export class GuestService {
           deletedAt: IsNull(),
         },
         relations: {
-          user: true
-        }
+          user: true,
+        },
       });
       if (!leadGuest) throw new NotFoundError("Lead Guest not found");
 
@@ -3282,35 +3387,42 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
 
       if (guest) {
-        if(guest.user.email) {
-        const createMailPayload = {
-          eventDate: event.startDate,
-          eventName: event.name,
-          imageFlyer: event.imageFlyer,
-          location: event.location.location,
-          city: event.location.city,
-          hostName: event.owner.firstName,
+        if (guest.user.email) {
+          const createMailPayload = {
+            eventDate: event.startDate,
+            eventName: event.name,
+            imageFlyer: event.imageFlyer,
+            location: event.location.location,
+            city: event.location.city,
+            hostName: event.owner.firstName,
+          };
+          const addOnMailPayload = {
+            email: guest.user.email,
+            userId: guest.user.id,
+            firstName: guest.user.firstName,
+            eventId: event.id,
+            leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
+          };
+          await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
+        } else if (guest.user.phoneNumber) {
+          const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+          const success = await serviceMesh
+            .notificationService()
+            .sendTextMessage(guest.user.phoneNumber, message);
+          if (!success)
+            throw new BadRequestError(
+              "An error occurred while sending SMS invitation, please try again."
+            );
         }
-        const addOnMailPayload = {
-          email: guest.user.email,
-          userId: guest.user.id,
-          firstName: guest.user.firstName,
-          eventId: event.id,
-          leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}` ,
-        }
-        await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload)
-      } else if (guest.user.phoneNumber) {
-        const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-        const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
-        if (!success) throw new BadRequestError('An error occurred while sending SMS invitation, please try again.');
+        return toGuestDataSimple(guest, []);
       }
-      return toGuestDataSimple(guest, []);
-    }
     });
 
     // Execute all guest invites concurrently
     const invitedGuestsResults = await Promise.all(invites);
-    const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(Boolean) as GuestDataSimple[];
+    const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(
+      Boolean
+    ) as GuestDataSimple[];
     return invitedGuests;
   }
 
@@ -3396,10 +3508,20 @@ export class GuestService {
 
       // Step 5: Retrieve guests already associated with the event
       if (!payload.isUploadUser) {
-        const existingGuestList: Guest[] = await this.dbConnection.getRepository(Guest).find({
-          where: { event: { id: event.id }, deletedAt: IsNull(), user: In(existingUsers.filter((user) => user !== null).map((user) => user.id)) },
-          relations: { user: true, addedBy: true },
-        });
+        const existingGuestList: Guest[] = await this.dbConnection
+          .getRepository(Guest)
+          .find({
+            where: {
+              event: { id: event.id },
+              deletedAt: IsNull(),
+              user: In(
+                existingUsers
+                  .filter((user) => user !== null)
+                  .map((user) => user.id)
+              ),
+            },
+            relations: { user: true, addedBy: true },
+          });
 
         if (existingGuestList.length > 0) {
           existingGuestList.map((guest) => {
@@ -3644,8 +3766,13 @@ export class GuestService {
     token: string
   ): Promise<GuestDataSimple> {
     // Step 1: Check if the event exists and is not deleted
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId, deletedAt: IsNull() }, relations: {location: true} });
-    if (!event) throw new NotFoundError('Event not found');
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({
+        where: { id: payload.eventId, deletedAt: IsNull() },
+        relations: { location: true },
+      });
+    if (!event) throw new NotFoundError("Event not found");
 
     // Step 2: Verify the existence of the host
     const host = (
@@ -3725,7 +3852,11 @@ export class GuestService {
         email: email || "",
         phoneNumber: phoneNumber || "",
       }))(payload);
-      const member: SimpleUser = (await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)).data;
+      const member: SimpleUser = (
+        await serviceMesh
+          .userService()
+          .registerInvitesAsNonMember(memberPayload)
+      ).data;
       // Extract user data and email
       emailData = {
         eventId: event.id,
@@ -3765,9 +3896,9 @@ export class GuestService {
           location: event.location.location,
           city: event.location.city,
           hostName: host.firstName,
-          emailsData: emailData
-        }
-       await sendEventInviteNonMember(createPayload)
+          emailsData: emailData,
+        };
+        await sendEventInviteNonMember(createPayload);
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
         const success = await serviceMesh
@@ -3795,7 +3926,13 @@ export class GuestService {
       .leftJoinAndSelect("guest.declinedBy", "declinedBy")
       .leftJoinAndSelect("guest.ticketType", "ticketType")
       .where({ event: { id: event.id } })
-      .andWhere({ status: In([GuestStatus.DRAFT, GuestStatus.INVITED, GuestStatus.CONFIRMED]) })
+      .andWhere({
+        status: In([
+          GuestStatus.DRAFT,
+          GuestStatus.INVITED,
+          GuestStatus.CONFIRMED,
+        ]),
+      })
       .andWhere({ user: { id: guest.user.id } })
       .limit(1);
 
@@ -3933,17 +4070,23 @@ export class GuestService {
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
       guests.map(async (guest) => {
-        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-        const vouches = (await VouchRequestService.getUserVouches({ id: guest.user.id }));
-        const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
-          where: {
-            user: { id: guest.user.id },
-            event: { id: payload.eventId },
-          },
-          relations: {
-            question: true,
-          },
+        const focuses = (
+          await serviceMesh.userService().getUserFocuses(guest.user.id)
+        ).data;
+        const vouches = await VouchRequestService.getUserVouches({
+          id: guest.user.id,
         });
+        const answers = await this.dbConnection
+          .getRepository(UserQuizAnswer)
+          .find({
+            where: {
+              user: { id: guest.user.id },
+              event: { id: payload.eventId },
+            },
+            relations: {
+              question: true,
+            },
+          });
         const guestData = toGuest(
           guest,
           focuses,
@@ -3996,8 +4139,13 @@ export class GuestService {
 
     const guest = await queryBuilder.getOne();
 
-    const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
-    const vouches = await VouchRequestService.getUserVouchesByEvent({ requesterId: guest.user.id, eventId: event.id });
+    const focuses = (
+      await serviceMesh.userService().getUserFocuses(guest.user.id)
+    ).data;
+    const vouches = await VouchRequestService.getUserVouchesByEvent({
+      requesterId: guest.user.id,
+      eventId: event.id,
+    });
     const answers = await this.dbConnection.getRepository(UserQuizAnswer).find({
       where: {
         user: { id: guest.user.id },

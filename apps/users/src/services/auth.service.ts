@@ -443,6 +443,27 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+      where: {
+        deletedAt: IsNull(),
+        roles: {
+          role: {
+            name: 'admin',
+          },
+        },
+      },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+    
+    const adminUserIds = adminUsers.map((user) => user.id);
+
+    if(adminUserIds.length > 0)
+    await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+
     return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
@@ -529,6 +550,27 @@ export class AuthService {
 
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+
+    const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+      where: {
+        deletedAt: IsNull(),
+        roles: {
+          role: {
+            name: 'admin',
+          },
+        },
+      },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+    
+    const adminUserIds = adminUsers.map((user) => user.id);
+
+    if(adminUserIds.length > 0)
+    await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
 
     return '';
   }

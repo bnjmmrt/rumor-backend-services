@@ -1,4 +1,4 @@
-import { access } from "fs";
+import { NotificationModules } from "packages/rumor-utils/shared/notifications/interfaces/notification.interface";
 
 let notificationMatrix = {
   applicationAppoved: {
@@ -137,34 +137,27 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
-  },
-  eventInvitationNonMember:{
-    pushMessage: "",
-    appMessage: "[Linked User Name] invited you to attend [Event Name]",
-    appNotification: true,
-    pushNotificaton: false,
-    body: { eventId: "" },
-    linkedUser: "",
-    linkedEvent: "",
     image: "linkedEvent.imageFlyer"
   },
   userApplication: {
     pushMessage: "",
     appMessage: "[Linked User Name] submitted a New User Application",
     appNotification: true,
-    pushNotificaton: true,
-    body: { eventId: "" },
+    pushNotificaton: false,
+    body: { userId: "" },
     linkedUser: "",
-    linkedEvent: "",
+    notifcationModule: "user",
+    image: "linkedUser.profileImage"
   },
   hostApplication: {
     pushMessage: "",
     appMessage: "[Linked User Name] submitted a New Host Application",
     appNotification: true,
     pushNotificaton: false,
-    body: { eventId: "" },
+    body: { userId: "" },
     linkedUser: "",
-    linkedEvent: "",
+    notifcationModule: "user",
+    image: "linkedUser.profileImage"
   },
   eventSubmitted: {
     pushMessage: "",
@@ -174,6 +167,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    NotificationModule: "event",
+    image: "linkedEvent.imageFlyer"
   },
   eventEdited: {
     pushMessage: "",
@@ -183,6 +178,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    NotificationModule: "event",
+    image: "linkedEvent.imageFlyer"
   },
   hostReport: {
     pushMessage: "",
