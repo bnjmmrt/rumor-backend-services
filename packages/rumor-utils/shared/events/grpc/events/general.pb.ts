@@ -19,6 +19,7 @@ export enum UserSource {
   REQUEST_IN_APP = 4,
   PLUS_1 = 5,
   UNRECOGNIZED = -1,
+  HOST_APPLICATION = 6,
 }
 
 export enum EventStatus {
