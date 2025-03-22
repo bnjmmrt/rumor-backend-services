@@ -150,6 +150,7 @@ export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentU
     publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
+    timeZone: event?.timeZone,
     guest: currentGuest
       ? {
           guestId: currentGuest.id,

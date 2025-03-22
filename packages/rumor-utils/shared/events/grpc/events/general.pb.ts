@@ -548,6 +548,7 @@ export interface GuestEventData {
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
   autoPublished?: boolean | undefined;
+  timeZone?: string | undefined;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   guest?: GuestDataEvent | undefined;

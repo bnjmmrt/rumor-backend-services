@@ -1140,11 +1140,11 @@ export class AuthService {
         await serviceMesh.notificationService().sendEmailFromTemplate(
           [
             {
-              key: 'first_name',
+              key: 'code',
               value: code.response.code,
             },
           ],
-          'Host Application Submitted',
+          'Non-Member Verify Email',
           [payload.email],
           null,
         );
