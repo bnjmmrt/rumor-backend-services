@@ -2718,6 +2718,13 @@ export class AuthService {
     }
     user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
 
+    let existingMapping = null;
+    if (user) {
+      existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { host: { id: payload.id }, user: { id: user.id } },
+      });
+    }
+
     const newUser: User | null = new User();
     if (!user) {
       newUser.email = payload.email ?? '';
@@ -2727,6 +2734,18 @@ export class AuthService {
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const newMapping = new HostUserMapping();
+      newMapping.user = user;
+      newMapping.host = { id: payload.id } as User;
+      await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+    } else {
+      if (!existingMapping) {
+        const newMapping = new HostUserMapping();
+        newMapping.user = user;
+        newMapping.host = { id: payload.id } as User;
+        await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+      }
     }
 
     return toSimpleUser(user);
