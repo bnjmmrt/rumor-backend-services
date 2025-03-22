@@ -813,6 +813,7 @@ export class GuestService {
                     );
                   }
                   guest.status = GuestStatus.DECLINED;
+                  guest.declinedBy = { id: payload.hostId } as User;
                   break;
 
                 case GuestStatus.DRAFT:
