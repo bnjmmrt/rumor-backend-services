@@ -436,7 +436,7 @@ export interface GuestData {
   favorite?: boolean | undefined;
   roles: UserRoleComplete[];
   addedBy?: string | undefined;
-  invitationSource: UserSource;
+  invitationSource: string;
   categories: string[];
   userId?: string | undefined;
   guestId?: string | undefined;
