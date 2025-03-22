@@ -8,172 +8,124 @@ import { UserSettings } from "rumor-utils/shared/users/entities/user-settings.en
 import { In } from "typeorm";
 import getNotificationDetails from "../server/helpers/notificationMatrix";
 import firebaseNotificationsService from "../utils/firebase-notifications/firebase-notifications.service";
+import {
+  toNotificationslisting,
+  toNotification,
+} from "rumor-utils/shared/notifications/mappers/notification.mapper";
 
 class NotificationService {
   public dbConnection = database;
 
   async sendNotification(
     notificationType: string,
-    recipients: User | User[],
-    linkedUser?: User,
-    linkedEvent?: Event
+    recipients: string | string[],
+    linkedUserId?: string,
+    linkedEventId?: string
   ) {
     const recipientList = Array.isArray(recipients) ? recipients : [recipients];
-
+  
+    // Fetch notification template
     const notificationTemplate = getNotificationDetails(notificationType);
-
     if (!notificationTemplate) {
       throw new Error(`Invalid notification type: ${notificationType}`);
     }
-
-    const notificationsToSave = [];
-    const fcmTokens: string[] = [];
-    let notificationImage: string = "";
-
-    for (const recipient of recipientList) {
-      let pushMessage = notificationTemplate.pushMessage || "";
-      let appMessage = notificationTemplate.appMessage || "";
-      let body: any = notificationTemplate.body;
-
-      let message = pushMessage || appMessage;
-      message = message
-        .replace("[Event Start Time]", linkedEvent?.startDate || "")
-        .replace(
-          "[Recipient Name]",
-          recipient?.firstName
-            ? `${recipient.firstName} ${recipient.lastName}`
-            : ""
-        )
-        .replace(
-          "[Linked User Name]",
-          linkedUser?.firstName
-            ? `${linkedUser.firstName} ${linkedUser.lastName}`
-            : ""
-        )
-        .replace("[Event Name]", linkedEvent?.name || "")
-        .replace("[Event City Name]", linkedEvent?.location?.city || "")
-        .replace("[Member Name]", body?.name || "")
-        .replace("[Host Name]", body?.name || "");
-
-      if (pushMessage) {
-        pushMessage = message;
-      }
-
-      if (appMessage) {
-        appMessage = message;
-      }
-
-      if (notificationTemplate.hasOwnProperty("linkedUser")) {
-        notificationImage = linkedUser.profilePicture;
-      } else {
-        notificationImage = linkedEvent.imageFlyer;
-      }
-
-      const userPreferences = await UserSettings.getRepository().findOne({
-        where: { user: recipient },
-      });
-      const canSendPush =
-        notificationTemplate.pushNotification &&
-        userPreferences.enableAppNotifications;
-      const canSendApp = notificationTemplate.appNotification;
-
-      // Save notification data for batch insert
-      if (canSendApp) {
-        notificationsToSave.push({
-          recipient,
-          title: "Rumor",
-          message,
-          body,
-          notificationType,
-          isSeen: false,
-          pushNotification: canSendPush,
-          appNotification: canSendApp,
-          linkedUser,
-          linkedEvent,
-        });
-      }
-
-      // Collect FCM tokens for push notifications
-      if (canSendPush) {
-        const tokens = await PushNotificationToken.getRepository().find({
-          where: { user: recipient },
-          select: ["notificationToken"],
-        });
-        fcmTokens.push(...tokens.map((data) => data.notificationToken));
+  
+    // Fetch linked entities in a single query each
+     
+    const linkedUser:User = linkedUserId ? await User.getRepository().findOne({ where: { id: linkedUserId } }) : null
+    const linkedEvent:Event = linkedEventId ? await Event.getRepository().findOne({ where: { id: linkedEventId } }) : null
+    
+    if (notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser) {
+      throw new NotFoundError("Linked user not found");
+    }
+    if (notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent) {
+      throw new NotFoundError("Linked event not found");
+    }
+  
+    const notificationsToSave: Notification[] = [];
+    const pushNotifications: { token: string; message: string; title: string; image: string }[] = [];
+  
+    // Bulk fetch recipient users, preferences, and push tokens
+    const recipientsData = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.userSettings", "userSettings")
+      .leftJoinAndSelect("user.pushNotificationToken", "pushNotificationToken")
+      .where("user.id IN (:...recipientList)", { recipientList })
+      .getMany();
+  
+    for (const recipientUser of recipientsData) {
+      if (!recipientUser) continue;
+  
+      const body: any = notificationTemplate.body ? { eventId: linkedEvent?.id, userId: linkedUser?.id } : {};
+      const notificationImage = eval(notificationTemplate.image) || "";
+  
+      // Generate personalized messages
+      const replaceTemplateValues = (message: string) =>
+        message
+          .replace("[Event Start Time]", (linkedEvent?.startDate || "").toString())
+          .replace("[Recipient Name]", recipientUser.firstName ? `${recipientUser.firstName} ${recipientUser.lastName}` : "")
+          .replace("[Linked User Name]", linkedUser?.firstName ? `${linkedUser.firstName} ${linkedUser.lastName}` : "")
+          .replace("[Event Name]", linkedEvent?.name || "")
+          .replace("[Event City Name]", linkedEvent?.location?.city || "")
+          .replace("[Member Name]", body?.name || "")
+          .replace("[Host Name]", body?.name || "");
+  
+      const appMessage = replaceTemplateValues(notificationTemplate.appMessage || "");
+      const pushMessage = replaceTemplateValues(notificationTemplate.pushMessage || "");
+  
+      // Prepare notification for saving
+      const notification = new Notification();
+      notification.title = "Rumor";
+      notification.message = appMessage;
+      notification.body = body;
+      notification.notificationType = notificationType;
+      notification.linkedUser = linkedUser;
+      notification.linkedEvent = linkedEvent;
+      notification.notificationModule = notificationTemplate.notificationModule;
+      notification.recipients = [recipientUser];
+      notification.notificationImage = notificationTemplate.image;
+  
+      notificationsToSave.push(notification);
+  
+      // Handle push notification if enabled
+      if (notificationTemplate.pushNotification && recipientUser.userSettings?.enableAppNotifications) {
+        for (const tokenObj of recipientUser.pushNotificationToken) {
+          pushNotifications.push({
+            token: tokenObj.notificationToken,
+            message: pushMessage,
+            title: "Rumor",
+            image: notificationImage,
+          });
+        }
       }
     }
-
-    // Save all notifications in a single DB operation (batch insert)
-    const notificationRepository =
-      this.dbConnection.getRepository(Notification);
-    await notificationRepository.save(notificationsToSave);
-
-    // Send push notifications in bulk
-    if (fcmTokens.length > 0) {
-      await firebaseNotificationsService.sendPushNotification({
-        tokens: fcmTokens,
-        body: notificationsToSave[0]?.message,
-        title: notificationsToSave[0]?.title,
-        image: notificationImage,
-      });
+  
+    // Batch insert notifications
+    if (notificationsToSave.length > 0) {
+      await this.dbConnection.getRepository(Notification).save(notificationsToSave);
     }
-
+  
+    // Send push notifications in bulk, ensuring different messages per recipient
+    if (pushNotifications.length > 0) {
+      for (const push of pushNotifications) {
+        await firebaseNotificationsService.sendPushNotification({
+          tokens: [push.token],
+          body: push.message,
+          title: push.title,
+          image: push.image,
+        });
+      }
+    }
+  
     return { success: true, message: "Notifications sent successfully." };
   }
-
-  async createNotification(
-    title: string,
-    message: string,
-    body: object,
-    notificationType: string,
-    notificationModule: string,
-    recipientIds: string[],
-    linkedUserId?: string,
-    linkedEventId?: string
-  ): Promise<Notification> {
-    return await this.dbConnection.connection.transaction(
-      async (transactionalEntityManager) => {
-        const notificationRepository =
-          transactionalEntityManager.getRepository(Notification);
-        const userRepository = transactionalEntityManager.getRepository(User);
-        const eventRepository = transactionalEntityManager.getRepository(Event);
-
-        const newNotification = notificationRepository.create({
-          title,
-          message,
-          body,
-          notificationType,
-          notificationModule,
-          linkedUser: linkedUserId
-            ? await userRepository.findOne({ where: { id: linkedUserId } })
-            : null,
-          linkedEvent: linkedEventId
-            ? await eventRepository.findOne({ where: { id: linkedEventId } })
-            : null,
-        });
-
-        const savedNotification = await notificationRepository.save(
-          newNotification
-        );
-
-        if (recipientIds.length > 0) {
-          const recipients = await userRepository.find({
-            where: { id: In(recipientIds) },
-          });
-          savedNotification.recipients = recipients;
-          await notificationRepository.save(savedNotification);
-        }
-
-        return savedNotification;
-      }
-    );
-  }
-
+  
   async getAllNotifications(
     recipientId: string,
     take = 10,
     skip = 0
-  ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+  ): Promise<{ totalCount: number; result: Partial<Notification>[] }> {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
       .createQueryBuilder("notification")
@@ -181,28 +133,22 @@ class NotificationService {
         "notification.recipients",
         "recipient",
         "recipient.id = :recipientId",
-        { recipientId }
+        {
+          recipientId,
+        }
       )
-      .select([
-        "notification.id",
-        "notification.title AS description",
-        "notification.notificationType",
-        "notification.created_at",
-        "notification.message",
-        "notification.body",
-      ])
-      .orderBy("notification.created_at", "DESC");
+      .leftJoinAndSelect("notification.linkedUser", "linkedUser")
+      .leftJoinAndSelect("notification.linkedEvent", "linkedEvent")
+      .orderBy("notification.createdAt", "DESC");
 
-    // Get total count without pagination
     const totalCount = await queryBuilder.getCount();
 
-    // Apply pagination
-    const notifications = await queryBuilder.take(take).skip(skip).getRawMany();
+    const notifications = await queryBuilder.take(take).skip(skip).getMany();
 
-    return { totalCount, notifications };
+    return { totalCount, result: toNotificationslisting(notifications) };
   }
 
-  async getNotificationDetail(notificationId: string): Promise<Notification> {
+  async getNotificationDetail(notificationId: string): Promise<any> {
     // Fetch the notification
     const notification = await this.dbConnection
       .getRepository(Notification)
@@ -223,7 +169,7 @@ class NotificationService {
         .update(notificationId, { isSeen: true });
     }
 
-    return notification;
+    return toNotification(notification);
   }
 
   async deleteNotification(
@@ -241,11 +187,11 @@ class NotificationService {
   }
 
   async findAllNotifications(
-    recipientId:string,
+    recipientId: string,
     take = 10,
     skip = 0,
     notificationByModule?: string,
-    notificationByType?: string,
+    notificationByType?: string
   ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
@@ -258,7 +204,7 @@ class NotificationService {
       )
       .select([
         "notification.id",
-        "notification.title AS description",
+        "notification.title",
         "notification.notificationType",
         "notification.notificationModule",
         "notification.created_at",
@@ -299,6 +245,7 @@ class NotificationService {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
       .createQueryBuilder("notification")
+      .where("notification.isSeen = false")
       .innerJoin(
         "notification.recipients",
         "recipient",
@@ -356,6 +303,54 @@ class NotificationService {
       .execute();
 
     return { deletedCount: result.affected || 0 };
+  }
+
+  async createNotification(
+    title: string,
+    message: string,
+    body: object,
+    notificationType: string,
+    notificationModule: string,
+    recipientIds: string[],
+    linkedUserId?: string,
+    linkedEventId?: string
+  ): Promise<Notification> {
+    return await this.dbConnection.connection.transaction(
+      async (transactionalEntityManager) => {
+        const notificationRepository =
+          transactionalEntityManager.getRepository(Notification);
+        const userRepository = transactionalEntityManager.getRepository(User);
+        const eventRepository = transactionalEntityManager.getRepository(Event);
+
+        const newNotification = notificationRepository.create({
+          title,
+          message,
+          body,
+          notificationType,
+          notificationModule,
+          linkedUser: linkedUserId
+            ? await userRepository.findOne({ where: { id: linkedUserId } })
+            : null,
+          linkedEvent: linkedEventId
+            ? await eventRepository.findOne({ where: { id: linkedEventId } })
+            : null,
+        });
+
+        const savedNotification = await notificationRepository.save(
+          newNotification
+        );
+
+        if (recipientIds.length > 0) {
+          const recipients = await userRepository.find({
+            where: { id: In(recipientIds) },
+          });
+          savedNotification.recipients = recipients;
+          await notificationRepository.save(savedNotification);
+        }
+
+        return savedNotification;
+      }
+    );
   }
 }
 

@@ -27,6 +27,7 @@ export const userSourceToEntity: { [s in UserSourceProto]: UserSource } = {
   [UserSourceProto.REQUEST_IN_APP]: UserSource.REQUEST_IN_APP,
   [UserSourceProto.PLUS_1]: UserSource.PLUS_1,
   [UserSourceProto.UNRECOGNIZED]: UserSource.UNRECOGNIZED,
+  [UserSourceProto.HOST_APPLICATION]: UserSource.HOST_APPLICATION,
 };
 
 export const entityToUserSource: { [s in UserSource]: UserSourceProto } = {
@@ -37,6 +38,7 @@ export const entityToUserSource: { [s in UserSource]: UserSourceProto } = {
   [UserSource.REQUEST_IN_APP]: UserSourceProto.REQUEST_IN_APP,
   [UserSource.PLUS_1]: UserSourceProto.PLUS_1,
   [UserSource.UNRECOGNIZED]: UserSourceProto.UNRECOGNIZED,
+  [UserSource.HOST_APPLICATION]: UserSourceProto.HOST_APPLICATION,
 };
 
 export const newUserStatusTosUserStatus: { [s in NewUserStatus]: UserStatus } = {

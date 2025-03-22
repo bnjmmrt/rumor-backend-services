@@ -32,6 +32,8 @@ import {
   GuestStatus,
 } from "rumor-utils/shared/events/interfaces/event.interface";
 import config from "../config";
+import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -436,7 +438,7 @@ export class SignupFormsServices {
       await queryRunner.startTransaction();
 
       if (!userPayload.id) {
-        await this.registerUserAsNonMember(userPayload, queryRunner);
+         await this.registerUserAsNonMember(userPayload, queryRunner);
       }
       const inviteGuestPayload = new Guest();
       inviteGuestPayload.event = signupForm.event;
@@ -455,6 +457,14 @@ export class SignupFormsServices {
 
       await queryRunner.manager.save(submissions);
       await queryRunner.commitTransaction();
+
+      try {
+         // Send Notification
+          serviceMesh.notificationService().sendNotification(NotificationType.RSVP_SIGNUP_FORM_REQUEST, signupForm.event.owner.id, signupForm.event.id, userPayload.id);
+      } catch (error) {
+        console.log("🚀 ~ SignupFormsServices ~ error:", error)
+      }
+     
       return submissions;
     } catch (err) {
       throw err;

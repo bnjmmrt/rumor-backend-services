@@ -48,6 +48,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -182,6 +183,7 @@ import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interfac
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from "csv-stringify";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -441,6 +443,32 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ memberSignUp ~ error:", error)
+    }
+
     return {
       id: savedUser.id,
       roles: savedUser.roles.map((role) => ({
@@ -495,7 +523,7 @@ export class AuthService {
 
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: "host" },
-      UserSource.REQUEST_IN_APP
+      UserSource.HOST_APPLICATION
     );
 
     // Micro-service call
@@ -528,6 +556,31 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ hostSignUp ~ error:", error)
+    }
     return '';
   }
 
@@ -1139,11 +1192,11 @@ export class AuthService {
         await serviceMesh.notificationService().sendEmailFromTemplate(
           [
             {
-              key: 'first_name',
+              key: 'code',
               value: code.response.code,
             },
           ],
-          'Host Application Submitted',
+          'Non-Member Verify Email',
           [payload.email],
           null,
         );
@@ -1183,7 +1236,7 @@ export class AuthService {
     if (payload.isDeactivated && user.isDeactivated) {
       this.reactivateUserAccount({ email: user.email })
     }
-    
+
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -1343,11 +1396,20 @@ export class AuthService {
       throw new NotFoundError('Host');
     }
 
+    let authenticatedUser = null
     const request: LoginRequest = {
       loginId: user.email,
       password: payload.password,
     };
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    try {
+      authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    }
+    catch (e) {
+      throw new BadRequestError('Invalid email or password');
+    }
+    if (!authenticatedUser) {
+      throw new BadRequestError('Invalid email or password');
+    }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
@@ -1739,6 +1801,13 @@ export class AuthService {
       );
     } catch (error) { }
 
+    try {
+      // Send Notification
+      serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ approveMember ~ error:", error)
+    }
+    
     return responses.ok;
   }
 
@@ -2493,9 +2562,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = true;
+        return userData;
       }),
     );
     return { result: users, totalCount };
@@ -2647,6 +2718,13 @@ export class AuthService {
     }
     user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
 
+    let existingMapping = null;
+    if (user) {
+      existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { host: { id: payload.id }, user: { id: user.id } },
+      });
+    }
+
     const newUser: User | null = new User();
     if (!user) {
       newUser.email = payload.email ?? '';
@@ -2656,6 +2734,18 @@ export class AuthService {
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const newMapping = new HostUserMapping();
+      newMapping.user = user;
+      newMapping.host = { id: payload.id } as User;
+      await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+    } else {
+      if (!existingMapping) {
+        const newMapping = new HostUserMapping();
+        newMapping.user = user;
+        newMapping.host = { id: payload.id } as User;
+        await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+      }
     }
 
     return toSimpleUser(user);
@@ -3719,7 +3809,6 @@ export class AuthService {
       userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
     }
 
-    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4361,6 +4450,29 @@ export class AuthService {
     return '';
   }
 
+  public static async manageMultipleUsersSpam(payload: ManageMulipleUsersRequestDto): Promise<string> {
+    const { id: hostId, isSpam, userIds } = payload;
+
+    // Validate Host Exists
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: hostId } });
+    if (!host) {
+      throw new NotFoundError('Host');
+    }
+
+    // Prepare settings for upsert
+    const settings = userIds.map((userId) => ({
+      host: { id: hostId },
+      user: { id: userId },
+      isSpam,
+    }));
+
+    // Perform upsert operation
+    await this.dbConnection.getRepository(HostUserSettings)
+      .upsert(settings, ['host', 'user']);
+
+    return '';
+  }
+
   /**
    * Reports a user by storing a report record with associated role IDs.
    * @param payload - The DTO containing report details.
@@ -4400,6 +4512,8 @@ export class AuthService {
       reportedByRoleId: reportedByRole.id,
       reportedToRoleId: reportedToRole.id,
     };
+
+    
 
     return data;
   }
