@@ -417,11 +417,12 @@ export class GuestController {
 
   public static exportCsv = asyncWrapper(
     async (req, res): Promise<void> => {
+      const { id } = req.params;
       const hostId = (req as any).user;
       const query = req.query;
       const payload: GuestsQueryRequestDto = {
         hostId: hostId,
-        eventId: req.params.eventId,
+        eventId: id,
         query,
       };
   
