@@ -152,6 +152,8 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
 
 export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
   let addedBy, addedByPicture, declinedBy, declinedByPicture;
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   if (guest.event.owner.id === guest.addedBy?.id) {
     addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
     addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
@@ -188,7 +190,7 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     addedByPicture,
     declinedBy,
     declinedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    invitationSource: UserSource[invitationSourceNumber],
     status: guest.status,
     categories: focuses.map((focus) => focus.name),
     guestId: guest.id,
