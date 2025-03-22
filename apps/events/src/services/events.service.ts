@@ -33,7 +33,7 @@ import {
   GuestCountByStatuses,
   ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
+import { DataSource, FindOptionsOrder, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
 import { parse } from 'qs';
 import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
@@ -889,11 +889,11 @@ export class EventsService {
       );
     }
 
-    const order = parsedQuery.sortBy
+    const order: FindOptionsOrder<Event> = parsedQuery.sortBy
       ? {
-        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+        [String(parsedQuery.sortBy)]: parsedQuery.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
       }
-      : undefined;
+      : { createdAt: 'DESC' };
 
     let relations = includeRelations
       ? ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions', 'ageLimit']

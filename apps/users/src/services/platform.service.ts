@@ -24,7 +24,7 @@ import { User } from "rumor-utils/shared/users/entities/user.entity";
 import { Interest } from "rumor-utils/shared/users/entities/interest.entity";
 import { responses } from "../common/responses.common";
 import database from "../database";
-import { ConflictError, NotFoundError } from "rumor-utils/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "rumor-utils/errors";
 
 export class PlatformService {
   public static dbConnection = database;
@@ -125,6 +125,16 @@ export class PlatformService {
   public static async createInterest(
     payload: CreateInterestRequestDto
   ): Promise<InterestData> {
+
+    const repo = this.dbConnection.getRepository(Interest);
+
+    // Check if interest already exists
+    const existing = await repo.findOne({ where: { name: payload.name } });
+
+    if (existing) {
+      throw new ForbiddenError("Interest with this name already exists.");
+    }
+
     const item = new Interest();
     item.name = payload.name;
     item.description = payload.description;
