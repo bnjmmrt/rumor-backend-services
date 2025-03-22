@@ -60,6 +60,7 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
+import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 const responses = {
@@ -1931,53 +1932,20 @@ export class EventsService {
       const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
 
       if (guest.user?.email) {
-        // TODO: Change email and sms template
-        const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
-          [
-            {
-              key: 'custom_message',
-              value: message,
-            },
-            {
-              key: 'event_name',
-              value: eventName,
-            },
-            {
-              key: 'image_url',
-              value: event.imageFlyer,
-            },
-            {
-              key: 'time',
-              value: eventStartDate,
-            },
-            {
-              key: 'location',
-              value: eventLocation,
-            },
-          ],
-          'Event Info Updated',
-          [guest.user.email],
-          null,
-          // this.logger,
-        );
-
-        if (!mailServiceResponse) {
-          // this.logger.warn(`Failed to send mail for event date/location to ${guestName}`);
+        const createMailPayload = {
+          eventName,
+          imageFlyer: event.imageFlyer,
+          eventDate: event.startDate,
+          location: event.location.location,
+          city: event.location.city
         }
+        await sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id )
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
-        const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
-
-        if (!success) {
-          // this.logger.warn(`Failed to send SMS  for event date/location to guest ${guestName}`);
-        }
-      } else {
-        // Log if no contact details exist
-        // this.logger.warn(`No contact details available for ${guestName}, skipping notification for event date/location .`);
-      }
+        await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
+      } 
     });
     await Promise.allSettled(notificationPromises);
-    // this.logger.log(`Notifications sent for event ${eventId}`);
   }
 
   public static async validateAddress(payload: AddressValidationRequest): Promise<AddressValidationResponse> {
@@ -2471,8 +2439,8 @@ export class EventsService {
         serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
         serviceMesh.notificationService().sendNotification(NotificationType.EVENT_SUBMISSION_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
-    } else if(payload.status === EventStatus[EventStatus.REJECTED_STATUS]){
-      await serviceMesh.notificationService().sendEmailFromTemplate( [{ key: "event_name", value: updatedEvent.name }, { key: "host_name", value: host.firstName }],"Host Event Rejected by Admin", [updatedEvent.owner.email],null)
+    } else if([EventStatus[EventStatus.REJECTED_STATUS], EventStatus[EventStatus.DECLINED_STATUS] ].includes(updatedEvent.status) ){
+      serviceMesh.notificationService().sendEmailFromTemplate( [{ key: "event_name", value: updatedEvent.name }, { key: "host_name", value: host.firstName }],"Host Event Rejected by Admin", [updatedEvent.owner.email],null)
     }    
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -2776,39 +2744,15 @@ export class EventsService {
         try {
           if (guest.user?.email) {
             // Send email notification
-            let mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate([
-              {
-                key: 'first_name',
-                value: guestName,
-              },
-              {
-                key: 'event_name',
-                value: eventName,
-              },
-              {
-                key: 'custom_message',
-                value: message,
-              },
-              {
-                key: 'image_url',
-                value: event.imageFlyer,
-              },
-              {
-                key: 'time',
-                value: event.startDate,
-              },
-              {
-                key: 'location',
-                value: `${event.location.location}, ${event.location.city}`,
-              },
-              {
-                key: 'host_name',
-                value: event.owner?.additionalHostInformation?.companyName || 'Host',
-              },
-            ],
-              'Event Cancelation Notification',
-              [guest.user.email],
-              null,)
+            const createPayload = {
+              eventDate: event.startDate,
+                eventName,
+                imageFlyer: event.imageFlyer,
+                location: event.location.location,
+                city: event.location.city,
+                hostName: event.owner?.additionalHostInformation?.companyName,
+            }
+            let mailServiceResponse = await sendEventCancellation(createPayload, guest.user.email, guestName, message)
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
@@ -2818,10 +2762,7 @@ export class EventsService {
             if (success) {
               notificationSuccess = true;
             }
-          } else {
-            // Log if no contact details exist
-            // this.logger.warn(`No contact details available for ${guestName || 'guest'}, skipping notification for event.`);
-          }
+          } 
         }
 
         catch (error) {
@@ -2837,7 +2778,6 @@ export class EventsService {
       await queryRunner.commitTransaction();
 
       //step 7: resolve notification promices
-      //TODO: in separate ticket need to handle If mail sent fails then we need to implement notification fn with scheduler, that will take care of resend.
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
       const notificationRecipients = guests.map((data:Guest) => data.user.id);

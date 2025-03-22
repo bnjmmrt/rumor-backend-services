@@ -19,6 +19,7 @@ export enum UserSource {
   REQUEST_IN_APP = 4,
   PLUS_1 = 5,
   UNRECOGNIZED = -1,
+  HOST_APPLICATION = 6,
 }
 
 export enum EventStatus {
@@ -547,6 +548,7 @@ export interface GuestEventData {
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
   autoPublished?: boolean | undefined;
+  timeZone?: string | undefined;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   guest?: GuestDataEvent | undefined;
