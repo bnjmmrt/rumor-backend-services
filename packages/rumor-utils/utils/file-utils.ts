@@ -53,13 +53,15 @@ function toCamelCase<T extends Record<string, unknown>>(obj: T): Record<string, 
 }
 
 const isValidEmail = (email: string): boolean => {
+  const trimmedEmail = email.trim();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(trimmedEmail);
 };
 
 const isValidPhoneNumber = (phoneNumber: string): boolean => {
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/; // Supports international E.164 format
-  return phoneRegex.test(phoneNumber);
+  const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
+  return phoneRegex.test(cleaned);
 };
 
 export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
