@@ -595,7 +595,6 @@ export class GuestService {
             }
             sendEventInviteMember(createMailPayload)
             } else if (data.role.includes('non_member')) {
-              console.log("🚀 ~ GuestService ~ invitedGuestsEmails.map ~ data.role:", data.role)
               const createMailPayload = {
                 eventDate: event.startDate,
                 eventName: event.name,
@@ -651,7 +650,6 @@ export class GuestService {
       // Return transformed guest data
       return guestsTransform;
     } catch (err) {
-      console.log("🚀 ~ GuestService ~ updateGuests ~ err:", err)
       // Log and return error response in case of failure
       throw new BadRequestError('Error updating guests');
     }
@@ -728,7 +726,7 @@ export class GuestService {
     const checkedInStatus = parsedQuery?.checkedIn
     const userSource = parsedQuery?.userSource;
     const declinedBy = parsedQuery?.declinedBy;
-    const spam = parsedQuery?.spam;
+    const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
     let favorite = false;
@@ -1069,10 +1067,7 @@ export class GuestService {
         queryBuilder.leftJoin('Collaborator', 'collaborator1', 'collaborator1.user_id = guest.declinedBy.id').andWhere('collaborator1.user_id IS NOT NULL');
       }
       if (declinedByFilters.includes('declinedByUser')) {
-        queryBuilder
-          .leftJoin('Collaborator', 'collaborator2', 'collaborator2.user_id = guest.declinedBy.id')
-          .andWhere('collaborator2.user_id IS NULL')
-          .andWhere('guest.declinedBy.id != :hostId', { hostId: payload.hostId });
+        queryBuilder.andWhere('guest.declinedBy.id = guest.user.id');
       }
     }
 
