@@ -2743,7 +2743,7 @@ export class AuthService {
       if (!existingMapping) {
         const newMapping = new HostUserMapping();
         newMapping.user = user;
-        newMapping.host = { id: payload.id } as User; // Assuming payload.id refers to the host
+        newMapping.host = { id: payload.id } as User;
         await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
       }
     }
