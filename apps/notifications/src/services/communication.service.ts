@@ -25,6 +25,7 @@ export class CommunicationService {
       where: { templateName: payload.template },
     });
     
+    console.log("🚀 ~ CommunicationService ~ sendEmailFromTemplate ~ template:", template)
     if (!template) {
       throw new NotFoundError("Template for send email not found");
     }
@@ -33,6 +34,7 @@ export class CommunicationService {
     for (const item of payload.dynamicData) {
       dynamicData[item.key] = item.value;
     }
+    console.log("🚀 ~ CommunicationService ~ sendEmailFromTemplate ~ dynamicData:", dynamicData)
 
     for (const item of template.params) {
       if (item.mandatory && !dynamicData[item.key]) {

@@ -80,7 +80,9 @@ export class ReferralCodeService {
         .andWhere(
           new Brackets((qb) => {
             qb.where("code.expirationDate >= CURRENT_DATE")
-              .orWhere("code.usageCount = code.usageLimit");
+            .orWhere("code.expirationDate IS NULL")
+            .orWhere("code.usageCount = code.usageLimit")
+            .orWhere("code.usageLimit = -1")
           })
         );
     } else {
