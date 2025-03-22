@@ -2454,7 +2454,7 @@ export class EventsService {
         },
       ];
       if (updatedEvent.isPublished) {
-        // await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Published", [updatedEvent.owner.email],null)
         serviceMesh.notificationService().sendNotification(NotificationType.EVENT_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
       else {
@@ -2468,7 +2468,7 @@ export class EventsService {
           value: `${hour}: ${minutes}`,
         },
       )
-        // await serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
+        serviceMesh.notificationService().sendEmailFromTemplate(params,"Host Event Approved by Admin - Pre-Publish", [updatedEvent.owner.email],null)
         serviceMesh.notificationService().sendNotification(NotificationType.EVENT_SUBMISSION_APPROVED, updatedEvent.owner.id, updatedEvent.id);
       }
     } else if(payload.status === EventStatus[EventStatus.REJECTED_STATUS]){
@@ -2749,7 +2749,7 @@ export class EventsService {
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('guest.event', 'event')
-        .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+        .select(['guest.id','user.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
         .where({ event: { id: eventId } })
         .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
         .getMany();
@@ -2823,6 +2823,7 @@ export class EventsService {
             // this.logger.warn(`No contact details available for ${guestName || 'guest'}, skipping notification for event.`);
           }
         }
+
         catch (error) {
           // this.logger.error(`Error sending notification to ${guestName || 'guest'} for event:`, error);
         }
@@ -2839,6 +2840,9 @@ export class EventsService {
       //TODO: in separate ticket need to handle If mail sent fails then we need to implement notification fn with scheduler, that will take care of resend.
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
+      const notificationRecipients = guests.map((data:Guest) => data.user.id);
+      serviceMesh.notificationService().sendNotification(NotificationType.EVENT_CANCELLED, notificationRecipients, eventId, event.owner.id);
+      
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
         // throw new Error('Failed to notify all users. Event cancellation aborted.');

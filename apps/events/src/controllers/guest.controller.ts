@@ -273,6 +273,7 @@ export class GuestController {
   public static acceptEventInvitation = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: AcceptEventInvitationRequestDto = {
+        
         userId: req.params.id,
         eventId: req.params.eventId,
         ...req.body

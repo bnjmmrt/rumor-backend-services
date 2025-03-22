@@ -1,8 +1,11 @@
+import { access } from "fs";
+
 let notificationMatrix = {
   applicationAppoved: {
     pushMessage: "Welcome to Rumor. Your application has been approved!",
     PushNotification: true,
     appNotification: false,
+    action:"Approved into Rumor"
   },
   profileReferrals: {
     pushMessage:
@@ -13,6 +16,7 @@ let notificationMatrix = {
     pushNotification: true,
     body: { userId: "" },
     linkedUser: "",
+    image: "linkedUser.profilePicture"
   },
   eventReminder: {
     pushMessage:
@@ -21,6 +25,8 @@ let notificationMatrix = {
     pushNotification: true,
     body: { eventId: "" },
     linkedEvent: "",
+    action:"Event Reminder - 24 hours prior",
+    image: "linkedEvent.imageFlyer"
   },
   eventCancelled: {
     pushMessage: "Hi [Recipient Name], [Event Name] has been canceled.",
@@ -30,6 +36,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action:"Event Cancelled",
+    image: "linkedEvent.imageFlyer"
   },
   eventInvitation: {
     pushMessage: "You've received an invite to attend [Event Name]! Tap to RSVP.",
@@ -39,6 +47,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action:"Invite Received",
+    image: "linkedEvent.imageFlyer"
   },
   eventPosted: {
     pushMessage: "[Linked User Name] just posted a new event. Check it out now. ",
@@ -48,6 +58,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action: "New Event Posted From Host you Follow",
+    image: "linkedEvent.imageFlyer"
   },
   eventPostedCity: {
     pushMessage:
@@ -56,10 +68,20 @@ let notificationMatrix = {
       "A new event [Event Name] was just published in [Event City Name]",
     appNotification: true,
     pushNotificaton: true,
-    body: { eventId: "" },
+    body: { eventId: "", linkedCity: "" },
     linkedUser: "",
+    linkedEvent: ""
+  },
+  eventRequestApproved:{
+    pushMessage: "Your request for [Event Name] was approved!.",
+    appMessage: "[Linked User Name] approved your request to attend [Event Name].",
+    appNotification: true,
+    pushNotificaton: true,
+    body: { eventId: "" },
     linkedEvent: "",
-    linkedCity: "",
+    linkedUser:"",
+    action:"Request Approved Notification",
+    image: "linkedEvent.imageFlyer"
   },
   eventRequestDenied: {
     pushMessage:
@@ -69,6 +91,8 @@ let notificationMatrix = {
     pushNotificaton: true,
     body: { eventId: "" },
     linkedEvent: "",
+    linkedUser:"",
+    image: "linkedEvent.imageFlyer"
   },
   eventVouch: {
     pushMessage:
@@ -79,6 +103,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action:"Event Vouch Request",
+    image: "linkedEvent.imageFlyer"
   },
   eventAnnouncement: {
     pushMessage:
@@ -89,6 +115,8 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action:"New Event Announcements",
+    image: "linkedEvent.imageFlyer"
   },
   signUpFormApproved: {
     pushMessage: "",
@@ -98,15 +126,27 @@ let notificationMatrix = {
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+    action:"Request Approved Notification (Sign up forms)",
+    image: "linkedEvent.imageFlyer"
   },
   signUpFormRejected: {
     pushMessage: "",
     appMessage: "[Linked User Name] declined your request to attend [Event Name]",
     appNotification: true,
-    pushNotificaton: true,
+    pushNotificaton: false,
     body: { eventId: "" },
     linkedUser: "",
     linkedEvent: "",
+  },
+  eventInvitationNonMember:{
+    pushMessage: "",
+    appMessage: "[Linked User Name] invited you to attend [Event Name]",
+    appNotification: true,
+    pushNotificaton: false,
+    body: { eventId: "" },
+    linkedUser: "",
+    linkedEvent: "",
+    image: "linkedEvent.imageFlyer"
   },
   userApplication: {
     pushMessage: "",

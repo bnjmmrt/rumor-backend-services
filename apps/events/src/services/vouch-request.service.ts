@@ -9,6 +9,8 @@ import { Event, User } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, ConflictError } from 'rumor-utils/errors';
 import { UserVouch, VouchRequest as VouchRequestResponse } from 'rumor-utils/shared/events/grpc/platform/general.pb';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class VouchRequestService {
   public static dbConnection = database;
@@ -30,6 +32,7 @@ export class VouchRequestService {
 
     await this.dbConnection.getRepository(VouchRequest).save(vouchRequest);
 
+    serviceMesh.notificationService().sendNotification(NotificationType.EVENT_VOUCH, payload.userId, payload.eventId, payload.requesterId);
     return ''
   }
 

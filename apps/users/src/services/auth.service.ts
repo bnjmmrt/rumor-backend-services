@@ -183,6 +183,7 @@ import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interfac
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from "csv-stringify";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -1749,6 +1750,8 @@ export class AuthService {
       );
     } catch (error) { }
 
+    // Send Notification
+    serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     return responses.ok;
   }
 

@@ -13,6 +13,9 @@ import {
   GuestStatus,
 } from "rumor-utils/shared/events/interfaces/event.interface";
 import { toEventAnnouncementRecipients } from "rumor-utils/shared/events/mappers/event-announcement.mapper";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import serviceMesh from '../server/helpers/serviceMeshHandler';
+
 export class EventAnnouncementService {
   public static dbConnection = database;
 
@@ -125,6 +128,8 @@ export class EventAnnouncementService {
     eventAnnouncement.recipients = recipientUsers;
     eventAnnouncement.addedBy = addedByUsers;
     eventAnnouncement.ticketType = ticketTypes;
+
+    serviceMesh.notificationService().sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
 
     return await database
       .getRepository(EventAnnouncement)
