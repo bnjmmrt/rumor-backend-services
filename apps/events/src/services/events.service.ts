@@ -2653,28 +2653,33 @@ export class EventsService {
         }
       }
 
-      if(eventCurrentStatus === EventStatusEnum.APPROVED_STATUS){
-        const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
-          where: {
-            deletedAt: IsNull(),
-            roles: {
-              role: {
-                name: 'admin',
+      try {
+        if(eventCurrentStatus === EventStatusEnum.APPROVED_STATUS){
+          const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+            where: {
+              deletedAt: IsNull(),
+              roles: {
+                role: {
+                  name: 'admin',
+                },
               },
             },
-          },
-          relations: {
-            roles: {
-              role: true,
+            relations: {
+              roles: {
+                role: true,
+              },
             },
-          },
-        });
-        
-        const adminUserIds = adminUsers.map((user) => user.id);
-    
-        if(adminUserIds.length > 0)
-        await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, event.id, event.owner.id);    
+          });
+          
+          const adminUserIds = adminUsers.map((user) => user.id);
+      
+          if(adminUserIds.length > 0)
+          await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, event.id, event.owner.id);    
+        }
+      } catch (error) {
+        console.log("🚀 ~ EventsService ~ error:", error)
       }
+      
       
       /**ends here */
       const updatedEvent = await this.dbConnection

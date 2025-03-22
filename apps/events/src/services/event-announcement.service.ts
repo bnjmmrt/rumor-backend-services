@@ -129,7 +129,11 @@ export class EventAnnouncementService {
     eventAnnouncement.addedBy = addedByUsers;
     eventAnnouncement.ticketType = ticketTypes;
 
-    serviceMesh.notificationService().sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+    try {
+      serviceMesh.notificationService().sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+    } catch (error) {
+      console.log("🚀 ~ EventAnnouncementService ~ postAnnouncement ~ error:", error)
+    }
 
     return await database
       .getRepository(EventAnnouncement)

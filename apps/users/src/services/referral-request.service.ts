@@ -33,7 +33,12 @@ export class ReferralRequestService {
       await this.dbConnection
         .getRepository(ReferralRequest).save(referralRequest);
       
-        serviceMesh.notificationService().sendNotification(NotificationType.PROFILE_REFERRALS, payload.userId, null, payload.requesterId);
+        try {
+          serviceMesh.notificationService().sendNotification(NotificationType.PROFILE_REFERRALS, payload.userId, null, payload.requesterId);
+        } catch (error) {
+          console.log("🚀 ~ ReferralRequestService ~ createReferralRequest ~ error:", error)
+        }
+
       return responses.ok;
     } catch (err) {
     //   this.logger.error(err);

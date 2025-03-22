@@ -443,26 +443,31 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
-    const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
-      where: {
-        deletedAt: IsNull(),
-        roles: {
-          role: {
-            name: 'admin',
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
           },
         },
-      },
-      relations: {
-        roles: {
-          role: true,
+        relations: {
+          roles: {
+            role: true,
+          },
         },
-      },
-    });
-    
-    const adminUserIds = adminUsers.map((user) => user.id);
-
-    if(adminUserIds.length > 0)
-    await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ memberSignUp ~ error:", error)
+    }
 
     return {
       id: savedUser.id,
@@ -551,27 +556,31 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
-    const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
-      where: {
-        deletedAt: IsNull(),
-        roles: {
-          role: {
-            name: 'admin',
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
           },
         },
-      },
-      relations: {
-        roles: {
-          role: true,
+        relations: {
+          roles: {
+            role: true,
+          },
         },
-      },
-    });
-    
-    const adminUserIds = adminUsers.map((user) => user.id);
-
-    if(adminUserIds.length > 0)
-    await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
-
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ hostSignUp ~ error:", error)
+    }
     return '';
   }
 
@@ -1792,8 +1801,13 @@ export class AuthService {
       );
     } catch (error) { }
 
-    // Send Notification
-    serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    try {
+      // Send Notification
+      serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ approveMember ~ error:", error)
+    }
+    
     return responses.ok;
   }
 
@@ -4477,6 +4491,8 @@ export class AuthService {
       reportedByRoleId: reportedByRole.id,
       reportedToRoleId: reportedToRole.id,
     };
+
+    
 
     return data;
   }

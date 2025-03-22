@@ -32,7 +32,11 @@ export class VouchRequestService {
 
     await this.dbConnection.getRepository(VouchRequest).save(vouchRequest);
 
-    serviceMesh.notificationService().sendNotification(NotificationType.EVENT_VOUCH, payload.userId, payload.eventId, payload.requesterId);
+    try {
+      serviceMesh.notificationService().sendNotification(NotificationType.EVENT_VOUCH, payload.userId, payload.eventId, payload.requesterId);
+    } catch (error) {
+      console.log("🚀 ~ VouchRequestService ~ createVouchRequest ~ error:", error)
+    }
     return ''
   }
 
