@@ -250,10 +250,15 @@ export class GuestService {
 
       // Extract main guest IDs
       let guestIds: string[] = getGuests.result
-        .filter(
-          (guest) => guest && guest.id && guest.status === entityToGuestStatus[currentStatus], // Convert string to enum
-        )
-        .map((guest) => guest.id);
+      .filter(
+        (guest) => {
+          if(guest && guest.id) {
+            const checkCondition = typeof guest.status === 'string' ? guest.status === currentStatus : guest.status === entityToGuestStatus[currentStatus]
+            if (checkCondition) return true
+          } 
+        }// Convert string to enum
+      )
+      .map((guest) => guest.id);
 
       // Extract additional guest IDs (if any)
       const additionalGuestIds: string[] = getGuests.result
