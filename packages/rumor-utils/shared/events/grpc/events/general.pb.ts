@@ -432,8 +432,8 @@ export interface GuestData {
   age?: number | undefined;
   address?: AddressGuest | undefined;
   interest: InterestData[];
-  followsYou?: boolean | undefined;
-  favorite?: boolean | undefined;
+  // followsYou?: boolean | undefined;
+  // favorite?: boolean | undefined;
   roles: UserRoleComplete[];
   addedBy?: string | undefined;
   invitationSource: string;
@@ -449,6 +449,8 @@ export interface GuestData {
   declinedById?: string | undefined;
   isSpammedByHost?: boolean | undefined;
   rejectedReason?: string | undefined;
+  isFollow?: boolean | undefined;
+  isFavorite?: boolean | undefined;
 }
 
 export interface GuestDataSimple {
