@@ -34,6 +34,7 @@ import {
 import config from "../config";
 import serviceMesh from "../server/helpers/serviceMeshHandler";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
+import { isValidEmail, isValidPhoneNumber } from "packages/rumor-utils/utils/file-utils";
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -335,10 +336,17 @@ export class SignupFormsServices {
             break;
           case "email":
             userPayload.email = ans.answers;
+            if (!isValidEmail(userPayload.email)) {
+              throw new BadRequestError('Invalid Email format');
+        
+            }
             break;
           case "phone":
             userPayload.phoneNumber = ans.answers;
-            break;
+            if (!isValidPhoneNumber(userPayload.phoneNumber)) {
+              throw new BadRequestError('Invalid Phone Number format');
+              }             
+              break;
           case "request access for additional guests":
             requestedGuests.additional = Number(ans.answers);
             break;
