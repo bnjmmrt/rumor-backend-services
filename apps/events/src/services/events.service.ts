@@ -134,6 +134,7 @@ import {
   sendEventUpdation,
 } from "../utils/emails.utils";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
+import {isValidPhoneNumber} from 'rumor-utils/utils/file-utils';
 
 const responses = {
   conflict: (message: string) => ({
@@ -2764,7 +2765,7 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        await sendEventUpdation(
+        sendEventUpdation(
           createMailPayload,
           guest.user.email,
           guest.user.id,
@@ -2772,9 +2773,21 @@ export class EventsService {
         );
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
-        await serviceMesh
-          .notificationService()
-          .sendTextMessage(guest.user.phoneNumber, message);
+        try {
+          const validateNumber = isValidPhoneNumber(guest.user.phoneNumber) 
+          if (validateNumber) {
+            const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '')
+            await serviceMesh
+              .notificationService()
+              .sendTextMessage(cleanedNumber, message);
+          } else {
+            // Log the issue and exit early (no throw)
+            console.log(`⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`);
+            return; // or just skip sending, depending on your function structure
+          }
+        } catch(err) {
+          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+        }
       }
     });
     await Promise.allSettled(notificationPromises);
@@ -3466,7 +3479,7 @@ export class EventsService {
           { key: "host_name", value: host.firstName },
         ],
         "Host Event Rejected by Admin",
-        [updatedEvent.owner.email],
+        [updatedEvent.owner.email.trim()],
         null
       );
     }
@@ -3850,7 +3863,7 @@ export class EventsService {
               city: event.location.city,
               hostName: event.owner?.additionalHostInformation?.companyName,
             };
-            let mailServiceResponse = await sendEventCancellation(
+            let mailServiceResponse = sendEventCancellation(
               createPayload,
               guest.user.email,
               guestName,
@@ -3861,14 +3874,23 @@ export class EventsService {
             }
           } else if (guest.user?.phoneNumber) {
             // Send SMS notification
-            const success = await serviceMesh
-              .notificationService()
-              .sendTextMessage(
-                guest.user.phoneNumber,
-                `${mobileNotificationMessage} \n${message}`
-              );
-            if (success) {
-              notificationSuccess = true;
+            try {
+              const validateNumber = isValidPhoneNumber(guest.user.phoneNumber) 
+              if (validateNumber) {
+                const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '')
+                const success = await serviceMesh
+                  .notificationService()
+                  .sendTextMessage(cleanedNumber, `${mobileNotificationMessage} \n${message}`);
+                  if (success) {
+                    notificationSuccess = true;
+                  }
+              } else {
+                // Log the issue and exit early (no throw)
+                console.log(`⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`);
+                return; // or just skip sending, depending on your function structure
+              }
+            } catch(err) {
+              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {

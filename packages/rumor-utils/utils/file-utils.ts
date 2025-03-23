@@ -52,13 +52,13 @@ function toCamelCase<T extends Record<string, unknown>>(obj: T): Record<string, 
   return newObj;
 }
 
-const isValidEmail = (email: string): boolean => {
+export const isValidEmail = (email: string): boolean => {
   const trimmedEmail = email.trim();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(trimmedEmail);
 };
 
-const isValidPhoneNumber = (phoneNumber: string): boolean => {
+export const isValidPhoneNumber = (phoneNumber: string): boolean => {
   const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
   const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
   return phoneRegex.test(cleaned);
