@@ -629,6 +629,7 @@ export interface GuestDetail {
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;
   inviteMessage?: string | undefined;
+  signupFormName?: string | undefined;
 }
 
 export interface GuestDetails {

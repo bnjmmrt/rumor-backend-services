@@ -106,6 +106,7 @@ import {
   GuestDetails,
   BulkUserData,
   UserEventInviteesData,
+  QuizData,
 } from "rumor-utils/shared/events/grpc/events/general.pb";
 import database from "../database";
 import config from "../config";
@@ -4242,7 +4243,12 @@ export class GuestService {
     const guestProfileResponse = await this.getGuestProfile(payload);
     const guestDetail = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
-      relations: { ticketType: true, user: true, event: true },
+      relations: {
+        ticketType: true,
+        user: true,
+        event: true,
+        signupFormSubmissions: { signupForm: true },
+      },
     });
     if (!guestDetail) {
       throw new NotFoundError("Guest not found");
@@ -4265,14 +4271,27 @@ export class GuestService {
       id: guestDetail.user.id,
     });
 
-    const quizAnswer = await this.dbConnection
-      .getRepository(UserQuizAnswer)
-      .find({
-        where: {
-          user: { id: guestDetail.user.id },
-          event: { id: guestDetail.event.id },
-        },
+    let questions: QuizData[] = [];
+    if (guestDetail.invitationSource === UserSource.SIGN_UP_FORM) {
+      guestDetail.signupFormSubmissions.answers.forEach((a) => {
+        const ans: QuizData = { question: a.name, answer: a.answers };
+        questions.push(ans);
       });
+    } else {
+      let quizAnswer = await this.dbConnection
+        .getRepository(UserQuizAnswer)
+        .find({
+          where: {
+            user: { id: guestDetail.user.id },
+            event: { id: guestDetail.event.id },
+          },
+          relations: {
+            question: true,
+          },
+        });
+      questions =
+        quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [];
+    }
 
     return {
       guestDetail: {
@@ -4283,12 +4302,10 @@ export class GuestService {
         maxAdditionalGuests,
         privateGuestNote,
         guestStatus,
+        signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
       guestProfile: guestProfileResponse,
-      quizDataList: {
-        questions:
-          quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [],
-      },
+      quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
     };
   }
