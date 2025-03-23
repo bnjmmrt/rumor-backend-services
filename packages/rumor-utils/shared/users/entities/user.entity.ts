@@ -143,10 +143,10 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => Ticket, (ticket) => ticket.user)
   tickets: Ticket[];
 
-  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.follower)
+  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.follower, {cascade: true})
   following: HostFollowing[];
 
-  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.host)
+  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.host, {cascade: true})
   followers: HostFollowing[];
 
   @OneToMany(() => HostUserMapping, (hostCreated) => hostCreated.user)
@@ -155,13 +155,13 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => HostUserMapping, (hostCreated) => hostCreated.host)
   createdByHost: HostUserMapping[];
 
-  @OneToMany(() => HostCustomUsersLists, (hostCustomUsersLists) => hostCustomUsersLists.host)
+  @OneToMany(() => HostCustomUsersLists, (hostCustomUsersLists) => hostCustomUsersLists.host, { onDelete: 'CASCADE' })
   customLists: HostCustomUsersLists[];
 
-  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.host)
+  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.host, {cascade: true})
   favoritedMembers: HostFavorite[];
 
-  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.member)
+  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.member, {cascade: true})
   favoritedByHosts: HostFavorite[];
 
   @OneToOne(() => TemporaryPassword, (temporaryPassword) => temporaryPassword.user, {
@@ -210,7 +210,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => HostFeedback, (hostFeedback) => hostFeedback.user)
   hostFeedbacks: Relation<HostFeedback[]>;
 
-  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.user)
+  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.user, {cascade: true})
   managedByHosts: Relation<HostUserSettings[]>;
 
   @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.host)

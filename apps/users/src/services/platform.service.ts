@@ -144,7 +144,7 @@ export class PlatformService {
   }
 
   public static async listInterests(): Promise<InterestData[]> {
-    const interests = await this.dbConnection.getRepository(Interest).find();
+    const interests = await this.dbConnection.getRepository(Interest).find({ order: { name: 'ASC' } });
     return interests;
   }
 

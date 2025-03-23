@@ -16,7 +16,7 @@ export class SignupFormSubmissions extends RumorBaseEntity {
   answers: ISignupFormQuestionsRequest[];
 
   @ManyToOne(() => EventSignupForms, (signupForm) => signupForm.submissions, {
-    onDelete: "RESTRICT",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn({ name: "signup_form_id" })

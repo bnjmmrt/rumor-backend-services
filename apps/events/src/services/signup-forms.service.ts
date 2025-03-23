@@ -32,8 +32,9 @@ import {
   GuestStatus,
 } from "rumor-utils/shared/events/interfaces/event.interface";
 import config from "../config";
-import serviceMesh from '../server/helpers/serviceMeshHandler';
-import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import serviceMesh from "../server/helpers/serviceMeshHandler";
+import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
+import { isValidEmail, isValidPhoneNumber } from "packages/rumor-utils/utils/file-utils";
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -317,7 +318,7 @@ export class SignupFormsServices {
     requestPayload: SignupFormAnswersDto[],
     answerList: SignupFormAnswersDto[],
     userPayload: User,
-    requestedGuests: number
+    requestedGuests: any
   ) {
     requestPayload.forEach((ans: SignupFormAnswersDto) => {
       const answer = new SignupFormAnswersDto();
@@ -335,13 +336,19 @@ export class SignupFormsServices {
             break;
           case "email":
             userPayload.email = ans.answers;
+            if (!isValidEmail(userPayload.email)) {
+              throw new BadRequestError('Invalid Email format');
+        
+            }
             break;
           case "phone":
             userPayload.phoneNumber = ans.answers;
-            break;
+            if (!isValidPhoneNumber(userPayload.phoneNumber)) {
+              throw new BadRequestError('Invalid Phone Number format');
+              }             
+              break;
           case "request access for additional guests":
-            console.log(`request access for additional guests -> ${ans.answers}`)
-            requestedGuests = Number(ans.answers);
+            requestedGuests.additional = Number(ans.answers);
             break;
         }
       }
@@ -367,7 +374,10 @@ export class SignupFormsServices {
     await queryRunner.manager.save(userRole);
   }
 
-  private static async validateUserAsGuest(eventId: string, userPayload: User) {
+  private static async validateUserAsGuest(
+    eventId: string,
+    userPayload: User
+  ): Promise<[User, Guest]> {
     let user = null;
     if (userPayload.email) {
       user = await User.findOne({
@@ -383,20 +393,22 @@ export class SignupFormsServices {
       );
     }
     if (!user) {
-      return userPayload;
+      return [userPayload, new Guest()];
     }
 
     if (user.id) {
       const guest = await Guest.findOne({
         where: { user: { id: userPayload.id }, event: { id: eventId } },
       });
-      if (guest) {
+      if (guest && guest.status !== GuestStatus.DRAFT) {
         throw new ForbiddenError(
           "You are already part of this event. Please log into application and check your event status."
         );
       }
+      return [user, guest];
     }
-    return user;
+    return [user, new Guest()];
+
   }
 
   public static async answers(
@@ -424,7 +436,7 @@ export class SignupFormsServices {
       }
       let userPayload = new User();
       const answerList: SignupFormAnswersDto[] = [];
-      let requestedGuests: number = 0;
+      let requestedGuests: any = { additional: 0 };
 
       this.extractUserPayloadAndAnswers(
         payload,
@@ -432,43 +444,60 @@ export class SignupFormsServices {
         userPayload,
         requestedGuests
       );
-      console.log(`request access for additional guests -> ${requestedGuests}`)
-
-      userPayload = await this.validateUserAsGuest(eventId, userPayload);
+      let inviteGuestPayload = null;
+      [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
       if (!userPayload.id) {
-         await this.registerUserAsNonMember(userPayload, queryRunner);
+        await this.registerUserAsNonMember(userPayload, queryRunner);
       }
-      const inviteGuestPayload = new Guest();
+
+      /**--Create Submissions */
+      const submissions = new SignupFormSubmissions();
+      submissions.signupForm = { id: id } as EventSignupForms;
+      submissions.answers = answerList;
+      submissions.attendees = { id: userPayload.id } as User;
+      await queryRunner.manager.save(submissions);
+
+      /**-- Create Guest */
       inviteGuestPayload.event = signupForm.event;
-      inviteGuestPayload.additionalRequestedGuests = requestedGuests;
+      inviteGuestPayload.additionalRequestedGuests = requestedGuests.additional;
+      inviteGuestPayload.maxAdditionalGuests = signupForm.event.limitOnePlus;
       inviteGuestPayload.user = { id: userPayload.id } as User;
       inviteGuestPayload.invitationSource = UserSource.SIGN_UP_FORM;
       inviteGuestPayload.ticketType = undefined;
       inviteGuestPayload.status = GuestStatus.APPLIED;
+      inviteGuestPayload.signupFormSubmissions = {
+        id: submissions.id,
+      } as SignupFormSubmissions;
+
       await queryRunner.manager.save(inviteGuestPayload);
 
-      const submissions = new SignupFormSubmissions();
-      submissions.signupForm = { id: id } as EventSignupForms;
-      submissions.answers = answerList;
-      submissions.guest = { id: inviteGuestPayload.id } as Guest;
-      submissions.attendees = { id: userPayload.id } as User;
+      // -- Create Guest
+      // const submissions = new SignupFormSubmissions();
+      // submissions.signupForm = { id: id } as EventSignupForms;
+      // submissions.answers = answerList;
+      // submissions.guest = { id: inviteGuestPayload.id } as Guest;
+      // submissions.attendees = { id: userPayload.id } as User;
 
-      await queryRunner.manager.save(submissions);
-      inviteGuestPayload.signupFormSubmissions = {id: submissions.id} as SignupFormSubmissions;
       await queryRunner.manager.save(inviteGuestPayload);
       await queryRunner.commitTransaction();
 
       try {
-         // Send Notification
-          serviceMesh.notificationService().sendNotification(NotificationType.RSVP_SIGNUP_FORM_REQUEST, signupForm.event.owner.id, signupForm.event.id, userPayload.id);
+        // Send Notification
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.RSVP_SIGNUP_FORM_REQUEST,
+            signupForm.event.owner.id,
+            signupForm.event.id,
+            userPayload.id
+          );
       } catch (error) {
-        console.log("🚀 ~ SignupFormsServices ~ error:", error)
+        console.log("🚀 ~ SignupFormsServices ~ error:", error);
       }
-     
       return submissions;
     } catch (err) {
       throw err;
@@ -599,7 +628,7 @@ export class SignupFormsServices {
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
-        .addSelect('gst.additionalRequestedGuests', 'partySize')
+        .addSelect("gst.additionalRequestedGuests + 1", "partySize")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);

@@ -446,6 +446,9 @@ export interface GuestData {
   additionalGuests: AdditionalGuest[];
   checkIn?: boolean | undefined;
   addedById?: string | undefined;
+  declinedById?: string | undefined;
+  isSpammedByHost?: boolean | undefined;
+  rejectedReason?: string | undefined;
 }
 
 export interface GuestDataSimple {
@@ -629,6 +632,7 @@ export interface GuestDetail {
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;
   inviteMessage?: string | undefined;
+  signupFormName?: string | undefined;
 }
 
 export interface GuestDetails {
@@ -683,6 +687,8 @@ export interface SignupFormsResponse {
   userId: string;
   userName: string;
   userProfile: string;
+  companyName: string;
+  companyProfile: string;
   description: string;
   hasAccessForAdditionalGuests: boolean;
   startDate: string;

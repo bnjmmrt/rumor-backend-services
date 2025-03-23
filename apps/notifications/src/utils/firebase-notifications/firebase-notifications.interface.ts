@@ -3,4 +3,5 @@ export interface PushNotificationPayload {
   body: string;
   title: string;
   image: string;
+  data?: object
 }

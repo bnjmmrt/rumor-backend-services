@@ -1,5 +1,4 @@
 import connectionManager from "../database";
-import { IdRequestDto } from "rumor-utils/shared/users/dtos/shared.dto";
 import { User } from "rumor-utils/shared/users/entities/user.entity";
 import {
   GetPushNotificationTokensRequest,
@@ -9,22 +8,23 @@ import {
 } from "rumor-utils/shared/users/grpc/auth/settings.pb";
 import { UserSettings } from "rumor-utils/shared/users/entities/user-settings.entity";
 import { responses } from "../common/responses.common";
-import { isWithinTimeRange } from "../utils/auth.util";
 import {
   DeleteNotificationTokenRequestDto,
-  UpdateNotificationSettingRequestDto,
 } from "rumor-utils/shared/users/dtos/settings.dto";
 import { UserDataSimple } from "rumor-utils/shared/users/grpc/auth/auth.pb";
 import { SaveNotificationTokenRequestDto } from "rumor-utils/shared/users/dtos/settings.dto";
 import { GenericResponse } from "rumor-utils/shared/users/grpc/auth/shared.pb";
 import { PushNotificationToken } from "rumor-utils/shared/users/entities/push-notification-token.entity";
+import { NotFoundError } from 'rumor-utils/errors'
+import { IsNull } from "typeorm";
 
 export class SettingsService {
   static dbConnection = connectionManager;
 
   public static async getNotificationSettings(id: string): Promise<any> {
-    const user = await this.dbConnection.getRepository(User).findOneBy({ id });
-    if (!user) return responses.notFound("User not found!");
+    if(!id) throw new NotFoundError("User not found!");
+    const user = await this.dbConnection.getRepository(User).findOne({where: {id, deletedAt: IsNull()}});
+    if (!user) throw new NotFoundError("User not found!");
 
     let notificationSettings = await this.dbConnection
       .getRepository(UserSettings)
@@ -56,9 +56,11 @@ export class SettingsService {
   }
 
   public static async updateNotificationSettings(payload: any): Promise<any> {
+    if(!payload.userId) throw new NotFoundError("User not found!");
+    
     const user = await this.dbConnection
       .getRepository(User)
-      .findOneBy({ id: payload.userId });
+      .findOneBy({ id: payload.userId, deletedAt: IsNull() });
     if (!user) return responses.notFound("User not found!");
 
     let notificationSettings = await this.dbConnection
