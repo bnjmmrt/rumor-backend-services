@@ -2739,14 +2739,21 @@ export class GuestService {
     }
 
     // Send Notification to Host
-    serviceMesh
-      .notificationService()
-      .sendNotification(
-        NotificationType.NEW_GUEST_REQUEST,
-        event.owner?.id,
-        event.id,
-        user.id
+    try {
+      serviceMesh
+        .notificationService()
+        .sendNotification(
+          NotificationType.NEW_GUEST_REQUEST,
+          event.owner.id,
+          event.id,
+          user.id
+        );
+    } catch (error) {
+      console.log(
+        ":rocket: ~ guestService ~ requestBecomeGuest ~ error:",
+        error
       );
+    }
     return "";
   }
 
