@@ -3956,7 +3956,8 @@ export class EventsService {
       .leftJoinAndSelect("collaborators.user", "user")
       .leftJoinAndSelect("collaborators.role", "role")
       .leftJoin("event.guests", "guest") // Ensure guests are linked to event
-      .where("(owner.id = :userId OR collaborators.user.id = :userId)", {
+      // .where("(owner.id = :userId OR collaborators.user.id = :userId)", { //TODO:this should be enable when we have approved collaborator
+      .where("(owner.id = :userId)", {
         userId,
       })
       .loadRelationCountAndMap(
