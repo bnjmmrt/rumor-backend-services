@@ -119,7 +119,7 @@ import {
   HostFollowing,
 } from "rumor-utils/shared/users/entities";
 import { HostUserMapping } from "rumor-utils/shared/users/entities/host-user-mapping.entity";
-import { processCsvFile, generateErrorCsv } from "rumor-utils/utils/file-utils";
+import { processCsvFile, generateErrorCsv, isValidPhoneNumber } from "rumor-utils/utils/file-utils";
 import S3Service from "../utils/aws/s3";
 import { stringify } from "csv-stringify";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
@@ -871,23 +871,7 @@ export class GuestService {
         // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map((data) => {
-            if (data.role.includes('member')) {
-            const createMailPayload = {
-              eventDate: event.startDate,
-              eventName: event.name,
-              imageFlyer: event.imageFlyer,
-              location: event.location.location,
-              city: event.location.city,
-              hostName: event.owner.firstName,
-              emailsData: {
-                eventId: data.eventId,
-                id: data.id,
-                firstName: data.firstName,
-                email: data.email
-              },
-            }
-            sendEventInviteMember(createMailPayload)
-            } else if (data.role.includes('non_member')) {
+         if (data.role.includes('member')) {
               const createMailPayload = {
                 eventDate: event.startDate,
                 eventName: event.name,
@@ -3232,16 +3216,23 @@ export class GuestService {
         eventId: event.id,
         leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
       };
-      await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
+      sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
     } else if (payload.phoneNumber) {
       const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-      const success = await serviceMesh
-        .notificationService()
-        .sendTextMessage(payload.phoneNumber, message);
-      if (!success) {
-        throw new BadRequestError(
-          "An error occurred while sending SMS invitation, please try again."
-        );
+      try {
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+          await serviceMesh
+            .notificationService()
+            .sendTextMessage(cleanedNumber, message);
+        } else {
+          // Log the issue and exit early (no throw)
+          console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+          return; // or just skip sending, depending on your function structure
+        }
+      } catch(err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
 
@@ -3409,16 +3400,24 @@ export class GuestService {
             eventId: event.id,
             leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
           };
-          await sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
+          sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
         } else if (guest.user.phoneNumber) {
           const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-          const success = await serviceMesh
-            .notificationService()
-            .sendTextMessage(guest.user.phoneNumber, message);
-          if (!success)
-            throw new BadRequestError(
-              "An error occurred while sending SMS invitation, please try again."
-            );
+          try {
+            const validateNumber = isValidPhoneNumber(guest.user.phoneNumber) 
+            if (validateNumber) {
+              const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '')
+              await serviceMesh
+                .notificationService()
+                .sendTextMessage(cleanedNumber, message);
+            } else {
+              // Log the issue and exit early (no throw)
+              console.log(`⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`);
+              return; // or just skip sending, depending on your function structure
+            }
+          } catch(err) {
+            console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          }
         }
         return toGuestDataSimple(guest, []);
       }
@@ -3667,11 +3666,8 @@ export class GuestService {
           { uploadedViaCsv: { id: csvUploadRecord.id } }
         );
     });
-
-    newMappings.push(
-      ...users.map((user) => ({ user, host: { id: payload.hostId } }))
-    );
-    await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+    
+    if(newMappings.length !==0) await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
 
     // Step 9: Return the response with success and failure counts
     return {
@@ -3904,16 +3900,23 @@ export class GuestService {
           hostName: host.firstName,
           emailsData: emailData,
         };
-        await sendEventInviteNonMember(createPayload);
+        sendEventInviteNonMember(createPayload);
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
-        const success = await serviceMesh
-          .notificationService()
-          .sendTextMessage(payload.phoneNumber, message);
-        if (!success) {
-          throw new BadRequestError(
-            "An error occurred while sending SMS invitation, please try again."
-          );
+        try {
+          const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+          if (validateNumber) {
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+            await serviceMesh
+              .notificationService()
+              .sendTextMessage(cleanedNumber, message);
+          } else {
+            // Log the issue and exit early (no throw)
+            console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+            return; // or just skip sending, depending on your function structure
+          }
+        } catch(err) {
+          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
     }

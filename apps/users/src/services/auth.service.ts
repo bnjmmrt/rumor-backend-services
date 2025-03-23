@@ -184,6 +184,7 @@ import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from "csv-stringify";
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import {isValidPhoneNumber} from 'rumor-utils/utils/file-utils';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -415,7 +416,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email], // Send email to the member
+        [newUser.email.trim()], // Send email to the member
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -537,7 +538,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email],
+        [payload.email.trim()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -754,7 +755,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email],
+        [payload.email.trim()],
         null,
         // this.logger,
       );
@@ -775,7 +776,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email],
+        [payload.email.trim()],
         null,
       );
       if (!mailServiceResponse) {
@@ -953,11 +954,20 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-        if (!success) {
-          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+          await serviceMesh
+            .notificationService()
+            .sendTextMessage(cleanedNumber, message);
+        } else {
+          // Log the issue and exit early (no throw)
+          console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+          return; // or just skip sending, depending on your function structure
         }
-      } catch (error) { }
+      } catch(err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
     }
 
     if (payload.email) {
@@ -977,7 +987,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
+        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
         if (!success) {
           throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
         }
@@ -1028,7 +1038,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
+      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
       if (!success) {
         throw new BadRequestError('An error occured while sending Email invitation, please try again.')
       }
@@ -1197,14 +1207,28 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email],
+          [payload.email.trim()],
           null,
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
         if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
           const message = 'Your Rumor verification code: ' + code.response.code;
-          serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+          try {
+            const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+            if (validateNumber) {
+              const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+              await serviceMesh
+                .notificationService()
+                .sendTextMessage(cleanedNumber, message);
+            } else {
+              // Log the issue and exit early (no throw)
+              console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+              return; // or just skip sending, depending on your function structure
+            }
+          } catch(err) {
+            console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+          }
         }
       }
     } catch (error) { }
@@ -1796,7 +1820,7 @@ export class AuthService {
           },
         ],
         'Member Approved into Rumor',
-        [user.email],
+        [user.email.trim()],
         null,
       );
     } catch (error) { }
@@ -1923,7 +1947,7 @@ export class AuthService {
                 },
               ],
               'Member Approved into Rumor',
-              [user.email], // Send email to the approved member
+              [user.email.trim()], // Send email to the approved member
               null,
             );
           }
@@ -2865,7 +2889,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email],
+          [payload.email.trim()],
           null,
         );
       } else {
@@ -2877,7 +2901,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email],
+          [payload.email.trim()],
           null,
         );
       }
@@ -3710,7 +3734,7 @@ export class AuthService {
 
     // Send all emails in parallel
     try {
-      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
+      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null)));
     } catch (error) { }
     // if (skippedUsers.length > 0) {
     //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
@@ -4653,7 +4677,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email],
+        [user.email.trim()],
         null,
       );
     } catch (error) { }
