@@ -18,7 +18,7 @@ interface MailComponent {
     } | undefined;
 };
 
-export const sendEventInviteMember = async (mailComponents: MailComponent): Promise<AxiosResponse<any, any>> => {
+export const sendEventInviteMember = (mailComponents: MailComponent): Promise<AxiosResponse<any, any>> => {
     const { eventDate, eventName, imageFlyer, location, city, hostName, emailsData } = mailComponents;
     const { month, day, dayOfWeek, hour, minutes } = extractDate(eventDate);
     const params = [
@@ -63,11 +63,11 @@ export const sendEventInviteMember = async (mailComponents: MailComponent): Prom
             value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     });
         try {
-           return await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Member: Event Invite Recieved', [data.email], null)
+           return serviceMesh.notificationService().sendEmailFromTemplate(params, 'Member: Event Invite Recieved', [data.email.trim()], null)
         } catch (error) { }
 };
 
-export const sendEventInviteNonMember = async (mailComponents: MailComponent): Promise<AxiosResponse<any, any>> => {
+export const sendEventInviteNonMember = (mailComponents: MailComponent): Promise<AxiosResponse<any, any>> => {
     const { eventDate, eventName, imageFlyer, location, city, hostName, emailsData } = mailComponents;
     const { month, day, dayOfWeek, hour, minutes } = extractDate(eventDate);
     const params = [
@@ -112,11 +112,11 @@ export const sendEventInviteNonMember = async (mailComponents: MailComponent): P
             value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
         });
         try {
-           return await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Non-Member: Event Invite Recieved', [data.email], null)
+           return serviceMesh.notificationService().sendEmailFromTemplate(params, 'Non-Member: Event Invite Recieved', [data.email.trim()], null)
         } catch (error) { }
 }
 
-export const sendEventCancellation = async (mailComponents: MailComponent, email: string, guestName: string, message: string): Promise<AxiosResponse<any, any>> => {
+export const sendEventCancellation = (mailComponents: MailComponent, email: string, guestName: string, message: string): Promise<AxiosResponse<any, any>> => {
     const { eventDate, eventName, imageFlyer, location, city, hostName } = mailComponents;
     const { month, day, dayOfWeek, hour, minutes } = extractDate(eventDate);
             const params = [
@@ -166,11 +166,11 @@ export const sendEventCancellation = async (mailComponents: MailComponent, email
               },
             ];
             try {
-                return await serviceMesh.notificationService().sendEmailFromTemplate(params, "Event Cancelation Notification", [email], null)
+                return serviceMesh.notificationService().sendEmailFromTemplate(params, "Event Cancelation Notification", [email.trim()], null)
             } catch(err) { }
 }
 
-export const sendEventUpdation = async (mailComponents: MailComponent, email: string, userId: string, eventId: string): Promise<AxiosResponse<any, any>> => {
+export const sendEventUpdation = (mailComponents: MailComponent, email: string, userId: string, eventId: string): Promise<AxiosResponse<any, any>> => {
     const redirectPath = `users/${userId}/events/${eventId}`;
     const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
 
@@ -215,11 +215,11 @@ export const sendEventUpdation = async (mailComponents: MailComponent, email: st
     ];
 
     try {
-        return await serviceMesh.notificationService().sendEmailFromTemplate(params, "Event Info Updated", [email], null)
+        return serviceMesh.notificationService().sendEmailFromTemplate(params, "Event Info Updated", [email.trim()], null)
     } catch (err) { }
 }
 
-export const sendEventInvitePlusOnes = async (mailComponents: MailComponent, addOnData: any): Promise<AxiosResponse<any, any>> => {
+export const sendEventInvitePlusOnes = (mailComponents: MailComponent, addOnData: any): Promise<AxiosResponse<any, any>> => {
     const {email, userId, firstName, eventId, leadGuestName} = addOnData
     const redirectPath = `users/${userId}/events/${eventId}`;
     const { eventDate, eventName, imageFlyer, location, city, hostName } = mailComponents;
@@ -276,6 +276,6 @@ export const sendEventInvitePlusOnes = async (mailComponents: MailComponent, add
     ];
 
     try {
-        return await serviceMesh.notificationService().sendEmailFromTemplate(params, "Non-Member: Invited as Plus ones by Member", [email], null)
+        return serviceMesh.notificationService().sendEmailFromTemplate(params, "Non-Member: Invited as Plus ones by Member", [email.trim()], null)
     } catch (err) { }
 }

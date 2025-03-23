@@ -7,6 +7,7 @@ import { IsNull } from 'typeorm';
 import { toFeaturedEventSection } from 'rumor-utils/shared/events/mappers/featured-event-sections.mapper';
 import database from '../database';
 import { FeaturedEventsSection } from 'packages/rumor-utils/shared/events/grpc/platform/general.pb';
+import { BadRequestError, ConflictError, ForbiddenError } from 'rumor-utils/errors';
 
 export class FeaturedEventSectionsService {
   public static dbConnection = database;
@@ -31,7 +32,7 @@ export class FeaturedEventSectionsService {
       (featuredEventSection) => featuredEventSection.name.toLowerCase().replace(' ', '') === payload.name.toLowerCase().replace(' ', ''),
     );
     if (existingFeaturedEventSection) {
-      throw new Error('Featured event section with this name already exists!');
+      throw new ForbiddenError('Featured event section with this name already exists!');
     }
 
     // Find the smallest available index
