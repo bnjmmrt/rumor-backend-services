@@ -599,6 +599,7 @@ export class SignupFormsServices {
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
+        .addSelect('gst.additionalRequestedGuests', 'partySize')
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
