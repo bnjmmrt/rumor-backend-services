@@ -38,6 +38,8 @@ export const buildSignupFormsResponse = (
     userId: esf.createdBy.id,
     userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,
     userProfile: esf.createdBy.profilePicture,
+    companyName: companyName,
+    companyProfile: event.owner?.additionalHostInformation?.companyLogo,
     submissionCount: submissions,
     isActive: esf.isActive,
     isPublished: esf.isPublished,
