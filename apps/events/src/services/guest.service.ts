@@ -1924,6 +1924,15 @@ export class GuestService {
     const favorite =
       guest.user.favoritedByHosts?.some((f) => f.host?.id === payload.userId) ??
       false;
+      const hostUserSettings = await this.dbConnection
+      .getRepository(HostUserSettings)
+      .findOne({
+        where: {
+          user: { id: guest.user?.id },
+          host: { id: payload.userId },
+        },
+      });
+    const isSpammedByHost = hostUserSettings ? hostUserSettings.isSpam : false;
 
     const additionalGuests = await this.dbConnection.getRepository(Guest).find({
       relations: {
@@ -1967,7 +1976,8 @@ export class GuestService {
       focuses,
       followsYou,
       favorite,
-      additionalGuestData
+      additionalGuestData,
+      isSpammedByHost
     );
     return val;
   }

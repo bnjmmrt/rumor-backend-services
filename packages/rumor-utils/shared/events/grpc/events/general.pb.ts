@@ -446,6 +446,9 @@ export interface GuestData {
   additionalGuests: AdditionalGuest[];
   checkIn?: boolean | undefined;
   addedById?: string | undefined;
+  declinedById?: string | undefined;
+  isSpammedByHost?: boolean | undefined;
+  rejectedReason?: string | undefined;
 }
 
 export interface GuestDataSimple {

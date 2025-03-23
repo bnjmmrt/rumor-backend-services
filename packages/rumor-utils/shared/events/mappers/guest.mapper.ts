@@ -150,7 +150,7 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
   };
 };
 
-export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
+export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData, isSpammedByHost?: boolean): GuestData => {
   let addedBy, addedByPicture, declinedBy, declinedByPicture;
   const invitationSourceNumber =
     typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
@@ -190,6 +190,7 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     addedByPicture,
     declinedBy,
     declinedByPicture,
+    rejectedReason: guest.rejectedReason,
     invitationSource: UserSource[invitationSourceNumber],
     status: guest.status,
     categories: focuses.map((focus) => focus.name),
@@ -198,6 +199,8 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     additionalGuests: additionalGuestData,
     checkIn: guest.checkIn,
     addedById: guest.addedBy?.id,
+    declinedById: guest.declinedBy?.id,
+    isSpammedByHost: isSpammedByHost
   };
 };
 
