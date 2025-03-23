@@ -23,7 +23,7 @@ export class SignupFormQuestions extends RumorBaseEntity {
   ordering: number;
 
   @ManyToOne(() => EventSignupForms, (event) => event.questions, {
-    onDelete: "RESTRICT",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn({ name: "sign_up_form_id" })

@@ -5,7 +5,7 @@ import { RumorBaseEntity } from '../../entities/rumor-base.entity';
 
 @Entity()
 export class HostCustomUsersListsUsers extends RumorBaseEntity {
-  @ManyToOne(() => HostCustomUsersLists, (customList) => customList.usersLists)
+  @ManyToOne(() => HostCustomUsersLists, (customList) => customList.usersLists, {onDelete: 'CASCADE'})
   @JoinColumn({ name: 'list_id' })
   list: HostCustomUsersLists;
 
