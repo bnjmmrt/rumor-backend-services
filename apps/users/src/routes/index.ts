@@ -216,8 +216,8 @@ router.delete("/auth/referral-codes/:id", ReferralCodeController.deleteReferralC
 router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
 
 
-router.get('/notification-preferences', SettingsController.getNotificationSettings);
-router.put('/notification-preferences', SettingsController.updateNotificationSettings);
+router.get('/notification-preferences', AuthMiddleware.fusionAuth, SettingsController.getNotificationSettings);
+router.put('/notification-preferences', AuthMiddleware.fusionAuth, SettingsController.updateNotificationSettings);
 
 //collaborator user routes
 router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
