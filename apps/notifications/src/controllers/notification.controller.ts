@@ -1,6 +1,7 @@
 import notificationService from "../services/notification.service";
 import asyncWrapper from "../server/helpers/asyncWrapper";
 import {CreateResponse, GetResponse, DeleteResponse} from 'rumor-utils/success';
+import firebaseNotificationsService from "../utils/firebase-notifications/firebase-notifications.service";
 
 export class NotificationController {
   public static sendNotification = asyncWrapper(
@@ -19,6 +20,29 @@ export class NotificationController {
       res.status(successResponse.statusCode).json(successResponse);
     }
   );
+
+  public static sendPushNotification = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { tokens,
+        body,
+        title,
+        image,
+        data
+       } =
+        req.body;
+        
+        await firebaseNotificationsService.sendPushNotification({
+          tokens,
+          body,
+          title,
+          image,
+          data
+        });
+
+      const successResponse = new CreateResponse({}, "Notification sent successfully");
+      res.status(successResponse.statusCode).json(successResponse);
+    }
+  )
 
   public static getAllNotifications = asyncWrapper(
     async (req, res): Promise<void> => {

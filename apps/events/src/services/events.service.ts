@@ -2657,33 +2657,41 @@ export class EventsService {
       }
 
       try {
-        if(eventCurrentStatus === EventStatusEnum.APPROVED_STATUS){
-          const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
-            where: {
-              deletedAt: IsNull(),
-              roles: {
-                role: {
-                  name: 'admin',
+        if (eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
+          const adminUsers: User[] = await this.dbConnection
+            .getRepository(User)
+            .find({
+              where: {
+                deletedAt: IsNull(),
+                roles: {
+                  role: {
+                    name: "admin",
+                  },
                 },
               },
-            },
-            relations: {
-              roles: {
-                role: true,
+              relations: {
+                roles: {
+                  role: true,
+                },
               },
-            },
-          });
-          
+            });
+
           const adminUserIds = adminUsers.map((user) => user.id);
-      
-          if(adminUserIds.length > 0)
-          await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, event.id, event.owner.id);    
+
+          if (adminUserIds.length > 0)
+            await serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.USER_APPLICATION,
+                adminUserIds,
+                event.id,
+                event.owner.id
+              );
         }
       } catch (error) {
-        console.log("🚀 ~ EventsService ~ error:", error)
+        console.log("🚀 ~ EventsService ~ error:", error);
       }
-      
-      
+
       /**ends here */
       const updatedEvent = await this.dbConnection
         .getRepository(Event)
@@ -3433,6 +3441,7 @@ export class EventsService {
             [updatedEvent.owner.email],
             null
           );
+        // Send Push Notification
         serviceMesh
           .notificationService()
           .sendNotification(
@@ -3454,6 +3463,7 @@ export class EventsService {
             value: `${hour}: ${minutes}`,
           }
         );
+        try {
         serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
@@ -3462,13 +3472,17 @@ export class EventsService {
             [updatedEvent.owner.email],
             null
           );
-        serviceMesh
-          .notificationService()
-          .sendNotification(
-            NotificationType.EVENT_SUBMISSION_APPROVED,
-            updatedEvent.owner.id,
-            updatedEvent.id
-          );
+        //Send Push Notifications
+          serviceMesh
+            .notificationService()
+            .sendNotification(
+              NotificationType.EVENT_SUBMISSION_APPROVED,
+              updatedEvent.owner.id,
+              updatedEvent.id
+            );
+        } catch (error) {
+          console.log("🚀 ~ EventsService ~ error:", error);
+        }
       }
     } else if (
       [

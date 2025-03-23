@@ -33,6 +33,10 @@ router.get('/get-email-template', CommunicationController.getEmailTemplate);
  */
 router.post('/notification', NotificationController.sendNotification);
 
+/**
+ * Route for Testing the Push Notifications
+ */
+ router.post('/notification/push', NotificationController.sendPushNotification);
 
 /**
  * Route for Notification Creation - Will be used in service Mesh for interservice communication call

@@ -3,8 +3,6 @@ import { Notification } from "rumor-utils/shared/notifications/entities/notifica
 import { NotFoundError } from "rumor-utils/errors";
 import { Event } from "rumor-utils/shared/events/entities";
 import { User } from "rumor-utils/shared/users/entities/user.entity";
-import { PushNotificationToken } from "rumor-utils/shared/users/entities/push-notification-token.entity";
-import { UserSettings } from "rumor-utils/shared/users/entities/user-settings.entity";
 import { In } from "typeorm";
 import getNotificationDetails from "../server/helpers/notificationMatrix";
 import firebaseNotificationsService from "../utils/firebase-notifications/firebase-notifications.service";
@@ -23,28 +21,42 @@ class NotificationService {
     linkedEventId?: string
   ) {
     const recipientList = Array.isArray(recipients) ? recipients : [recipients];
-  
+
     // Fetch notification template
     const notificationTemplate = getNotificationDetails(notificationType);
+    console.log(
+      "🚀 ~ NotificationService ~ notificationTemplate:",
+      notificationTemplate
+    );
     if (!notificationTemplate) {
       throw new Error(`Invalid notification type: ${notificationType}`);
     }
-  
+
     // Fetch linked entities in a single query each
-     
-    const linkedUser:User = linkedUserId ? await User.getRepository().findOne({ where: { id: linkedUserId } }) : null
-    const linkedEvent:Event = linkedEventId ? await Event.getRepository().findOne({ where: { id: linkedEventId } }) : null
-    
+
+    const linkedUser: User = linkedUserId
+      ? await User.getRepository().findOne({ where: { id: linkedUserId } })
+      : null;
+    const linkedEvent: Event = linkedEventId
+      ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
+      : null;
+
     if (notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser) {
       throw new NotFoundError("Linked user not found");
     }
     if (notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent) {
       throw new NotFoundError("Linked event not found");
     }
-  
+
     const notificationsToSave: Notification[] = [];
-    const pushNotifications: { token: string; message: string; title: string; image: string }[] = [];
-  
+    const pushNotifications: {
+      tokens: string[];
+      body: string;
+      title: string;
+      image: string;
+      data?: object;
+    }[] = [];
+
     // Bulk fetch recipient users, preferences, and push tokens
     const recipientsData = await this.dbConnection
       .getRepository(User)
@@ -53,27 +65,50 @@ class NotificationService {
       .leftJoinAndSelect("user.pushNotificationToken", "pushNotificationToken")
       .where("user.id IN (:...recipientList)", { recipientList })
       .getMany();
-  
+
     for (const recipientUser of recipientsData) {
       if (!recipientUser) continue;
-  
-      const body: any = notificationTemplate.body ? { eventId: linkedEvent?.id, userId: linkedUser?.id } : {};
+
+      const body: any = notificationTemplate.body
+        ? {
+            eventId: linkedEvent ? linkedEvent.id : "",
+            userId: linkedUser ? linkedUser.id : "",
+            action: notificationTemplate.action,
+          }
+        : {};
       const notificationImage = eval(notificationTemplate.image) || "";
-  
+
       // Generate personalized messages
       const replaceTemplateValues = (message: string) =>
         message
-          .replace("[Event Start Time]", (linkedEvent?.startDate || "").toString())
-          .replace("[Recipient Name]", recipientUser.firstName ? `${recipientUser.firstName} ${recipientUser.lastName}` : "")
-          .replace("[Linked User Name]", linkedUser?.firstName ? `${linkedUser.firstName} ${linkedUser.lastName}` : "")
+          .replace(
+            "[Event Start Time]",
+            (linkedEvent?.startDate || "").toString()
+          )
+          .replace(
+            "[Recipient Name]",
+            recipientUser.firstName
+              ? `${recipientUser.firstName} ${recipientUser.lastName}`
+              : ""
+          )
+          .replace(
+            "[Linked User Name]",
+            linkedUser?.firstName
+              ? `${linkedUser.firstName} ${linkedUser.lastName}`
+              : ""
+          )
           .replace("[Event Name]", linkedEvent?.name || "")
           .replace("[Event City Name]", linkedEvent?.location?.city || "")
           .replace("[Member Name]", body?.name || "")
           .replace("[Host Name]", body?.name || "");
-  
-      const appMessage = replaceTemplateValues(notificationTemplate.appMessage || "");
-      const pushMessage = replaceTemplateValues(notificationTemplate.pushMessage || "");
-  
+
+      const appMessage = replaceTemplateValues(
+        notificationTemplate.appMessage || ""
+      );
+      const pushMessage = replaceTemplateValues(
+        notificationTemplate.pushMessage || ""
+      );
+
       // Prepare notification for saving
       const notification = new Notification();
       notification.title = "Rumor";
@@ -85,42 +120,46 @@ class NotificationService {
       notification.notificationModule = notificationTemplate.notificationModule;
       notification.recipients = [recipientUser];
       notification.notificationImage = notificationTemplate.image;
-  
       notificationsToSave.push(notification);
-  
+
+      const userPushPreference = recipientUser.userSettings ? recipientUser.userSettings.enableAppNotifications : true;
+    
       // Handle push notification if enabled
-      if (notificationTemplate.pushNotification && recipientUser.userSettings?.enableAppNotifications) {
-        for (const tokenObj of recipientUser.pushNotificationToken) {
-          pushNotifications.push({
-            token: tokenObj.notificationToken,
-            message: pushMessage,
-            title: "Rumor",
-            image: notificationImage,
-          });
-        }
+      if (
+        notificationTemplate.pushNotification &&
+        userPushPreference
+      ) {
+        pushNotifications.push({
+          tokens: recipientUser?.pushNotificationToken.map(
+            (data) => data.notificationToken
+          ),
+          body: pushMessage,
+          title: "The Rumor",
+          image: notificationImage,
+          data: { ...body, notificationType },
+        });
       }
     }
-  
+
     // Batch insert notifications
     if (notificationsToSave.length > 0) {
-      await this.dbConnection.getRepository(Notification).save(notificationsToSave);
+      await this.dbConnection
+        .getRepository(Notification)
+        .save(notificationsToSave);
     }
-  
+
     // Send push notifications in bulk, ensuring different messages per recipient
     if (pushNotifications.length > 0) {
       for (const push of pushNotifications) {
         await firebaseNotificationsService.sendPushNotification({
-          tokens: [push.token],
-          body: push.message,
-          title: push.title,
-          image: push.image,
+          ...push,
         });
       }
     }
-  
+
     return { success: true, message: "Notifications sent successfully." };
   }
-  
+
   async getAllNotifications(
     recipientId: string,
     take = 10,
@@ -192,7 +231,7 @@ class NotificationService {
     skip = 0,
     notificationByModule?: string,
     notificationByType?: string
-  ): Promise<{ totalCount: number; notifications: Partial<Notification>[] }> {
+  ): Promise<{ totalCount: number; result: Partial<Notification>[] }> {
     const queryBuilder = this.dbConnection
       .getRepository(Notification)
       .createQueryBuilder("notification")
@@ -200,18 +239,13 @@ class NotificationService {
         "notification.recipients",
         "recipient",
         "recipient.id = :recipientId",
-        { recipientId }
+        {
+          recipientId,
+        }
       )
-      .select([
-        "notification.id",
-        "notification.title",
-        "notification.notificationType",
-        "notification.notificationModule",
-        "notification.created_at",
-        "notification.message",
-        "notification.body",
-      ])
-      .orderBy("notification.created_at", "DESC");
+      .leftJoinAndSelect("notification.linkedUser", "linkedUser")
+      .leftJoinAndSelect("notification.linkedEvent", "linkedEvent")
+      .orderBy("notification.createdAt", "DESC");
 
     // Apply filters if provided
     if (notificationByModule) {
@@ -232,9 +266,9 @@ class NotificationService {
     const totalCount = await queryBuilder.getCount();
 
     // Apply pagination
-    const notifications = await queryBuilder.take(take).skip(skip).getRawMany();
+    const notifications = await queryBuilder.take(take).skip(skip).getMany();
 
-    return { totalCount, notifications };
+    return { totalCount, result: toNotificationslisting(notifications) };
   }
 
   async getNotificationSummary(recipientId: string): Promise<{
