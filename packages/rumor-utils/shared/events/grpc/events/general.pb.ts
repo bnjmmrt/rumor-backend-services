@@ -684,6 +684,8 @@ export interface SignupFormsResponse {
   userId: string;
   userName: string;
   userProfile: string;
+  companyName: string;
+  companyProfile: string;
   description: string;
   hasAccessForAdditionalGuests: boolean;
   startDate: string;
