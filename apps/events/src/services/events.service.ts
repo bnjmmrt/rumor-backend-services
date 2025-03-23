@@ -245,7 +245,10 @@ export class EventsService {
       : {};
     const [eventTypes, total] = await this.dbConnection
       .getRepository(EventTypes)
-      .findAndCount({ ...pagination });
+      .findAndCount({
+        ...pagination,
+        order: { name: 'ASC' }
+      });
     return {
       items: eventTypes,
       total,
