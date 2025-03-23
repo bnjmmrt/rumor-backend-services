@@ -2638,13 +2638,9 @@ export class GuestService {
       },
     });
 
-    if(alreadyGuest.status === GuestStatus.DRAFT) {
-
+    if (alreadyGuest && ![GuestStatus.DRAFT, GuestStatus.DECLINED].includes(alreadyGuest.status)) {
+      throw new BadRequestError("User is already a guest of this event");
     }
-
-
-    if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
-
     const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
       where: {
         event: { id: payload.eventId },
@@ -2705,15 +2701,9 @@ export class GuestService {
     }
 
     if (alreadyGuest) {
-      if (
-        alreadyGuest?.status === GuestStatus.DECLINED ||
-        alreadyGuest?.status === GuestStatus.NO_STATUS
-      ) {
-        //means guest is again requesting for rsvp
-        alreadyGuest.status = GuestStatus.APPLIED;
-        alreadyGuest.declinedBy = null;
-        alreadyGuest.rejectedReason = null;
-      }
+      alreadyGuest.status = GuestStatus.APPLIED;
+      alreadyGuest.declinedBy = null;
+      alreadyGuest.rejectedReason = null;
       alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
       await this.dbConnection.getRepository(Guest).save(alreadyGuest);
     } else {
@@ -2727,14 +2717,21 @@ export class GuestService {
     }
 
     // Send Notification to Host
-    serviceMesh
-      .notificationService()
-      .sendNotification(
-        NotificationType.NEW_GUEST_REQUEST,
-        event.owner.id,
-        event.id,
-        user.id
+    try {
+      serviceMesh
+        .notificationService()
+        .sendNotification(
+          NotificationType.NEW_GUEST_REQUEST,
+          event.owner.id,
+          event.id,
+          user.id
+        );
+    } catch (error) {
+      console.log(
+        ":rocket: ~ guestService ~ requestBecomeGuest ~ error:",
+        error
       );
+    }
     return "";
   }
 
