@@ -317,7 +317,7 @@ export class SignupFormsServices {
     requestPayload: SignupFormAnswersDto[],
     answerList: SignupFormAnswersDto[],
     userPayload: User,
-    requestedGuests: number = 0
+    requestedGuests: number
   ) {
     requestPayload.forEach((ans: SignupFormAnswersDto) => {
       const answer = new SignupFormAnswersDto();
@@ -340,6 +340,7 @@ export class SignupFormsServices {
             userPayload.phoneNumber = ans.answers;
             break;
           case "request access for additional guests":
+            console.log(`request access for additional guests -> ${ans.answers}`)
             requestedGuests = Number(ans.answers);
             break;
         }
@@ -431,6 +432,7 @@ export class SignupFormsServices {
         userPayload,
         requestedGuests
       );
+      console.log(`request access for additional guests -> ${requestedGuests}`)
 
       userPayload = await this.validateUserAsGuest(eventId, userPayload);
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
@@ -442,9 +444,9 @@ export class SignupFormsServices {
       }
       const inviteGuestPayload = new Guest();
       inviteGuestPayload.event = signupForm.event;
-      inviteGuestPayload.maxAdditionalGuests = requestedGuests;
+      inviteGuestPayload.additionalRequestedGuests = requestedGuests;
       inviteGuestPayload.user = { id: userPayload.id } as User;
-      inviteGuestPayload.invitationSource = UserSource.INVITED_BY_HOST;
+      inviteGuestPayload.invitationSource = UserSource.SIGN_UP_FORM;
       inviteGuestPayload.ticketType = undefined;
       inviteGuestPayload.status = GuestStatus.APPLIED;
       await queryRunner.manager.save(inviteGuestPayload);
@@ -456,6 +458,8 @@ export class SignupFormsServices {
       submissions.attendees = { id: userPayload.id } as User;
 
       await queryRunner.manager.save(submissions);
+      inviteGuestPayload.signupFormSubmissions = {id: submissions.id} as SignupFormSubmissions;
+      await queryRunner.manager.save(inviteGuestPayload);
       await queryRunner.commitTransaction();
 
       try {
