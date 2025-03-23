@@ -3666,11 +3666,8 @@ export class GuestService {
           { uploadedViaCsv: { id: csvUploadRecord.id } }
         );
     });
-
-    newMappings.push(
-      ...users.map((user) => ({ user, host: { id: payload.hostId } }))
-    );
-    await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+    
+    if(newMappings.length !==0) await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
 
     // Step 9: Return the response with success and failure counts
     return {
