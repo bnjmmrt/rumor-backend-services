@@ -22,10 +22,9 @@ export class ConnectionManager {
             "packages/rumor-utils/shared/notifications/entities/*.ts",
             "packages/rumor-utils/shared/notifications/entities/*.js"
           ],
-          ...(["development", "staging", "production", "uat"].includes(
-            config.get("NODE_ENV")
-          ) && { ssl: { rejectUnauthorized: false } }),
-          synchronize: true
+          ssl: { rejectUnauthorized: false },
+          synchronize: false,
+          logging: true
         });
         this.connection = await appDataSource.initialize();
       }

@@ -2665,8 +2665,12 @@ export class GuestService {
       },
     });
 
-    if (alreadyGuest)
-      throw new BadRequestError("User is already a guest of this event");
+    if(alreadyGuest.status === GuestStatus.DRAFT) {
+
+    }
+
+
+    if (alreadyGuest) throw new BadRequestError('User is already a guest of this event');
 
     const quiz = await this.dbConnection.getRepository(QuizQuestion).find({
       where: {

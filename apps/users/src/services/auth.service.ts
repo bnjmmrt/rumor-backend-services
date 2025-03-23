@@ -1856,6 +1856,11 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
+      if (payload.status === UserStatus.WAITLISTED) {
+        // Make him non-member
+        continue;
+      }
+
       const userRole = userRoles.find((ur) => ur.user.id === user.id);
       const nonMemberUserRole = userRoles.find(
         (ur) => ur.user.id === user.id && ur.role.name === "non_member"
