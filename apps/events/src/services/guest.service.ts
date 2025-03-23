@@ -927,28 +927,6 @@ export class GuestService {
           })
         );
       }
-
-      // Send declined emails if guests were updated and declines are enabled
-      if (
-        updatedGuests.length > 0 &&
-        declinedGuestsEmails.length > 0 &&
-        payload.sendInvite
-      ) {
-        // TO DO: Change email and sms template
-        await Promise.all(
-          declinedGuestsEmails.map((email) =>
-            serviceMesh
-              .notificationService()
-              .sendEmailFromTemplate(
-                [{ key: "first_name", value: "" }],
-                "Host Application Submitted",
-                [email],
-                null
-              )
-          )
-        );
-      }
-
       // Fetch and transform updated guest data for response
       const updatedGuestIds = updatedGuests.map((el) => el.id);
       const rowsUpdated = await this.dbConnection.getRepository(Guest).find({
