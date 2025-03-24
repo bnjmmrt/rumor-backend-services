@@ -3659,93 +3659,162 @@ export class AuthService {
   }
 
   public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
-    const users = await this.dbConnection.getRepository(User).find({
-      where: { id: In(payload.ids) },
-      relations: ['roles', 'roles.role'],
-    });
+    try {
+      const users = await this.dbConnection.getRepository(User).find({
+        where: { id: In(payload.ids) },
+        relations: ["roles", "roles.role"],
+      });
 
-
-    if (!users.length) {
-      throw new NotFoundError('Host')
-    }
-
-    const hostRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: {
-        id: In(users.flatMap((user) => user?.roles?.filter((role) => role.role.name === 'host' || role.role.name === 'co_host').map((role) => role.id))),
-      },
-    });
-
-    if (!hostRoles.length) throw new NotFoundError('valid hosts');
-
-    const skippedUsers: string[] = [];
-    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-
-    for (const user of users) {
-      const hostRole = hostRoles.find((role) => role.id === user.roles.find((r) => r.role.name === 'host' || r.role.name === 'co_host')?.id);
-
-      if (!hostRole) continue;
-
-
-      // If changing to WAITLIST, prevent already approved users from being waitlisted
-      if (
-        newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
-        hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
-      ) {
-        skippedUsers.push(user.email);
-        continue;
+      if (!users.length) {
+        throw new NotFoundError("Host");
       }
 
-      hostRole.status = newUserStatusTosUserStatus[payload.status];
+      const hostRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          id: In(
+            users.flatMap((user) =>
+              user?.roles
+                ?.filter(
+                  (role) =>
+                    role.role.name === "host" || role.role.name === "co_host"
+                )
+                .map((role) => role.id)
+            )
+          ),
+        },
+      });
 
-      if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.APPROVE]) {
-        const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
-        if (users.response.total === 0) {
-          await this.approveHost(user);
-          const token = await this.generateToken(user);
+      if (!hostRoles.length) throw new NotFoundError("valid hosts");
+
+      const skippedUsers: string[] = [];
+      const emailsToSend: { email: string; subject: string; data: any[] }[] =
+        [];
+
+      for (const user of users) {
+        const hostRole = hostRoles.find(
+          (role) =>
+            role.id ===
+            user.roles.find(
+              (r) => r.role.name === "host" || r.role.name === "co_host"
+            )?.id
+        );
+
+        if (!hostRole) continue;
+
+        // If changing to WAITLIST, prevent already approved users from being waitlisted
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+            newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+          hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          skippedUsers.push(user.email);
+          continue;
+        }
+
+        hostRole.status = newUserStatusTosUserStatus[payload.status];
+
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          const users = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .searchUsersByIds([user.id]);
+          if (users.response.total === 0) {
+            await this.approveHost(user);
+            const token = await this.generateToken(user);
+            emailsToSend.push({
+              email: user.email,
+              subject: "Host Application Approved",
+              data: [
+                { key: "first_name", value: user.firstName },
+                {
+                  key: "company_name",
+                  value:
+                    user.additionalHostInformation?.companyName ??
+                    user.firstName,
+                },
+                {
+                  key: "password_token",
+                  value: config.get("RUMOR_WEBSITE_HOST") + `token/${token}`,
+                },
+              ],
+            });
+          }
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.WAITLIST]
+        ) {
           emailsToSend.push({
             email: user.email,
-            subject: 'Host Application Approved',
+            subject: "Host Application Denied",
+            data: [],
+          });
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]
+        ) {
+          const today = new Date();
+          const afterThirtyDays = new Date(
+            today.getFullYear(),
+            today.getMonth() + 1,
+            today.getDate()
+          );
+          const fullMonthName = afterThirtyDays.toLocaleString("default", {
+            month: "long",
+          });
+          const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+          emailsToSend.push({
+            email: user.email,
+            subject: "Account Deactivated",
             data: [
-              { key: 'first_name', value: user.firstName },
-              { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
-              { key: 'password_token', value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}` },
+              { key: "first_name", value: user.firstName },
+              {
+                key: "activate_before_datetime",
+                value: reactivateBeforeTimestamp,
+              },
             ],
           });
         }
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST]) {
-        emailsToSend.push({ email: user.email, subject: 'Host Application Denied', data: [] });
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]) {
-        const today = new Date();
-        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-        emailsToSend.push({
-          email: user.email,
-          subject: 'Account Deactivated',
-          data: [
-            { key: 'first_name', value: user.firstName },
-            { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-          ],
-        });
       }
-    }
 
-    await this.dbConnection.getRepository(UserRole).save(hostRoles);
+      await this.dbConnection.getRepository(UserRole).save(hostRoles);
 
-    // Send all emails in parallel
-    try {
-      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null)));
-    } catch (error) { }
-    // if (skippedUsers.length > 0) {
-    //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
-    // }
+      // Send all emails in parallel
+      try {
+        await Promise.all(
+          emailsToSend.map((email) =>
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim()],
+                null
+              )
+          )
+        );
+      } catch (error) {}
+      // if (skippedUsers.length > 0) {
+      //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
+      // }
 
-    return {
-      updatedUsers: users.map(user => ({
-        id: user.id,
-        status: hostRoles.find(role => role.id === user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id)?.status ?? null,
-      })),
-      skippedUsers,
+      return {
+        updatedUsers: users.map((user) => ({
+          id: user.id,
+          status:
+            hostRoles.find(
+              (role) =>
+                role.id ===
+                user.roles.find(
+                  (r) => r.role.name === "host" || r.role.name === "co_host"
+                )?.id
+            )?.status ?? null,
+        })),
+        skippedUsers,
+      };
+    } catch (err: any) {
+      throw new NotFoundError(`Host Status Updates failed:: ${err.message}`);
     }
   }
 
