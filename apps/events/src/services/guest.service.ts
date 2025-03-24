@@ -623,15 +623,21 @@ export class GuestService {
               },
             };
 
-            // Send Push for Member Invitation
+            try {
+              // Send Push for Member Invitation
             serviceMesh
-              .notificationService()
-              .sendNotification(
-                NotificationType.EVENT_INVITATION,
-                data.id,
-                payload.eventId,
-                payload.hostId
-              );
+            .notificationService()
+            .sendNotification(
+              NotificationType.EVENT_INVITATION,
+              data.id,
+              payload.eventId,
+              payload.hostId
+            );
+            } catch (error) {
+              console.log("🚀 ~ GuestService ~ emailsData.map ~ error:", error)
+              
+            }
+            
 
             sendEventInviteMember(createMailPayload);
           } else if (data.role.includes("non_member")) {
