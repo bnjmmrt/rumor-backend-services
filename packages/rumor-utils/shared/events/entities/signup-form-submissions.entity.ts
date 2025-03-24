@@ -15,6 +15,10 @@ export class SignupFormSubmissions extends RumorBaseEntity {
   @Column({ type: "jsonb", nullable: false, name: "answers" })
   answers: ISignupFormQuestionsRequest[];
 
+
+  @Column({ type: "uuid", nullable: true, name: "guest_id" })
+  guestId: string;
+
   @ManyToOne(() => EventSignupForms, (signupForm) => signupForm.submissions, {
     onDelete: "CASCADE",
     onUpdate: "CASCADE",
@@ -33,6 +37,5 @@ export class SignupFormSubmissions extends RumorBaseEntity {
     onDelete: "RESTRICT",
     onUpdate: "CASCADE",
   })
-  @JoinColumn({ name: "guest_id" })
   guest: Guest;
 }

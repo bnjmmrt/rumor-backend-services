@@ -472,17 +472,10 @@ export class SignupFormsServices {
       inviteGuestPayload.signupFormSubmissions = {
         id: submissions.id,
       } as SignupFormSubmissions;
-
       await queryRunner.manager.save(inviteGuestPayload);
 
-      // -- Create Guest
-      // const submissions = new SignupFormSubmissions();
-      // submissions.signupForm = { id: id } as EventSignupForms;
-      // submissions.answers = answerList;
-      // submissions.guest = { id: inviteGuestPayload.id } as Guest;
-      // submissions.attendees = { id: userPayload.id } as User;
-
-      await queryRunner.manager.save(inviteGuestPayload);
+      submissions.guestId = inviteGuestPayload.id;
+      await queryRunner.manager.save(submissions);
       await queryRunner.commitTransaction();
 
       try {
