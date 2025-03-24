@@ -116,8 +116,8 @@ export const toGuest = (
       : [],
     vouches: vouches?.length
       ? vouches.map((item) => {
-          return toVouchesData(item);
-        })
+        return toVouchesData(item);
+      })
       : [],
     email: guest?.user?.email,
     privateGuestNote: guest?.privateGuestNote,
@@ -157,11 +157,15 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
   if (guest.event.owner.id === guest.addedBy?.id) {
     addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
     addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
-    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
-    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
   } else {
     addedBy = `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`.trim();
     addedByPicture = guest.addedBy?.profilePicture || '';
+  }
+
+  if (guest.event.owner.id === guest.declinedBy?.id) {
+    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
+    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
     declinedBy = `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`.trim();
     declinedByPicture = guest.declinedBy?.profilePicture || '';
   }
