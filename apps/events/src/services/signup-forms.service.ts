@@ -34,7 +34,7 @@ import {
 import config from "../config";
 import serviceMesh from "../server/helpers/serviceMeshHandler";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
-import { isValidEmail, isValidPhoneNumber } from "packages/rumor-utils/utils/file-utils";
+import { isValidEmail, isValidPhoneNumber } from "rumor-utils/utils/file-utils";
 
 export class SignupFormsServices {
   public static dbConnection = database;
