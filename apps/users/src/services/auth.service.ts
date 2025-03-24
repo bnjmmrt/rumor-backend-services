@@ -371,11 +371,11 @@ export class AuthService {
       const registrationRequest: RegistrationRequest = {
         registration: {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
-          username: payload.email.split('@')[0],
+          username: payload.email,
         },
         sendSetPasswordEmail: false,
         user: {
-          username: payload.email.split('@')[0],
+          username: payload.email,
           birthDate: payload.dateOfBirth,
           email: payload.email,
           firstName: payload.firstName,
@@ -3465,12 +3465,12 @@ export class AuthService {
     const registrationRequest: RegistrationRequest = {
       registration: {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
+        username: payload.email,
       },
       sendSetPasswordEmail: false,
       user: {
         id: user.id,
-        username: payload.email.split('@')[0],
+        username: payload.email,
         // birthDate: payload.dateOfBirth,
         email: payload.email,
         firstName: payload.firstName,
@@ -3759,12 +3759,12 @@ export class AuthService {
     const registrationRequest: RegistrationRequest = {
       registration: {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email.split('@')[0],
+        username: user.email,
       },
       sendSetPasswordEmail: false,
       user: {
         id: user.id,
-        username: user.email.split('@')[0],
+        username: user.email,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,

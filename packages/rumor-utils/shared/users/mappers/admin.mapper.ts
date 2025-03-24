@@ -110,6 +110,7 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
 export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string, eventCount?: number): MemberProfile => {
   return {
     id: user.id,
+    userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
     category: focuses.map((focus) => focus.name).join(', '),

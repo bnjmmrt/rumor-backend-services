@@ -543,6 +543,7 @@ export interface InvitedUsers {
 
 export interface MemberProfile {
   id: string;
+  userId?: string | undefined;
   firstName: string;
   lastName: string;
   category: string;

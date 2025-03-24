@@ -104,7 +104,6 @@ router.patch(
 
 router.get(
   "/signup-forms/:id/submissions",
-  AuthMiddleware.fusionAuthRequired,
   SignupFormsController.listSubmissions
 );
 

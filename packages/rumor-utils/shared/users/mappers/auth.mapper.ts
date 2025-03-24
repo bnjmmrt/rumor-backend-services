@@ -282,6 +282,7 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
 export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string, eventCount: number = 0): MemberProfile => {
   return {
     id: user.id,
+    userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
     category: focuses.map((focus) => focus.name).join(', '),
