@@ -573,7 +573,7 @@ export class AuthService {
           },
         },
       });
-      
+
       const adminUserIds = adminUsers.map((user) => user.id);
   
       if(adminUserIds.length > 0)

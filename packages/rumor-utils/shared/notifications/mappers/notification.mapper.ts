@@ -19,6 +19,7 @@ function toNotificationslisting(
     title: notification.title,
     message: notification.message,
     type: notification.notificationType,
+    notificationModule: notification.notificationModule,
     image: eval(`notification.${notification.notificationImage}`),
     isSeen: notification.isSeen,
     body: notification.body,
