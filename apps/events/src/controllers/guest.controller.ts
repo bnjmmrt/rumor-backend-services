@@ -419,7 +419,7 @@ export class GuestController {
     async (req, res): Promise<void> => {
       const { id } = req.params;
       const hostId = (req as any).user;
-      const query = req.query;
+      const query = req.query as string;
       const payload: GuestsQueryRequestDto = {
         hostId: hostId,
         eventId: id,

@@ -1455,6 +1455,10 @@ export class EventsService {
         "tickets",
         "guests",
         "restrictedInvites",
+        "featuredEventSection",
+        "csvUploads",
+        "signupForms",
+        "notifications"
       ],
     });
     if (!event) throw new NotFoundError("Event was not found!");
