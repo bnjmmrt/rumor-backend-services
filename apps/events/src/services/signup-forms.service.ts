@@ -464,7 +464,7 @@ export class SignupFormsServices {
       /**-- Create Guest */
       inviteGuestPayload.event = signupForm.event;
       inviteGuestPayload.additionalRequestedGuests = requestedGuests.additional;
-      inviteGuestPayload.maxAdditionalGuests = signupForm.event.limitOnePlus;
+      inviteGuestPayload.maxAdditionalGuests = requestedGuests.additional;
       inviteGuestPayload.user = { id: userPayload.id } as User;
       inviteGuestPayload.invitationSource = UserSource.SIGN_UP_FORM;
       inviteGuestPayload.ticketType = undefined;
