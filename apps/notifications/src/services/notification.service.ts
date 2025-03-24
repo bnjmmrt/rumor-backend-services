@@ -20,140 +20,148 @@ class NotificationService {
     linkedUserId?: string,
     linkedEventId?: string
   ) {
-    const recipientList = Array.isArray(recipients) ? recipients : [recipients];
+    try {
+      const recipientList = Array.isArray(recipients)
+        ? recipients
+        : [recipients];
 
-    // Fetch notification template
-    const notificationTemplate = getNotificationDetails(notificationType);
-    if (!notificationTemplate) {
-      throw new Error(`Invalid notification type: ${notificationType}`);
-    }
-
-    // Fetch linked entities in a single query each
-
-    const linkedUser: User = linkedUserId
-      ? await User.getRepository().findOne({ where: { id: linkedUserId } })
-      : null;
-    const linkedEvent: Event = linkedEventId
-      ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
-      : null;
-
-    if (notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser) {
-      throw new NotFoundError("Linked user not found");
-    }
-    if (notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent) {
-      throw new NotFoundError("Linked event not found");
-    }
-
-    const notificationsToSave: Notification[] = [];
-    const pushNotifications: {
-      tokens: string[];
-      body: string;
-      title: string;
-      image: string;
-      data?: object;
-    }[] = [];
-
-    // Bulk fetch recipient users, preferences, and push tokens
-    const recipientsData = await this.dbConnection
-      .getRepository(User)
-      .createQueryBuilder("user")
-      .leftJoinAndSelect("user.userSettings", "userSettings")
-      .leftJoinAndSelect("user.pushNotificationToken", "pushNotificationToken")
-      .where("user.id IN (:...recipientList)", { recipientList })
-      .getMany();
-
-    for (const recipientUser of recipientsData) {
-      if (!recipientUser) continue;
-
-      const body: any = notificationTemplate.body
-        ? {
-            eventId: linkedEvent ? linkedEvent.id : "",
-            userId: linkedUser ? linkedUser.id : "",
-            action: notificationTemplate.action,
-          }
-        : {};
-      const notificationImage = eval(notificationTemplate.image) || "";
-
-      // Generate personalized messages
-      const replaceTemplateValues = (message: string) =>
-        message
-          .replace(
-            "[Event Start Time]",
-            (linkedEvent?.startDate || "").toString()
-          )
-          .replace(
-            "[Recipient Name]",
-            recipientUser.firstName
-              ? `${recipientUser.firstName} ${recipientUser.lastName}`
-              : ""
-          )
-          .replace(
-            "[Linked User Name]",
-            linkedUser?.firstName
-              ? `${linkedUser.firstName} ${linkedUser.lastName}`
-              : ""
-          )
-          .replace("[Event Name]", linkedEvent?.name || "")
-          .replace("[Event City Name]", linkedEvent?.location?.city || "")
-          .replace("[Member Name]", body?.name || "")
-          .replace("[Host Name]", body?.name || "");
-
-      const appMessage = replaceTemplateValues(
-        notificationTemplate.appMessage || ""
-      );
-      const pushMessage = replaceTemplateValues(
-        notificationTemplate.pushMessage || ""
-      );
-
-      // Prepare notification for saving
-      const notification = new Notification();
-      notification.title = "Rumor";
-      notification.message = appMessage;
-      notification.body = body;
-      notification.notificationType = notificationType;
-      notification.linkedUser = linkedUser;
-      notification.linkedEvent = linkedEvent;
-      notification.notificationModule = notificationTemplate.notificationModule;
-      notification.recipients = [recipientUser];
-      notification.notificationImage = notificationTemplate.image;
-      notificationsToSave.push(notification);
-
-      const userPushPreference = recipientUser.userSettings ? recipientUser.userSettings.enableAppNotifications : true;
-    
-      // Handle push notification if enabled
-      if (
-        notificationTemplate.pushNotification &&
-        userPushPreference
-      ) {
-        pushNotifications.push({
-          tokens: recipientUser?.pushNotificationToken.map(
-            (data) => data.notificationToken
-          ),
-          body: pushMessage,
-          title: "The Rumor",
-          image: notificationImage,
-          data: { ...body, notificationType },
-        });
+      // Fetch notification template
+      const notificationTemplate = getNotificationDetails(notificationType);
+      if (!notificationTemplate) {
+        throw new Error(`Invalid notification type: ${notificationType}`);
       }
-    }
 
-    // Batch insert notifications
-    if (notificationsToSave.length > 0) {
-      await this.dbConnection
-        .getRepository(Notification)
-        .save(notificationsToSave);
-    }
+      // Fetch linked entities in a single query each
 
-    // Send push notifications in bulk, ensuring different messages per recipient
-    if (pushNotifications.length > 0) {
-      for (const push of pushNotifications) {
-        await firebaseNotificationsService.sendPushNotification({
-          ...push,
-        });
+      const linkedUser: User = linkedUserId
+        ? await User.getRepository().findOne({ where: { id: linkedUserId } })
+        : null;
+      const linkedEvent: Event = linkedEventId
+        ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
+        : null;
+
+      if (notificationTemplate.hasOwnProperty("linkedUser") && !linkedUser) {
+        throw new NotFoundError("Linked user not found");
       }
-    }
+      if (notificationTemplate.hasOwnProperty("linkedEvent") && !linkedEvent) {
+        throw new NotFoundError("Linked event not found");
+      }
 
-    return { success: true, message: "Notifications sent successfully." };
+      const notificationsToSave: Notification[] = [];
+      const pushNotifications: {
+        tokens: string[];
+        body: string;
+        title: string;
+        image: string;
+        data?: object;
+      }[] = [];
+
+      // Bulk fetch recipient users, preferences, and push tokens
+      const recipientsData = await this.dbConnection
+        .getRepository(User)
+        .createQueryBuilder("user")
+        .leftJoinAndSelect("user.userSettings", "userSettings")
+        .leftJoinAndSelect(
+          "user.pushNotificationToken",
+          "pushNotificationToken"
+        )
+        .where("user.id IN (:...recipientList)", { recipientList })
+        .getMany();
+
+      for (const recipientUser of recipientsData) {
+        if (!recipientUser) continue;
+
+        const body: any = notificationTemplate.body
+          ? {
+              eventId: linkedEvent ? linkedEvent.id : "",
+              userId: linkedUser ? linkedUser.id : "",
+              action: notificationTemplate.action,
+            }
+          : {};
+        const notificationImage = eval(notificationTemplate.image) || "";
+
+        // Generate personalized messages
+        const replaceTemplateValues = (message: string) =>
+          message
+            .replace(
+              "[Event Start Time]",
+              (linkedEvent?.startDate || "").toString()
+            )
+            .replace(
+              "[Recipient Name]",
+              recipientUser.firstName
+                ? `${recipientUser.firstName} ${recipientUser.lastName}`
+                : ""
+            )
+            .replace(
+              "[Linked User Name]",
+              linkedUser?.firstName
+                ? `${linkedUser.firstName} ${linkedUser.lastName}`
+                : ""
+            )
+            .replace("[Event Name]", linkedEvent?.name || "")
+            .replace("[Event City Name]", linkedEvent?.location?.city || "")
+            .replace("[Member Name]", body?.name || "")
+            .replace("[Host Name]", body?.name || "");
+
+        const appMessage = replaceTemplateValues(
+          notificationTemplate.appMessage || ""
+        );
+        const pushMessage = replaceTemplateValues(
+          notificationTemplate.pushMessage || ""
+        );
+
+        // Prepare notification for saving
+        const notification = new Notification();
+        notification.title = "Rumor";
+        notification.message = appMessage;
+        notification.body = body;
+        notification.notificationType = notificationType;
+        notification.linkedUser = linkedUser;
+        notification.linkedEvent = linkedEvent;
+        notification.notificationModule =
+          notificationTemplate.notificationModule;
+        notification.recipients = [recipientUser];
+        notification.notificationImage = notificationTemplate.image;
+        notificationsToSave.push(notification);
+
+        const userPushPreference = recipientUser.userSettings
+          ? recipientUser.userSettings.enableAppNotifications
+          : true;
+
+        // Handle push notification if enabled
+        if (notificationTemplate.pushNotification && userPushPreference) {
+          pushNotifications.push({
+            tokens: recipientUser?.pushNotificationToken.map(
+              (data) => data.notificationToken
+            ),
+            body: pushMessage,
+            title: "The Rumor",
+            image: notificationImage,
+            data: { ...body, notificationType },
+          });
+        }
+      }
+
+      // Batch insert notifications
+      if (notificationsToSave.length > 0) {
+        await this.dbConnection
+          .getRepository(Notification)
+          .save(notificationsToSave);
+      }
+
+      // Send push notifications in bulk, ensuring different messages per recipient
+      if (pushNotifications.length > 0) {
+        for (const push of pushNotifications) {
+          await firebaseNotificationsService.sendPushNotification({
+            ...push,
+          });
+        }
+      }
+      return { success: true, message: "Notifications sent successfully." };
+    } catch (error) {
+      console.log("🚀 ~ NotificationService ~ error:", error);
+    }
   }
 
   async getAllNotifications(
