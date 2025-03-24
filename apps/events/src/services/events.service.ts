@@ -750,6 +750,7 @@ export class EventsService {
             .userService()
             .getUserWithRolesByEmail(collaboratorDto.email);
           user = response?.data;
+          // console.log('user', user)
         } catch (e) {}
         const roleEntity = roleMap.get(collaboratorDto.role);
         if (!roleEntity) {
@@ -774,7 +775,11 @@ export class EventsService {
                 .userService()
                 .getUserWithRolesByEmail(collaboratorDto.email)
             )?.data;
-          } catch (e) {}
+            // console.log("🚀 ~ user: new collab", user)
+            
+          } catch (e) {
+            // console.log('while creating new collab', e)
+          }
         }
         // Assign role to user if not already assigned.
         const hasRole = user.roles.some(
@@ -1450,6 +1455,10 @@ export class EventsService {
         "tickets",
         "guests",
         "restrictedInvites",
+        "featuredEventSection",
+        "csvUploads",
+        "signupForms",
+        "notifications"
       ],
     });
     if (!event) throw new NotFoundError("Event was not found!");
@@ -1595,6 +1604,8 @@ export class EventsService {
       const newCollaborators = collaborators.filter(
         (c) => c.action === "create"
       );
+      // console.log("🚀 ~ newCollaborators:", newCollaborators)
+      
       if (newCollaborators.length > 0) {
         await this.insertCollaboratorsWithTransaction(
           newCollaborators,
@@ -1752,6 +1763,8 @@ export class EventsService {
               .userService()
               .getUserWithRolesByEmail(collaborator.email)
           )?.data;
+          // console.log("🚀 ~ user:", user)
+          
         } catch (e) {}
         userMap.set(collaborator.email, user);
 
@@ -2456,7 +2469,7 @@ export class EventsService {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
+//Imp Note: backend is expecting publish date should come everytime from frontend
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.id, deletedAt: IsNull() },
@@ -2513,7 +2526,7 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (event.publishDate != undefined || event.publishDate !== null) {
+      if (payload.publishDate != undefined || payload.publishDate !== null) {
         event.publishDate = payload.publishDate
           ? new Date(payload.publishDate)
           : null;
@@ -4353,7 +4366,7 @@ export class EventsService {
         `COUNT(guest.id) AS totalCount`,
       ])
       .where(
-        "(guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.added_by_id IS NULL))",
+        "(guest.event_id = :eventId)",
         {
           eventId,
           userId,

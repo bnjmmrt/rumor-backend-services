@@ -117,17 +117,18 @@ export class Event extends RumorBaseEntity {
 
   @ManyToOne(() => FeaturedEventSection, (featuredEventSection) => featuredEventSection.events, {
     nullable: true,
-    onDelete: 'SET NULL',
+    cascade: true, 
+    onDelete: 'CASCADE'
   })
   featuredEventSection: FeaturedEventSection;
 
-  @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.event)
+  @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.event, {cascade: true, onDelete: 'CASCADE' })
   csvUploads: CsvUploadRecords[];
 
   @OneToMany(() => EventSignupForms, (esf) => esf.event, { cascade: true, onDelete: 'CASCADE' })
   signupForms: EventSignupForms[];
 
-  @OneToMany(() => Notification, (notification) => notification.linkedEvent)
+  @OneToMany(() => Notification, (notification) => notification.linkedEvent, { cascade: true, onDelete: 'CASCADE' })
   notifications: Notification[];
 
 }

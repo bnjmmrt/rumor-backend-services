@@ -630,6 +630,7 @@ export interface GuestDetail {
   guestId: string;
   userId: string;
   ticketType?: string | undefined;
+  ticketTypeId?: string | undefined;
   maxAdditionalGuests?: number | undefined;
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;

@@ -7,7 +7,10 @@ import { Event } from './event.entity';
 @Entity()
 export class CsvUploadRecords extends RumorBaseEntity {
   @Index()
-  @ManyToOne(() => Event, (event) => event.csvUploads, { nullable: true, cascade: true })
+  @ManyToOne(() => Event, (event) => event.csvUploads, {
+    nullable: true, onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
   @JoinColumn({ name: 'event_id' })
   event: Event | null; // Nullable for cases where it's user upload
 

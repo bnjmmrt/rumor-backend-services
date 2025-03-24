@@ -24,10 +24,6 @@ class NotificationService {
 
     // Fetch notification template
     const notificationTemplate = getNotificationDetails(notificationType);
-    console.log(
-      "🚀 ~ NotificationService ~ notificationTemplate:",
-      notificationTemplate
-    );
     if (!notificationTemplate) {
       throw new Error(`Invalid notification type: ${notificationType}`);
     }
