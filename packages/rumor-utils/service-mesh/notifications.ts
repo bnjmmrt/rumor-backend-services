@@ -15,3 +15,5 @@ export const sendEmailFromTemplate = (dynamicData, template: string, to: string[
 export const getTemplateById = (id: string) => apiService.getApi().get(`/auth/validate`);
 
 export const sendPushNotification = (tokens: string[], title: string, body: string) => apiService.getApi().post(`/auth/validate`, { tokens, title, body });
+
+export const sendNotification = (notificationType:string, recipients: string|string[], linkedEventId?:string, linkedUserId?:string) => apiService.getApi().post(`/notification`,{notificationType, recipients, linkedEventId, linkedUserId});

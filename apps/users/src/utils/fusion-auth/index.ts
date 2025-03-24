@@ -37,6 +37,37 @@ class AuthMiddleware {
       }
     };
 
+    fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const authorization = req.header("Authorization");
+        if (!authorization) {
+          next();
+          return;
+        }
+
+        const tokenParts = authorization.split("Bearer ");
+        if (tokenParts.length < 2) {
+            res.status(401).send("Unauthorized");
+            return;
+        }
+        const token = tokenParts[1];
+
+        const response = await this.validate({ token });
+
+        if (!response || !response.userId) {
+            res.status(401).send("Unauthorized");
+            return;
+        }
+
+        (req as any).user = response.userId;
+        (req as any).token = token;
+
+        next();
+      } catch (error) {
+        res.send(new AuthorizationError(`Authorization Error : ${error} `)).status(error);
+      }
+    };
+
     async validate({ token }: ValidateRequestDto): Promise<any> {
         try {
           const fusionAuthClient = new FusionAuthClient(config.get('FUSIONAUTH_API_KEY'),config.get('FUSIONAUTH_BASE_URL')); 

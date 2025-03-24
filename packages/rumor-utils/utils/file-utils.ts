@@ -52,14 +52,16 @@ function toCamelCase<T extends Record<string, unknown>>(obj: T): Record<string, 
   return newObj;
 }
 
-const isValidEmail = (email: string): boolean => {
+export const isValidEmail = (email: string): boolean => {
+  const trimmedEmail = email.trim();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(trimmedEmail);
 };
 
-const isValidPhoneNumber = (phoneNumber: string): boolean => {
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/; // Supports international E.164 format
-  return phoneRegex.test(phoneNumber);
+export const isValidPhoneNumber = (phoneNumber: string): boolean => {
+  const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
+  const phoneRegex = /^\+[1-9]\d{1,14}$/; // E.164 format
+  return phoneRegex.test(cleaned);
 };
 
 export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
@@ -88,18 +90,28 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
       if (!record.firstName) reasons.push('First Name is required');
       if (!record.lastName) reasons.push('Last Name is required');
 
-      // Email & Phone Validation
-      if (!record.email) {
-        reasons.push('Email is required');
-      } else if (!isValidEmail(record.email)) {
-        reasons.push('Invalid Email format');
-      }
+      const rawPhone = record.phoneNumber?.toString().trim() || '';
+      const rawEmail = record.email?.toString().trim() || '';
 
       if (isUploadUser) {
-        if (!record.phoneNumber) {
-          reasons.push('Phone Number is required');
-        } else if (!isValidPhoneNumber(record.phoneNumber)) {
-          reasons.push('Invalid Phone Number format');
+         // At least one of email or phone number must be present
+         if (!rawEmail && !rawPhone) {
+           reasons.push('Either Email or Phone Number is required');
+         }
+ 
+         if (rawEmail && !isValidEmail(rawEmail)) {
+           reasons.push('Invalid Email format');
+         }
+ 
+         if (rawPhone && !isValidPhoneNumber(rawPhone)) {
+             reasons.push('Invalid Phone Number format');
+           } 
+       } else {
+        // Email is mandatory
+        if (!rawEmail) {
+          reasons.push('Email is required');
+        } else if (!isValidEmail(rawEmail)) {
+          reasons.push('Invalid Email format');
         }
       }
 
@@ -107,6 +119,8 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
         record.reason = reasons.join(', ');
         garbageData.push(record);
       } else {
+        record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
+        record.email = rawEmail.trim();
         validData.push(record);
       }
     }

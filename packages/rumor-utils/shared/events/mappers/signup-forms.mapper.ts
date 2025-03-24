@@ -38,6 +38,8 @@ export const buildSignupFormsResponse = (
     userId: esf.createdBy.id,
     userName: `${esf.createdBy.firstName} ${esf.createdBy.lastName}`,
     userProfile: esf.createdBy.profilePicture,
+    companyName: companyName,
+    companyProfile: event.owner?.additionalHostInformation?.companyLogo,
     submissionCount: submissions,
     isActive: esf.isActive,
     isPublished: esf.isPublished,
@@ -49,6 +51,7 @@ export const buildSignupFormsResponse = (
     eventStatus: event.status,
     eventName: event.name,
     eventId: event.id,
+    limitOnePlus: event.limitOnePlus || 0
   };
   result.questions &&
     result.questions.sort((a, b) => {

@@ -116,8 +116,8 @@ export const toGuest = (
       : [],
     vouches: vouches?.length
       ? vouches.map((item) => {
-          return toVouchesData(item);
-        })
+        return toVouchesData(item);
+      })
       : [],
     email: guest?.user?.email,
     privateGuestNote: guest?.privateGuestNote,
@@ -150,16 +150,22 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
   };
 };
 
-export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
+export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData, isSpammedByHost?: boolean): GuestData => {
   let addedBy, addedByPicture, declinedBy, declinedByPicture;
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   if (guest.event.owner.id === guest.addedBy?.id) {
     addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
     addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
-    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
-    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
   } else {
     addedBy = `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`.trim();
     addedByPicture = guest.addedBy?.profilePicture || '';
+  }
+
+  if (guest.event.owner.id === guest.declinedBy?.id) {
+    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
+    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
     declinedBy = `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`.trim();
     declinedByPicture = guest.declinedBy?.profilePicture || '';
   }
@@ -182,13 +188,14 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     age: calculateAge(user.dateOfBirth),
     address: user.address,
     interest: user.interests || [],
-    followsYou,
-    favorite,
+    isFollow: followsYou,
+    isFavorite: favorite,
     addedBy,
     addedByPicture,
     declinedBy,
     declinedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    rejectedReason: guest.rejectedReason,
+    invitationSource: UserSource[invitationSourceNumber],
     status: guest.status,
     categories: focuses.map((focus) => focus.name),
     guestId: guest.id,
@@ -196,6 +203,8 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     additionalGuests: additionalGuestData,
     checkIn: guest.checkIn,
     addedById: guest.addedBy?.id,
+    declinedById: guest.declinedBy?.id,
+    isSpammedByHost: isSpammedByHost
   };
 };
 

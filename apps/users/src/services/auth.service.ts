@@ -48,6 +48,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -182,6 +183,8 @@ import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interfac
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from "csv-stringify";
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb'
+import {isValidPhoneNumber} from 'rumor-utils/utils/file-utils';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -368,11 +371,11 @@ export class AuthService {
       const registrationRequest: RegistrationRequest = {
         registration: {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
-          username: payload.email.split('@')[0],
+          username: payload.email,
         },
         sendSetPasswordEmail: false,
         user: {
-          username: payload.email.split('@')[0],
+          username: payload.email,
           birthDate: payload.dateOfBirth,
           email: payload.email,
           firstName: payload.firstName,
@@ -413,7 +416,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email], // Send email to the member
+        [newUser.email.trim()], // Send email to the member
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -440,6 +443,32 @@ export class AuthService {
 
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ memberSignUp ~ error:", error)
+    }
 
     return {
       id: savedUser.id,
@@ -495,7 +524,7 @@ export class AuthService {
 
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: "host" },
-      UserSource.REQUEST_IN_APP
+      UserSource.HOST_APPLICATION
     );
 
     // Micro-service call
@@ -509,7 +538,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email],
+        [payload.email.trim()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -528,6 +557,31 @@ export class AuthService {
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map((user) => user.id);
+  
+      if(adminUserIds.length > 0)
+      await serviceMesh.notificationService().sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
+  
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ hostSignUp ~ error:", error)
+    }
     return '';
   }
 
@@ -701,7 +755,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email],
+        [payload.email.trim()],
         null,
         // this.logger,
       );
@@ -722,7 +776,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email],
+        [payload.email.trim()],
         null,
       );
       if (!mailServiceResponse) {
@@ -900,11 +954,20 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-        if (!success) {
-          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+          await serviceMesh
+            .notificationService()
+            .sendTextMessage(cleanedNumber, message);
+        } else {
+          // Log the issue and exit early (no throw)
+          console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+          return; // or just skip sending, depending on your function structure
         }
-      } catch (error) { }
+      } catch(err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
     }
 
     if (payload.email) {
@@ -924,7 +987,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
+        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
         if (!success) {
           throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
         }
@@ -975,7 +1038,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
+      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
       if (!success) {
         throw new BadRequestError('An error occured while sending Email invitation, please try again.')
       }
@@ -1139,19 +1202,33 @@ export class AuthService {
         await serviceMesh.notificationService().sendEmailFromTemplate(
           [
             {
-              key: 'first_name',
+              key: 'code',
               value: code.response.code,
             },
           ],
-          'Host Application Submitted',
-          [payload.email],
+          'Non-Member Verify Email',
+          [payload.email.trim()],
           null,
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
         if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
           const message = 'Your Rumor verification code: ' + code.response.code;
-          serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+          try {
+            const validateNumber = isValidPhoneNumber(payload.phoneNumber) 
+            if (validateNumber) {
+              const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '')
+              await serviceMesh
+                .notificationService()
+                .sendTextMessage(cleanedNumber, message);
+            } else {
+              // Log the issue and exit early (no throw)
+              console.log(`⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`);
+              return; // or just skip sending, depending on your function structure
+            }
+          } catch(err) {
+            console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+          }
         }
       }
     } catch (error) { }
@@ -1183,7 +1260,7 @@ export class AuthService {
     if (payload.isDeactivated && user.isDeactivated) {
       this.reactivateUserAccount({ email: user.email })
     }
-    
+
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
       try {
@@ -1343,11 +1420,20 @@ export class AuthService {
       throw new NotFoundError('Host');
     }
 
+    let authenticatedUser = null
     const request: LoginRequest = {
       loginId: user.email,
       password: payload.password,
     };
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    try {
+      authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+    }
+    catch (e) {
+      throw new BadRequestError('Invalid email or password');
+    }
+    if (!authenticatedUser) {
+      throw new BadRequestError('Invalid email or password');
+    }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
@@ -1734,11 +1820,18 @@ export class AuthService {
           },
         ],
         'Member Approved into Rumor',
-        [user.email],
+        [user.email.trim()],
         null,
       );
     } catch (error) { }
 
+    try {
+      // Send Notification
+      serviceMesh.notificationService().sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ approveMember ~ error:", error)
+    }
+    
     return responses.ok;
   }
 
@@ -1787,6 +1880,11 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
+      if (payload.status === UserStatus.WAITLISTED) {
+        // Make him non-member
+        continue;
+      }
+
       const userRole = userRoles.find((ur) => ur.user.id === user.id);
       const nonMemberUserRole = userRoles.find(
         (ur) => ur.user.id === user.id && ur.role.name === "non_member"
@@ -1849,7 +1947,7 @@ export class AuthService {
                 },
               ],
               'Member Approved into Rumor',
-              [user.email], // Send email to the approved member
+              [user.email.trim()], // Send email to the approved member
               null,
             );
           }
@@ -2493,9 +2591,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = true;
+        return userData;
       }),
     );
     return { result: users, totalCount };
@@ -2647,6 +2747,13 @@ export class AuthService {
     }
     user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
 
+    let existingMapping = null;
+    if (user) {
+      existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { host: { id: payload.id }, user: { id: user.id } },
+      });
+    }
+
     const newUser: User | null = new User();
     if (!user) {
       newUser.email = payload.email ?? '';
@@ -2656,6 +2763,18 @@ export class AuthService {
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const newMapping = new HostUserMapping();
+      newMapping.user = user;
+      newMapping.host = { id: payload.id } as User;
+      await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+    } else {
+      if (!existingMapping) {
+        const newMapping = new HostUserMapping();
+        newMapping.user = user;
+        newMapping.host = { id: payload.id } as User;
+        await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+      }
     }
 
     return toSimpleUser(user);
@@ -2770,7 +2889,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email],
+          [payload.email.trim()],
           null,
         );
       } else {
@@ -2782,7 +2901,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email],
+          [payload.email.trim()],
           null,
         );
       }
@@ -3346,12 +3465,12 @@ export class AuthService {
     const registrationRequest: RegistrationRequest = {
       registration: {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
+        username: payload.email,
       },
       sendSetPasswordEmail: false,
       user: {
         id: user.id,
-        username: payload.email.split('@')[0],
+        username: payload.email,
         // birthDate: payload.dateOfBirth,
         email: payload.email,
         firstName: payload.firstName,
@@ -3540,93 +3659,162 @@ export class AuthService {
   }
 
   public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
-    const users = await this.dbConnection.getRepository(User).find({
-      where: { id: In(payload.ids) },
-      relations: ['roles', 'roles.role'],
-    });
+    try {
+      const users = await this.dbConnection.getRepository(User).find({
+        where: { id: In(payload.ids) },
+        relations: ["roles", "roles.role"],
+      });
 
-
-    if (!users.length) {
-      throw new NotFoundError('Host')
-    }
-
-    const hostRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: {
-        id: In(users.flatMap((user) => user?.roles?.filter((role) => role.role.name === 'host' || role.role.name === 'co_host').map((role) => role.id))),
-      },
-    });
-
-    if (!hostRoles.length) throw new NotFoundError('valid hosts');
-
-    const skippedUsers: string[] = [];
-    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-
-    for (const user of users) {
-      const hostRole = hostRoles.find((role) => role.id === user.roles.find((r) => r.role.name === 'host' || r.role.name === 'co_host')?.id);
-
-      if (!hostRole) continue;
-
-
-      // If changing to WAITLIST, prevent already approved users from being waitlisted
-      if (
-        newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
-        hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
-      ) {
-        skippedUsers.push(user.email);
-        continue;
+      if (!users.length) {
+        throw new NotFoundError("Host");
       }
 
-      hostRole.status = newUserStatusTosUserStatus[payload.status];
+      const hostRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          id: In(
+            users.flatMap((user) =>
+              user?.roles
+                ?.filter(
+                  (role) =>
+                    role.role.name === "host" || role.role.name === "co_host"
+                )
+                .map((role) => role.id)
+            )
+          ),
+        },
+      });
 
-      if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.APPROVE]) {
-        const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
-        if (users.response.total === 0) {
-          await this.approveHost(user);
-          const token = await this.generateToken(user);
+      if (!hostRoles.length) throw new NotFoundError("valid hosts");
+
+      const skippedUsers: string[] = [];
+      const emailsToSend: { email: string; subject: string; data: any[] }[] =
+        [];
+
+      for (const user of users) {
+        const hostRole = hostRoles.find(
+          (role) =>
+            role.id ===
+            user.roles.find(
+              (r) => r.role.name === "host" || r.role.name === "co_host"
+            )?.id
+        );
+
+        if (!hostRole) continue;
+
+        // If changing to WAITLIST, prevent already approved users from being waitlisted
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+            newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+          hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          skippedUsers.push(user.email);
+          continue;
+        }
+
+        hostRole.status = newUserStatusTosUserStatus[payload.status];
+
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          const users = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .searchUsersByIds([user.id]);
+          if (users.response.total === 0) {
+            await this.approveHost(user);
+            const token = await this.generateToken(user);
+            emailsToSend.push({
+              email: user.email,
+              subject: "Host Application Approved",
+              data: [
+                { key: "first_name", value: user.firstName },
+                {
+                  key: "company_name",
+                  value:
+                    user.additionalHostInformation?.companyName ??
+                    user.firstName,
+                },
+                {
+                  key: "password_token",
+                  value: config.get("RUMOR_WEBSITE_HOST") + `token/${token}`,
+                },
+              ],
+            });
+          }
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.WAITLIST]
+        ) {
           emailsToSend.push({
             email: user.email,
-            subject: 'Host Application Approved',
+            subject: "Host Application Denied",
+            data: [],
+          });
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]
+        ) {
+          const today = new Date();
+          const afterThirtyDays = new Date(
+            today.getFullYear(),
+            today.getMonth() + 1,
+            today.getDate()
+          );
+          const fullMonthName = afterThirtyDays.toLocaleString("default", {
+            month: "long",
+          });
+          const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+          emailsToSend.push({
+            email: user.email,
+            subject: "Account Deactivated",
             data: [
-              { key: 'first_name', value: user.firstName },
-              { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
-              { key: 'password_token', value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}` },
+              { key: "first_name", value: user.firstName },
+              {
+                key: "activate_before_datetime",
+                value: reactivateBeforeTimestamp,
+              },
             ],
           });
         }
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST]) {
-        emailsToSend.push({ email: user.email, subject: 'Host Application Denied', data: [] });
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]) {
-        const today = new Date();
-        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-        emailsToSend.push({
-          email: user.email,
-          subject: 'Account Deactivated',
-          data: [
-            { key: 'first_name', value: user.firstName },
-            { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-          ],
-        });
       }
-    }
 
-    await this.dbConnection.getRepository(UserRole).save(hostRoles);
+      await this.dbConnection.getRepository(UserRole).save(hostRoles);
 
-    // Send all emails in parallel
-    try {
-      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
-    } catch (error) { }
-    // if (skippedUsers.length > 0) {
-    //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
-    // }
+      // Send all emails in parallel
+      try {
+        await Promise.all(
+          emailsToSend.map((email) =>
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim()],
+                null
+              )
+          )
+        );
+      } catch (error) {}
+      // if (skippedUsers.length > 0) {
+      //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
+      // }
 
-    return {
-      updatedUsers: users.map(user => ({
-        id: user.id,
-        status: hostRoles.find(role => role.id === user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id)?.status ?? null,
-      })),
-      skippedUsers,
+      return {
+        updatedUsers: users.map((user) => ({
+          id: user.id,
+          status:
+            hostRoles.find(
+              (role) =>
+                role.id ===
+                user.roles.find(
+                  (r) => r.role.name === "host" || r.role.name === "co_host"
+                )?.id
+            )?.status ?? null,
+        })),
+        skippedUsers,
+      };
+    } catch (err: any) {
+      throw new NotFoundError(`Host Status Updates failed:: ${err.message}`);
     }
   }
 
@@ -3640,12 +3828,12 @@ export class AuthService {
     const registrationRequest: RegistrationRequest = {
       registration: {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email.split('@')[0],
+        username: user.email,
       },
       sendSetPasswordEmail: false,
       user: {
         id: user.id,
-        username: user.email.split('@')[0],
+        username: user.email,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -3719,7 +3907,6 @@ export class AuthService {
       userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
     }
 
-    console.log("userRole", userRole)
     // Micro-service call
     const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
 
@@ -4361,6 +4548,29 @@ export class AuthService {
     return '';
   }
 
+  public static async manageMultipleUsersSpam(payload: ManageMulipleUsersRequestDto): Promise<string> {
+    const { id: hostId, isSpam, userIds } = payload;
+
+    // Validate Host Exists
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: hostId } });
+    if (!host) {
+      throw new NotFoundError('Host');
+    }
+
+    // Prepare settings for upsert
+    const settings = userIds.map((userId) => ({
+      host: { id: hostId },
+      user: { id: userId },
+      isSpam,
+    }));
+
+    // Perform upsert operation
+    await this.dbConnection.getRepository(HostUserSettings)
+      .upsert(settings, ['host', 'user']);
+
+    return '';
+  }
+
   /**
    * Reports a user by storing a report record with associated role IDs.
    * @param payload - The DTO containing report details.
@@ -4400,6 +4610,8 @@ export class AuthService {
       reportedByRoleId: reportedByRole.id,
       reportedToRoleId: reportedToRole.id,
     };
+
+    
 
     return data;
   }
@@ -4534,7 +4746,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email],
+        [user.email.trim()],
         null,
       );
     } catch (error) { }

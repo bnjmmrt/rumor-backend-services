@@ -481,7 +481,11 @@ router.get(
 );
 
 //Vouches
-router.post("/events/vouch-requests", AuthMiddleware.fusionAuthRequired, VouchRequestController.createVouchRequest); /**TestStatus: working */
+router.post(
+  "/events/vouch-requests",
+  AuthMiddleware.fusionAuthRequired,
+  VouchRequestController.createVouchRequest
+); /**TestStatus: working */
 router.get(
   "/events/vouch-requests",
   AuthMiddleware.fusionAuthRequired,
@@ -518,24 +522,23 @@ router.post(
   EventsController.toggleGuestCheckStatus
 );
 
-
 router.get(
   "/featured-events-sections",
   AuthMiddleware.fusionAuthRequired,
   FeaturedEventSectionsController.featuredEventSections
-)
+);
 
 router.post(
   "/event/featured-events-sections",
   AuthMiddleware.fusionAuthRequired,
   FeaturedEventSectionsController.createFeaturedEventSection
-)
+);
 
 router.delete(
   "/event/featured-events-sections/:id",
   AuthMiddleware.fusionAuthRequired,
   FeaturedEventSectionsController.deleteFeaturedEventSection
-)
+);
 
 router.get(
   "/guest/event/:id/export",
@@ -543,8 +546,5 @@ router.get(
   GuestController.exportCsv
 );
 
-router.delete(
-  "/delete-host-events/:id",
-  EventsController.deleteHostEvents
-)
+router.delete("/delete-host-events/:id", EventsController.deleteHostEvents);
 export default router;

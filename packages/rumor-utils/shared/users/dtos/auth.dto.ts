@@ -729,6 +729,20 @@ export class ManageUserRequestDto implements AddHostUserSettingsRequest {
   isSpam: boolean;
 }
 
+export class ManageMulipleUsersRequestDto {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsBoolean()
+  isSpam: boolean;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  userIds: string[];
+}
+
 export class ReportUserRequestDto implements ReportRequest {
   @IsUUID()
   @IsNotEmpty()

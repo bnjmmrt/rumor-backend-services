@@ -3,29 +3,32 @@ import { PushNotificationPayload } from './firebase-notifications.interface';
 import config from '../../config'
 
 class FirebaseNotificationsService {
-  async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
-    firebase.initializeApp({
-      credential: firebase.credential.cert({
-        projectId: config.get('FIREBASE_PROJECT_ID'), 
-        clientEmail: config.get('FIREBASE_CLIENT_EMAIL'),
-        privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, "\n"),
-      }),
-    });
+  private static app: firebase.app.App | null = null;
 
+  private getFirebaseApp(): firebase.app.App {
+    if (!FirebaseNotificationsService.app) {
+      FirebaseNotificationsService.app = firebase.initializeApp({
+        credential: firebase.credential.cert({
+          projectId: config.get('FIREBASE_PROJECT_ID'),
+          clientEmail: config.get('FIREBASE_CLIENT_EMAIL'),
+          privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, "\n"),
+        }),
+      });
+    }
+    return FirebaseNotificationsService.app;
+  }
+
+
+  async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
     try {
-      const response = await firebase.messaging().sendEachForMulticast({
+      const firebaseApp = this.getFirebaseApp();
+      const response = await firebaseApp.messaging().sendEachForMulticast({
         tokens: payload.tokens,
-        webpush: {
-          notification: {
-            title: payload.title,
-            body: payload.body,
-            image: payload.image
-          },
-        },
+        data: { ...payload.data },
         notification: {
           title: payload.title, 
           body: payload.body,
-          imageUrl: payload.image
+          imageUrl: payload.image,    
         },
       });
 

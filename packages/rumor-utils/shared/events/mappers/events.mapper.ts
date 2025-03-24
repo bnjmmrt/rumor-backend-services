@@ -20,9 +20,9 @@ export const toEvent = (
   const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest, memberUserId);
   const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
   // const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
-  const eventStatus: EventStatusEnum = predefinedStatuses.includes(EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum])
-    ? EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum]
-    : formatEventStatusToEventStatusEnum(event);
+  const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
+  ? event.status
+  : formatEventStatusToEventStatusEnum(event);
   const location = event.location ? { ...event.location, placeId: event.location.googlePlaceId } : undefined;
   const ownerDetails = {
     ...event.owner,
@@ -128,8 +128,8 @@ export const groupCollaborators = (
 
 export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentUserId?: string): GuestEventData => {
   const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
-  const eventStatus: EventStatusEnum = predefinedStatuses.includes(EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum])
-  ? EventStatusEnum[EventStatus[event.status] as unknown as keyof typeof EventStatusEnum]
+  const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
+  ? event.status
   : formatEventStatusToEventStatusEnum(event);
   return {
     description: event.description || '',
@@ -150,6 +150,7 @@ export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentU
     publishDate: event.publishDate ? formatDateFromDB(event.publishDate) : '',
     autoPublished: !event.publishDate,
     isPrivate: event.isPrivate || false,
+    timeZone: event?.timeZone,
     guest: currentGuest
       ? {
           guestId: currentGuest.id,

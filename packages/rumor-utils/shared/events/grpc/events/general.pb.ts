@@ -19,6 +19,7 @@ export enum UserSource {
   REQUEST_IN_APP = 4,
   PLUS_1 = 5,
   UNRECOGNIZED = -1,
+  HOST_APPLICATION = 6,
 }
 
 export enum EventStatus {
@@ -431,11 +432,11 @@ export interface GuestData {
   age?: number | undefined;
   address?: AddressGuest | undefined;
   interest: InterestData[];
-  followsYou?: boolean | undefined;
-  favorite?: boolean | undefined;
+  // followsYou?: boolean | undefined;
+  // favorite?: boolean | undefined;
   roles: UserRoleComplete[];
   addedBy?: string | undefined;
-  invitationSource: UserSource;
+  invitationSource: string;
   categories: string[];
   userId?: string | undefined;
   guestId?: string | undefined;
@@ -445,6 +446,11 @@ export interface GuestData {
   additionalGuests: AdditionalGuest[];
   checkIn?: boolean | undefined;
   addedById?: string | undefined;
+  declinedById?: string | undefined;
+  isSpammedByHost?: boolean | undefined;
+  rejectedReason?: string | undefined;
+  isFollow?: boolean | undefined;
+  isFavorite?: boolean | undefined;
 }
 
 export interface GuestDataSimple {
@@ -547,6 +553,7 @@ export interface GuestEventData {
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
   autoPublished?: boolean | undefined;
+  timeZone?: string | undefined;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   guest?: GuestDataEvent | undefined;
@@ -623,10 +630,12 @@ export interface GuestDetail {
   guestId: string;
   userId: string;
   ticketType?: string | undefined;
+  ticketTypeId?: string | undefined;
   maxAdditionalGuests?: number | undefined;
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;
   inviteMessage?: string | undefined;
+  signupFormName?: string | undefined;
 }
 
 export interface GuestDetails {
@@ -681,6 +690,8 @@ export interface SignupFormsResponse {
   userId: string;
   userName: string;
   userProfile: string;
+  companyName: string;
+  companyProfile: string;
   description: string;
   hasAccessForAdditionalGuests: boolean;
   startDate: string;
@@ -695,6 +706,7 @@ export interface SignupFormsResponse {
   eventStatus: EventStatusEnum;
   eventName: string;
   eventId: string;
+  limitOnePlus: number;
 }
 
 export interface ISignupFormQuestionsRequest {

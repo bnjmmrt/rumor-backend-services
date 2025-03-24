@@ -6,7 +6,7 @@ import {
 import { IdRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
 import { ReferralCode } from "rumor-utils/shared/users/entities/referral-code.entity";
 import { ReferredUser } from "rumor-utils/shared/users/entities/referred-user.entity";
-import { IsNull } from "typeorm";
+import { Brackets, IsNull } from "typeorm";
 import { QueryParamRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
 import { parse } from "qs";
 import { toReferralCode } from "rumor-utils/shared/users/mappers/referral-code.mapper";
@@ -71,17 +71,20 @@ export class ReferralCodeService {
   ): Promise<ReferralCodeData[]> {
     const parsedQuery = parse(payload.query);
 
-    const deactivatedCodes =
-      parsedQuery?.deactivated && parsedQuery.deactivated === "true";
-
-    const queryBuilder =
-      this.dbConnection.getRepository(ReferralCode).createQueryBuilder("code");
+    const deactivatedCodes = parsedQuery?.deactivated && parsedQuery.deactivated === "true";  
+    const queryBuilder = this.dbConnection.getRepository(ReferralCode).createQueryBuilder("code");
 
     if (deactivatedCodes) {
       queryBuilder
         .where("code.isManuallyDeactivated = true")
-        .orWhere("code.expirationDate < CURRENT_DATE")
-        .orWhere("code.usageCount = code.usageLimit");
+        .andWhere(
+          new Brackets((qb) => {
+            qb.where("code.expirationDate >= CURRENT_DATE")
+            .orWhere("code.expirationDate IS NULL")
+            .orWhere("code.usageCount = code.usageLimit")
+            .orWhere("code.usageLimit = -1")
+          })
+        );
     } else {
       queryBuilder
         .where("code.isManuallyDeactivated = false")
@@ -94,7 +97,7 @@ export class ReferralCodeService {
     }
 
     const referralCodes = await queryBuilder.getMany();
-    return (referralCodes.map((code) => toReferralCode(code)))
+    return referralCodes.map((code) => toReferralCode(code));
   }
 
   public static async updateReferralCode(
@@ -155,6 +158,26 @@ export class ReferralCodeService {
     }
 
     referralCode.isManuallyDeactivated = true;
+    await this.dbConnection.getRepository(ReferralCode).save(referralCode);
+
+    return toReferralCode(referralCode);
+  }
+
+  public static async activateReferralCode(
+    payload: IdRequestDto
+  ): Promise<ReferralCodeData> {
+    const referralCode = await this.dbConnection.getRepository(ReferralCode).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
+
+    if (!referralCode) {
+      throw new BadRequestError('Referral code not found')
+    }
+
+    referralCode.isManuallyDeactivated = false;
     await this.dbConnection.getRepository(ReferralCode).save(referralCode);
 
     return toReferralCode(referralCode);
