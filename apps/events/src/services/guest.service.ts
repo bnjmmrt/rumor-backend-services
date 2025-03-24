@@ -1949,6 +1949,7 @@ export class GuestService {
           id: user?.id,
           firstName: user?.firstName,
           lastName: user?.lastName,
+          gender: user?.gender,
           guestId: additionalGuest?.id,
           addedBy: additionalGuest?.addedBy.id,
           addedByPicture: additionalGuest.addedBy
