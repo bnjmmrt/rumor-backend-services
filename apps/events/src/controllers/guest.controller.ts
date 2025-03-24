@@ -357,7 +357,7 @@ export class GuestController {
     async (req, res): Promise<void> => {
       const payload: UserAndIdRequestDto = {
         id: req.params.id,
-        userid: (req as any).user,
+        userId: (req as any).user,
         ...req.body
       }
       const response: GuestDetails = await GuestService.getGuestDetails(payload);
