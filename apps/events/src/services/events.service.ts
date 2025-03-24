@@ -733,6 +733,15 @@ export class EventsService {
           relations: ["ticketType", "user"],
         }
       );
+      //Validate duplicate collaborators
+      const existingEmails = new Set(existingCollaborators.map(collab => collab.user.email));
+
+      for (const { email } of collaboratorsDto) {
+        if (existingEmails.has(email)) {
+          throw new BadRequestError(`Duplicate collaborator found: ${email}`);
+        }
+      }
+      //ends here
 
       // Create a Set to track existing (userId, eventId, ticketTypeId) combinations
       const existingCollaboratorSet = new Set(
@@ -750,7 +759,6 @@ export class EventsService {
             .userService()
             .getUserWithRolesByEmail(collaboratorDto.email);
           user = response?.data;
-          // console.log('user', user)
         } catch (e) {}
         const roleEntity = roleMap.get(collaboratorDto.role);
         if (!roleEntity) {
@@ -775,10 +783,7 @@ export class EventsService {
                 .userService()
                 .getUserWithRolesByEmail(collaboratorDto.email)
             )?.data;
-            // console.log("🚀 ~ user: new collab", user)
-            
           } catch (e) {
-            // console.log('while creating new collab', e)
           }
         }
         // Assign role to user if not already assigned.
@@ -1591,7 +1596,7 @@ export class EventsService {
       }
 
       // Step 1: Validate that there are no duplicate emails in create/update actions
-      await this.validateCollaboratorEmails(collaborators);
+      await this.validateCollaboratorEmails(collaborators, event);
 
       // Step 2: Process existing collaborators (update/delete)
       await this.processExistingCollaborators(
@@ -1604,8 +1609,6 @@ export class EventsService {
       const newCollaborators = collaborators.filter(
         (c) => c.action === "create"
       );
-      // console.log("🚀 ~ newCollaborators:", newCollaborators)
-      
       if (newCollaborators.length > 0) {
         await this.insertCollaboratorsWithTransaction(
           newCollaborators,
@@ -1622,7 +1625,7 @@ export class EventsService {
    * Ensures no duplicate emails exist in 'create' or 'update' actions.
    */
   private static validateCollaboratorEmails(
-    collaborators: UpdateCollaboratorDto[]
+    collaborators: UpdateCollaboratorDto[], event: Event,
   ): void {
     const emailSet = new Set<string>();
 
@@ -1631,6 +1634,9 @@ export class EventsService {
         collaborator.action === "create" ||
         collaborator.action === "update"
       ) {
+        if (event.owner?.email === collaborator.email) {
+          throw new BadRequestError("Owner is already a collaborator");
+        }
         if (emailSet.has(collaborator.email)) {
           throw new Error(`Duplicate email detected: ${collaborator.email}`);
         }
@@ -1667,16 +1673,13 @@ export class EventsService {
     let users = [];
     // const rolesTofind = collaborators.map(c => roleMap.get(collaboratorRoleToEntity[c.role]).name);
     try {
-      users = (
-        await Promise.all(
-          collaborators.map(
-            async (c) =>
-              (
-                await serviceMesh.userService().getUserWithRolesByEmail(c.email)
-              )?.data
-          )
-        )
-      ).filter((node) => node);
+      const userDataFromDb = await Promise.allSettled(
+        collaborators.map(async (c) => (await serviceMesh.userService().getUserWithRolesByEmail(c.email))?.data)
+      );
+      // Filter only fulfilled results and extract the values
+      users = userDataFromDb
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => (result as PromiseFulfilledResult<any>).value); // Ensure TypeScript understands this
     } catch (e) {}
     const roleNames = collaborators.map((c) => c.role);
     if (roleNames.length === 0) {
@@ -1763,14 +1766,13 @@ export class EventsService {
               .userService()
               .getUserWithRolesByEmail(collaborator.email)
           )?.data;
-          // console.log("🚀 ~ user:", user)
-          
         } catch (e) {}
         userMap.set(collaborator.email, user);
 
         //update collaboartor
         const tickets = collaborator.tickets;
         // Process tickets for the collaborator.
+        let updatedCollabSet = new Set();
         for (const ticket of tickets) {
           //should not insert for deleted tickets
           if (ticket.action === "delete") {
@@ -1791,6 +1793,8 @@ export class EventsService {
               `Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`
             );
           }
+          const collaboratorKey = `${user.id}-${ticketType?.id}-${eventId}`;
+          if (!updatedCollabSet.has(collaboratorKey)) {
           collaboratorsToInsert.push(
             createCollaboratorEntity(
               user.id,
@@ -1802,6 +1806,8 @@ export class EventsService {
             )
           );
         }
+        updatedCollabSet.add(collaboratorKey);
+       }
         //TODO: if no tickets the also it should do entry with null tickettype id
       }
       const roleEntity: any = roleMap.get(collaborator.role); //TODO: this is duplicate line
@@ -1936,8 +1942,9 @@ export class EventsService {
           } else if (ticket.action === "create") {
             const ticketName = normalizeCatalogName(ticket.name);
             const ticketType = ticketTypeMap.get(ticketName);
-            if (!ticketType)
+            if (!ticketType){
               throw new Error(`Ticket type ${ticket.name} not found.`);
+            }
             // Check if a collaborator already exists
             const collaboratorKey = `${user.id}-${ticketType?.id}-${eventId}`;
 
