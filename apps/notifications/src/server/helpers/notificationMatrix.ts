@@ -50,6 +50,17 @@ let notificationMatrix = {
     action:"Invite Received",
     image: "linkedEvent.imageFlyer"
   },
+  eventInvitationNonMember:{
+    pushMessage: "",
+    appMessage: "[Linked User Name] invited you to attend [Event Name] ",
+    appNotification: true,
+    pushNotification: false,
+    body: { eventId: "" },
+    linkedUser: "",
+    linkedEvent: "",
+    action:"Event Invite Received ",
+    image: "linkedEvent.imageFlyer"
+  },
   eventPosted: {
     pushMessage: "[Linked User Name] just posted a new event. Check it out now. ",
     appMessage: "[Linked User Name] just published a new event [Event Name]",
