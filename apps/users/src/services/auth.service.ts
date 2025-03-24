@@ -1863,8 +1863,10 @@ export class AuthService {
     }
 
     const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
-    if (!memberRole) {
-      throw new NotFoundError('Role')
+    const nonMemberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } });
+
+    if (!memberRole || !nonMemberRole) {
+      throw new NotFoundError('Role');
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -1879,43 +1881,70 @@ export class AuthService {
     const failedUsers: string[] = [];
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
+    // for (const user of users) {
+    //   if (payload.status === UserStatus.WAITLISTED) {
+    //     // Make him non-member
+    //     continue;
+    //   }
+
+    //   const userRole = userRoles.find((ur) => ur.user.id === user.id);
+    //   const nonMemberUserRole = userRoles.find(
+    //     (ur) => ur.user.id === user.id && ur.role.name === "non_member"
+    //   );
+
+    //   if (nonMemberUserRole) {
+    //     usersToUpdate.push({
+    //       userRole: nonMemberUserRole,
+    //       newStatus: payload.status,
+    //       newRole: memberRole,
+    //     });
+    //   }
+
+    //   if (userRole) {
+    //     usersToUpdate.push({ userRole, newStatus: payload.status });
+    //   }
+
+    //   // if (payload.status === UserStatus.WAITLISTED) {
+    //   // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
+    //   //   console.error(`User ${user.id} is active and cannot be waitlisted`);
+    //   //   failedUsers.push(user.id);
+    //   //   continue;
+    //   // }
+    //   // }
+    //   // if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+    //   //   usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
+    //   // }
+
+    //   // if (payload.status === UserStatus.DEACTIVATED && userRole) {
+    //   //   usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
+    //   // }
+    // }
+
     for (const user of users) {
+      const userRole = userRoles.find((ur) => ur.user.id === user.id);
+      const isCurrentlyNonMember = userRoles.some((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
+
       if (payload.status === UserStatus.WAITLISTED) {
-        // Make him non-member
+        // Assign "non_member" role on WAITLISTED status
+        if (!isCurrentlyNonMember) {
+          usersToUpdate.push({ userRole, newStatus: UserStatus.WAITLISTED, newRole: nonMemberRole });
+        }
         continue;
       }
 
-      const userRole = userRoles.find((ur) => ur.user.id === user.id);
-      const nonMemberUserRole = userRoles.find(
-        (ur) => ur.user.id === user.id && ur.role.name === "non_member"
-      );
-
-      if (nonMemberUserRole) {
-        usersToUpdate.push({
-          userRole: nonMemberUserRole,
-          newStatus: payload.status,
-          newRole: memberRole,
-        });
+      if (payload.status === UserStatus.ACTIVE) {
+        // Assign "member" role on ACTIVE status
+        if (isCurrentlyNonMember) {
+          usersToUpdate.push({ userRole, newStatus: UserStatus.ACTIVE, newRole: memberRole });
+        }
       }
 
-      if (userRole) {
-        usersToUpdate.push({ userRole, newStatus: payload.status });
+      if (payload.status === UserStatus.DEACTIVATED) {
+        // Only update status to DEACTIVATED, without changing roles
+        if (userRole) {
+          usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
+        }
       }
-
-      // if (payload.status === UserStatus.WAITLISTED) {
-      // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
-      //   console.error(`User ${user.id} is active and cannot be waitlisted`);
-      //   failedUsers.push(user.id);
-      //   continue;
-      // }
-      // }
-      // if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
-      //   usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
-      // }
-
-      // if (payload.status === UserStatus.DEACTIVATED && userRole) {
-      //   usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
-      // }
     }
 
     // Perform bulk updates only for valid users
