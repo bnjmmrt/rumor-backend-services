@@ -1,6 +1,6 @@
 import { RequestById, UserAndIdRequest } from '../grpc/events/events.pb';
 import { ParsedQs } from 'qs';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import {IsNotEmpty, IsOptional, IsString, IsUUID, isString, IsBoolean} from 'class-validator';
 
 
 export class RequestByIdDto implements RequestById {
@@ -17,6 +17,7 @@ export class UserAndIdRequestDto implements UserAndIdRequest {
   @IsOptional()
   @IsUUID()
   userId?: string;
+
 }
 
 export type PaginationQuery = {

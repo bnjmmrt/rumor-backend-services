@@ -1,76 +1,84 @@
-import { ParsedQs } from 'qs';
-import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest, RequestByUserAndEventRequest } from '../grpc/auth/shared.pb';
-import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
-import { UserStatus } from '../interfaces/shared.interface';
+import {ParsedQs} from 'qs';
+import {
+    TokenRequest,
+    PaginatedRequest,
+    UserAndIdRequest,
+    IdRequest,
+    RequestByUserAndEventRequest
+} from '../grpc/auth/shared.pb';
+import {IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString, IsBoolean} from 'class-validator';
+import {UserStatus} from '../interfaces/shared.interface';
 
 export class TokenRequestDto implements TokenRequest {
-  @IsString()
-  @IsNotEmpty()
-  token: string;
+    @IsString()
+    @IsNotEmpty()
+    token: string;
 }
 
 export class IdRequestDto implements IdRequest {
-  @IsUUID()
-  @IsNotEmpty()
-  id: string;
+    @IsUUID()
+    @IsNotEmpty()
+    id: string;
 }
 
 export class UserAndIdRequestDto implements UserAndIdRequest {
-  @IsUUID()
-  @IsNotEmpty()
-  userId: string;
+    @IsUUID()
+    @IsNotEmpty()
+    userId: string;
 
-  @IsUUID()
-  @IsNotEmpty()
-  id: string;
+    @IsUUID()
+    @IsNotEmpty()
+    id: string;
+
+
 }
 
 export class RequestByUserAndEventDto implements RequestByUserAndEventRequest {
-  @IsNotEmpty()
-  @IsUUID()
-  userId: string;
+    @IsNotEmpty()
+    @IsUUID()
+    userId: string;
 
-  @IsNotEmpty()
-  @IsUUID()
-  eventId: string;
+    @IsNotEmpty()
+    @IsUUID()
+    eventId: string;
 }
 
 export class PaginatedRequestDto implements PaginatedRequest {
-  @IsUUID()
-  @IsOptional()
-  userId: string;
-  @IsString()
-  @IsOptional()
-  query?: string;
+    @IsUUID()
+    @IsOptional()
+    userId: string;
+    @IsString()
+    @IsOptional()
+    query?: string;
 }
 
 export class ReportAndFeedbackRequestDto {
-  @IsString()
-  query: string;
+    @IsString()
+    query: string;
 }
 
 export type PaginationQuery = {
-  take: string;
-  skip: string;
+    take: string;
+    skip: string;
 };
 
 export class UpdateUsersStatusDto {
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  @IsNotEmpty()
-  ids: string[];
+    @IsArray()
+    @IsUUID(undefined, {each: true})
+    @IsNotEmpty()
+    ids: string[];
 
-  @IsNotEmpty()
-  status: UserStatus;
+    @IsNotEmpty()
+    status: UserStatus;
 }
 
 export const hasPagination = (query: ParsedQs | null): query is PaginationQuery => {
-  if (!query) return false;
-  if (typeof query !== 'object') return false;
-  const { take, skip } = query;
-  if (!isString(take)) return false;
-  if (isNaN(parseInt(take))) return false;
-  if (!isString(skip)) return false;
-  if (isNaN(parseInt(skip))) return false;
-  return true;
+    if (!query) return false;
+    if (typeof query !== 'object') return false;
+    const {take, skip} = query;
+    if (!isString(take)) return false;
+    if (isNaN(parseInt(take))) return false;
+    if (!isString(skip)) return false;
+    if (isNaN(parseInt(skip))) return false;
+    return true;
 };
