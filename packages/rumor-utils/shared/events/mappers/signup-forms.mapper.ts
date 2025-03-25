@@ -1,27 +1,20 @@
-import { Event } from "../entities";
-import { EventSignupForms } from "../entities/event-signup-forms.entity";
-import { SignupFormQuestions } from "../entities/signup-form-questions.entity";
-import {
-  CollaboratorsEvent,
-  SignupFormsResponse,
-} from "../grpc/events/general.pb";
-import { groupCollaborators } from "./events.mapper";
+import { Event } from '../entities';
+import { EventSignupForms } from '../entities/event-signup-forms.entity';
+import { SignupFormQuestions } from '../entities/signup-form-questions.entity';
+import { CollaboratorsEvent, SignupFormsResponse } from '../grpc/events/general.pb';
+import { groupCollaborators } from './events.mapper';
 
 export const buildSignupFormsResponse = (
   event: Event,
   esf: EventSignupForms,
   baseUrl: string,
-  submissions: number = 0
+  submissions: number = 0,
 ): SignupFormsResponse => {
-  const companyName: string = (
-    event.owner?.additionalHostInformation?.companyName || ""
-  )
-    .split(" ")
-    .join("");
-  const eventName: string = event.name.split(" ").join("");
-  const collaborators: CollaboratorsEvent[] = groupCollaborators(
-    event?.collaborators
-  );
+  const companyName: string = (event.owner?.additionalHostInformation?.companyName || '')
+    .split(' ')
+    .join('');
+  const eventName: string = event.name.split(' ').join('');
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators);
 
   const result: SignupFormsResponse = {
     id: esf.id,
@@ -45,13 +38,12 @@ export const buildSignupFormsResponse = (
     isPublished: esf.isPublished,
     description: esf.description,
     url: `${baseUrl}/${companyName}/${eventName}/${esf.urlCode}`,
-    questions:
-      (esf.questions && esf.questions.map((q) => buildQuestion(q))) || [],
+    questions: (esf.questions && esf.questions.map(q => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
     eventStatus: event.status,
     eventName: event.name,
     eventId: event.id,
-    limitOnePlus: event.limitOnePlus || 0
+    limitOnePlus: event.limitOnePlus || 0,
   };
   result.questions &&
     result.questions.sort((a, b) => {

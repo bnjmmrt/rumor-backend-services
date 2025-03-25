@@ -9,11 +9,11 @@ import {
   PutObjectCommandOutput,
   DeleteObjectCommandOutput,
   HeadObjectCommandOutput,
-} from "@aws-sdk/client-s3";
+} from '@aws-sdk/client-s3';
 
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import config from "../../config";
-import { AWSError } from "rumor-utils/errors";
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import config from '../../config';
+import { AWSError } from 'rumor-utils/errors';
 
 // // Multer-S3 Configuration for Direct Upload
 // export const upload = multer({
@@ -51,7 +51,7 @@ interface FileDataResponse {
 }
 
 export const humanFileSize = (size: number): string => {
-  const units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  const units = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
   let i = 0;
   while (size >= 1024 && i < units.length - 1) {
     size /= 1024;
@@ -66,13 +66,13 @@ class S3ServiceHandler {
   }
 
   public async uploadFile(payload: FilePayload): Promise<PutObjectCommandOutput> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 
@@ -84,7 +84,7 @@ class S3ServiceHandler {
       ContentType: contentType,
       Metadata: {
         type,
-        filename: filename ? filename.replace(/[^a-zA-Z0-9 .]/g, "") : fileKeyId ,
+        filename: filename ? filename.replace(/[^a-zA-Z0-9 .]/g, '') : fileKeyId,
         size: humanFileSize(size),
         contentType,
       },
@@ -98,13 +98,13 @@ class S3ServiceHandler {
   }
 
   public async removeFile(fileKeyId: string): Promise<DeleteObjectCommandOutput> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 
@@ -121,13 +121,13 @@ class S3ServiceHandler {
   }
 
   public async getFile(fileKeyId: string): Promise<HeadObjectCommandOutput> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 
@@ -144,13 +144,13 @@ class S3ServiceHandler {
   }
 
   public async updateFile(payload: FilePayload): Promise<PutObjectCommandOutput> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 
@@ -162,7 +162,7 @@ class S3ServiceHandler {
       ContentType: contentType,
       Metadata: {
         type,
-        filename: filename.replace(/[^a-zA-Z0-9 .]/g, ""),
+        filename: filename.replace(/[^a-zA-Z0-9 .]/g, ''),
         size: humanFileSize(size),
         contentType,
       },
@@ -176,13 +176,13 @@ class S3ServiceHandler {
   }
 
   public async getFileUrl(fileKey: string, expiresIn: number = 3600): Promise<string> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 
@@ -197,14 +197,18 @@ class S3ServiceHandler {
     }
   }
 
-  public async UploadFileUrl(fileKey: string, contentType: string, expiresIn: number = 3600): Promise<string> {
-    const bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+  public async UploadFileUrl(
+    fileKey: string,
+    contentType: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
+    const bucketName = config.get('BUCKET_DOCUMENTS_NAME');
 
     const s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
 

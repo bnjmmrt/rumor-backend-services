@@ -2,7 +2,11 @@ import { EventStatus, GuestStatus } from 'rumor-utils/shared/events/grpc/events/
 import { parse } from 'qs';
 // import { Gender } from 'rumor-utils/shared/events/utils/event.utils';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { CreateEventRequestDto, EventLocationDto, UpdateEventRequestDto } from 'rumor-utils/shared/events/dtos/events.dto';
+import {
+  CreateEventRequestDto,
+  EventLocationDto,
+  UpdateEventRequestDto,
+} from 'rumor-utils/shared/events/dtos/events.dto';
 import { Event, EventLocation } from 'rumor-utils/shared/entities';
 import { Gender } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
@@ -12,7 +16,9 @@ interface AddressComponent {
   types: string[];
 }
 
-export const getCityNameFromAddressComponents = (addressComponents: AddressComponent[]): string | undefined => {
+export const getCityNameFromAddressComponents = (
+  addressComponents: AddressComponent[],
+): string | undefined => {
   for (const component of addressComponents) {
     if (component.types.includes('locality')) {
       return component.long_name;
@@ -40,9 +46,15 @@ export const isValidUserGender = (gender: string): boolean => {
 
 export const validateFilters = (query: string): { error: boolean; response: string } => {
   const parsedFilters = parse(query);
-  const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-  const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-  const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+  const socialNetworkNames = parsedFilters?.socialNetworkNames
+    ? parsedFilters.socialNetworkNames
+    : undefined;
+  const followerCountFrom = parsedFilters?.followerCountFrom
+    ? parseInt(parsedFilters.followerCountFrom as string)
+    : undefined;
+  const followerCountTo = parsedFilters?.followerCountTo
+    ? parseInt(parsedFilters.followerCountTo as string)
+    : undefined;
   const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
   if (searchValue) {
     if (typeof searchValue !== 'string' || searchValue.length === 0) {
@@ -58,16 +70,24 @@ export const validateFilters = (query: string): { error: boolean; response: stri
       };
     }
     if (followerCountFrom > followerCountTo) {
-      return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
+      return {
+        error: true,
+        response: 'followerCountFrom must be less than or equal to followerCountTo.',
+      };
     }
 
     if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      const socialNetworkArray = socialNetworkNames
+        .split(',')
+        .map(name => name.trim().toUpperCase());
 
-      const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+      const invalidNames = socialNetworkArray.filter(name => !(name in SocialProviderType));
 
       if (invalidNames.length > 0) {
-        return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+        return {
+          error: true,
+          response: `Invalid social network names: ${invalidNames.join(', ')}`,
+        };
       }
 
       return { error: false, response: socialNetworkArray.join(',') };
@@ -82,15 +102,17 @@ export const validateFilters = (query: string): { error: boolean; response: stri
  * @param {CreateEventRequestDto} payload - The event data containing startDate, endDate, and optionally publishDate.
  * @returns {{ error: boolean; response?: string }} - Returns an error flag and an optional error message.
  */
-export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventRequestDto): { error: boolean; response?: string } => {
+export const validateEventDates = (
+  payload: CreateEventRequestDto | UpdateEventRequestDto,
+): { error: boolean; response?: string } => {
   const currentDate = new Date();
   /**added console to debug the dates issue if any on live server*/
-  console.log('\n',"validateEventDates --> user Time zone: ", payload.timeZone)
-  console.log('\n', "validateEventDates --> currentDate:   ", currentDate)
-  console.log(" validateEventDates --> payload.startDate:  ", payload.startDate)
-  console.log("validateEventDates --> payload.endDate:     ", payload.endDate)
-  console.log("validateEventDates --> payload.publishDate: ", payload.publishDate )
- 
+  console.log('\n', 'validateEventDates --> user Time zone: ', payload.timeZone);
+  console.log('\n', 'validateEventDates --> currentDate:   ', currentDate);
+  console.log(' validateEventDates --> payload.startDate:  ', payload.startDate);
+  console.log('validateEventDates --> payload.endDate:     ', payload.endDate);
+  console.log('validateEventDates --> payload.publishDate: ', payload.publishDate);
+
   if (!payload.startDate || !isUtcDate(payload.startDate)) {
     return { error: true, response: 'Start Date must be valid and in UTC standard' };
   }
@@ -119,7 +141,10 @@ export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventR
   }
 
   // Ensure the end date is later than the start date
-  if (!payload.endDate || new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()) {
+  if (
+    !payload.endDate ||
+    new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()
+  ) {
     return { error: true, response: 'End date must be later than the start date.' };
   }
   return { error: false }; // No errors found
@@ -177,7 +202,10 @@ export const isUtcDate = (dateString: string): boolean => {
  * @param existingEvent - The existing event details stored in the database.
  * @returns An object indicating whether changes exist and specifying which fields changed.
  */
-export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, existingEvent: Event): { changed: boolean; changes: string[] } {
+export function hasEventDateOrLocationChanged(
+  updatedDateAndLocation: any,
+  existingEvent: Event,
+): { changed: boolean; changes: string[] } {
   const changes: string[] = [];
 
   /**
@@ -192,8 +220,12 @@ export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, exist
     return normalizeDate(date1)?.toISOString() === normalizeDate(date2)?.toISOString();
   };
   // Convert possible string dates to Date objects
-  const newEventStartDate = updatedDateAndLocation.startDate ? new Date(updatedDateAndLocation.startDate) : existingEvent.startDate;
-  const newEventEndDate = updatedDateAndLocation.endDate ? new Date(updatedDateAndLocation.endDate) : existingEvent.endDate;
+  const newEventStartDate = updatedDateAndLocation.startDate
+    ? new Date(updatedDateAndLocation.startDate)
+    : existingEvent.startDate;
+  const newEventEndDate = updatedDateAndLocation.endDate
+    ? new Date(updatedDateAndLocation.endDate)
+    : existingEvent.endDate;
 
   // Compare start date (ignoring seconds)
   if (updatedDateAndLocation.startDate) {
@@ -227,20 +259,30 @@ export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, exist
   }
   return { changed: changes.length > 0, changes };
 }
-export function extractDate(date: Date): { year: string; month: string; day: string; dayOfWeek: string, hour: string, minutes: string } {
+export function extractDate(date: Date): {
+  year: string;
+  month: string;
+  day: string;
+  dayOfWeek: string;
+  hour: string;
+  minutes: string;
+} {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
-    throw new Error("Invalid date object provided");
+    throw new Error('Invalid date object provided');
   }
   const updatedDate = new Date(date);
-  const hour= updatedDate.getUTCHours() > 0 ? updatedDate.getUTCHours().toString() : '00'
-  const minutes= updatedDate.getUTCMinutes() > 0  ? updatedDate.getUTCMinutes().toString() : '00' 
+  const hour = updatedDate.getUTCHours() > 0 ? updatedDate.getUTCHours().toString() : '00';
+  const minutes = updatedDate.getUTCMinutes() > 0 ? updatedDate.getUTCMinutes().toString() : '00';
   return {
     year: updatedDate.getUTCFullYear().toString(),
-    month: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"][updatedDate.getUTCMonth()], // Months are 0-based
+    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'][
+      updatedDate.getUTCMonth()
+    ], // Months are 0-based
     day: updatedDate.getUTCDate().toString(),
-    dayOfWeek: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][date.getUTCDay()],
+    dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+      date.getUTCDay()
+    ],
     hour,
-    minutes
+    minutes,
   };
 }
-

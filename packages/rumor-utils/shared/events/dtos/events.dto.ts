@@ -1,4 +1,16 @@
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsObject } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  IsObject,
+} from 'class-validator';
 import {
   AddEventToFeaturedSectionRequest,
   AddressValidationRequest,
@@ -15,7 +27,13 @@ import {
 } from '../grpc/events/events.pb';
 import { IsPublishDateValid } from '../validators/pupublish-date-valid.constraint';
 import { EventStatusEnum } from '../interfaces/event.interface';
-import { EventAgeLimit, EventLocation, EventStatus, QueryRequest, TicketStatus } from '../grpc/events/general.pb';
+import {
+  EventAgeLimit,
+  EventLocation,
+  EventStatus,
+  QueryRequest,
+  TicketStatus,
+} from '../grpc/events/general.pb';
 import { Type } from 'class-transformer';
 import { CreateTicketTypeRequestDto, UpdateTicketTypeRequestDto } from './ticket-type.dto';
 import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from './quiz-question.dto';

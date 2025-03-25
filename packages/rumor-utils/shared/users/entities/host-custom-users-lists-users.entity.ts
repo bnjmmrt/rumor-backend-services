@@ -5,11 +5,13 @@ import { RumorBaseEntity } from '../../entities/rumor-base.entity';
 
 @Entity()
 export class HostCustomUsersListsUsers extends RumorBaseEntity {
-  @ManyToOne(() => HostCustomUsersLists, (customList) => customList.usersLists, {onDelete: 'CASCADE'})
+  @ManyToOne(() => HostCustomUsersLists, customList => customList.usersLists, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'list_id' })
   list: HostCustomUsersLists;
 
-  @ManyToOne(() => User, (user) => user.customLists)
+  @ManyToOne(() => User, user => user.customLists)
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

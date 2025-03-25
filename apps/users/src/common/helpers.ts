@@ -8,8 +8,9 @@ export const generateUniqueFileName = (type: string) => {
   return fileName;
 };
 
-
-export const asyncWrapper = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+export const asyncWrapper = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res, next).catch(next); // Forward errors to the Express error handler
   };

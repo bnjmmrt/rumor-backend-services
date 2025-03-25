@@ -1,4 +1,16 @@
-import { IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 import {
   CheckAgeRequest,
@@ -70,7 +82,8 @@ export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsNotEmpty()
   dateOfBirth: string;
   @IsStrongPassword({
-    message: 'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
+    message:
+      'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
   })
   @IsNotEmpty()
   password: string;
@@ -554,7 +567,7 @@ export class UpdateUserStatusRequestDto implements UpdateUserStatusRequest {
   status: NewUserStatus;
 }
 
-export class UpdateHostsStatusRequestDto  {
+export class UpdateHostsStatusRequestDto {
   @IsUUID()
   @IsNotEmpty()
   ids: string[];
@@ -574,7 +587,8 @@ export class SetHostPasswordRequestDto implements SetHostPasswordRequest {
   @IsNotEmpty()
   token: string;
   @IsStrongPassword({
-    message: 'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
+    message:
+      'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
   })
   @IsNotEmpty()
   password: string;
