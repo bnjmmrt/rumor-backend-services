@@ -175,6 +175,12 @@ export class GuestService {
       .findOne({ where: { id: eventId } });
     if (!event) throw new NotFoundError("Event not found");
 
+     // Validate ticket type if provided in the request
+     let ticketType = await this.dbConnection
+     .getRepository(TicketType)
+     .findOne({ where: { id: payload.ticketTypeId } });
+      if (!ticketType) throw new NotFoundError("Ticket type not found");
+
     // Fetch the host profile
     const host = (
       await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)
@@ -501,15 +507,12 @@ export class GuestService {
     ).data;
     if (!host) throw new NotFoundError("Host not found");
 
-    let ticketType = undefined;
-    if (payload.ticketTypeId) {
       // Fetch ticket type details if a ticketTypeId is provided
-      ticketType = await this.dbConnection
+      let ticketType = await this.dbConnection
         .getRepository(TicketType)
         .findOne({ where: { id: payload.ticketTypeId } });
 
       if (!ticketType) throw new NotFoundError("Ticket type not found");
-    }
 
     // Validate and normalize guest status
     const guestStatus = payload?.guestStatus
@@ -633,7 +636,6 @@ export class GuestService {
             );
             } catch (error) {
               console.log("🚀 ~ GuestService ~ emailsData.map ~ error:", error)
-              
             }
             
 
@@ -701,15 +703,11 @@ export class GuestService {
     payload: UpdateGuestsRequestDto
   ): Promise<GuestDataSimple[]> {
     try {
-      let ticketType;
-
       // Validate ticket type if provided in the request
-      if (payload.ticketTypeId) {
-        ticketType = await this.dbConnection
+        const ticketType = await this.dbConnection
           .getRepository(TicketType)
           .findOne({ where: { id: payload.ticketTypeId } });
         if (!ticketType) throw new NotFoundError("Ticket type not found");
-      }
 
       // Validate guest status if provided
       const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
@@ -830,6 +828,7 @@ export class GuestService {
                   // Only allow setting status to DRAFT if current status is INVITED, CONFIRMED or DECLINED
                   if (
                     ![
+                      GuestStatus.DRAFT,
                       GuestStatus.INVITED,
                       GuestStatus.DECLINED,
                       GuestStatus.CONFIRMED,
@@ -4280,6 +4279,14 @@ export class GuestService {
         signupFormSubmissions: { signupForm: true },
       },
     });
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: guestDetail.event.id },
+      relations: { owner: true }
+    })
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { user: { id: guestDetail.user.id }, host: { id: event.owner.id } },
+    })    
+    
     if (!guestDetail) {
       throw new NotFoundError("Guest not found");
     }
@@ -4338,6 +4345,7 @@ export class GuestService {
       guestProfile: guestProfileResponse,
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
+      hostUserMappingId: hostUserMapping?.id ?? ''
     };
   }
 
