@@ -747,8 +747,7 @@ export class GuestService {
             guest.privateGuestNote =
               payload.privateGuestNote ?? guest.privateGuestNote;
             guest.inviteMessage = payload.inviteMessage ?? guest.inviteMessage;
-            if (payload.hostId) guest.addedBy = { id: payload.hostId } as User;
-
+            if (!guest.addedBy && payload.hostId) guest.addedBy = { id: payload.hostId } as User;
             // Handle guest status updates if a new status is provided
             if (guestStatus) {
               switch (guestStatus) {
