@@ -126,11 +126,7 @@ import {
 import S3Service from "../utils/aws/s3";
 import { stringify } from "csv-stringify";
 import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
-import {
-  sendEventInviteMember,
-  sendEventInviteNonMember,
-  sendEventInvitePlusOnes,
-} from "../utils/emails.utils";
+import {sendEventInviteMember, sendEventInviteNonMember, sendEventInvitePlusOnes, sendGuestEventApproval} from '../utils/emails.utils';
 
 export class GuestService {
   public static dbConnection = database;
@@ -743,6 +739,7 @@ export class GuestService {
               email: guest.user.email,
               firstName: guest.user.firstName,
               role: user.roles.flatMap((role) => role.role.name),
+              invitationSource: guest.invitationSource
             };
             // Update max additional guests and private notes if provided
             guest.maxAdditionalGuests =
@@ -932,6 +929,34 @@ export class GuestService {
             }
           })
         );
+      }
+
+      if (
+        updatedGuests.length > 0 &&
+        confirmedGuestsEmails.length > 0 &&
+        payload.sendInvite
+      ) {
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: confirmedGuestsEmails[0].eventId },
+          relations: { location: true, owner: true },
+        });
+        confirmedGuestsEmails.map((data) => {
+          if (data.role.includes("non_member") && data.invitationSource === UserSource.SIGN_UP_FORM) {
+            const createMailPayload = {
+              eventDate: event.startDate,
+              eventName: event.name,
+              imageFlyer: event.imageFlyer,
+              location: event.location.location,
+              city: event.location.city,
+              emailsData: {
+                eventId: data.eventId,
+                id: data.id,
+                firstName: data.firstName,
+                email: data.email,
+              },
+            };
+            sendGuestEventApproval(createMailPayload);
+          }})    
       }
       // Fetch and transform updated guest data for response
       const updatedGuestIds = updatedGuests.map((el) => el.id);
