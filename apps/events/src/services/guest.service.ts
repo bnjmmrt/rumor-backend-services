@@ -2399,50 +2399,57 @@ export class GuestService {
       userFilter.guests.status = In(guestStatusFilter);
     } else if (multipleGuestStatusFilter.length > 1) {
       for (const status of multipleGuestStatusFilter) {
+        let orCondition: any = {}; // Initialize OR condition object
         switch (status) {
           case "UPCOMING":
-            orConditions.push({
+            orCondition = {
               endDate: MoreThan(dateNow),
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
               },
-            });
+            };
             break;
           case "PAST":
-            orConditions.push({
+            orCondition = {
               endDate: LessThan(dateNow),
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
               },
-            });
+            };
             break;
           case "INVITED":
-            orConditions.push({
+            orCondition = {
               guests: {
                 status: GuestStatus.INVITED,
                 user: { id: payload.userId },
               },
-            });
+            };
             break;
           case "APPLIED":
-            orConditions.push({
+            orCondition = {
               guests: {
                 status: GuestStatus.APPLIED,
                 user: { id: payload.userId },
               },
-            });
+            };
             break;
           case "DECLINED":
-            orConditions.push({
+            orCondition = {
               guests: {
                 status: GuestStatus.DECLINED,
                 user: { id: payload.userId },
               },
-            });
+            };
             break;
         }
+        // If `ownerId` exists, include it in each `OR` condition
+        if (parsedQuery.ownerId) {
+          orCondition.owner = { id: parsedQuery.ownerId };
+        }
+        // Add the condition to the `orConditions` array
+        orConditions.push(orCondition);
       }
     }
 
