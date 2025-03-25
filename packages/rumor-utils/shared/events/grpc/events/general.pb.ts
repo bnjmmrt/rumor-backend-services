@@ -646,6 +646,7 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
+  hostUserMappingId?: string | undefined;
 }
 
 export interface QuizDataList {
