@@ -9,9 +9,9 @@
 import { Observable } from "rxjs";
 import {
   FeaturedEventsSection,
-  Focus,
+  FocusData,
   InterestData,
-  ReferralCode,
+  ReferralCodeData,
   ReferralRequest,
   ReferralRequestStatus,
   UserVouch,
@@ -48,7 +48,7 @@ export interface GenericResponse {
 export interface FocusResponse {
   status: number;
   error?: Error | undefined;
-  data: Focus[];
+  data: FocusData[];
 }
 
 /** Add Focus */
@@ -123,13 +123,13 @@ export interface UpdateReferralCodeRequest {
 export interface ReferralCodeResponse {
   status: number;
   error?: Error | undefined;
-  data?: ReferralCode | undefined;
+  data?: ReferralCodeData | undefined;
 }
 
 export interface ReferralCodesResponse {
   status: number;
   error?: Error | undefined;
-  data: ReferralCode[];
+  data: ReferralCodeData[];
 }
 
 /** Create Referral Request */
@@ -178,6 +178,11 @@ export interface GetUserVouchesResponse {
   status: number;
   error?: Error | undefined;
   data: UserVouch[];
+}
+
+export interface GetUserVouchRequest {
+  requesterId: string;
+  eventId: string;
 }
 
 /** Save Referred User */

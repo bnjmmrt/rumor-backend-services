@@ -1,18 +1,26 @@
 import * as _ from 'lodash';
-import dayjs from 'dayjs';
-import { User } from "../entities/user.entity"
-import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile } from '../grpc/auth/auth.pb';
+import { User } from '../entities/user.entity';
+import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
+import * as dayjs from 'dayjs';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
-import { entityToUserStatus } from './shared.mapper';
+import { entityToUserSource, entityToUserStatus} from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
 
-export const toHostProfile = (user: User, status: UserStatus, source: UserSource, isMemberFollowingHost: boolean): HostProfile => {
+export const toHostProfile = (
+  user: User,
+  status: any,
+  source: any,
+  isMemberFollowingHost: boolean,
+  isMemberBlockedHost: boolean,
+  roleId: string,
+  roleName: string,
+): HostProfile => {
   const upcomingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -20,11 +28,12 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
   const pastEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PAST_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -32,11 +41,12 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
   const pendingEvents = user.hostedEvents
     .filter((event) => formatEventStatus(event) === EventStatus.PENDING_STATUS)
-    .map((event:any) => {
+    .map((event) => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -44,6 +54,7 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
         startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
         endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
         imageFlyer: event.imageFlyer || '',
+        eventLocation: event.location || undefined,
       };
     });
 
@@ -56,9 +67,9 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     phoneNumber: user.phoneNumber,
     eventsPerYear: user?.additionalHostInformation?.eventsPerYear || 0,
     referredBy: user?.additionalHostInformation?.referredBy || '',
-    source,
-    status,
-    hostSince: dayjs(user.createdAt).format('MM/DD/YYYY'),
+    source: source,
+    status: status,
+    hostSince: dayjs(user.createdAt).format('MM/DD/YYYY HH:mm') || '',
     bio: user?.additionalHostInformation?.bio || '',
     totalAttendees: 0,
     totalInfluencerSpend: 0,
@@ -72,10 +83,13 @@ export const toHostProfile = (user: User, status: UserStatus, source: UserSource
     socialMedia: user?.additionalHostInformation?.socialMedia || {},
     isMemberFollowingHost,
     website: user?.additionalHostInformation?.website || '',
+    isMemberBlockedHost,
+    roleId: roleId,
+    roleName: roleName,
   };
 };
 
-export const toBasicHostProfile = (user: User, status: UserStatus, source: UserSource): BasicHostProfile => {
+export const toBasicHostProfile = (user: User, status: any, source: any): BasicHostProfile => {
   return {
     id: user.id,
     firstName: user.firstName,
@@ -93,13 +107,15 @@ export const toBasicHostProfile = (user: User, status: UserStatus, source: UserS
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string): MemberProfile => {
+export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string, eventCount?: number): MemberProfile => {
   return {
     id: user.id,
+    userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
     category: focuses.map((focus) => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
+    placeId: user.address?.googlePlaceId,
     dateOfBirth: user.dateOfBirth,
     phoneNumber: user.phoneNumber,
     email: user.email,
@@ -121,5 +137,8 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     requestedEvents: [],
     status: entityToUserStatus[role.status],
     instagramUsername: instagramUsername,
+    customLists: [],
+    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
+    eventCount
   };
 };

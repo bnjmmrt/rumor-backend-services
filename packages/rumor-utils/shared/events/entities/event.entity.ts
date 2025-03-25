@@ -1,4 +1,4 @@
-import { Entity, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, OneToMany, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { QuizQuestion } from './quiz-question.entity';
 import { Collaborator } from './collaborator.entity';
 import { TicketType } from './ticket-type.entity';
@@ -14,6 +14,9 @@ import { EventStatusEnum } from '../interfaces/event.interface';
 import { Ticket } from './ticket.entity';
 import { FeaturedEventSection } from './featured-event-section.entity';
 import { EventSignupForms } from './event-signup-forms.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
+import { CsvUploadRecords } from './csv-upload-records.entity';
+import { RestrictedInvites } from './restricted-invites.entity';
 
 @Entity()
 export class Event extends RumorBaseEntity {
@@ -29,16 +32,19 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'boolean', default: true, name: 'enabled' })
   enabled: boolean;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'start_date' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'start_date' })
   startDate?: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'end_date' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'end_date' })
   endDate?: Date;
+
+  @Column({ type: "varchar", nullable: true, name: "timezone" })
+  timeZone?: string;
 
   @Column({ type: 'integer', nullable: true, name: 'limit_one_plus' })
   limitOnePlus?: number;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'rsvp_deadline' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'rsvp_deadline' })
   rsvpDeadline?: Date;
 
   @Column({ type: 'boolean', default: true, name: 'show_location' })
@@ -56,7 +62,7 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'enum', enum: EventStatusEnum, nullable: true, name: 'status' })
   status: EventStatusEnum;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'publish_date' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'publish_date' })
   publishDate?: Date;
 
   @Column({ type: 'boolean', name: 'is_published', default: false })
@@ -65,22 +71,22 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'is_private', default: false })
   isPrivate?: boolean;
 
-  @Column({ type: 'integer', nullable: true, name: 'capacity' })
+  @Column({ type: 'integer', nullable: true, name: 'capacity', default:0 })
   capacity?: number;
 
-  @OneToMany(() => QuizQuestion, (question) => question.event)
+  @OneToMany(() => QuizQuestion, (question) => question.event, { cascade: true, onDelete: 'CASCADE' })
   quizQuestions: QuizQuestion[];
 
-  @OneToMany(() => Collaborator, (collaborator) => collaborator.event)
+  @OneToMany(() => Collaborator, (collaborator) => collaborator.event, { cascade: true, onDelete: 'CASCADE' })
   collaborators: Collaborator[];
 
-  @OneToMany(() => TicketType, (ticketType) => ticketType.event)
+  @OneToMany(() => TicketType, (ticketType) => ticketType.event, { cascade: true, onDelete: 'CASCADE' })
   ticketTypes: TicketType[];
 
-  @OneToMany(() => Talent, (talent) => talent.event)
+  @OneToMany(() => Talent, (talent) => talent.event, { cascade: true, onDelete: 'CASCADE' })
   talents: Talent[];
 
-  @OneToMany(() => Ticket, (ticket) => ticket.event)
+  @OneToMany(() => Ticket, (ticket) => ticket.event, { cascade: true, onDelete: 'CASCADE' })
   tickets: Ticket[];
 
   @ManyToOne(() => EventTypes, { nullable: true, cascade: true })
@@ -103,15 +109,26 @@ export class Event extends RumorBaseEntity {
   @JoinColumn({ name: 'owner_id', referencedColumnName: 'id' })
   owner?: User;
 
-  @OneToMany(() => Guest, (guest) => guest.event)
+  @OneToMany(() => Guest, (guest) => guest.event, { cascade: true, onDelete: 'CASCADE' })
   guests: Guest[];
+
+  @OneToMany(() => RestrictedInvites, (ri) => ri.event, { cascade: true, onDelete: 'CASCADE' })
+  restrictedInvites: RestrictedInvites;
 
   @ManyToOne(() => FeaturedEventSection, (featuredEventSection) => featuredEventSection.events, {
     nullable: true,
-    onDelete: 'SET NULL',
+    cascade: true, 
+    onDelete: 'CASCADE'
   })
   featuredEventSection: FeaturedEventSection;
 
-  @OneToMany(() => EventSignupForms, (esf) => esf.event)
+  @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.event, {cascade: true, onDelete: 'CASCADE' })
+  csvUploads: CsvUploadRecords[];
+
+  @OneToMany(() => EventSignupForms, (esf) => esf.event, { cascade: true, onDelete: 'CASCADE' })
   signupForms: EventSignupForms[];
+
+  @OneToMany(() => Notification, (notification) => notification.linkedEvent, { cascade: true, onDelete: 'CASCADE' })
+  notifications: Notification[];
+
 }

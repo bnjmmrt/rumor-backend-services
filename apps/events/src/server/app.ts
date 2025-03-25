@@ -4,7 +4,7 @@ import * as bodyParser from "body-parser";
 import helmet from "helmet";
 import * as cors from "cors";
 import router from "../routes/index";
-import { globalErrorHandler } from "rumor-utils/middlewares/global-error-handler.middleware";
+import errorHandler from "rumor-utils/middlewares/global-error-handler.middleware";
 import { NotFoundError } from "rumor-utils/errors/not-found.error";
 
 const app: Express = express();
@@ -14,19 +14,20 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: "*", 
-    methods: ["GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"], 
-    allowedHeaders: ["X-Requested-With", "Content-Type"], 
-    credentials: true,
+    origin: "*", // Allows any domain
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.get("/events/v1/health", (req: Request, res: Response) => {
-  res.json({ status: "UP" , timestamp:new Date()}).status(200);
+  res.json({ status: "UP", timestamp: new Date() }).status(200);
 });
 
 app.use("/events/v1", router);
-app.get('*', (req: Request, res: Response, next: NextFunction) => next(new NotFoundError(req.path)));
-app.use(globalErrorHandler);
+app.get("*", (req: Request, res: Response, next: NextFunction) =>
+  next(new NotFoundError(req.path))
+);
+app.use(errorHandler);
 
 export default app;

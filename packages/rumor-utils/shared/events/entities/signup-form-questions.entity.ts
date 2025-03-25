@@ -16,11 +16,14 @@ export class SignupFormQuestions extends RumorBaseEntity {
   @Column({ type: "varchar", name: "name" })
   name: string;
 
+  @Column({ type: "varchar", name: "value", default: null })
+  value: string;
+
   @Column({ type: "integer", name: "ordering", default: 0 })
   ordering: number;
 
   @ManyToOne(() => EventSignupForms, (event) => event.questions, {
-    onDelete: "RESTRICT",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn({ name: "sign_up_form_id" })

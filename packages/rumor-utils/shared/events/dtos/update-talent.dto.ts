@@ -33,4 +33,8 @@ export class UpdateTalentRequestDto implements UpdateTalentRequest {
   @IsOptional()
   @IsUUID()
   eventId?: string;
+
+  @IsString()
+  @IsOptional()
+  action?: string;
 }

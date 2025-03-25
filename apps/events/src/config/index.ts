@@ -1,10 +1,8 @@
-// const { getSecret } = require('../utils/aws/secretsManager');
 import getSecret from '../utils/aws/secretsManager';
 import defaultConfig from './default';
 import developmentConfig from './development';
 import stagingConfig from './staging';
 import productionConfig from './production';
-// import { ProgrammerError } from '../utils/errors';
 
 class Config {
     values: { [key: string]: any };
@@ -81,7 +79,6 @@ class Config {
                     break;
 
                 default:
-                    // throw new ProgrammerError(`No config for environment '${environment}'`);
             }
 
             console.info(`[CONFIG] Successfully loaded config.`);

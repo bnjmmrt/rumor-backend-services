@@ -1,47 +1,92 @@
-// import { Controller } from '@nestjs/common';
-// import { ReferralCodeService } from '../services/referral-code.service';
-// import { GrpcMethod } from '@nestjs/microservices';
-// import { ReferralCodesResponse, PLATFORM_SERVICE_NAME, ReferralCodeResponse } from '../grpc/platform/platform.pb';
-// import { CreateReferralCodeRequestDto, ReferredUserRequestDto, UpdateReferralCodeRequestDto } from '../dtos/referral-code.dto';
-// import { IdRequestDto, QueryParamRequestDto } from '../dtos/platform.dto';
-// import { GenericResponse } from 'apps/auth/src/grpc/auth/shared.pb';
+import { CreateReferralCodeRequestDto, ReferredUserRequestDto, UpdateReferralCodeRequestDto } from "rumor-utils/shared/users/dtos/referral-code.dto";
+import asyncWrapper from "../server/helpers/asyncWrapper";
+import { CreateResponse, GetResponse } from "rumor-utils/success";
+import { ReferralCodeService } from "../services/referral-code.service";
+import { ReferralCodeData } from "rumor-utils/shared/events/grpc/platform/general.pb";
+import { IdRequestDto, QueryParamRequestDto } from "rumor-utils/shared/users/dtos/platform.dto";
 
-// @Controller()
-// export class ReferralCodeController {
-//   constructor(private readonly referralCodeService: ReferralCodeService) {}
+export class ReferralCodeController {
+  public static createReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: CreateReferralCodeRequestDto = req.body;
+      const response: ReferralCodeData =
+      await ReferralCodeService.createReferralCode(payload);
+      const createResponse = new CreateResponse(response, 'Referral code created successfully!');
+      res.status(createResponse.statusCode).json(createResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'CreateReferralCode')
-//   public async createReferralCode(payload: CreateReferralCodeRequestDto): Promise<ReferralCodeResponse> {
-//     return this.referralCodeService.createReferralCode(payload);
-//   }
+  public static getReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id } = req.params;
+      const payload: IdRequestDto = { id };
+      const response: ReferralCodeData =
+        await ReferralCodeService.getReferralCode(payload);
+      const getResponse = new GetResponse(response, 'Referral code retrieved successfully!');
+      res.status(getResponse.statusCode).json(getResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'GetReferralCode')
-//   public async getReferralCode(payload: IdRequestDto): Promise<ReferralCodeResponse> {
-//     return this.referralCodeService.getReferralCode(payload);
-//   }
+  public static getReferralCodes = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const query = req.query;
+      const payload: QueryParamRequestDto = { query };
+      const response: ReferralCodeData[] =
+        await ReferralCodeService.getReferralCodes(payload);
+      const getResponse = new GetResponse(response, 'Referral codes retrieved successfully!');
+      res.status(getResponse.statusCode).json(getResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'GetReferralCodes')
-//   public async getAllReferralCodes(payload: QueryParamRequestDto): Promise<ReferralCodesResponse> {
-//     return this.referralCodeService.getReferralCodes(payload);
-//   }
+  public static updateReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: UpdateReferralCodeRequestDto = req.body;
+      const response: ReferralCodeData =
+        await ReferralCodeService.updateReferralCode(payload);
+      const updateResponse = new CreateResponse(response, 'Referral codes updated successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'UpdateReferralCode')
-//   public async updateReferralCode(payload: UpdateReferralCodeRequestDto): Promise<ReferralCodeResponse> {
-//     return this.referralCodeService.updateReferralCode(payload);
-//   }
+  public static deactivateReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id } = req.params;
+      const payload: IdRequestDto = { id };
+      const response: ReferralCodeData =
+        await ReferralCodeService.deactivateReferralCode(payload);
+      const updateResponse = new CreateResponse(response, 'Referral code deactivated successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'DeactivateReferralCode')
-//   public async deactivateReferralCode(payload: IdRequestDto): Promise<ReferralCodeResponse> {
-//     return this.referralCodeService.deactivateReferralCode(payload);
-//   }
+  public static activateReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id } = req.params;
+      const payload: IdRequestDto = { id };
+      const response: ReferralCodeData =
+      await ReferralCodeService.activateReferralCode(payload);
+      const updateResponse = new CreateResponse(response, 'Referral code activated successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'DeleteReferralCode')
-//   public async deleteReferralCode(payload: IdRequestDto): Promise<ReferralCodeResponse> {
-//     return this.referralCodeService.deleteReferralCode(payload);
-//   }
+  public static deleteReferralCode = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const {id} = req.params;
+      const payload: IdRequestDto = {id};
+      const response: ReferralCodeData =
+        await ReferralCodeService.deleteReferralCode(payload);
+      const updateResponse = new CreateResponse(response, 'Referral code deleted successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
 
-//   @GrpcMethod(PLATFORM_SERVICE_NAME, 'SaveReferredUser')
-//   public async saveReferredUser(payload: ReferredUserRequestDto): Promise<GenericResponse> {
-//     return this.referralCodeService.saveReferredUser(payload);
-//   }
-// }
+  public static saveReferredUser = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const payload: ReferredUserRequestDto = req.body;
+      const response: string = await ReferralCodeService.saveReferredUser(payload);
+      const updateResponse = new CreateResponse(response, 'Referral code saved successfully!');
+      res.status(updateResponse.statusCode).json(updateResponse);
+    }
+  );
+}

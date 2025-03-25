@@ -11,6 +11,9 @@ import {
   CurrentUser,
   ConfirmedMember,
   SimpleUser,
+  UsersList,
+  MemberProfile,
+  customListData,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -99,77 +102,52 @@ export const toCreateUser = (user: User): SimpleUser => {
   };
 };
 
-export const toCurrentUser = (user: User, focuses: FocusProto[], role: UserRole): CurrentUser => {
-  const roleData = {
-    roleId: role.id,
-    roleName: role.role.name,
-    status: entityToUserStatus[role.status],
-    source: role.source ? entityToUserSource[role.source] : null,
-  };
-  if (role.role.name === 'member') {
-    const member = {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      memberProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        gender: user.gender ? entityToGender[user.gender] : null,
-        dateOfBirth: user.dateOfBirth ? user.dateOfBirth : null,
-        address: user.address
-          ? {
-              address: user.address.address,
-              placeId: user.address.googlePlaceId,
-            }
-          : null,
-        focuses,
-        socialProviders: (user.socialProviders || []).map((provider) => {
-          return {
-            type: entityToProviderType[provider.type],
-            accessToken: provider.longLivedToken,
-            username: provider.username,
-          };
-        }),
-        imageUrl: user.profilePicture,
-        memberSince: formatSinceDate('Member', user.createdAt),
-      },
+export const toCurrentUser = (user: User, focuses: FocusProto[], roles: UserRole[]): CurrentUser => {
+  // Construct role data based on user roles
+  const roleData = roles.map(role => {
+    // Basic structure for each role
+    const baseRoleData = {
+      id: role.id,
+      userId: user.id,
+      roleName: role.role.name,
+      status: role.status,
+      source: role.source || null,
     };
 
-    return member;
-  } else if (role.role.name === 'host' || role.role.name === 'co_host') {
-    return {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      hostProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
+    // Add role-specific data based on roleName
+    if (role.role.name === 'member') {
+      return {
+        ...baseRoleData,
+        focuses: focuses,
+        socialProviders: user.socialProviders || [],
+        memberSince: formatSinceDate('Member', user.createdAt),
+      };
+    }
+
+    if (role.role.name === 'host' || role.role.name === 'co_host') {
+      return {
+        ...baseRoleData,
         hostSince: formatSinceDate('Host', user.createdAt),
         companyName: user.additionalHostInformation?.companyName || null,
         eventsPerYear: user.additionalHostInformation?.eventsPerYear || null,
         website: user.additionalHostInformation?.website || null,
         referredBy: user.additionalHostInformation?.referredBy || null,
-        imageUrl: user.additionalHostInformation?.companyLogo || null,
-      },
-    };
-  } else {
-    return {
-      ...roleData,
-      profileSetupCompleted: role.profileSetupCompleted,
-      userProfile: {
-        id: user.id,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        imageUrl: user.profilePicture,
-      },
-    };
-  }
+        companyLogo: user.additionalHostInformation?.companyLogo || null,
+      };
+    }
+
+    // For non-member or admin roles (UserRole)
+    return baseRoleData;
+  });
+  // Return the CurrentUser object with the roles data
+  return {
+    phoneNumber: user.phoneNumber,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    role: roleData,
+  };
 };
 
 export const toMember = (
@@ -200,16 +178,56 @@ export const toMember = (
   return {
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
-    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    gender: user.gender,
     types: focuses.map((focus) => focus.name),
     categories: interests.map((interest) => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
-    status: entityToUserStatus[role.status] ?? entityToUserStatus.UNRECOGNIZED,
+    status: role.status ?? 'UNRECOGNIZED',
     profilePicture: user.profilePicture,
     email: user.email,
     instagramUsername,
     role: role.role.name,
+    age: calculateAge(user.dateOfBirth),
+    phoneNumber: user.phoneNumber,
+    dateOfBirth: user.dateOfBirth
+  };
+};
+
+export const toUser = (
+  user: User,
+  focuses: FocusProto[] = [],
+  interests: InterestData[] = [],
+  role: UserRole,
+  socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
+): UsersList => {
+  let totalFollowerCount = 0;
+
+  if (user.socialStats) {
+    if (Object.keys(socialNetworkObject).length > 0) {
+      totalFollowerCount = Object.keys(socialNetworkObject).reduce((acc, key) => {
+        const statKey = `${key.toLowerCase()}FollowersCount`;
+        return acc + (user.socialStats[statKey] || 0);
+      }, 0);
+    } else {
+      totalFollowerCount = Object.values(user.socialStats).reduce((acc, val) => {
+        return typeof val === 'number' ? acc + val : acc;
+      }, 0);
+    }
+  }
+
+  const followerCount = formatToUnits(totalFollowerCount) || 'N/A';
+
+  return {
+    id: user.id,
+    name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
+    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    categories: focuses.map((focus) => focus.name),
+    interests: interests.map((interest) => interest.name),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    followerCount,
+    profilePicture: user.profilePicture,
+    type: role.role.name,
     age: calculateAge(user.dateOfBirth),
   };
 };
@@ -236,7 +254,7 @@ export const toHost = (user: RawHost): Host => {
     contactName: `${_.startCase(user.user_first_name)} ${_.startCase(user.user_last_name)}`,
     email: user.user_email,
     appliedOn: dayjs(user.user_created_at).format('DD/MM/YYYY'),
-    status: entityToUserStatus[user.user_role_status],
+    status: user.user_role_status,
     referralCode: '',
     hostedEvents,
   };
@@ -258,5 +276,39 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+  };
+};
+
+export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string, eventCount: number = 0): MemberProfile => {
+  return {
+    id: user.id,
+    userId: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    category: focuses.map((focus) => focus.name).join(', '),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    dateOfBirth: user.dateOfBirth,
+    placeId: user?.address?.googlePlaceId,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    gender: user.gender,
+    socialStats: {
+      instagramFollowersCount: user.socialStats?.instagramFollowersCount || 0,
+    },
+    referredBy: [],
+    upcomingEvents: [],
+    pastEvents: [],
+    invitedEvents: [],
+    requestedEvents: [],
+    status: role?.status,
+    role: role?.role?.name,
+    roleId: role?.role?.id,
+    interest: interests.map((interest) => interest.name).join(', '),
+    age: calculateAge(user.dateOfBirth),
+    imageUrl: user.profilePicture || '',
+    instagramUsername: instagramUsername,
+    customLists: customLists,
+    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
+    eventCount: eventCount
   };
 };

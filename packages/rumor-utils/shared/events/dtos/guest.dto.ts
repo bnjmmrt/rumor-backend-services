@@ -11,10 +11,74 @@ import {
   InviteGuestRequest,
   GuestsQueryRequest,
   ManageBulkGuestsRequest,
+  FetchBulkGuestsRequest,
+  BulkUploadGuestsRequest,
+  ManageGuestsRequest,
 } from '../grpc/events/events.pb';
 import { Type } from 'class-transformer';
 import { AnswersData, GuestStatus } from '../grpc/events/general.pb';
 
+export class ManageGuestsRequestDto implements ManageGuestsRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  hostId: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isSelectedAll?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  bulkUploadStatus?: boolean;
+
+  @IsString()
+  @IsOptional()
+  filePath?: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  inclusiveIds: string[];
+
+  @IsArray()
+  @IsNotEmpty()
+  exclusiveIds: string[];
+
+  @IsString()
+  @IsOptional()
+  ticketTypeId?: string;
+
+  @IsNumber()
+  @IsOptional()
+  maxAdditionalGuests?: number;
+
+  @IsString()
+  @IsOptional()
+  inviteMessage?: string;
+
+  @IsString()
+  @IsOptional()
+  privateGuestNote?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  guestStatus: string;
+
+  @IsString()
+  @IsNotEmpty()
+  currentStatus: string;
+
+  @IsString()
+  @IsNotEmpty()
+  action: string;
+
+  @IsString()
+  @IsOptional()
+  query?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  sendNotification?: boolean;
+}
 export class AddGuestsRequestDto implements AddGuestsRequest {
   @IsUUID()
   @IsNotEmpty()
@@ -28,7 +92,7 @@ export class AddGuestsRequestDto implements AddGuestsRequest {
   @IsNotEmpty()
   users: string[];
 
-  @IsUUID()
+  @IsString()
   @IsOptional()
   ticketTypeId?: string;
 
@@ -54,11 +118,15 @@ export class AddGuestsRequestDto implements AddGuestsRequest {
 }
 
 export class UpdateGuestsRequestDto implements UpdateGuestsRequest {
+  @IsString()
+  @IsOptional()
+  hostId?: string;
+
   @IsArray()
   @IsNotEmpty()
   guests: string[];
 
-  @IsUUID()
+  @IsString()
   @IsOptional()
   ticketTypeId?: string;
 
@@ -97,6 +165,10 @@ export class GuestsQueryRequestDto implements GuestsQueryRequest {
   @IsUUID()
   @IsNotEmpty()
   eventId: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  hostId: string;
 
   @IsString()
   @IsOptional()
@@ -195,6 +267,15 @@ export class DeclineEventInvitationRequestDto implements DeclineEventInvitationR
   reason: string;
 }
 
+export class AcceptEventInvitationRequestDto {
+  @IsUUID()
+  @IsNotEmpty()
+  eventId: string;
+
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+}
 export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsUUID()
   @IsNotEmpty()
@@ -213,11 +294,99 @@ export class InvitedGuestRequestDto implements InviteGuestRequest {
   lastName: string;
 
   @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  email?: string;
+}
+
+export class InvitedGuestsRequestDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InvitedGuestRequestDto)
+  @IsNotEmpty()
+  guests: InvitedGuestRequestDto[];
+}
+export class BulkUploadGuestsRequestDto implements BulkUploadGuestsRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  hostId: string;
+
+  @IsString()
+  @IsOptional()
+  eventId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  filePath: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isUploadUser?: boolean
+}
+
+export class FetchBulkGuestsRequestDto implements FetchBulkGuestsRequest {
+  @IsString()
+  @IsOptional()
+  query?: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  successUserCount: number;
+}
+
+export class InviteNewUserRequestDto implements InviteGuestRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  userId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  eventId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  firstName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  lastName: string;
+
+  @IsString()
+  @IsOptional()
   phoneNumber: string;
 
   @IsString()
+  @IsOptional()
   email: string;
+
+  @IsString()
+  @IsOptional()
+  ticketTypeId?: string;
+
+  @IsNumber()
+  @IsOptional()
+  maxAdditionalGuests?: number;
+
+  @IsString()
+  @IsOptional()
+  inviteMessage?: string;
+
+  @IsString()
+  @IsOptional()
+  privateGuestNote?: string;
+
+  @IsString()
+  @IsOptional()
+  guestStatus?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  sendInvite?: boolean;
 }
+
 export class ManageBulkGuestsRequestDto implements ManageBulkGuestsRequest {
   @IsArray()
   @IsNotEmpty()
@@ -230,7 +399,7 @@ export class ManageBulkGuestsRequestDto implements ManageBulkGuestsRequest {
   @IsNotEmpty()
   status: GuestStatus;
 
-  @IsUUID()
+  @IsString()
   @IsOptional()
   ticketTypeId: string;
 

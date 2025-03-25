@@ -6,6 +6,7 @@ import { responses } from '../common/responses';
 import { normalizeCatalogName } from '../common/helpers';
 import { Event } from 'rumor-utils/shared/events/entities';
 import database from '../database';
+import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 
 export class TicketTypeService {
   public static dbConnection = database;
@@ -39,44 +40,35 @@ export class TicketTypeService {
     }
   }
 
-  public static async getTicketType(payload: RequestByIdDto): Promise<TicketTypeResponse> {
-    try {
-      const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
-        where: {
-          id: payload.id,
-          deletedAt: IsNull(),
-        },
-      });
+  public static async getTicketType(payload: RequestByIdDto): Promise<TicketType> {
 
-      if (!ticketType) {
-        return responses.notFound('Ticket type not found');
-      }
-      return responses.data(ticketType);
-    } catch (err) {
-      return responses.badRequest('Error getting ticket type');
+    const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
+
+    if (!ticketType) {
+      throw new NotFoundError('Ticket type not found');
     }
+    return ticketType
+
   }
 
-  public static async getTicketTypes(payload: RequestByIdDto): Promise<TicketTypesResponse> {
+  public static async getTicketTypes(payload: RequestByIdDto): Promise<TicketType[]> {
     const eventId = payload?.id;
-    if (!eventId) return responses.badRequest('eventId param is a required value');
-    try {
-      const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
-
-      if (!event) return responses.badRequest('Event with given Id was not found');
-
-      const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
-        where: {
-          event: {
-            id: event.id,
-          },
+    if (!eventId) throw new BadRequestError('eventId param is a required value');
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
+    if (!event) throw new BadRequestError('Event with given Id was not found');
+    const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
+      where: {
+        event: {
+          id: event.id,
         },
-      });
-
-      return responses.data(ticketTypes);
-    } catch (err) {
-      return responses.badRequest('Error getting ticket types');
-    }
+      },
+    });
+    return ticketTypes
   }
 
   public static async updateTicketType(payload: UpdateTicketTypeRequestDto): Promise<TicketTypeResponse> {

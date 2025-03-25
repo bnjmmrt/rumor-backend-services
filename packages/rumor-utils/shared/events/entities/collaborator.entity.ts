@@ -57,7 +57,7 @@ export class Collaborator extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Event, (event) => event.collaborators, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })

@@ -3,8 +3,8 @@ import { FeaturedEventsSection as FeaturedEventsSectionProto } from '../grpc/pla
 
 export const toFeaturedEventSection = (featuredEventSection: FeaturedEventSection): FeaturedEventsSectionProto => {
   return {
-    id: featuredEventSection.id,
-    name: featuredEventSection.name,
-    index: featuredEventSection.index,
+    id: featuredEventSection?.id,
+    name: featuredEventSection?.name,
+    index: featuredEventSection?.index,
   };
 };

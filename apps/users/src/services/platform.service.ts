@@ -1,237 +1,244 @@
-// import { Injectable, Logger } from '@nestjs/common';
-// import { InjectRepository } from '@nestjs/typeorm';
-// import { Focus } from '../entities/focus.entity';
-// import { IsNull, Repository } from 'typeorm';
-// import { FocusResponse, GenericResponse, InterestResponse, InterestsResponse } from '../grpc/platform/platform.pb';
-// import { toFocus, toInterest } from '../mappers/platform.mapper';
-// import {
-//   AddFocusRequestDto,
-//   CreateInterestRequestDto,
-//   EditFocusNameRequestDto,
-//   IdRequestDto,
-//   SaveFocusesForUserRequestoDto,
-//   SaveInterestsForUserRequestDto,
-//   UpdateInterestRequestDto,
-// } from '../dtos/platform.dto';
-// import { User } from 'apps/auth/src/entities/user.entity';
-// import { Interest } from '../entities/interest.entity';
-// import { responses } from '../common/responses';
+import { Focus } from "rumor-utils/shared/users/entities/focus.entity";
+import { IsNull } from "typeorm";
+import {
+  FocusResponse,
+  GenericResponse,
+  InterestResponse,
+  InterestsResponse,
+} from "rumor-utils/shared/users/grpc/platform/platform.pb";
+import { FocusData, InterestData } from "rumor-utils/shared/users/grpc/platform/general.pb";
+import {
+  toFocus,
+  toInterest,
+} from "rumor-utils/shared/users/mappers/platform.mapper";
+import {
+  AddFocusRequestDto,
+  CreateInterestRequestDto,
+  EditFocusNameRequestDto,
+  IdRequestDto,
+  SaveFocusesForUserRequestoDto,
+  SaveInterestsForUserRequestDto,
+  UpdateInterestRequestDto,
+} from "rumor-utils/shared/users/dtos/platform.dto";
+import { User } from "rumor-utils/shared/users/entities/user.entity";
+import { Interest } from "rumor-utils/shared/users/entities/interest.entity";
+import { responses } from "../common/responses.common";
+import database from "../database";
+import { ConflictError, ForbiddenError, NotFoundError } from "rumor-utils/errors";
 
-// @Injectable()
-// export class PlatformService {
-//   private readonly logger = new Logger(PlatformService.name);
+export class PlatformService {
+  public static dbConnection = database;
 
-//   @InjectRepository(Focus)
-//   private readonly focusRepository: Repository<Focus>;
+  public static async getFocuses(): Promise<FocusData[]> {
+    const focuses = await this.dbConnection
+      .getRepository(Focus)
+      .find({ where: { deletedAt: IsNull() } });
+    return focuses.map((focus) => toFocus(focus));
+  }
 
-//   @InjectRepository(Interest)
-//   private readonly interestRepository: Repository<Interest>;
+  public static async getUserFocuses(
+    payload: IdRequestDto
+  ): Promise<FocusData[]> {
+    const focuses = await this.dbConnection
+      .getRepository(Focus)
+      .find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
+    const data = focuses.length > 0 ? focuses.map((focus) => toFocus(focus)) : [];
+    return data
+  }
 
-//   async getFocuses(): Promise<FocusResponse> {
-//     try {
-//       const focuses = await this.focusRepository.find({ where: { deletedAt: IsNull() } });
-//       return responses.data(focuses.map((focus) => toFocus(focus)));
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Unknown error occured, please try again');
-//     }
-//   }
+  public static async addFocus(
+    payload: AddFocusRequestDto
+  ): Promise<String> {
+    const focus = await this.dbConnection.getRepository(Focus).findOne({
+      where: {
+        name: payload.name.toLowerCase(),
+        deletedAt: IsNull(),
+      },
+    });
+    if (focus) throw new ConflictError("Focus with this name already exists");
 
-//   async getUserFocuses(payload: IdRequestDto): Promise<FocusResponse> {
-//     try {
-//       const focuses = await this.focusRepository.find({ where: { users: { id: payload.id }, deletedAt: IsNull() } });
-//       return responses.data(focuses.map((focus) => toFocus(focus)));
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Unknown error occured, please try again');
-//     }
-//   }
+    const newFocus = new Focus();
+    newFocus.name = payload.name.toLowerCase();
+    await this.dbConnection.getRepository(Focus).save(newFocus);
+    return;
+  }
 
-//   async addFocus(payload: AddFocusRequestDto): Promise<GenericResponse> {
-//     try {
-//       const focus = await this.focusRepository.findOne({
-//         where: {
-//           name: payload.name.toLowerCase(),
-//           deletedAt: IsNull(),
-//         },
-//       });
-//       if (focus) return responses.conflict('Focus with this name already exists');
+  public static async editFocusName(
+    payload: EditFocusNameRequestDto
+  ): Promise<GenericResponse> {
+    const focus = await this.dbConnection.getRepository(Focus).findOne({
+      where: {
+        id: payload.id,
+        deletedAt: IsNull(),
+      },
+    });
+    if (!focus) throw new NotFoundError("Focus");
 
-//       const newFocus = new Focus();
-//       newFocus.name = payload.name.toLowerCase();
-//       await this.focusRepository.save(newFocus);
-//       return responses.ok;
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Unknown error occured, please try again');
-//     }
-//   }
+    focus.name = payload.name.toLowerCase();
+    await this.dbConnection.getRepository(Focus).save(focus);
+    return;
+  }
 
-//   async editFocusName(payload: EditFocusNameRequestDto): Promise<GenericResponse> {
-//     try {
-//       const focus = await this.focusRepository.findOne({
-//         where: {
-//           id: payload.id,
-//           deletedAt: IsNull(),
-//         },
-//       });
-//       if (!focus) return responses.notFound('Focus not found');
+  public static async saveFocusesForUser(
+    payload: SaveFocusesForUserRequestoDto
+  ): Promise<GenericResponse> {
 
-//       focus.name = payload.name.toLowerCase();
-//       await this.focusRepository.save(focus);
-//       return responses.ok;
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Unknown error occured, please try again');
-//     }
-//   }
+    const focuses = await this.dbConnection.getRepository(Focus).find({
+      where: {
+        users: { id: payload.userId },
+        deletedAt: IsNull(),
+      },
+      relations: ['users'],
+    });
 
-//   async saveFocusesForUser(payload: SaveFocusesForUserRequestoDto): Promise<GenericResponse> {
-//     try {
-//       await Promise.all(
-//         payload.focusIds.map(async (focusId) => {
-//           const focus = await this.focusRepository.findOne({
-//             where: {
-//               id: focusId,
-//               deletedAt: IsNull(),
-//             },
-//             relations: {
-//               users: true,
-//             },
-//           });
+    if (focuses.length > 0) {
+      await Promise.all(
+        focuses.map(async (focus) => {
+          focus.users = focus.users.filter((user) => user.id !== payload.userId);
+          return this.dbConnection.getRepository(Focus).save(focus);
+        }),
+      );
+    }
+    await Promise.all(
+      payload.focusIds.map(async (focusId) => {
+        const focus = await this.dbConnection.getRepository(Focus).findOne({
+          where: {
+            id: focusId,
+            deletedAt: IsNull(),
+          },
+          relations: {
+            users: true,
+          },
+        });
 
-//           if (!focus) return;
+        if (focus) {
+          if (!focus.users.find((u) => u.id === payload.userId)) {
+            focus.users = [...focus.users, { id: payload.userId } as User];
+            await this.dbConnection.getRepository(Focus).save(focus);
+          }
+        }
+      })
+    );
+    return;
+  }
 
-//           if (focus.users.find((u) => u.id === payload.userId) === undefined) {
-//             focus.users = [...focus.users, { id: payload.userId } as User];
-//             await this.focusRepository.save(focus);
-//           }
-//         }),
-//       );
-//       return responses.ok;
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Unknown error occured, please try again');
-//     }
-//   }
+  public static async createInterest(
+    payload: CreateInterestRequestDto
+  ): Promise<InterestData> {
 
-//   public async createInterest(payload: CreateInterestRequestDto): Promise<InterestResponse> {
-//     try {
-//       const item = new Interest();
-//       item.name = payload.name;
-//       item.description = payload.description;
-//       item.enabled = payload.enabled;
-//       const created = await this.interestRepository.save(item);
-//       return responses.data(created);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error at create item for Interest');
-//     }
-//   }
+    const repo = this.dbConnection.getRepository(Interest);
 
-//   public async listInterests(): Promise<InterestsResponse> {
-//     try {
-//       const interests = await this.interestRepository.find();
-//       return responses.data(interests);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error at get list of items of Interest');
-//     }
-//   }
+    // Check if interest already exists
+    const existing = await repo.findOne({ where: { name: payload.name } });
 
-//   public async getUserInterests(payload: IdRequestDto): Promise<InterestsResponse> {
-//     try {
-//       const interests = await this.interestRepository.find({
-//         where: {
-//           users: { id: payload.id },
-//           deletedAt: IsNull(),
-//         },
-//       });
-//       return responses.data(interests.map((interest) => toInterest(interest)));
-//     } catch (err) {
-//       this.logger.error('Error fetching user interests:', err);
-//       return responses.badRequest('Error fetching user interests');
-//     }
-//   }
+    if (existing) {
+      throw new ForbiddenError("Interest with this name already exists.");
+    }
 
-//   public async saveInterestsForUser(payload: SaveInterestsForUserRequestDto): Promise<GenericResponse> {
-//     try {
-//       const interests = await this.interestRepository.find({
-//         where: {
-//           users: { id: payload.userId },
-//           deletedAt: IsNull(),
-//         },
-//         relations: ['users'],
-//       });
+    const item = new Interest();
+    item.name = payload.name;
+    item.description = payload.description;
+    item.enabled = payload.enabled;
+    const created = await this.dbConnection.getRepository(Interest).save(item);
+    return created;
+  }
 
-//       if (interests.length > 0) {
-//         await Promise.all(
-//           interests.map(async (interest) => {
-//             interest.users = interest.users.filter((user) => user.id !== payload.userId);
-//             return this.interestRepository.save(interest);
-//           }),
-//         );
-//       }
+  public static async listInterests(): Promise<InterestData[]> {
+    const interests = await this.dbConnection.getRepository(Interest).find({ order: { name: 'ASC' } });
+    return interests;
+  }
 
-//       await Promise.all(
-//         payload.interestsIds.map(async (interestId) => {
-//           const interest = await this.interestRepository.findOne({
-//             where: {
-//               id: interestId,
-//               deletedAt: IsNull(),
-//             },
-//             relations: ['users'],
-//           });
+  public static async getUserInterests(
+    payload: IdRequestDto
+  ): Promise<InterestData[]> {
+    const interests = await this.dbConnection.getRepository(Interest).find({
+      where: {
+        users: { id: payload.id },
+        deletedAt: IsNull(),
+      },
+    });
+    const data = interests.map((interest) => toInterest(interest));
+    return data
+  }
 
-//           if (interest) {
-//             if (!interest.users.find((u) => u.id === payload.userId)) {
-//               interest.users = [...interest.users, { id: payload.userId } as User];
-//               await this.interestRepository.save(interest);
-//             }
-//           }
-//         }),
-//       );
+  public static async saveInterestsForUser(
+    payload: SaveInterestsForUserRequestDto
+  ): Promise<GenericResponse> {
+    const interests = await this.dbConnection.getRepository(Interest).find({
+      where: {
+        users: { id: payload.userId },
+        deletedAt: IsNull(),
+      },
+      relations: ["users"],
+    });
 
-//       return responses.ok;
-//     } catch (err) {
-//       this.logger.error('Error saving interests for user:', err);
-//       return responses.badRequest('Error saving interests for user');
-//     }
-//   }
+    if (interests.length > 0) {
+      await Promise.all(
+        interests.map(async (interest) => {
+          interest.users = interest.users.filter(
+            (user) => user.id !== payload.userId
+          );
+          return this.dbConnection.getRepository(Interest).save(interest);
+        })
+      );
+    }
 
-//   public async deleteInterest(payload: IdRequestDto): Promise<GenericResponse> {
-//     try {
-//       const result = await this.interestRepository.delete(payload.id);
-//       if (result.affected === 0) {
-//         return responses.notFound('Item of Interest not found');
-//       }
-//       return responses.ok;
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error at delete an item for Interest');
-//     }
-//   }
+    await Promise.all(
+      payload.interestsIds.map(async (interestId) => {
+        const interest = await this.dbConnection
+          .getRepository(Interest)
+          .findOne({
+            where: {
+              id: interestId,
+              deletedAt: IsNull(),
+            },
+            relations: ["users"],
+          });
 
-//   public async updateInterest(payload: UpdateInterestRequestDto): Promise<InterestResponse> {
-//     try {
-//       const updateItem = { ...payload };
-//       delete updateItem.id;
-//       await this.interestRepository.update(
-//         {
-//           id: payload.id,
-//         },
-//         updateItem,
-//       );
-//       const interest = await this.interestRepository.findOne({
-//         where: {
-//           id: payload.id,
-//         },
-//       });
-//       if (!interest) return responses.notFound('Item of Interest not found');
-//       return responses.data(interest);
-//     } catch (err) {
-//       this.logger.error(err);
-//       return responses.badRequest('Error at update an item for Interest');
-//     }
-//   }
-// }
+        if (interest) {
+          if (!interest.users.find((u) => u.id === payload.userId)) {
+            interest.users = [
+              ...interest.users,
+              { id: payload.userId } as User,
+            ];
+            await this.dbConnection.getRepository(Interest).save(interest);
+          }
+        }
+      })
+    );
+
+    return;
+  }
+
+  public static async deleteInterest(
+    payload: IdRequestDto
+  ): Promise<GenericResponse> {
+    const result = await this.dbConnection
+      .getRepository(Interest)
+      .delete(payload.id);
+    if (result.affected === 0) {
+      throw new NotFoundError("Item of Interest not found");
+    }
+    return;
+  }
+
+  public static async updateInterest(
+    payload: UpdateInterestRequestDto
+  ): Promise<InterestData> {
+    const updateItem = { ...payload };
+    delete updateItem.id;
+    await this.dbConnection.getRepository(Interest).update(
+      {
+        id: payload.id,
+      },
+      updateItem
+    );
+    const interest = await this.dbConnection.getRepository(Interest).findOne({
+      where: {
+        id: payload.id,
+      },
+    });
+    if (!interest) throw new NotFoundError("Item of Interest not found");
+    return interest;
+  }
+}

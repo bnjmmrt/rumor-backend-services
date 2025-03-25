@@ -1,6 +1,16 @@
 import { Guest as GuestEntity } from "../entities/guest.entity";
+import {
+  AdditionalGuest,
+  Guest,
+  GuestData,
+  GuestDataSimple,
+  GuestStatus as GuestStatusProto,
+  InterestData,
+  QuizData,
+  UserSource,
+  VouchesData,
+} from '../grpc/events/general.pb';
 import { User } from '../../users/entities/user.entity';
-import { Guest, GuestData, GuestDataSimple, GuestStatus as GuestStatusProto, QuizData, UserSource, VouchesData } from '../grpc/events/general.pb';
 import { GuestStatus, TicketStatusEnum } from '../interfaces/event.interface';
 import { calculateAge } from '../../../utils/utils';
 import { entityToUserSource, entityToUserStatus } from '../../users/mappers/shared.mapper';
@@ -11,6 +21,7 @@ import { SocialProviderType } from '../../users/interfaces/shared.interface';
 import { UserQuizAnswer } from '../entities/user-quiz-question-answer.entity';
 import { ListEventUsedTicketsData, TicketStatus } from '../grpc/events/general.pb';
 import { Ticket } from '../entities/ticket.entity';
+import { entityToGender } from '../../users/mappers/auth.mapper';
 
 export const entityToGuestStatus: { [s in GuestStatus]: GuestStatusProto } = {
   [GuestStatus.NO_STATUS]: GuestStatusProto.NO_STATUS,
@@ -56,6 +67,7 @@ export const toGuest = (
   socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
   vouches?: UserVouch[] | undefined,
   answers?: UserQuizAnswer[] | undefined,
+  interests: InterestData[] = [],
 ): Guest => {
   let totalFollowerCount = 0;
 
@@ -73,27 +85,29 @@ export const toGuest = (
   }
 
   const roles = guest?.user?.roles?.length > 0 ? guest.user.roles[0] : undefined;
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const addedBy = guest.addedBy ? `${guest.addedBy?.additionalHostInformation?.companyName}` : '';
+  const addedByPicture = guest.addedBy ? guest.addedBy?.additionalHostInformation?.companyLogo : '';
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
   return {
     userId: guest.user?.id,
     id: guest.id,
     name: `${guest.user?.firstName || ''} ${guest.user?.lastName || ''}`,
     addedBy,
     addedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    invitationSource: UserSource[invitationSourceNumber],
     declinedBy: `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`,
     declinedByPicture: guest.declinedBy ? guest.declinedBy?.profilePicture : '',
-    status: entityToGuestStatus[guest.status],
+    status: GuestStatus[guest.status],
     ticketType: guest.ticketType?.name,
     partySize: guest.maxAdditionalGuests + 1,
     numFollowers: formatToUnits(totalFollowerCount),
     baseCity: guest?.user?.address?.address || '',
-    category: focuses.map((focus) => focus.name),
+    category: focuses.length > 0 ? focuses.map((focus) => focus.name): [],
     maxAdditionalGuests: guest.maxAdditionalGuests,
-    source: roles ? entityToUserSource[roles.source] : null,
-    checkIn: false,
-    additionalRequestedGuests: guest?.additionalRequestedGuests || null,
+    source: roles ? UserSource[invitationSourceNumber] : null,
+    checkIn: guest.checkIn,
+    additionalRequestedGuests: guest?.additionalRequestedGuests || 0,
     profilePicture: guest?.user?.profilePicture || '',
     questions: answers?.length
       ? answers.map((item) => {
@@ -102,12 +116,16 @@ export const toGuest = (
       : [],
     vouches: vouches?.length
       ? vouches.map((item) => {
-          return toVouchesData(item);
-        })
+        return toVouchesData(item);
+      })
       : [],
     email: guest?.user?.email,
     privateGuestNote: guest?.privateGuestNote,
-    isBanned: guest?.user?.roles?.some((item) => item.isBlacklisted) ?? false,
+    age: calculateAge(guest.user.dateOfBirth),
+    interest: interests ? interests.map((interest) => interest.name) : [],
+    gender: entityToGender[guest.user.gender] ?? entityToGender.NOT_APPLICABLE,
+    additionalGuests: [],
+    phoneNumber: guest?.user?.phoneNumber,
   };
 };
 
@@ -128,14 +146,29 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
     email: vouch?.email,
     picture: vouch?.picture,
     isApproved: vouch?.isApproved,
+    idUserVouch: vouch?.idUserVouch,
   };
 };
 
-export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[]): GuestData => {
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
-  const declinedBy = guest.declinedBy ? `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}` : '';
-  const declinedByPicture = guest.declinedBy ? guest.declinedBy?.profilePicture : '';
+export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData, isSpammedByHost?: boolean): GuestData => {
+  let addedBy, addedByPicture, declinedBy, declinedByPicture;
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
+  if (guest.event.owner.id === guest.addedBy?.id) {
+    addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
+    addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
+    addedBy = `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`.trim();
+    addedByPicture = guest.addedBy?.profilePicture || '';
+  }
+
+  if (guest.event.owner.id === guest.declinedBy?.id) {
+    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
+    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
+    declinedBy = `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`.trim();
+    declinedByPicture = guest.declinedBy?.profilePicture || '';
+  }
   return {
     roles: user.roles.map((item) => {
       return {
@@ -155,25 +188,39 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     age: calculateAge(user.dateOfBirth),
     address: user.address,
     interest: user.interests || [],
-    followsYou: false,
-    favorite: false,
+    isFollow: followsYou,
+    isFavorite: favorite,
     addedBy,
     addedByPicture,
     declinedBy,
     declinedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    rejectedReason: guest.rejectedReason,
+    invitationSource: UserSource[invitationSourceNumber],
     status: guest.status,
     categories: focuses.map((focus) => focus.name),
     guestId: guest.id,
     userId: user.id,
+    additionalGuests: additionalGuestData,
+    checkIn: guest.checkIn,
+    addedById: guest.addedBy?.id,
+    declinedById: guest.declinedBy?.id,
+    isSpammedByHost: isSpammedByHost
   };
 };
 
-export const toGuestDataSimple = (guest: GuestEntity, focuses: FocusProto[], invitedGuests: GuestDataSimple[] = []): GuestDataSimple => {
+export const toGuestDataSimple = (
+  guest: GuestEntity,
+  focuses: FocusProto[],
+  isRestricted: boolean = false,
+  restrictedId?: string,
+  invitedGuests: GuestDataSimple[] = [],
+): GuestDataSimple => {
   const user = guest.user;
   const roleInfo = user.roles?.find((item) => item.role.name === 'member' || item.role.name === 'non_member');
   const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
   const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
 
   return {
     id: guest.id,
@@ -183,18 +230,18 @@ export const toGuestDataSimple = (guest: GuestEntity, focuses: FocusProto[], inv
     profilePicture: user.profilePicture || '',
     status: roleInfo?.status ? GuestStatus[roleInfo?.status] : GuestStatus.NO_STATUS,
     source: roleInfo?.source || '',
-    guestStatus: guest.status,
-    guestId: guest.id,
+    guestStatus: isRestricted ? GuestStatus.DECLINED : guest.status,
+    guestId: isRestricted && restrictedId ? restrictedId : guest.id,
     username: user.username || '',
     ticketType: guest.ticketType?.name,
     numberAdditionalGuests: guest.maxAdditionalGuests,
     category: focuses.map((focus) => focus.name),
-    checkIn: false,
+    checkIn: guest.checkIn,
     phoneNumber: user.phoneNumber,
     age: calculateAge(user.dateOfBirth),
     addedBy,
     addedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    invitationSource: invitationSourceNumber,
     userId: user.id,
     invitees: invitedGuests,
     maxAdditionalGuests: guest.maxAdditionalGuests,
@@ -207,5 +254,44 @@ export const toTicketData = (ticket: Ticket): ListEventUsedTicketsData => {
     guestId: ticket.guest.id,
     ticketId: ticket.id,
     status: entityToTicketStatus[ticket.status],
+  };
+};
+
+export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocuses: FocusProto[], plusOnesInterests: InterestData[] = []): AdditionalGuest => {
+  let totalFollowerCount = 0;
+
+  if (additionalGuest?.user?.socialStats) {
+    totalFollowerCount = Object.values(additionalGuest.user.socialStats).reduce((acc, val) => {
+      return typeof val === 'number' ? acc + val : acc;
+    }, 0);
+  }
+
+  const addedBy = additionalGuest.addedBy ? `${additionalGuest.addedBy?.firstName || ''} ${additionalGuest.addedBy?.lastName || ''}` : '';
+  const addedByPicture = additionalGuest.addedBy ? additionalGuest.addedBy?.profilePicture : '';
+  const invitationSourceNumber =
+    typeof additionalGuest.invitationSource === 'number' && UserSource[additionalGuest.invitationSource] !== undefined
+      ? additionalGuest.invitationSource
+      : UserSource.UNRECOGNIZED;
+
+  return {
+    id: additionalGuest.user?.id,
+    firstName: additionalGuest.user?.firstName,
+    lastName: additionalGuest.user?.lastName,
+    guestId: additionalGuest.id,
+    interest: plusOnesInterests ? plusOnesInterests.map((interest) => interest.name) : [],
+    category: plusOnesFocuses ? plusOnesFocuses.map((focus) => focus.name) : [],
+    profilePicture: additionalGuest?.user?.profilePicture,
+    ticketType: additionalGuest?.ticketType?.name,
+    numFollowers: formatToUnits(totalFollowerCount),
+    status: GuestStatus[additionalGuest.status],
+    baseCity: additionalGuest?.user?.address?.address || '',
+    checkIn: additionalGuest.checkIn,
+    gender: entityToGender[additionalGuest.user.gender] ?? entityToGender.NOT_APPLICABLE,
+    invitationSource: UserSource[invitationSourceNumber],
+    isBanned: false,
+    addedBy,
+    addedByPicture,
+    declinedBy: additionalGuest.declinedBy ? `${additionalGuest.declinedBy?.firstName || ''} ${additionalGuest.declinedBy?.lastName || ''}` : '',
+    declinedByPicture: additionalGuest.declinedBy ? additionalGuest.declinedBy?.profilePicture : '',
   };
 };

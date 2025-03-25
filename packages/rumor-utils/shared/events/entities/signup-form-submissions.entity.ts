@@ -3,9 +3,7 @@ import {
   Entity,
   Column,
   ManyToOne,
-  JoinColumn,
-  OneToMany,
-  OneToOne,
+  JoinColumn, OneToOne
 } from "typeorm";
 import { EventSignupForms } from "./event-signup-forms.entity";
 import { User } from "../../users/entities/user.entity";
@@ -17,8 +15,12 @@ export class SignupFormSubmissions extends RumorBaseEntity {
   @Column({ type: "jsonb", nullable: false, name: "answers" })
   answers: ISignupFormQuestionsRequest[];
 
+
+  @Column({ type: "uuid", nullable: true, name: "guest_id" })
+  guestId: string;
+
   @ManyToOne(() => EventSignupForms, (signupForm) => signupForm.submissions, {
-    onDelete: "RESTRICT",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn({ name: "signup_form_id" })
@@ -35,6 +37,5 @@ export class SignupFormSubmissions extends RumorBaseEntity {
     onDelete: "RESTRICT",
     onUpdate: "CASCADE",
   })
-  @JoinColumn({ name: "guest_id" })
   guest: Guest;
 }

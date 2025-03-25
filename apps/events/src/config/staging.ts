@@ -1,9 +1,13 @@
 const config = {
     parameters: [],
     secrets: [
+        {
+            remoteKey: 'stage-rumor'
+        }
     ],
     values: {
-        PORT: 8001
+        PORT: 8001,
+        NODE_ENV:'staging'
     }
 };
 

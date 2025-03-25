@@ -1,6 +1,7 @@
 import { ParsedQs } from 'qs';
-import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest } from '../grpc/auth/shared.pb';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest, RequestByUserAndEventRequest } from '../grpc/auth/shared.pb';
+import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import { UserStatus } from '../interfaces/shared.interface';
 
 export class TokenRequestDto implements TokenRequest {
   @IsString()
@@ -24,12 +25,27 @@ export class UserAndIdRequestDto implements UserAndIdRequest {
   id: string;
 }
 
+export class RequestByUserAndEventDto implements RequestByUserAndEventRequest {
+  @IsNotEmpty()
+  @IsUUID()
+  userId: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  eventId: string;
+}
+
 export class PaginatedRequestDto implements PaginatedRequest {
   @IsUUID()
   @IsOptional()
   userId: string;
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
+  query?: string;
+}
+
+export class ReportAndFeedbackRequestDto {
+  @IsString()
   query: string;
 }
 
@@ -37,6 +53,16 @@ export type PaginationQuery = {
   take: string;
   skip: string;
 };
+
+export class UpdateUsersStatusDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsNotEmpty()
+  ids: string[];
+
+  @IsNotEmpty()
+  status: UserStatus;
+}
 
 export const hasPagination = (query: ParsedQs | null): query is PaginationQuery => {
   if (!query) return false;

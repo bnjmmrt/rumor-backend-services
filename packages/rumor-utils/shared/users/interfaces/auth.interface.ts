@@ -1,17 +1,8 @@
+import { HostSocialMedia } from '../grpc/auth/auth.pb';
 import { UserStatus } from './shared.interface';
 
 export interface AdditionalMemberInformation {
   socialUrl: string;
-}
-
-export interface HostSocialMedia {
-  instagram?: string | undefined;
-  tiktok?: string | undefined;
-  linkedin?: string | undefined;
-  youtube?: string | undefined;
-  facebook?: string | undefined;
-  x?: string | undefined;
-  snapchat?: string | undefined;
 }
 
 export interface AdditionalHostInformation {
@@ -68,3 +59,51 @@ export enum RoleType {
   Member = 'member',
   NonMember = 'non_member',
 }
+
+export enum Tag {
+  General = 'general',
+  Bug = 'bug',
+  NewFeatureSuggestion = 'new_feature_suggestion',
+}
+
+export enum FilterTypes {
+  list = 'list',
+  pastEvents = 'pastEvents',
+  category = 'category',
+  baseCity = 'baseCity',
+  gender = 'gender',
+  age = 'age',
+  interest = 'interest',
+  type = 'type',
+  ticketType = 'ticketType',
+  partySize = 'partySize',
+  addedBy = 'addedBy',
+  requestSource = 'requestSource',
+  checkedIn = 'checkedIn',
+  declinedBy = 'declinedBy',
+  spammed = 'spammed',
+  userSource = 'userSource',
+  vouch = 'vouch',
+  followers = 'followers',
+}
+
+export const FilterTypeValues: Record<FilterTypes, string> = {
+  [FilterTypes.list]: 'checkbox',
+  [FilterTypes.pastEvents]: 'checkbox',
+  [FilterTypes.category]: 'checkbox',
+  [FilterTypes.baseCity]: 'baseCityFilter',
+  [FilterTypes.gender]: 'checkbox',
+  [FilterTypes.age]: 'age',
+  [FilterTypes.interest]: 'checkbox',
+  [FilterTypes.type]: 'checkbox',
+  [FilterTypes.ticketType]: 'checkbox',
+  [FilterTypes.partySize]: 'partySize',
+  [FilterTypes.addedBy]: 'checkbox',
+  [FilterTypes.requestSource]: 'checkbox',
+  [FilterTypes.checkedIn]: 'checkbox',
+  [FilterTypes.declinedBy]: 'checkbox',
+  [FilterTypes.spammed]: 'checkbox',
+  [FilterTypes.userSource]: 'checkbox',
+  [FilterTypes.vouch]: 'checkbox',
+  [FilterTypes.followers]: 'followers',
+};

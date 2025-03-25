@@ -13,6 +13,9 @@ export class EventSignupForms extends RumorBaseEntity {
   @Column({ type: "boolean", default: false, name: "is_published" })
   isPublished: boolean;
 
+  @Column({ type: "varchar", name: "name", default: "" })
+  name: string;
+
   @Column({ type: "varchar", name: "styling", nullable: false })
   styling: string;
 
@@ -43,15 +46,15 @@ export class EventSignupForms extends RumorBaseEntity {
   createdBy: User;
 
   @ManyToOne(() => Event, (event) => event.signupForms, {
-    onDelete: "RESTRICT",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn({ name: "event_id" })
   event: Event;
 
-  @OneToMany(() => SignupFormQuestions, (question) => question.signupForms)
+  @OneToMany(() => SignupFormQuestions, (question) => question.signupForms, {cascade: true, onDelete: 'CASCADE' })
   questions: SignupFormQuestions[];
 
-  @OneToMany(() => SignupFormSubmissions, (submission) => submission.signupForm)
+  @OneToMany(() => SignupFormSubmissions, (submission) => submission.signupForm, {cascade: true, onDelete: 'CASCADE' })
   submissions: SignupFormSubmissions[];
 }

@@ -1,11 +1,12 @@
 import { SuccessResponse } from "./base.success.response";
-
-export class UpdateResponse implements SuccessResponse<void> {
-    statusCode: number = 204;
+export class UpdateResponse<T> implements SuccessResponse<T> {
+    success: boolean = true;   
+    statusCode: number = 201;
+    data?: T;
     message?: string;
-    data: void = undefined; // Explicitly set data to undefined
   
-    constructor(message?: string) {
+    constructor(data?: any, message?: string) {
       this.message = message;
+      this.data = data
     }
   }

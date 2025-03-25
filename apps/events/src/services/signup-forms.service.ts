@@ -14,16 +14,27 @@ import {
   Role,
   Guest,
 } from "rumor-utils/shared/entities";
-import { ForbiddenError, NotFoundError } from "rumor-utils/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "rumor-utils/errors";
 import database from "../database";
 import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
 import { parse } from "qs";
-import { Brackets, DataSource } from "typeorm";
+import { Brackets, DataSource, QueryRunner, UpdateResult } from "typeorm";
 import { isUUID } from "class-validator";
-import { EventStatusEnum } from "rumor-utils/shared/events/interfaces/event.interface";
+import {
+  EventStatusEnum,
+  GuestStatus,
+} from "rumor-utils/shared/events/interfaces/event.interface";
+import config from "../config";
+import serviceMesh from "../server/helpers/serviceMeshHandler";
+import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
+import { isValidEmail, isValidPhoneNumber } from "rumor-utils/utils/file-utils";
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -66,11 +77,8 @@ export class SignupFormsServices {
       relations: { createdBy: true, questions: true },
     });
 
-    const data = buildSignupFormsResponse(
-      event,
-      signupForm,
-      "https://dev.therumor.com"
-    );
+    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+    const data = buildSignupFormsResponse(event, signupForm, baseUrl);
     return data;
   }
 
@@ -92,14 +100,10 @@ export class SignupFormsServices {
 
       const resultList: SignupFormsResponse[] = [];
 
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
       signupForms.forEach((sf) =>
         resultList.push(
-          buildSignupFormsResponse(
-            event,
-            sf,
-            "https://dev.therumor.com",
-            sf.submissions.length
-          )
+          buildSignupFormsResponse(event, sf, baseUrl, sf.submissions.length)
         )
       );
       return resultList;
@@ -134,10 +138,15 @@ export class SignupFormsServices {
         throw new ForbiddenError("SignupForm does not exists");
       }
 
+      if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
+        throw new NotFoundError("Event does not exists");
+      }
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+
       const data = buildSignupFormsResponse(
         eventSignupForm.event,
         eventSignupForm,
-        "https://dev.therumor.com"
+        baseUrl
       );
 
       return data;
@@ -158,20 +167,23 @@ export class SignupFormsServices {
       if (!event) {
         throw new NotFoundError("Event");
       }
-      if (!event.isPublished) {
-        throw new ForbiddenError("This event is not published.");
-      }
       if (event.isPrivate) {
         throw new ForbiddenError(
           "You cannot create signup forms for private events."
         );
       }
-      let random = (Math.random() + 1).toString(6).substring(6);
+      let random = Math.floor(100000 + Math.random() * 900000).toString();
 
+      const companyName = (
+        event.owner?.additionalHostInformation?.companyName || ""
+      )
+        .split(" ")
+        .join("");
       const signupForm = new EventSignupForms();
       signupForm.hasAccessForAdditionalGuests =
         body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
+      signupForm.name = body.name || `${companyName} 's`;
       signupForm.styling = body.styling;
       signupForm.urlCode = random;
       signupForm.isPublished = true;
@@ -187,6 +199,7 @@ export class SignupFormsServices {
         const question = new SignupFormQuestions();
         question.name = q.name;
         question.isDefault = q.id ? true : false;
+        question.value = q.value;
         question.isRequired = q.isRequired;
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
@@ -197,12 +210,8 @@ export class SignupFormsServices {
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map((q) => q.id);
       await signupForm.save();
-      const response = buildSignupFormsResponse(
-        event,
-        signupForm,
-        "https://dev.therumor.com",
-        0
-      );
+      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+      const response = buildSignupFormsResponse(event, signupForm, baseUrl, 0);
       return response;
     } catch (error) {
       throw error;
@@ -217,52 +226,89 @@ export class SignupFormsServices {
     const signupForm: EventSignupForms | undefined =
       await EventSignupForms.findOne({
         where: { id: id, event: { id: eventId } },
-        relations: { event: true },
+        relations: { event: true, createdBy: true },
       });
     if (!signupForm) {
       throw new ForbiddenError("Signup Forms does not exists.");
     }
 
+    const oldQuestionIds: string[] = [];
+    body.questions.forEach((q) => q.id && oldQuestionIds.push(q.id));
+    // const oldQuestions: FindOperator<string> = In(oldQuestionIds);
+    // const questonList = await SignupFormQuestions.find({
+    //   where: { id: oldQuestions },
+    // });
+
+    const existingQuestions = await SignupFormQuestions.getRepository()
+      .createQueryBuilder()
+      .where("id IN (:...ids)", { ids: oldQuestionIds })
+      .getMany();
+
+    const questionsMap = new Map<string, boolean>();
+    existingQuestions.forEach((q) =>
+      questionsMap.set(q.id.toString(), q.isDefault)
+    );
+
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
     signupForm.styling = body.styling;
+    signupForm.isPublished = true;
+    signupForm.isActive = true;
+    signupForm.name = body.name;
 
+    const ids = [];
     const questionPromises: any[] = [];
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
       index++;
       const question = new SignupFormQuestions();
-      question.name = q.name;
-      question.isDefault = false;
-      question.isRequired = q.isRequired;
-      question.ordering = index;
-      question.signupForms = { id: id } as EventSignupForms;
-
-      switch (q.type.toLowerCase()) {
-        case "create":
-          questionList.push(question);
-          break;
-        case "update":
-          const updatesQuestion = SignupFormQuestions.update(q.id, question);
-          questionPromises.push(updatesQuestion);
-          break;
-        case "delete":
+      const isStatic = questionsMap.get(q.id) || false;
+      if (!isStatic) {
+        question.name = q.name;
+        question.isRequired = q.isRequired;
+        switch (q.action.toLowerCase()) {
+          case "create":
+            question.ordering = index;
+            question.signupForms = { id: id } as EventSignupForms;
+            questionList.push(question);
+            break;
+          case "update":
+            ids.push(q.id);
+            question.ordering = index;
+            const updatesQuestion = SignupFormQuestions.update(q.id, question);
+            questionPromises.push(updatesQuestion);
+            break;
+          case "delete":
+            const deleteQuestions = SignupFormQuestions.delete(q.id);
+            questionPromises.push(deleteQuestions);
+            break;
+        }
+      }
+      if (!body.hasAccessForAdditionalGuests) {
+        if (q.name === "Request Access for Additional Guests") {
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
-          break;
+        } else {
+          ids.push(q.id);
+          question.ordering = index;
+          question.value = q.value;
+          const updatesQuestion = SignupFormQuestions.update(q.id, question);
+          questionPromises.push(updatesQuestion);
+        }
       }
     }
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
     await SignupFormQuestions.insert(newQuestions);
-    const newQuestionIds = newQuestions.map((q) => q.id);
-    signupForm.questionIds.push(...newQuestionIds);
+    ids.push(...newQuestions.map((q) => q.id));
+    signupForm.questionIds = ids;
+    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
     await signupForm.save();
     const response = buildSignupFormsResponse(
       signupForm.event,
       signupForm,
-      "https://dev.therumor.com",
+      baseUrl,
       0
     );
     return response;
@@ -272,7 +318,7 @@ export class SignupFormsServices {
     requestPayload: SignupFormAnswersDto[],
     answerList: SignupFormAnswersDto[],
     userPayload: User,
-    requestedGuests: number = 0
+    requestedGuests: any
   ) {
     requestPayload.forEach((ans: SignupFormAnswersDto) => {
       const answer = new SignupFormAnswersDto();
@@ -290,17 +336,79 @@ export class SignupFormsServices {
             break;
           case "email":
             userPayload.email = ans.answers;
+            if (!isValidEmail(userPayload.email)) {
+              throw new BadRequestError('Invalid Email format');
+        
+            }
             break;
           case "phone":
             userPayload.phoneNumber = ans.answers;
-            break;
+            if (!isValidPhoneNumber(userPayload.phoneNumber)) {
+              throw new BadRequestError('Invalid Phone Number format');
+              }             
+              break;
           case "request access for additional guests":
-            requestedGuests = Number(ans.answers);
+            requestedGuests.additional = Number(ans.answers);
             break;
         }
       }
       answerList.push(answer);
     });
+  }
+
+  private static async registerUserAsNonMember(
+    payload: User,
+    queryRunner: QueryRunner
+  ) {
+    await queryRunner.manager.save(payload);
+
+    const nonMemberRole: Role[] = await this.dbConnection
+      .getRepository(Role)
+      .find({ where: { name: "non_member" } });
+
+    const userRole = UserRole.create({
+      role: { id: nonMemberRole[0].id },
+      user: { id: payload.id },
+    });
+
+    await queryRunner.manager.save(userRole);
+  }
+
+  private static async validateUserAsGuest(
+    eventId: string,
+    userPayload: User
+  ): Promise<[User, Guest]> {
+    let user = null;
+    if (userPayload.email) {
+      user = await User.findOne({
+        where: { email: userPayload.email },
+      });
+    } else if (userPayload.phoneNumber) {
+      user = await User.findOne({
+        where: { email: userPayload.phoneNumber },
+      });
+    } else {
+      throw new BadRequestError(
+        "User information missing to apply for an event."
+      );
+    }
+    if (!user) {
+      return [userPayload, new Guest()];
+    }
+
+    if (user.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userPayload.id }, event: { id: eventId } },
+      });
+      if (guest && guest.status !== GuestStatus.DRAFT) {
+        throw new ForbiddenError(
+          "You are already part of this event. Please log into application and check your event status."
+        );
+      }
+      return [user, guest];
+    }
+    return [user, new Guest()];
+
   }
 
   public static async answers(
@@ -324,40 +432,11 @@ export class SignupFormsServices {
 
       // Step 5: Ensure invites can only be sent for approved events
       if (signupForm.event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new ForbiddenError(
-          "You cannot send invites until the event has been approved by the Rumor admin"
-        );
+        throw new ForbiddenError("You can apply only for approved event.");
       }
-      const userPayload = new User();
+      let userPayload = new User();
       const answerList: SignupFormAnswersDto[] = [];
-      let requestedGuests: number = 0;
-      // payload.forEach((ans: SignupFormAnswersDto) => {
-      //   const answer = new SignupFormAnswersDto();
-      //   answer.answers = ans.answers || "";
-      //   answer.id = ans.id;
-      //   answer.isRequired = ans.isRequired;
-      //   answer.name = ans.name;
-      //   if (ans.isRequired) {
-      //     switch (answer.name.toLowerCase()) {
-      //       case "first name":
-      //         userPayload.firstName = ans.answers;
-      //         break;
-      //       case "last name":
-      //         userPayload.lastName = ans.answers;
-      //         break;
-      //       case "email":
-      //         userPayload.email = ans.answers;
-      //         break;
-      //       case "phone":
-      //         userPayload.phoneNumber = ans.answers;
-      //         break;
-      //       case "request access for additional guests":
-      //         requestedGuests = ans.answers;
-      //         break;
-      //     }
-      //   }
-      //   answerList.push(answer);
-      // });
+      let requestedGuests: any = { additional: 0 };
 
       this.extractUserPayloadAndAnswers(
         payload,
@@ -365,107 +444,99 @@ export class SignupFormsServices {
         userPayload,
         requestedGuests
       );
-
-      const queryRunner = database.connection.createQueryRunner();
+      let inviteGuestPayload = null;
+      [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
+      const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
-      await queryRunner.manager.save(userPayload);
-      //await userPayload.save();
+      if (!userPayload.id) {
+        await this.registerUserAsNonMember(userPayload, queryRunner);
+      }
 
-      const nonMemberRole: Role[] = await this.dbConnection
-        .getRepository(Role)
-        .find({ where: { name: "non_member" } });
-
-      // const userRole = await UserRole.create({
-      //   role: { id: nonMemberRole[0].id },
-      //   user: { id: userPayload.id },
-      // }).save();
-
-      const userRole = UserRole.create({
-        role: { id: nonMemberRole[0].id },
-        user: { id: userPayload.id },
-      });
-      await queryRunner.manager.save(userRole);
-
-      const inviteGuestPayload = new Guest();
-      inviteGuestPayload.event = signupForm.event;
-      inviteGuestPayload.maxAdditionalGuests = requestedGuests;
-      inviteGuestPayload.user = { id: userPayload.id } as User;
-      inviteGuestPayload.invitationSource = UserSource.INVITED_BY_HOST;
-      inviteGuestPayload.ticketType = undefined;
-      // inviteGuestPayload.status = GuestStatus.APPLIED;
-      // await inviteGuestPayload.save();
-      await queryRunner.manager.save(inviteGuestPayload);
-
+      /**--Create Submissions */
       const submissions = new SignupFormSubmissions();
       submissions.signupForm = { id: id } as EventSignupForms;
       submissions.answers = answerList;
-      submissions.guest = { id: inviteGuestPayload.id } as Guest;
       submissions.attendees = { id: userPayload.id } as User;
+      await queryRunner.manager.save(submissions);
 
-      // await submissions.save();
+      /**-- Create Guest */
+      inviteGuestPayload.event = signupForm.event;
+      inviteGuestPayload.additionalRequestedGuests = requestedGuests.additional;
+      inviteGuestPayload.maxAdditionalGuests = requestedGuests.additional;
+      inviteGuestPayload.user = { id: userPayload.id } as User;
+      inviteGuestPayload.invitationSource = UserSource.SIGN_UP_FORM;
+      inviteGuestPayload.ticketType = undefined;
+      inviteGuestPayload.status = GuestStatus.APPLIED;
+      inviteGuestPayload.signupFormSubmissions = {
+        id: submissions.id,
+      } as SignupFormSubmissions;
+      await queryRunner.manager.save(inviteGuestPayload);
+
+      submissions.guestId = inviteGuestPayload.id;
       await queryRunner.manager.save(submissions);
       await queryRunner.commitTransaction();
+
+      try {
+        // Send Notification
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.RSVP_SIGNUP_FORM_REQUEST,
+            signupForm.event.owner.id,
+            signupForm.event.id,
+            userPayload.id
+          );
+      } catch (error) {
+        console.log("🚀 ~ SignupFormsServices ~ error:", error);
+      }
       return submissions;
     } catch (err) {
       throw err;
     }
   }
 
+  /**
+   * 1. When an event is cancelled, need to deactivate Signup Forms.
+   * @param id
+   */
   public static async deactivate(id: string) {
-    await EventSignupForms.update(id, { isPublished: false });
+    const data: UpdateResult = await EventSignupForms.update(id, {
+      isPublished: false,
+      isActive: false,
+    });
+    return data;
   }
 
-  // private static generateSubmissionQuery(skip: number, take: number, ) {
-  //   const submissionsQuery = SignupFormSubmissions.createQueryBuilder("sfs")
-  //     .innerJoinAndSelect("sfs.attendees", "atd")
-  //     .innerJoinAndSelect("sfs.guest", "gst")
-  //     .orderBy("sfs.id", "DESC")
-  //     .addSelect("sfs.id", "id")
-  //     .addSelect("atd.firstName", "firstName")
-  //     .addSelect("atd.lastName", "lastName")
-  //     .addSelect("atd.email", "email")
-  //     .addSelect("atd.phone", "phone")
-  //     .addSelect("gst.status", "status")
-  //     .where("sfs.signup_form_id = :id", { signupFormId: id })
-  //     .skip(skip)
-  //     .take(take);
+  /**
+   * Situation 1: Event is Active and SF is created -> PUBLISHED and ACTIVE
+   * Situation 2: Event is passed and SF was Update -> RSVP CLOSED
+   * Timezone not coming up get signup forms.
+   * Collaborators data is not showing up email, role, name and profile.
+   * Only approved Collaborator which is Host will be shown.
+   * Host profile pictures.
+   */
 
-  //   if (parsedQuery.lastIndex && isUUID(parsedQuery.lastIndex)) {
-  //     submissionsQuery.andWhere("sfs.id > :id", { id: parsedQuery.lastIndex });
-  //   }
-
-  //   if (searchValue) {
-  //     const searchWords = searchValue.trim().split(/\s+/);
-  //     submissionsQuery.andWhere(
-  //       new Brackets((qb) => {
-  //         searchWords.forEach((word) => {
-  //           qb.orWhere("atd.firstName ILIKE :word", {
-  //             word: `%${word}%`,
-  //           }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
-  //         });
-  //       })
-  //     );
-  //   }
-  // }
-
-  public static async listSubmissions(id: string, payload: any) {
+  public static async listSubmissionsWithPerformanceOptimisations(
+    id: string,
+    payload: any
+  ) {
     try {
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take
         ? parseInt(parsedQuery.take as string)
         : undefined;
-      const skip = parsedQuery?.skip
-        ? parseInt(parsedQuery.skip as string)
-        : undefined;
+      const lastIndex =
+        parsedQuery?.lastIndex && isUUID(parsedQuery.lastIndex)
+          ? parsedQuery.lastIndex
+          : undefined;
 
       const searchValue =
         parsedQuery.findByName && typeof parsedQuery.findByName === "string"
           ? parsedQuery.findByName.toLowerCase()
           : "";
 
-      //const submissionsQuery = SignupFormSubmissions.createQueryBuilder("sfs")
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder("sfs")
@@ -478,10 +549,14 @@ export class SignupFormsServices {
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
-        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id })
-        .orderBy("sfs.id", "DESC")
-        .skip(skip)
-        .take(take);
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+
+      if (lastIndex && isUUID(lastIndex)) {
+        submissionsQuery.andWhere("sfs.id < :id", {
+          id: lastIndex,
+        });
+      }
+      submissionsQuery.orderBy("sfs.id", "DESC").limit(take);
 
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -504,4 +579,94 @@ export class SignupFormsServices {
       throw err;
     }
   }
+
+  public static async listSubmissions(id: string, payload: any) {
+    try {
+      const parsedQuery = parse(payload);
+      const take = parsedQuery?.take
+        ? parseInt(parsedQuery.take as string)
+        : undefined;
+
+      const skip = parsedQuery?.skip
+        ? parseInt(parsedQuery.skip as string)
+        : undefined;
+
+      const searchValue =
+        parsedQuery.findByName && typeof parsedQuery.findByName === "string"
+          ? parsedQuery.findByName.toLowerCase()
+          : "";
+
+      // const count = await SignupFormSubmissions.count({
+      //   where: {
+      //     signupForm: { id: id },
+      //   },
+      // });
+
+      const getCountQuery = database
+        .getRepository(SignupFormSubmissions)
+        .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+
+      const submissionsQuery = database
+        .getRepository(SignupFormSubmissions)
+        .createQueryBuilder("sfs")
+        .innerJoin("sfs.attendees", "atd")
+        .innerJoin("sfs.guest", "gst")
+        .select([])
+        .addSelect("sfs.id", "id")
+        .addSelect("atd.firstName", "firstName")
+        .addSelect("atd.profilePicture", "profilePicture")
+        .addSelect("atd.lastName", "lastName")
+        .addSelect("atd.email", "email")
+        .addSelect("atd.phone_number", "phone")
+        .addSelect("gst.status", "status")
+        .addSelect("gst.additionalRequestedGuests + 1", "partySize")
+        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+      if (searchValue) {
+        const searchWords = searchValue.trim().split(/\s+/);
+        getCountQuery.andWhere(
+          new Brackets((qb) => {
+            searchWords.forEach((word) => {
+              qb.orWhere("atd.firstName ILIKE :word", {
+                word: `%${word}%`,
+              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+            });
+          })
+        );
+        submissionsQuery.andWhere(
+          new Brackets((qb) => {
+            searchWords.forEach((word) => {
+              qb.orWhere("atd.firstName ILIKE :word", {
+                word: `%${word}%`,
+              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+            });
+          })
+        );
+      }
+      submissionsQuery.orderBy("sfs.id", "DESC").offset(skip).limit(take);
+
+      const count = await getCountQuery.getCount();
+      const submissionList = await submissionsQuery.getRawMany();
+      const result = { count, result: submissionList };
+      return result;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  // public static async setName(id: string, name: string) {
+  //   try {
+  //     const signupForm: EventSignupForms = await EventSignupForms.findOne({
+  //       where: { id: id },
+  //     });
+  //     if (!signupForm) {
+  //       throw new ForbiddenError("Signup Forms does not exists.");
+  //     }
+  //     signupForm.name = name;
+  //     await signupForm.save();
+  //   } catch (err) {
+  //     throw err;
+  //   }
+  // }
 }

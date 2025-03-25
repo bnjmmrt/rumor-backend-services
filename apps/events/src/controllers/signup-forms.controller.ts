@@ -8,6 +8,8 @@ import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
 } from "rumor-utils/shared/events/dtos/signup-forms.dto";
+import { BadRequestError } from "rumor-utils/errors";
+import { UpdateResult } from "typeorm";
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -41,7 +43,11 @@ export class SignupFormsController {
   public static create = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const eventId = req.params.id;
-      const payload = req.body as any;
+      const payload = req.body as CreateSignupFormDto;
+      const hostId = (req as any).user;
+      if (payload.userId !== hostId) {
+        throw new BadRequestError("Invalid host id provided.");
+      }
       const data: SignupFormsResponse = await SignupFormsServices.create(
         eventId,
         payload
@@ -54,6 +60,10 @@ export class SignupFormsController {
       const eventId = req.params.eventId;
       const id = req.params.id;
       const payload = req.body as CreateSignupFormDto;
+      const hostId = (req as any).user;
+      if (payload.userId !== hostId) {
+        throw new BadRequestError("Invalid host id provided.");
+      }
       const data: SignupFormsResponse = await SignupFormsServices.update(
         id,
         eventId,
@@ -85,8 +95,9 @@ export class SignupFormsController {
   public static deactivate = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const id = req.params.id;
-      await SignupFormsServices.deactivate(id);
-      res.json(new GetResponse({}));
+      const data: UpdateResult = await SignupFormsServices.deactivate(id);
+      const successResponse = new GetResponse(data.affected);
+      res.status(successResponse.statusCode).json(successResponse);
     }
   );
 
@@ -101,4 +112,13 @@ export class SignupFormsController {
       res.json(new GetResponse(submissions));
     }
   );
+
+  // public static setName = asyncWrapper(
+  //   async (req: Request, res: Response): Promise<void> => {
+  //     const payload = req.body;
+  //     const id = req.params.id;
+  //     const sforms = await SignupFormsServices.setName(id, payload.name);
+  //     res.json(new GetResponse(sforms));
+  //   }
+  // );
 }
