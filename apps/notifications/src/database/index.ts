@@ -26,7 +26,7 @@ export class ConnectionManager {
           ...(["development", "staging", "production", "uat"].includes(
             config.get("NODE_ENV")
           ) && { ssl: { rejectUnauthorized: false } }),
-          synchronize: true,
+          synchronize: false,
         });
         this.connection = await appDataSource.initialize();
       }
