@@ -2640,6 +2640,9 @@ export class GuestService {
         deletedAt: null,
         status: EventStatusEnum.APPROVED_STATUS,
       },
+      relations: {
+        owner: true
+      }
     });
 
     if (!event) {
@@ -2651,6 +2654,12 @@ export class GuestService {
     if (!user) {
       throw new NotFoundError("User not found");
     }
+    const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+      where: {
+        user: { id: user?.id },
+        host: { id: event.owner.id }
+      },
+    });
 
     const alreadyGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -2724,20 +2733,38 @@ export class GuestService {
         );
     }
 
-    if (alreadyGuest) {
-      alreadyGuest.status = GuestStatus.APPLIED;
-      alreadyGuest.declinedBy = null;
-      alreadyGuest.rejectedReason = null;
-      alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
-      await this.dbConnection.getRepository(Guest).save(alreadyGuest);
+    if (hostUserSettings && hostUserSettings.isSpam) {
+      if (alreadyGuest) {
+        alreadyGuest.status = GuestStatus.DECLINED;
+        alreadyGuest.declinedBy = { id: event?.owner.id } as User;
+        alreadyGuest.rejectedReason = "User is marked as spam";
+        await this.dbConnection.getRepository(Guest).save(alreadyGuest);
+      } else {
+        const declinedGuest = new Guest();
+        declinedGuest.event = event;
+        declinedGuest.user = { id: user?.id };
+        declinedGuest.declinedBy = { id: event?.owner.id } as User;
+        declinedGuest.status = GuestStatus.DECLINED;
+        declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
+        declinedGuest.rejectedReason = "User is marked as spam";
+        await this.dbConnection.getRepository(Guest).save(declinedGuest);
+      }
     } else {
-      const guest = new Guest();
-      guest.event = event;
-      guest.user = { id: user?.id };
-      guest.status = GuestStatus.APPLIED;
-      guest.additionalRequestedGuests = payload.additionalGuests;
-      guest.invitationSource = UserSource.REQUEST_IN_APP;
-      await this.dbConnection.getRepository(Guest).save(guest);
+      if (alreadyGuest) {
+        alreadyGuest.status = GuestStatus.APPLIED;
+        alreadyGuest.declinedBy = null;
+        alreadyGuest.rejectedReason = null;
+        alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+        await this.dbConnection.getRepository(Guest).save(alreadyGuest);
+      } else {
+        const guest = new Guest();
+        guest.event = event;
+        guest.user = { id: user?.id };
+        guest.status = GuestStatus.APPLIED;
+        guest.additionalRequestedGuests = payload.additionalGuests;
+        guest.invitationSource = UserSource.REQUEST_IN_APP;
+        await this.dbConnection.getRepository(Guest).save(guest);
+      }
     }
 
     // Send Notification to Host
