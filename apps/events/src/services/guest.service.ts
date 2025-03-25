@@ -779,7 +779,7 @@ export class GuestService {
                 case GuestStatus.CONFIRMED:
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
                   if (
-                    [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(
+                    [GuestStatus.APPLIED].includes(
                       guest.status
                     )
                   ) {
