@@ -114,11 +114,9 @@ import serviceMesh from "../server/helpers/serviceMeshHandler";
 import { HostUserSettings } from "rumor-utils/shared/users/entities/host-user-settings.entity";
 import { v4 as uuidv4 } from "uuid";
 import { toSimpleUser } from "rumor-utils/shared/users/mappers/auth.mapper";
-import {
-  HostCustomUsersLists,
-  HostFavorite,
-  HostFollowing,
-} from "rumor-utils/shared/users/entities";
+import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
+import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
+import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostUserMapping } from "rumor-utils/shared/users/entities/host-user-mapping.entity";
 import {
   processCsvFile,
