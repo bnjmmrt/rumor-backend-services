@@ -76,7 +76,7 @@ export const toEvent = (
     totalConfirmedGuests: totalConfirmedGuests || 0,
     guestOptionalMessage: guest?.inviteMessage || '',
     guestNote: guest?.privateGuestNote || '',
-    invitationDate: guest.status === 'INVITED' ? (guest?.createdAt?.toISOString() || '') : ''
+    invitationDate: guest?.status === 'INVITED' ? (guest?.createdAt?.toISOString() || '') : ''
   };
 };
 
