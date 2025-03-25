@@ -197,6 +197,9 @@ export interface EventData {
   invitationDeclinedBy?: string | undefined;
   isPublished?: boolean | undefined;
   totalCheckedInGuests?: number | undefined;
+  guestOptionalMessage?:  string | undefined;
+  guestNote?: string | undefined;
+  invitationDate?: string | undefined;
 }
 
 export interface FeaturedEventSection {
