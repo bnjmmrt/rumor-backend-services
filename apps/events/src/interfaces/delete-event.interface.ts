@@ -1,5 +1,5 @@
 export interface DeleteEventInterface {
-    id: string;
-    userId?: string;
-    fromAdmin?: boolean;
+  id: string;
+  userId?: string;
+  fromAdmin?: boolean;
 }

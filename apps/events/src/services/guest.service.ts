@@ -3958,7 +3958,7 @@ export class GuestService {
       },
       guestProfile: {
         ...guestProfileResponse,
-        hostUserMappingId: hostUserMapping?.id ?? ''
+        hostUserMappingId: hostUserMapping?.id ?? '',
       },
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
