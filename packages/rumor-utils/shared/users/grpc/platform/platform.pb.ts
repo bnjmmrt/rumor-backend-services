@@ -6,7 +6,7 @@
 
 /* eslint-disable */
 // import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
-import { Observable } from "rxjs";
+import { Observable } from 'rxjs';
 import {
   FeaturedEventsSection,
   FocusData,
@@ -16,13 +16,12 @@ import {
   ReferralRequestStatus,
   UserVouch,
   VouchRequest,
-} from "./general.pb";
+} from './general.pb';
 
-export const protobufPackage = "platform";
+export const protobufPackage = 'platform';
 
 /** General Messages */
-export interface EmptyRequest {
-}
+export interface EmptyRequest {}
 
 export interface IdRequest {
   id: string;
@@ -215,7 +214,7 @@ export interface GetSentReferralRequestsResponse {
   data: ReferralRequestStatus[];
 }
 
-export const PLATFORM_PACKAGE_NAME = "platform";
+export const PLATFORM_PACKAGE_NAME = 'platform';
 
 export interface PlatformServiceClient {
   /** Focus */
@@ -288,7 +287,9 @@ export interface PlatformServiceClient {
 
   getFeaturedEventSection(request: IdRequest): Observable<FeaturedEventSectionResponse>;
 
-  createFeaturedEventSection(request: CreateFeaturedEventSectionRequest): Observable<GenericResponse>;
+  createFeaturedEventSection(
+    request: CreateFeaturedEventSectionRequest,
+  ): Observable<GenericResponse>;
 
   deleteFeaturedEventSection(request: IdRequest): Observable<GenericResponse>;
 }
@@ -296,11 +297,17 @@ export interface PlatformServiceClient {
 export interface PlatformServiceController {
   /** Focus */
 
-  getFocuses(request: EmptyRequest): Promise<FocusResponse> | Observable<FocusResponse> | FocusResponse;
+  getFocuses(
+    request: EmptyRequest,
+  ): Promise<FocusResponse> | Observable<FocusResponse> | FocusResponse;
 
-  getUserFocuses(request: IdRequest): Promise<FocusResponse> | Observable<FocusResponse> | FocusResponse;
+  getUserFocuses(
+    request: IdRequest,
+  ): Promise<FocusResponse> | Observable<FocusResponse> | FocusResponse;
 
-  addFocus(request: AddFocusRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  addFocus(
+    request: AddFocusRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   editFocusName(
     request: EditFocusNameRequest,
@@ -320,15 +327,21 @@ export interface PlatformServiceController {
     request: UpdateInterestRequest,
   ): Promise<InterestResponse> | Observable<InterestResponse> | InterestResponse;
 
-  listInterests(request: EmptyRequest): Promise<InterestsResponse> | Observable<InterestsResponse> | InterestsResponse;
+  listInterests(
+    request: EmptyRequest,
+  ): Promise<InterestsResponse> | Observable<InterestsResponse> | InterestsResponse;
 
   saveInterestsForUser(
     request: SaveInterestsForUserRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  getUserInterests(request: IdRequest): Promise<InterestsResponse> | Observable<InterestsResponse> | InterestsResponse;
+  getUserInterests(
+    request: IdRequest,
+  ): Promise<InterestsResponse> | Observable<InterestsResponse> | InterestsResponse;
 
-  deleteInterest(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteInterest(
+    request: IdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   /** Referral Codes */
 
@@ -368,7 +381,10 @@ export interface PlatformServiceController {
 
   getReferralRequests(
     request: IdRequest,
-  ): Promise<ReferralRequestsResponse> | Observable<ReferralRequestsResponse> | ReferralRequestsResponse;
+  ):
+    | Promise<ReferralRequestsResponse>
+    | Observable<ReferralRequestsResponse>
+    | ReferralRequestsResponse;
 
   getSentReferralRequests(
     request: IdRequest,
@@ -405,11 +421,17 @@ export interface PlatformServiceController {
 
   getFeaturedEventSections(
     request: EmptyRequest,
-  ): Promise<FeaturedEventSectionsResponse> | Observable<FeaturedEventSectionsResponse> | FeaturedEventSectionsResponse;
+  ):
+    | Promise<FeaturedEventSectionsResponse>
+    | Observable<FeaturedEventSectionsResponse>
+    | FeaturedEventSectionsResponse;
 
   getFeaturedEventSection(
     request: IdRequest,
-  ): Promise<FeaturedEventSectionResponse> | Observable<FeaturedEventSectionResponse> | FeaturedEventSectionResponse;
+  ):
+    | Promise<FeaturedEventSectionResponse>
+    | Observable<FeaturedEventSectionResponse>
+    | FeaturedEventSectionResponse;
 
   createFeaturedEventSection(
     request: CreateFeaturedEventSectionRequest,
@@ -466,4 +488,4 @@ export interface PlatformServiceController {
 //   };
 // }
 
-export const PLATFORM_SERVICE_NAME = "PlatformService";
+export const PLATFORM_SERVICE_NAME = 'PlatformService';

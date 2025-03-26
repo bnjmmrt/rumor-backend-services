@@ -41,7 +41,7 @@ export class DefaultRoleSettings extends RumorBaseEntity {
   generateEventReports: boolean;
 
   @Index()
-  @ManyToOne(() => Role, (role) => role.defaultRoleSettings, {
+  @ManyToOne(() => Role, role => role.defaultRoleSettings, {
     onDelete: 'RESTRICT',
     onUpdate: 'CASCADE',
   })

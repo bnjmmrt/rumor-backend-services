@@ -1,19 +1,18 @@
-import { RumorBaseEntity } from "../../entities/rumor-base.entity";
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  JoinColumn, OneToOne
-} from "typeorm";
-import { EventSignupForms } from "./event-signup-forms.entity";
-import { User } from "../../users/entities/user.entity";
-import { ISignupFormQuestionsRequest } from "../grpc/events/general.pb";
-import { Guest } from "./guest.entity";
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { Entity, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
+import { EventSignupForms } from './event-signup-forms.entity';
+import { User } from '../../users/entities/user.entity';
+import { ISignupFormQuestionsRequest } from '../grpc/events/general.pb';
+import { Guest } from './guest.entity';
 
-@Entity("signup_form_submissions")
+@Entity('signup_form_submissions')
 export class SignupFormSubmissions extends RumorBaseEntity {
   @Column({ type: "jsonb", nullable: false, name: "answers" })
   answers: ISignupFormQuestionsRequest[];
+
+
+  @Column({ type: "uuid", nullable: true, name: "guest_id" })
+  guestId: string;
 
   @ManyToOne(() => EventSignupForms, (signupForm) => signupForm.submissions, {
     onDelete: "CASCADE",
@@ -33,6 +32,5 @@ export class SignupFormSubmissions extends RumorBaseEntity {
     onDelete: "RESTRICT",
     onUpdate: "CASCADE",
   })
-  @JoinColumn({ name: "guest_id" })
   guest: Guest;
 }

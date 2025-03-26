@@ -7,8 +7,7 @@
 //   return Inject(TWILIO_CONFIG_TOKEN);
 // }
 
-
-import { TWILIO_CONFIG_TOKEN } from "./twilio.constants";
+import { TWILIO_CONFIG_TOKEN } from './twilio.constants';
 
 // Function to get Twilio configuration
 export function getTwilioConfig() {

@@ -2,7 +2,6 @@ import { RequestById, UserAndIdRequest } from '../grpc/events/events.pb';
 import { ParsedQs } from 'qs';
 import {IsNotEmpty, IsOptional, IsString, IsUUID, isString, IsBoolean} from 'class-validator';
 
-
 export class RequestByIdDto implements RequestById {
   @IsNotEmpty()
   @IsUUID()

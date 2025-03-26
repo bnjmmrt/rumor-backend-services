@@ -1,5 +1,6 @@
 import { Column, Entity, ManyToOne, JoinColumn, Index, OneToMany } from 'typeorm';
-import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Event } from './event.entity';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { Event } from './event.entity';
 import { UserQuizAnswer } from './user-quiz-question-answer.entity';
 
 @Entity()
@@ -17,13 +18,13 @@ export class QuizQuestion extends RumorBaseEntity {
   order: number;
 
   @Index()
-  @ManyToOne(() => Event, (event) => event.quizQuestions, {
+  @ManyToOne(() => Event, event => event.quizQuestions, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })
   event: Event;
 
-  @OneToMany(() => UserQuizAnswer, (answer) => answer.question)
+  @OneToMany(() => UserQuizAnswer, answer => answer.question)
   answers: UserQuizAnswer[];
 }

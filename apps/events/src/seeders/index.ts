@@ -1,7 +1,12 @@
-import { DefaultRoleSettings, EventAgeLimit, EventTypes, Role } from "rumor-utils/shared/entities/index";
-import database from "../database";
+import {
+  DefaultRoleSettings,
+  EventAgeLimit,
+  EventTypes,
+  Role,
+} from 'rumor-utils/shared/entities/index';
+import database from '../database';
 import { CollaboratorRoles } from 'rumor-utils/shared/events/interfaces/event.interface';
-import serviceMesh from "../server/helpers/serviceMeshHandler";
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class Seeders {
   public static dbConnection = database;
@@ -115,7 +120,7 @@ export class Seeders {
         await await this.dbConnection.getRepository(EventTypes).save(data);
       }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 
@@ -149,7 +154,7 @@ export class Seeders {
         await this.dbConnection.getRepository(EventAgeLimit).save(data);
       }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 
@@ -214,7 +219,7 @@ export class Seeders {
         {
           role: CollaboratorRoles.CHECK_IN,
           config: {
-            editEventDetailsSettings:false,
+            editEventDetailsSettings: false,
             inviteGuestsToEvent: false,
             addGuestsToDrafts: false,
             viewFullGuestList: true,
@@ -251,7 +256,7 @@ export class Seeders {
         await this.dbConnection.getRepository(DefaultRoleSettings).save(settingsEntry);
       }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 }
