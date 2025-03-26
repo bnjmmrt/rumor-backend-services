@@ -2631,6 +2631,7 @@ export class AuthService {
   }
 
   public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<UserWithRoles> {
+    if(!payload.email) throw new BadRequestError('Invalid email')
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: null },
       relations: {
