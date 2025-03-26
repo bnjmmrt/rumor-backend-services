@@ -5,7 +5,13 @@ import {
   UpdateQuizQuestionRequestDto,
   UpdateUserQuizAnswerRequestDto,
 } from 'rumor-utils/shared/events/dtos/quiz-question.dto';
-import { GenericResponse, GetUserQuizAnswersResponse, QuizQuestionResponse, QuizQuestionsResponse, SaveUserQuizAnswersResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import {
+  GenericResponse,
+  GetUserQuizAnswersResponse,
+  QuizQuestionResponse,
+  QuizQuestionsResponse,
+  SaveUserQuizAnswersResponse,
+} from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { QuizQuestion } from 'rumor-utils/shared/events//entities/quiz-question.entity';
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses';
@@ -21,7 +27,9 @@ import { NotFoundError } from 'rumor-utils/errors';
 export class QuizQuestionService {
   public static dbConnection = database;
 
-  public static async createQuizQuestion(payload: CreateQuizQuestionRequestDto): Promise<QuizQuestionResponse> {
+  public static async createQuizQuestion(
+    payload: CreateQuizQuestionRequestDto,
+  ): Promise<QuizQuestionResponse> {
     const event: Event = await this.dbConnection.getRepository(Event).findOne({
       where: {
         id: payload.eventId,
@@ -42,7 +50,6 @@ export class QuizQuestionService {
     const created = await this.dbConnection.getRepository(QuizQuestion).save(quizQuestion);
 
     return responses.data(created);
-
   }
 
   public static async getEventQuizQuestions(payload: RequestByIdDto): Promise<QuizQuestion[]> {
@@ -52,10 +59,12 @@ export class QuizQuestionService {
         deletedAt: IsNull(),
       },
     });
-    return quizQuestions
+    return quizQuestions;
   }
 
-  public static async updateQuizQuestion(payload: UpdateQuizQuestionRequestDto): Promise<QuizQuestionResponse> {
+  public static async updateQuizQuestion(
+    payload: UpdateQuizQuestionRequestDto,
+  ): Promise<QuizQuestionResponse> {
     const quizQuestion = await this.dbConnection.getRepository(QuizQuestion).findOne({
       where: {
         id: payload.id,
@@ -66,7 +75,9 @@ export class QuizQuestionService {
     if (!quizQuestion) return responses.badRequest('Quiz question not found');
 
     delete payload.id;
-    const updatedQuizQuestion = this.dbConnection.getRepository(QuizQuestion).merge(quizQuestion, payload);
+    const updatedQuizQuestion = this.dbConnection
+      .getRepository(QuizQuestion)
+      .merge(quizQuestion, payload);
 
     await updatedQuizQuestion.save();
 
@@ -88,7 +99,9 @@ export class QuizQuestionService {
     return responses.data(quizQuestion);
   }
 
-  public static async saveUserQuizAnswers(payload: SaveUserQuizAnswersRequestDto): Promise<QuizAnswer[]> {
+  public static async saveUserQuizAnswers(
+    payload: SaveUserQuizAnswersRequestDto,
+  ): Promise<QuizAnswer[]> {
     /* TODO: commenting this since token is not there confirm with mobile team and update this function
      const user: any = await serviceMesh.userService().getCurrentMember();
      if (!user) throw new NotFoundError('User not found')
@@ -127,7 +140,7 @@ export class QuizQuestionService {
        }
      });  */
 
-    const promises = payload.answers.map(async (item) => {
+    const promises = payload.answers.map(async item => {
       const [question, event] = await Promise.all([
         this.dbConnection.getRepository(QuizQuestion).findOne({
           where: { id: item.questionId },
@@ -166,28 +179,35 @@ export class QuizQuestionService {
       relations: { question: true, event: true, user: true },
     });
 
-    return response.map((item) => ({
+    return response.map(item => ({
       answer: item.answer,
       questionId: item.question.id,
       eventId: item.event.id,
       id: item.id,
-    }))
+    }));
   }
 
-  public static async updateUserQuizAnswer(payload: UpdateUserQuizAnswerRequestDto): Promise<string> {
-    const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { answer: payload.answer });
+  public static async updateUserQuizAnswer(
+    payload: UpdateUserQuizAnswerRequestDto,
+  ): Promise<string> {
+    const update = await this.dbConnection
+      .getRepository(UserQuizAnswer)
+      .update({ id: payload.id }, { answer: payload.answer });
     if (!update) throw new NotFoundError('Element not found');
     return '';
   }
 
   public static async deleteUserQuizAnswer(payload: RequestByIdDto): Promise<GenericResponse> {
-    const update = await this.dbConnection.getRepository(UserQuizAnswer).update({ id: payload.id }, { deletedAt: new Date() });
+    const update = await this.dbConnection
+      .getRepository(UserQuizAnswer)
+      .update({ id: payload.id }, { deletedAt: new Date() });
     if (!update) throw new NotFoundError('Element not found');
-    return responses.ok
+    return responses.ok;
   }
 
-  public static async getUserQuizAnswers(payload: GetUserQuizAnswersRequestDto): Promise<QuizAnswer[]> {
-
+  public static async getUserQuizAnswers(
+    payload: GetUserQuizAnswersRequestDto,
+  ): Promise<QuizAnswer[]> {
     const response = await this.dbConnection.getRepository(UserQuizAnswer).find({
       where: {
         deletedAt: null,
@@ -200,13 +220,13 @@ export class QuizQuestionService {
       },
       relations: { question: true, event: true, user: true },
     });
-    return response.map((item) => {
+    return response.map(item => {
       return {
         answer: item.answer,
         questionId: item.question.id,
         eventId: item.event.id,
         id: item.id,
       };
-    })
+    });
   }
 }

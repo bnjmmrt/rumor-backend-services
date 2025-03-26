@@ -1,5 +1,12 @@
-import { CreateTicketTypeRequestDto, RequestByIdDto, UpdateTicketTypeRequestDto } from 'rumor-utils/shared/events/dtos';
-import { TicketTypesResponse, TicketTypeResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import {
+  CreateTicketTypeRequestDto,
+  RequestByIdDto,
+  UpdateTicketTypeRequestDto,
+} from 'rumor-utils/shared/events/dtos';
+import {
+  TicketTypesResponse,
+  TicketTypeResponse,
+} from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { TicketType } from 'rumor-utils/shared/events/entities/ticket-type.entity';
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses';
@@ -11,7 +18,9 @@ import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 export class TicketTypeService {
   public static dbConnection = database;
 
-  public static async createTicketType(payload: CreateTicketTypeRequestDto): Promise<TicketTypeResponse> {
+  public static async createTicketType(
+    payload: CreateTicketTypeRequestDto,
+  ): Promise<TicketTypeResponse> {
     try {
       const name = normalizeCatalogName(payload.name);
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
@@ -21,14 +30,17 @@ export class TicketTypeService {
           event: { id: payload.eventId },
         },
       });
-      if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
+      if (existingTicketType)
+        return responses.conflict('Ticket type with the same name already exists');
       const ticketType = new TicketType();
       ticketType.name = name;
       ticketType.description = payload.description;
       ticketType.capacity = payload.capacity;
 
       if (payload.eventId) {
-        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+        const event = await this.dbConnection
+          .getRepository(Event)
+          .findOne({ where: { id: payload.eventId } });
         if (event) ticketType.event = event;
       }
 
@@ -41,7 +53,6 @@ export class TicketTypeService {
   }
 
   public static async getTicketType(payload: RequestByIdDto): Promise<TicketType> {
-
     const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
       where: {
         id: payload.id,
@@ -52,8 +63,7 @@ export class TicketTypeService {
     if (!ticketType) {
       throw new NotFoundError('Ticket type not found');
     }
-    return ticketType
-
+    return ticketType;
   }
 
   public static async getTicketTypes(payload: RequestByIdDto): Promise<TicketType[]> {
@@ -68,10 +78,12 @@ export class TicketTypeService {
         },
       },
     });
-    return ticketTypes
+    return ticketTypes;
   }
 
-  public static async updateTicketType(payload: UpdateTicketTypeRequestDto): Promise<TicketTypeResponse> {
+  public static async updateTicketType(
+    payload: UpdateTicketTypeRequestDto,
+  ): Promise<TicketTypeResponse> {
     try {
       if (payload.name) payload.name = normalizeCatalogName(payload.name);
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
@@ -80,7 +92,8 @@ export class TicketTypeService {
           deletedAt: IsNull(),
         },
       });
-      if (existingTicketType) return responses.conflict('Ticket type with the same name already exists');
+      if (existingTicketType)
+        return responses.conflict('Ticket type with the same name already exists');
       const ticketType = await this.dbConnection.getRepository(TicketType).findOne({
         where: {
           id: payload.id,
@@ -91,10 +104,14 @@ export class TicketTypeService {
       if (!ticketType) return responses.badRequest('Ticket type not found');
 
       delete payload.id;
-      const updatedTicketType = this.dbConnection.getRepository(TicketType).merge(ticketType, payload);
+      const updatedTicketType = this.dbConnection
+        .getRepository(TicketType)
+        .merge(ticketType, payload);
 
       if (payload.eventId) {
-        const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.eventId } });
+        const event = await this.dbConnection
+          .getRepository(Event)
+          .findOne({ where: { id: payload.eventId } });
         if (event) updatedTicketType.event = event;
       }
 

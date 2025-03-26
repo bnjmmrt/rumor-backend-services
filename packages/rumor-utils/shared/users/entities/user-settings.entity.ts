@@ -52,7 +52,7 @@ export class UserSettings extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'enable_email_notification', default: true })
   enableEmailNotifications: boolean;
 
-  @OneToOne(() => User, (user) => user.userSettings, { nullable: true })
+  @OneToOne(() => User, user => user.userSettings, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }
