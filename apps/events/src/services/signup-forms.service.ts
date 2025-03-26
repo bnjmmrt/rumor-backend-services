@@ -617,10 +617,12 @@ export class SignupFormsServices {
         .addSelect("sfs.id", "id")
         .addSelect("atd.firstName", "firstName")
         .addSelect("atd.profilePicture", "profilePicture")
+        .addSelect("atd.id", "userId")
         .addSelect("atd.lastName", "lastName")
         .addSelect("atd.email", "email")
         .addSelect("atd.phone_number", "phone")
         .addSelect("gst.status", "status")
+        .addSelect("gst.id", "guestId")
         .addSelect("gst.additionalRequestedGuests + 1", "partySize")
         .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
       if (searchValue) {
@@ -648,6 +650,7 @@ export class SignupFormsServices {
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
+      console.log("🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:", submissionList)
       const result = { count, result: submissionList };
       return result;
     } catch (err) {
