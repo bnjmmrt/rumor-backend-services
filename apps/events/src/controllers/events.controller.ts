@@ -52,6 +52,8 @@ import {
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+
 export class EventsController {
   public static listEventStatus = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -151,7 +153,8 @@ export class EventsController {
   public static deleteEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const userId = (req as any).user;
     const { id } = req.params;
-    const payload: UserAndIdRequestDto = { id, userId };
+    const fromAdmin = req?.query?.fromAdmin ? true : false;
+    const payload: DeleteEventInterface = { id, userId, fromAdmin };
     // const id = req.params.id;
     const event: string = await EventsService.deleteEvent(payload);
 

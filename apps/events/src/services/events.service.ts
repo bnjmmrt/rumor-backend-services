@@ -86,6 +86,7 @@ import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
+import * as dayjs from 'dayjs'; // Import dayjs as a namespace
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import {
   EventStatus,
@@ -122,6 +123,7 @@ import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto'
 import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -163,6 +165,7 @@ export class EventsService {
 
   public static googleAuthClient = new GoogleAuthJWT();
   public static dataSource: DataSource;
+
   constructor() {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
@@ -1281,27 +1284,52 @@ export class EventsService {
     return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.id, owner: { id: payload.userId } },
-      relations: [
-        'quizQuestions',
-        'collaborators',
-        'ticketTypes',
-        'talents',
-        'tickets',
-        'guests',
-        'restrictedInvites',
-        'featuredEventSection',
-        'csvUploads',
-        'signupForms',
-        'notifications',
-        'quizQuestions.answers',
-      ],
-    });
+  public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
+    let event: Event;
+
+    if (payload.fromAdmin) {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    } else {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id, owner: { id: payload.userId } },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    }
+
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status === EventStatusEnum.APPROVED_STATUS) {
-      throw new ConflictError('Cannot delete an approved event');
+    const isEventApprovedAndNotEnded =
+      event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
+    if (isEventApprovedAndNotEnded) {
+      throw new ConflictError('Cannot delete an approved event that has not ended');
     }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
@@ -1396,6 +1424,7 @@ export class EventsService {
       throw new Error(`Error updating talents: ${error.message}`);
     }
   }
+
   private static async updateCollaboratorsWithTransaction(
     collaborators: UpdateCollaboratorDto[],
     event: Event,
@@ -3875,6 +3904,7 @@ export class EventsService {
       return [];
     }
   }
+
   // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
   //   try {
   //     if (!payload.id || !payload.userId) {
