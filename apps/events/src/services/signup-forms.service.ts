@@ -25,6 +25,7 @@ import config from '../config';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -371,10 +372,11 @@ export class SignupFormsServices {
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
     try {
-      const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
-        where: { id: id, event: { id: eventId } },
-        relations: { event: true },
-      });
+      const signupForm: EventSignupForms | undefined =
+        await EventSignupForms.findOne({
+          where: { id: id, event: { id: eventId } },
+          relations: { event: { owner: true } },
+        });
       if (!signupForm) {
         throw new ForbiddenError('Signup Forms');
       }
@@ -422,6 +424,12 @@ export class SignupFormsServices {
       } as SignupFormSubmissions;
 
       await queryRunner.manager.save(inviteGuestPayload);
+
+      /**-- Create Host User Mapping */
+      const hostUserMapping = new HostUserMapping();
+      hostUserMapping.user = { id: userPayload.id } as User;
+      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+      await queryRunner.manager.save(hostUserMapping);
 
       // -- Create Guest
       // const submissions = new SignupFormSubmissions();

@@ -454,6 +454,7 @@ export interface GuestData {
   rejectedReason?: string | undefined;
   isFollow?: boolean | undefined;
   isFavorite?: boolean | undefined;
+  hostUserMappingId?: string | undefined;
 }
 
 export interface GuestDataSimple {
@@ -647,7 +648,6 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
-  hostUserMappingId?: string | undefined;
 }
 
 export interface QuizDataList {

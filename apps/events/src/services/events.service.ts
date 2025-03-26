@@ -1296,6 +1296,7 @@ export class EventsService {
         'csvUploads',
         'signupForms',
         'notifications',
+        'quizQuestions.answers'
       ],
     });
     if (!event) throw new NotFoundError('Event was not found!');

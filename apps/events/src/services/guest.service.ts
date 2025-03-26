@@ -3956,10 +3956,12 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
-      guestProfile: guestProfileResponse,
+      guestProfile: {
+        ...guestProfileResponse,
+        hostUserMappingId: hostUserMapping?.id ?? ''
+      },
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
-      hostUserMappingId: hostUserMapping?.id ?? '',
     };
   }
 
