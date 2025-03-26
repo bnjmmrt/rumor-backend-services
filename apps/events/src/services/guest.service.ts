@@ -3949,6 +3949,7 @@ export class GuestService {
         userId: user?.id || null,
         ticketType: ticketType?.name || null,
         ticketTypeId: ticketType?.id || null,
+        eventId: guestDetail?.event.id || null,
         inviteMessage: guestDetail.inviteMessage,
         maxAdditionalGuests,
         privateGuestNote,
