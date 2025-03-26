@@ -1,12 +1,18 @@
 import * as _ from 'lodash';
 import { User } from '../entities/user.entity';
-import { BasicHostProfile, HostProfile, Focus as FocusProto, MemberProfile, customListData } from '../grpc/auth/auth.pb';
+import {
+  BasicHostProfile,
+  HostProfile,
+  Focus as FocusProto,
+  MemberProfile,
+  customListData,
+} from '../grpc/auth/auth.pb';
 import * as dayjs from 'dayjs';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
 import { EventStatus } from '../../events/grpc/events/general.pb';
 import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
-import { entityToUserSource, entityToUserStatus} from './shared.mapper';
+import { entityToUserSource, entityToUserStatus } from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
 
 export const toHostProfile = (
@@ -19,8 +25,8 @@ export const toHostProfile = (
   roleName: string,
 ): HostProfile => {
   const upcomingEvents = user.hostedEvents
-    .filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
-    .map((event) => {
+    .filter(event => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
+    .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -32,8 +38,8 @@ export const toHostProfile = (
       };
     });
   const pastEvents = user.hostedEvents
-    .filter((event) => formatEventStatus(event) === EventStatus.PAST_STATUS)
-    .map((event) => {
+    .filter(event => formatEventStatus(event) === EventStatus.PAST_STATUS)
+    .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -45,8 +51,8 @@ export const toHostProfile = (
       };
     });
   const pendingEvents = user.hostedEvents
-    .filter((event) => formatEventStatus(event) === EventStatus.PENDING_STATUS)
-    .map((event) => {
+    .filter(event => formatEventStatus(event) === EventStatus.PENDING_STATUS)
+    .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
@@ -107,13 +113,19 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string, eventCount?: number): MemberProfile => {
+export const toMemberProfile = (
+  user: User,
+  focuses: FocusProto[],
+  role: UserRole,
+  instagramUsername?: string,
+  eventCount?: number,
+): MemberProfile => {
   return {
     id: user.id,
     userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
-    category: focuses.map((focus) => focus.name).join(', '),
+    category: focuses.map(focus => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     placeId: user.address?.googlePlaceId,
     dateOfBirth: user.dateOfBirth,
@@ -138,7 +150,7 @@ export const toMemberProfile = (user: User, focuses: FocusProto[], role: UserRol
     status: entityToUserStatus[role.status],
     instagramUsername: instagramUsername,
     customLists: [],
-    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
-    eventCount
+    focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
+    eventCount,
   };
 };

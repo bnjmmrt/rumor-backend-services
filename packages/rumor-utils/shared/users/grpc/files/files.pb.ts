@@ -1,6 +1,6 @@
-import { Observable } from "rxjs";
+import { Observable } from 'rxjs';
 
-export const protobufPackage = "files";
+export const protobufPackage = 'files';
 
 /** Error */
 export interface Error {
@@ -62,7 +62,7 @@ export interface GetSignedUploadUrlRequest {
   extension?: string | undefined;
 }
 
-export const FILES_PACKAGE_NAME = "files";
+export const FILES_PACKAGE_NAME = 'files';
 
 export interface FilesServiceClient {
   uploadFile(request: UploadFileRequest): Observable<FileResponse>;
@@ -79,15 +79,21 @@ export interface FilesServiceClient {
 }
 
 export interface FilesServiceController {
-  uploadFile(request: UploadFileRequest): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
+  uploadFile(
+    request: UploadFileRequest,
+  ): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
 
-  getFile(request: RequestFileById): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
+  getFile(
+    request: RequestFileById,
+  ): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
 
   removeFile(
     request: RequestFileById,
   ): Promise<RemoveFileResponse> | Observable<RemoveFileResponse> | RemoveFileResponse;
 
-  updateFile(request: UpdateFileRequest): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
+  updateFile(
+    request: UpdateFileRequest,
+  ): Promise<FileResponse> | Observable<FileResponse> | FileResponse;
 
   /** S3 API for generating Pre-Signed URL */
 
@@ -111,4 +117,4 @@ export interface FilesServiceController {
 //   };
 // }
 
-export const FILES_SERVICE_NAME = "FilesService";
+export const FILES_SERVICE_NAME = 'FilesService';

@@ -1,5 +1,5 @@
-import { Role } from "rumor-utils/shared/entities/index";
-import database from "../database";
+import { Role } from 'rumor-utils/shared/entities/index';
+import database from '../database';
 
 export class Seeders {
   public static dbConnection = database;
@@ -7,18 +7,12 @@ export class Seeders {
   public static async seedRoles() {
     try {
       const rolesData = [
-        { name: "admin", subRoles: ["rumor_super_admin", "rumor_manager"] },
+        { name: 'admin', subRoles: ['rumor_super_admin', 'rumor_manager'] },
         {
-          name: "host",
-          subRoles: [
-            "main_host",
-            "co_host",
-            "promoter",
-            "contributor",
-            "check_in",
-          ],
+          name: 'host',
+          subRoles: ['main_host', 'co_host', 'promoter', 'contributor', 'check_in'],
         },
-        { name: "member", subRoles: ["non_member"] },
+        { name: 'member', subRoles: ['non_member'] },
       ];
 
       for (const roleData of rolesData) {
@@ -44,7 +38,7 @@ export class Seeders {
         }
       }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 }

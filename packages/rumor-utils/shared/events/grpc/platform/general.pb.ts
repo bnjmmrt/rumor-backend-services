@@ -4,9 +4,7 @@
 //   protoc               v5.29.1
 // source: grpc/platform/general.proto
 
-/* eslint-disable */
-
-export const protobufPackage = "platform";
+export const protobufPackage = 'platform';
 
 export interface FocusData {
   id: string;
@@ -66,4 +64,4 @@ export interface ReferralRequestStatus {
   userId: string;
 }
 
-export const PLATFORM_PACKAGE_NAME = "platform";
+export const PLATFORM_PACKAGE_NAME = 'platform';

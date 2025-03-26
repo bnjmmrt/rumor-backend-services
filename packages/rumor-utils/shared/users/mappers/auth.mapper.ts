@@ -40,7 +40,12 @@ export const entityToGender: { [g in Gender]: GenderProto } = {
   [Gender.NOT_APPLICABLE]: GenderProto.NOT_APPLICABLE,
 };
 
-export const toCurrentMember = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string): CurrentMember => {
+export const toCurrentMember = (
+  user: User,
+  focuses: FocusProto[],
+  role: UserRole,
+  instagramUsername?: string,
+): CurrentMember => {
   return {
     id: user.id,
     phoneNumber: user.phoneNumber,
@@ -57,14 +62,14 @@ export const toCurrentMember = (user: User, focuses: FocusProto[], role: UserRol
     approved: role?.status === UserStatus.ACTIVE,
     referralCode: 'user.referralCode',
     focuses,
-    socialProviders: user.socialProviders.map((provider) => {
+    socialProviders: user.socialProviders.map(provider => {
       return {
         type: entityToProviderType[provider.type],
         accessToken: provider.longLivedToken,
         username: provider.username,
       };
     }),
-    userRoles: user.roles.map((role) => {
+    userRoles: user.roles.map(role => {
       return {
         id: role.id,
         name: role.role.name,
@@ -102,7 +107,11 @@ export const toCreateUser = (user: User): SimpleUser => {
   };
 };
 
-export const toCurrentUser = (user: User, focuses: FocusProto[], roles: UserRole[]): CurrentUser => {
+export const toCurrentUser = (
+  user: User,
+  focuses: FocusProto[],
+  roles: UserRole[],
+): CurrentUser => {
   // Construct role data based on user roles
   const roleData = roles.map(role => {
     // Basic structure for each role
@@ -179,8 +188,8 @@ export const toMember = (
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
     gender: user.gender,
-    types: focuses.map((focus) => focus.name),
-    categories: interests.map((interest) => interest.name),
+    types: focuses.map(focus => focus.name),
+    categories: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
     status: role.status ?? 'UNRECOGNIZED',
@@ -190,7 +199,7 @@ export const toMember = (
     role: role.role.name,
     age: calculateAge(user.dateOfBirth),
     phoneNumber: user.phoneNumber,
-    dateOfBirth: user.dateOfBirth
+    dateOfBirth: user.dateOfBirth,
   };
 };
 
@@ -222,8 +231,8 @@ export const toUser = (
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
     gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
-    categories: focuses.map((focus) => focus.name),
-    interests: interests.map((interest) => interest.name),
+    categories: focuses.map(focus => focus.name),
+    interests: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
     profilePicture: user.profilePicture,
@@ -279,13 +288,21 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string, eventCount: number = 0): MemberProfile => {
+export const toMemberProfile = (
+  user: User,
+  focuses: FocusProto[] = [],
+  interests: InterestData[] = [],
+  role: UserRole,
+  customLists: customListData[],
+  instagramUsername?: string,
+  eventCount: number = 0,
+): MemberProfile => {
   return {
     id: user.id,
     userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
-    category: focuses.map((focus) => focus.name).join(', '),
+    category: focuses.map(focus => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     dateOfBirth: user.dateOfBirth,
     placeId: user?.address?.googlePlaceId,
@@ -303,12 +320,12 @@ export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interest
     status: role?.status,
     role: role?.role?.name,
     roleId: role?.role?.id,
-    interest: interests.map((interest) => interest.name).join(', '),
+    interest: interests.map(interest => interest.name).join(', '),
     age: calculateAge(user.dateOfBirth),
     imageUrl: user.profilePicture || '',
     instagramUsername: instagramUsername,
     customLists: customLists,
-    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
-    eventCount: eventCount
+    focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
+    eventCount: eventCount,
   };
 };

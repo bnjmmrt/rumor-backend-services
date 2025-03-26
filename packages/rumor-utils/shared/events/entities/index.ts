@@ -14,12 +14,12 @@ export { Ticket } from './ticket.entity';
 export { EventAgeLimit } from './event-age-limit.entity';
 export { DefaultRoleSettings } from './default-role-settings.entity';
 export { FeaturedEventSection } from './featured-event-section.entity';
-export { User } from '../../users/entities/user.entity'; 
+export { User } from '../../users/entities/user.entity';
 export { Address } from '../../users/entities/address.entity';
-export { EventAnnouncement } from './event-announcement.entity'; 
+export { EventAnnouncement } from './event-announcement.entity';
 export { EventSignupForms } from './event-signup-forms.entity';
 export { SignupFormQuestions } from './signup-form-questions.entity';
 export { SignupFormStaticQuestions } from './signup-form-static-questions.entity';
 export { SignupFormSubmissions } from './signup-form-submissions.entity';
-export { CsvUploadRecords } from './csv-upload-records.entity'
-export { RestrictedInvites } from './restricted-invites.entity'
+export { CsvUploadRecords } from './csv-upload-records.entity';
+export { RestrictedInvites } from './restricted-invites.entity';
