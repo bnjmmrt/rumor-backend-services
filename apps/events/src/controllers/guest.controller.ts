@@ -142,8 +142,8 @@ export class GuestController {
   public static getGuestProfile = asyncWrapper(
     async (req, res): Promise<void> => {
       const payload: UserAndIdRequestDto = {
-        eventId: req.params.id,
-        query: req.query as string,
+        id: req.params.id,
+        userId: (req as any).user,
         ...req.body
       }
       const response: GuestData = await GuestService.getGuestProfile(payload);
