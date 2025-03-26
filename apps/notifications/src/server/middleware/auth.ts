@@ -34,7 +34,10 @@ class AuthMiddleware {
            next();
        } catch (error) {
         console.log("🚀 ~ AuthMiddleware ~ fusionAuthRequired= ~ error:", error)
-        res.send(new AuthorizationError(`Authorization Error : ${error} `)).status(error);
+       const errMsg = new AuthorizationError(
+        `Session has expired, Please login again `
+      );
+      res.status(401).send(errMsg);
     }
     };
 }
