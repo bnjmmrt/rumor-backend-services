@@ -3611,7 +3611,10 @@ export class EventsService {
 
       return {
         guestId: guest.id,
-        ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
+        ticketStatus: hasTicket.status ?? undefined,
+        ticketTypeId: guest.ticketType.id ?? undefined,
+        ticketType: guest.ticketType.name ?? undefined,
+        guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
       };
@@ -3619,7 +3622,10 @@ export class EventsService {
 
     return {
       guestId: guest.id,
-      ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
+      ticketStatus: hasTicket.status ?? undefined,
+      ticketTypeId: guest.ticketType.id ?? undefined,
+      ticketType: guest.ticketType.name ?? undefined,
+      guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: "N/A",
       eventQr: guest?.event?.useQr || false,
     };
@@ -3707,10 +3713,7 @@ export class EventsService {
     // Step 8: Return the final response with updated details
     return {
       guestId: guest.id,
-      ticketStatus:
-        entityToTicketStatus[
-          updatedTicket?.status ?? TicketStatusEnum.TICKET_USED
-        ], // Fetch dynamically
+      ticketStatus: updatedTicket?.status ?? undefined, // Fetch dynamically
       eventQr: guest.event.useQr, // Return event QR usage flag
       checkInStatus: true,
     };

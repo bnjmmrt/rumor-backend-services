@@ -639,6 +639,7 @@ export interface GuestDetail {
   guestStatus?: GuestStatus | undefined;
   inviteMessage?: string | undefined;
   signupFormName?: string | undefined;
+  eventId?: string | undefined;
 }
 
 export interface GuestDetails {
@@ -655,7 +656,10 @@ export interface QuizDataList {
 
 export interface GenerateTicketForGuestData {
   guestId?: string | undefined;
-  ticketStatus?: TicketStatus | undefined;
+  ticketStatus?: string | undefined;
+  ticketTypeId?: string | undefined;
+  ticketType?: string | undefined;
+  guestNote?: string | undefined;
   jwtToken?: string | undefined;
   eventQr: boolean;
   checkInStatus?: boolean | undefined;
