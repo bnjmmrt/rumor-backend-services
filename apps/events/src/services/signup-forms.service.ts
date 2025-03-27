@@ -372,11 +372,10 @@ export class SignupFormsServices {
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
     try {
-      const signupForm: EventSignupForms | undefined =
-        await EventSignupForms.findOne({
-          where: { id: id, event: { id: eventId } },
-          relations: { event: { owner: true } },
-        });
+      const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
+        where: { id: id, event: { id: eventId } },
+        relations: { event: { owner: true } },
+      });
       if (!signupForm) {
         throw new ForbiddenError('Signup Forms');
       }
@@ -424,13 +423,15 @@ export class SignupFormsServices {
       } as SignupFormSubmissions;
       await queryRunner.manager.save(inviteGuestPayload);
 
+      submissions.guestId = inviteGuestPayload.id;
+      await queryRunner.manager.save(submissions);
+
       /**-- Create Host User Mapping */
       const hostUserMapping = new HostUserMapping();
       hostUserMapping.user = { id: userPayload.id } as User;
       hostUserMapping.host = { id: signupForm.event.owner.id } as User;
       await queryRunner.manager.save(hostUserMapping);
 
-      await queryRunner.manager.save(inviteGuestPayload);
       await queryRunner.commitTransaction();
 
       try {
@@ -567,6 +568,8 @@ export class SignupFormsServices {
         .addSelect('atd.email', 'email')
         .addSelect('atd.phone_number', 'phone')
         .addSelect('gst.status', 'status')
+        .addSelect('gst.guest_id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
         .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
