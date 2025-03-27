@@ -107,6 +107,17 @@ export class EventAnnouncementService {
     eventAnnouncement.addedBy = addedByUsers;
     eventAnnouncement.ticketType = ticketTypes;
 
+    /**
+     * Sending Notification & Email
+     * Check for recipient array 
+     * if empty that means we have to fetch the guest list (to fetch) using below method
+     * and send email to all those guest.user.id and also set the guest.user.id in the recupeints array for notification
+     * 
+     * if the recipient array is not empty then send the email and notification to that person only
+     * in this case we don't need to fetch the guest.user becuase the FE team is already sending the userIds in the recipients array
+     * 
+     */
+
     try {
       serviceMesh
         .notificationService()

@@ -12,6 +12,7 @@ import { TicketTypeController } from '../controllers/ticket-type.controller';
 import { CollaboratorController } from '../controllers/collaborator.controller';
 import { AdmissionTypeController } from '../controllers/admission-type.controller';
 import { FeaturedEventSectionsController } from '../controllers/featured-event-sections.controller';
+import { validateRequest } from '../server/middleware/validate-request'
 
 const router: Router = express.Router();
 
@@ -34,12 +35,14 @@ router.get(
 router.post(
   '/event/:eventId/event-announcement',
   AuthMiddleware.fusionAuthRequired,
+  validateRequest('eventAnnouncement'), //Validation in place
   EventAnnouncementController.postAnnouncement,
 );
 
 router.patch(
   '/event/:eventId/event-announcement/:announcementId',
   AuthMiddleware.fusionAuthRequired,
+  validateRequest('eventAnnouncement'), //Validation in place
   EventAnnouncementController.updateAnnouncement,
 );
 
