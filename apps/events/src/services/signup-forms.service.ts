@@ -430,13 +430,6 @@ export class SignupFormsServices {
       hostUserMapping.host = { id: signupForm.event.owner.id } as User;
       await queryRunner.manager.save(hostUserMapping);
 
-      // -- Create Guest
-      // const submissions = new SignupFormSubmissions();
-      // submissions.signupForm = { id: id } as EventSignupForms;
-      // submissions.answers = answerList;
-      // submissions.guest = { id: inviteGuestPayload.id } as Guest;
-      // submissions.attendees = { id: userPayload.id } as User;
-
       await queryRunner.manager.save(inviteGuestPayload);
       await queryRunner.commitTransaction();
 
@@ -504,6 +497,8 @@ export class SignupFormsServices {
         .addSelect('atd.email', 'email')
         .addSelect('atd.phone_number', 'phone')
         .addSelect('gst.status', 'status')
+        .addSelect('gst.guest_id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
 
       if (lastIndex && isUUID(lastIndex)) {
