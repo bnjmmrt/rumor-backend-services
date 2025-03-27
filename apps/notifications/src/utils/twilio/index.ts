@@ -1,3 +1,3 @@
-import TwilioService from "./sms";
+import TwilioService from './sms';
 
 export { TwilioService };

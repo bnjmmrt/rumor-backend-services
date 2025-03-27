@@ -1,6 +1,6 @@
-import * as firebase from "firebase-admin";
+import * as firebase from 'firebase-admin';
 import { PushNotificationPayload } from './firebase-notifications.interface';
-import config from '../../config'
+import config from '../../config';
 
 class FirebaseNotificationsService {
   private static app: firebase.app.App | null = null;
@@ -11,13 +11,12 @@ class FirebaseNotificationsService {
         credential: firebase.credential.cert({
           projectId: config.get('FIREBASE_PROJECT_ID'),
           clientEmail: config.get('FIREBASE_CLIENT_EMAIL'),
-          privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, "\n"),
+          privateKey: config.get(`FIREBASE_PRIVATE_KEY`)?.replace(/\\n/g, '\n'),
         }),
       });
     }
     return FirebaseNotificationsService.app;
   }
-
 
   async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
     try {
@@ -26,20 +25,20 @@ class FirebaseNotificationsService {
         tokens: payload.tokens,
         data: { ...payload.data },
         notification: {
-          title: payload.title, 
+          title: payload.title,
           body: payload.body,
-          imageUrl: payload.image,    
+          imageUrl: payload.image,
         },
       });
 
       if (response.successCount !== payload.tokens.length) {
-        const failures = response.responses.filter((res) => !res.success);
+        const failures = response.responses.filter(res => !res.success);
         console.warn(`Some push notifications failed: ${JSON.stringify(failures)}`);
       }
 
       return true;
     } catch (err) {
-      console.error("Error sending push notification:", err);
+      console.error('Error sending push notification:', err);
       return false;
     }
   }

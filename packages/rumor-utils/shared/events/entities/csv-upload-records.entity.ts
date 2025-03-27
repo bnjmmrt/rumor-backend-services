@@ -7,15 +7,16 @@ import { Event } from './event.entity';
 @Entity()
 export class CsvUploadRecords extends RumorBaseEntity {
   @Index()
-  @ManyToOne(() => Event, (event) => event.csvUploads, {
-    nullable: true, onDelete: "CASCADE",
-    onUpdate: "CASCADE",
+  @ManyToOne(() => Event, event => event.csvUploads, {
+    nullable: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })
   event: Event | null; // Nullable for cases where it's user upload
 
   @Index()
-  @ManyToOne(() => User, (user) => user.csvUploads, { cascade: true })
+  @ManyToOne(() => User, user => user.csvUploads, { cascade: true })
   @JoinColumn({ name: 'owner_id' })
   host: User;
 
@@ -29,6 +30,6 @@ export class CsvUploadRecords extends RumorBaseEntity {
   errorCsvPath?: string; // S3 path of the error CSV (garbageData), if applicable
 
   // New Relation: Users uploaded via this CSV
-  @OneToMany(() => User, (user) => user.uploadedViaCsv)
+  @OneToMany(() => User, user => user.uploadedViaCsv)
   uploadedUsers: User[];
 }

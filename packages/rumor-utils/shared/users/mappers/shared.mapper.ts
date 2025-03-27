@@ -1,4 +1,8 @@
-import { UserStatus as UserStatusProto, UserSource as UserSourceProto, NewUserStatus } from '../grpc/auth/shared.pb';
+import {
+  UserStatus as UserStatusProto,
+  UserSource as UserSourceProto,
+  NewUserStatus,
+} from '../grpc/auth/shared.pb';
 import { UserSource, UserStatus } from '../interfaces/shared.interface';
 
 export const userStatusToEntity: { [s in UserStatusProto]: UserStatus } = {

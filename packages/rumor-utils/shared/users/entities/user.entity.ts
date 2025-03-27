@@ -10,44 +10,44 @@ import {
   Index,
   ManyToOne,
   DeleteDateColumn,
-} from "typeorm";
-import { RumorBaseEntity } from "../../entities/rumor-base.entity";
-import { SocialProvider } from "./social-provider.entity";
+} from 'typeorm';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { SocialProvider } from './social-provider.entity';
 import {
   AdditionalHostInformation,
   AdditionalMemberInformation,
   Gender,
-} from "../interfaces/auth.interface";
-import { Address } from "./address.entity";
-import { Invitation } from "./invitation.entity";
-import { UserRole } from "./roles/user-role.entity";
-import { Event } from "../../events/entities/event.entity";
-import { UserSettings } from "./user-settings.entity";
-import { Ticket } from "../../events/entities/ticket.entity";
-import { Interest } from "./interest.entity";
-import { SocialStats } from "./social-stats.entity";
-import { Guest } from "../../events/entities";
-import { UserQuizAnswer } from "../../events/entities/user-quiz-question-answer.entity";
-import { HostFollowing } from "./host-following.entity";
-import { HostCustomUsersLists } from "./host-custom-users-lists.entity";
-import { HostFavorite } from "./host-favorite.entity";
-import { TemporaryPassword } from "./temporary-password.entity";
-import { TemporaryPasswordToken } from "./temporary-password-token.entity";
-import { UserAttendeeStats } from "../../events/entities/user-attendee-stats.entity";
-import { Collaborator } from "../../events/entities";
-import { CsvUploadRecords } from "../../events/entities";
-import { VouchRequest } from "./vouch-request.entity";
-import { PushNotificationToken } from "./push-notification-token.entity";
-import { HostUserMapping } from "./host-user-mapping.entity";
-import { SignupFormSubmissions } from "../../events/entities/signup-form-submissions.entity";
-import { EventSignupForms } from "../../events/entities/event-signup-forms.entity";
-import { Notification } from "../../notifications/entities/notification.entity";
+} from '../interfaces/auth.interface';
+import { Address } from './address.entity';
+import { Invitation } from './invitation.entity';
+import { UserRole } from './roles/user-role.entity';
+import { Event } from '../../events/entities/event.entity';
+import { UserSettings } from './user-settings.entity';
+import { Ticket } from '../../events/entities/ticket.entity';
+import { Interest } from './interest.entity';
+import { SocialStats } from './social-stats.entity';
+import { Guest } from '../../events/entities';
+import { UserQuizAnswer } from '../../events/entities/user-quiz-question-answer.entity';
+import { HostFollowing } from './host-following.entity';
+import { HostCustomUsersLists } from './host-custom-users-lists.entity';
+import { HostFavorite } from './host-favorite.entity';
+import { TemporaryPassword } from './temporary-password.entity';
+import { TemporaryPasswordToken } from './temporary-password-token.entity';
+import { UserAttendeeStats } from '../../events/entities/user-attendee-stats.entity';
+import { Collaborator } from '../../events/entities';
+import { CsvUploadRecords } from '../../events/entities';
+import { VouchRequest } from './vouch-request.entity';
+import { PushNotificationToken } from './push-notification-token.entity';
+import { HostUserMapping } from './host-user-mapping.entity';
+import { SignupFormSubmissions } from '../../events/entities/signup-form-submissions.entity';
+import { EventSignupForms } from '../../events/entities/event-signup-forms.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
 
-import { HostFeedback } from "./host-feedback.entity";
-import { HostUserSettings } from "./host-user-settings.entity";
-import { RestrictedInvites } from "../../events/entities";
-import { Focus } from "./focus.entity";
-import { Report } from "./report.entity";
+import { HostFeedback } from './host-feedback.entity';
+import { HostUserSettings } from './host-user-settings.entity';
+import { RestrictedInvites } from '../../events/entities';
+import { Focus } from './focus.entity';
+import { Report } from './report.entity';
 
 @Entity()
 export class User extends RumorBaseEntity {
@@ -95,29 +95,29 @@ export class User extends RumorBaseEntity {
   @DeleteDateColumn({ type: 'timestamp', nullable: true, name: 'deactivated_at' })
   deactivatedAt: Date | null;
 
-  @OneToMany(() => SocialProvider, (socialProvider) => socialProvider.user)
+  @OneToMany(() => SocialProvider, socialProvider => socialProvider.user)
   socialProviders: Relation<SocialProvider[]>;
 
-  @OneToOne(() => SocialStats, (socialStats) => socialStats.user)
+  @OneToOne(() => SocialStats, socialStats => socialStats.user)
   socialStats: Relation<SocialStats>;
 
   @OneToOne(() => Address, { nullable: true, cascade: true })
   @JoinColumn({ name: 'address_id', referencedColumnName: 'id' })
   address: Address | null;
 
-  @OneToMany(() => Invitation, (invitation) => invitation.inviteeUser)
+  @OneToMany(() => Invitation, invitation => invitation.inviteeUser)
   invitations: Relation<Invitation[]>;
 
-  @OneToMany(() => UserRole, (userRole) => userRole.user, { cascade: true })
+  @OneToMany(() => UserRole, userRole => userRole.user, { cascade: true })
   roles: Relation<UserRole[]>;
 
-  @OneToMany(() => Event, (event) => event.owner)
+  @OneToMany(() => Event, event => event.owner)
   hostedEvents: Event[];
 
-  @OneToMany(() => UserQuizAnswer, (answer) => answer.user)
+  @OneToMany(() => UserQuizAnswer, answer => answer.user)
   answers: UserQuizAnswer[];
 
-  @OneToOne(() => UserSettings, (userSettings) => userSettings.user)
+  @OneToOne(() => UserSettings, userSettings => userSettings.user)
   userSettings: Relation<UserSettings>;
 
   @ManyToMany(() => Interest, { cascade: false })
@@ -128,43 +128,45 @@ export class User extends RumorBaseEntity {
   @JoinTable()
   focuses: Focus[];
 
-  @OneToMany(() => RestrictedInvites, (ri) => ri.restrictedBy, { onDelete: 'CASCADE' })
+  @OneToMany(() => RestrictedInvites, ri => ri.restrictedBy, { onDelete: 'CASCADE' })
   restrictedByInvitee: RestrictedInvites;
 
-  @OneToMany(() => Guest, (guest) => guest.user)
+  @OneToMany(() => Guest, guest => guest.user)
   eventInvitations: Guest[];
 
-  @OneToMany(() => Guest, (guest) => guest.declinedBy)
+  @OneToMany(() => Guest, guest => guest.declinedBy)
   declinedGuests: Guest[];
 
-  @OneToMany(() => Guest, (guest) => guest.addedBy)
+  @OneToMany(() => Guest, guest => guest.addedBy)
   addedGuests: Guest[];
 
-  @OneToMany(() => Ticket, (ticket) => ticket.user)
+  @OneToMany(() => Ticket, ticket => ticket.user)
   tickets: Ticket[];
 
-  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.follower, {cascade: true})
+  @OneToMany(() => HostFollowing, hostFollowing => hostFollowing.follower, { cascade: true })
   following: HostFollowing[];
 
-  @OneToMany(() => HostFollowing, (hostFollowing) => hostFollowing.host, {cascade: true})
+  @OneToMany(() => HostFollowing, hostFollowing => hostFollowing.host, { cascade: true })
   followers: HostFollowing[];
 
-  @OneToMany(() => HostUserMapping, (hostCreated) => hostCreated.user)
+  @OneToMany(() => HostUserMapping, hostCreated => hostCreated.user)
   createdUser: HostUserMapping[];
 
-  @OneToMany(() => HostUserMapping, (hostCreated) => hostCreated.host)
+  @OneToMany(() => HostUserMapping, hostCreated => hostCreated.host)
   createdByHost: HostUserMapping[];
 
-  @OneToMany(() => HostCustomUsersLists, (hostCustomUsersLists) => hostCustomUsersLists.host, { onDelete: 'CASCADE' })
+  @OneToMany(() => HostCustomUsersLists, hostCustomUsersLists => hostCustomUsersLists.host, {
+    onDelete: 'CASCADE',
+  })
   customLists: HostCustomUsersLists[];
 
-  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.host, {cascade: true})
+  @OneToMany(() => HostFavorite, hostFavorite => hostFavorite.host, { cascade: true })
   favoritedMembers: HostFavorite[];
 
-  @OneToMany(() => HostFavorite, (hostFavorite) => hostFavorite.member, {cascade: true})
+  @OneToMany(() => HostFavorite, hostFavorite => hostFavorite.member, { cascade: true })
   favoritedByHosts: HostFavorite[];
 
-  @OneToOne(() => TemporaryPassword, (temporaryPassword) => temporaryPassword.user, {
+  @OneToOne(() => TemporaryPassword, temporaryPassword => temporaryPassword.user, {
     nullable: true,
     cascade: true,
     eager: true,
@@ -172,7 +174,7 @@ export class User extends RumorBaseEntity {
   @JoinColumn({ name: 'temporary_password_id', referencedColumnName: 'id' })
   temporaryPassword: TemporaryPassword | null;
 
-  @OneToOne(() => TemporaryPasswordToken, (temporaryPasswordToken) => temporaryPasswordToken.user, {
+  @OneToOne(() => TemporaryPasswordToken, temporaryPasswordToken => temporaryPasswordToken.user, {
     nullable: true,
     cascade: true,
     eager: true,
@@ -180,53 +182,53 @@ export class User extends RumorBaseEntity {
   @JoinColumn({ name: 'temporary_password_token_id', referencedColumnName: 'id' })
   temporaryPasswordToken: TemporaryPasswordToken | null;
 
-  @OneToOne(() => UserAttendeeStats, (attendeeStats) => attendeeStats.user)
+  @OneToOne(() => UserAttendeeStats, attendeeStats => attendeeStats.user)
   @JoinColumn({ name: 'attendee_stats_id' })
   attendeeStats: UserAttendeeStats;
 
-  @OneToMany(() => Collaborator, (collaborator) => collaborator.user)
+  @OneToMany(() => Collaborator, collaborator => collaborator.user)
   collaborators: Collaborator[];
 
-  @OneToMany(() => VouchRequest, (vouchRequest) => vouchRequest.user)
+  @OneToMany(() => VouchRequest, vouchRequest => vouchRequest.user)
   vouchRequests: VouchRequest[];
 
-  @OneToMany(() => VouchRequest, (vouchRequest) => vouchRequest.requester)
+  @OneToMany(() => VouchRequest, vouchRequest => vouchRequest.requester)
   requestedVouches: VouchRequest[];
 
-  @OneToMany(() => PushNotificationToken, (pushNotificationToken) => pushNotificationToken.user)
+  @OneToMany(() => PushNotificationToken, pushNotificationToken => pushNotificationToken.user)
   pushNotificationToken: PushNotificationToken[];
 
-  @OneToMany(() => SignupFormSubmissions, (sfs) => sfs.attendees)
+  @OneToMany(() => SignupFormSubmissions, sfs => sfs.attendees)
   signupFormSubmissions: SignupFormSubmissions[];
 
-  @OneToMany(() => EventSignupForms, (esf) => esf.event)
+  @OneToMany(() => EventSignupForms, esf => esf.event)
   signupForms: EventSignupForms[];
 
-  @OneToMany(() => Notification, (notification) => notification.linkedUser)
+  @OneToMany(() => Notification, notification => notification.linkedUser)
   triggeredNotifications: Notification[];
 
-  @ManyToMany(() => Notification, (notification) => notification.recipients)
+  @ManyToMany(() => Notification, notification => notification.recipients)
   notifications: Notification[];
-  @OneToMany(() => HostFeedback, (hostFeedback) => hostFeedback.user)
+  @OneToMany(() => HostFeedback, hostFeedback => hostFeedback.user)
   hostFeedbacks: Relation<HostFeedback[]>;
 
-  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.user, {cascade: true})
+  @OneToMany(() => HostUserSettings, hostUserSettings => hostUserSettings.user, { cascade: true })
   managedByHosts: Relation<HostUserSettings[]>;
 
-  @OneToMany(() => HostUserSettings, (hostUserSettings) => hostUserSettings.host)
+  @OneToMany(() => HostUserSettings, hostUserSettings => hostUserSettings.host)
   managingUsers: Relation<HostUserSettings[]>;
 
-  @OneToMany(() => Report, (report) => report.reportedBy)
+  @OneToMany(() => Report, report => report.reportedBy)
   reportsMade: Relation<Report[]>;
 
-  @OneToMany(() => Report, (report) => report.reportedTo)
+  @OneToMany(() => Report, report => report.reportedTo)
   reportsReceived: Relation<Report[]>;
 
-  @OneToMany(() => CsvUploadRecords, (csvUploads) => csvUploads.host)
+  @OneToMany(() => CsvUploadRecords, csvUploads => csvUploads.host)
   csvUploads: CsvUploadRecords[];
 
   // New Relation: Tracks which CSV upload created this user
-  @ManyToOne(() => CsvUploadRecords, (csvUpload) => csvUpload.uploadedUsers, { nullable: true })
+  @ManyToOne(() => CsvUploadRecords, csvUpload => csvUpload.uploadedUsers, { nullable: true })
   @JoinColumn({ name: 'csv_upload_id' })
   uploadedViaCsv: CsvUploadRecords | null;
 }

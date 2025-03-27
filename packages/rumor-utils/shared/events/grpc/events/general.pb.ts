@@ -1,6 +1,6 @@
-import { EventStatusEnum } from "../../interfaces/event.interface";
+import { EventStatusEnum } from '../../interfaces/event.interface';
 
-export const protobufPackage = "events";
+export const protobufPackage = 'events';
 
 export enum UserStatus {
   NEW_APPLICANT = 0,
@@ -197,7 +197,7 @@ export interface EventData {
   invitationDeclinedBy?: string | undefined;
   isPublished?: boolean | undefined;
   totalCheckedInGuests?: number | undefined;
-  guestOptionalMessage?:  string | undefined;
+  guestOptionalMessage?: string | undefined;
   guestNote?: string | undefined;
   invitationDate?: string | undefined;
 }
@@ -311,7 +311,7 @@ export interface CollaboratorsEvent {
   companyLogo?: string | undefined;
   companyName?: string | undefined;
   isFollowedByCurrentGuest?: boolean | undefined;
-  isApproved: boolean | undefined
+  isApproved: boolean | undefined;
 }
 
 export interface Collaborator {
@@ -454,6 +454,7 @@ export interface GuestData {
   rejectedReason?: string | undefined;
   isFollow?: boolean | undefined;
   isFavorite?: boolean | undefined;
+  hostUserMappingId?: string | undefined;
 }
 
 export interface GuestDataSimple {
@@ -647,7 +648,6 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
-  hostUserMappingId?: string | undefined;
 }
 
 export interface QuizDataList {
@@ -727,4 +727,4 @@ export interface ISignupFormQuestionsRequest {
   value?: string;
 }
 
-export const EVENTS_PACKAGE_NAME = "events";
+export const EVENTS_PACKAGE_NAME = 'events';

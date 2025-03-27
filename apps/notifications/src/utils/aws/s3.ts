@@ -13,7 +13,6 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import config from '../../config';
 import { AWSError } from 'rumor-utils/errors';
 
-
 interface FilePayload {
   file: Buffer;
   type: string;
@@ -32,7 +31,6 @@ interface FileDataResponse {
   contentType: string;
 }
 
-
 export const humanFileSize = (size: number): string => {
   const units = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
   let i = 0;
@@ -43,20 +41,19 @@ export const humanFileSize = (size: number): string => {
   return `${size.toFixed(2)} ${units[i]}`;
 };
 
-
 class S3ServiceHandler {
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
 
   constructor() {
     this.s3Client = new S3Client({
-      region: config.get("AWS_REGION"),
+      region: config.get('AWS_REGION'),
       credentials: {
-        accessKeyId: config.get("AWS_ACCESS_KEY"),
-        secretAccessKey: config.get("AWS_SECRET_KEY"),
+        accessKeyId: config.get('AWS_ACCESS_KEY'),
+        secretAccessKey: config.get('AWS_SECRET_KEY'),
       },
     });
-    this.bucketName = config.get("BUCKET_DOCUMENTS_NAME");
+    this.bucketName = config.get('BUCKET_DOCUMENTS_NAME');
   }
 
   private handleError(error: unknown) {
@@ -145,7 +142,11 @@ class S3ServiceHandler {
     }
   }
 
-  public async UploadFileUrl(fileKey: string, contentType: string, expiresIn: number = 3600): Promise<string> {
+  public async UploadFileUrl(
+    fileKey: string,
+    contentType: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
     const putObjectParams = { Bucket: this.bucketName, ContentType: contentType, Key: fileKey };
     const putObjectCommand = new PutObjectCommand(putObjectParams);
     const urlOptions = { expiresIn };
@@ -158,8 +159,5 @@ class S3ServiceHandler {
   }
 }
 
-const S3Service = new S3ServiceHandler()
+const S3Service = new S3ServiceHandler();
 export default S3Service;
-
-
-

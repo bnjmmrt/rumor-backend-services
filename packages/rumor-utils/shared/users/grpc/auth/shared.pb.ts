@@ -6,7 +6,7 @@
 
 /* eslint-disable */
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 /** ProviderType */
 export enum ProviderType {
@@ -60,8 +60,7 @@ export interface GenericResponse {
 }
 
 /** Empty Request */
-export interface EmptyRequest {
-}
+export interface EmptyRequest {}
 
 /** Id Request */
 export interface IdRequest {
@@ -108,4 +107,4 @@ export interface UserIdData {
   userId: string;
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';

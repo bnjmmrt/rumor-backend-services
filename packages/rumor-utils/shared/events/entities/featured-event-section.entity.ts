@@ -10,9 +10,9 @@ export class FeaturedEventSection extends RumorBaseEntity {
   @Column({ type: 'integer', name: 'index' })
   index: number;
 
-  @OneToMany(() => Event, (event) => event.featuredEventSection,{
-    onDelete: "CASCADE",
-    onUpdate: "CASCADE",
+  @OneToMany(() => Event, event => event.featuredEventSection, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
   events: Event[];
 }

@@ -1,6 +1,5 @@
 // import { Request, Response, NextFunction } from "express";
 
-
 // class AuthMiddleware {
 //   fusionAuthRequired = (req: Request, res: Response, next: NextFunction) => {
 //     const authorization = req.header("Authorization");
@@ -24,7 +23,7 @@
 //   checkPermission = (permission: string) => {
 //     return (req: Request, res: Response, next: NextFunction) => {
 //       const userId = res.getHeader("userId") as string;
-      
+
 //       // Simulating permission check
 //       const isAllowed = true; // Replace with actual permission validation logic
 //       if (!isAllowed) {

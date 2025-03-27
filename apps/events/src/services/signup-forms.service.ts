@@ -1,9 +1,6 @@
-import {
-  SignupFormsResponse,
-  UserSource,
-} from "rumor-utils/shared/events/grpc/events/general.pb";
-import { buildSignupFormsResponse } from "rumor-utils/shared/events/mappers/signup-forms.mapper";
-import { SignupFormStaticQuestions } from "rumor-utils/shared/events/entities/signup-form-static-questions.entity";
+import { SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { buildSignupFormsResponse } from 'rumor-utils/shared/events/mappers/signup-forms.mapper';
+import { SignupFormStaticQuestions } from 'rumor-utils/shared/events/entities/signup-form-static-questions.entity';
 import {
   Event,
   EventSignupForms,
@@ -13,28 +10,22 @@ import {
   UserRole,
   Role,
   Guest,
-} from "rumor-utils/shared/entities";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "rumor-utils/errors";
-import database from "../database";
+} from 'rumor-utils/shared/entities';
+import { BadRequestError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import database from '../database';
 import {
   CreateSignupFormDto,
   SignupFormAnswersDto,
-} from "rumor-utils/shared/events/dtos/signup-forms.dto";
-import { parse } from "qs";
-import { Brackets, DataSource, QueryRunner, UpdateResult } from "typeorm";
-import { isUUID } from "class-validator";
-import {
-  EventStatusEnum,
-  GuestStatus,
-} from "rumor-utils/shared/events/interfaces/event.interface";
-import config from "../config";
-import serviceMesh from "../server/helpers/serviceMeshHandler";
-import { NotificationType } from "rumor-utils/shared/notifications/grpc/notification/notification.pb";
-import { isValidEmail, isValidPhoneNumber } from "rumor-utils/utils/file-utils";
+} from 'rumor-utils/shared/events/dtos/signup-forms.dto';
+import { parse } from 'qs';
+import { Brackets, DataSource, QueryRunner, UpdateResult } from 'typeorm';
+import { isUUID } from 'class-validator';
+import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import config from '../config';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -54,10 +45,7 @@ export class SignupFormsServices {
     return staticQuestions;
   }
 
-  public static async get(
-    id: string,
-    eventId: string
-  ): Promise<SignupFormsResponse> {
+  public static async get(id: string, eventId: string): Promise<SignupFormsResponse> {
     const event: Event | undefined = await Event.findOne({
       where: { id: eventId },
       relations: {
@@ -70,28 +58,26 @@ export class SignupFormsServices {
       },
     });
     if (!event) {
-      throw new NotFoundError("Event");
+      throw new NotFoundError('Event');
     }
     const signupForm: EventSignupForms = await EventSignupForms.findOne({
       where: { id: id, event: { id: eventId } },
       relations: { createdBy: true, questions: true },
     });
 
-    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+    const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
     const data = buildSignupFormsResponse(event, signupForm, baseUrl);
     return data;
   }
 
-  public static async getByEventId(
-    eventId: string
-  ): Promise<SignupFormsResponse[]> {
+  public static async getByEventId(eventId: string): Promise<SignupFormsResponse[]> {
     try {
       const event: Event | undefined = await Event.findOne({
         where: { id: eventId },
         relations: { owner: true },
       });
       if (!event) {
-        throw new NotFoundError("Event not found");
+        throw new NotFoundError('Event not found');
       }
       const signupForms = await EventSignupForms.find({
         where: { event: { id: eventId } },
@@ -100,11 +86,9 @@ export class SignupFormsServices {
 
       const resultList: SignupFormsResponse[] = [];
 
-      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
-      signupForms.forEach((sf) =>
-        resultList.push(
-          buildSignupFormsResponse(event, sf, baseUrl, sf.submissions.length)
-        )
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
+      signupForms.forEach(sf =>
+        resultList.push(buildSignupFormsResponse(event, sf, baseUrl, sf.submissions.length)),
       );
       return resultList;
     } catch (err) {
@@ -114,40 +98,35 @@ export class SignupFormsServices {
 
   public static async getByUrl(code: string) {
     try {
-      const eventSignupForm: EventSignupForms | undefined =
-        await EventSignupForms.findOne({
-          where: {
-            urlCode: code,
-            isPublished: true,
+      const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
+        where: {
+          urlCode: code,
+          isPublished: true,
+        },
+        relations: {
+          event: {
+            collaborators: true,
+            ageLimit: true,
+            talents: true,
+            owner: true,
+            eventType: true,
+            location: true,
           },
-          relations: {
-            event: {
-              collaborators: true,
-              ageLimit: true,
-              talents: true,
-              owner: true,
-              eventType: true,
-              location: true,
-            },
-            createdBy: true,
-            questions: true,
-          },
-        });
+          createdBy: true,
+          questions: true,
+        },
+      });
 
       if (!eventSignupForm) {
-        throw new ForbiddenError("SignupForm does not exists");
+        throw new ForbiddenError('SignupForm does not exists');
       }
 
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
-        throw new NotFoundError("Event does not exists");
+        throw new NotFoundError('Event does not exists');
       }
-      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
 
-      const data = buildSignupFormsResponse(
-        eventSignupForm.event,
-        eventSignupForm,
-        baseUrl
-      );
+      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
       return data;
     } catch (err: any) {
@@ -157,7 +136,7 @@ export class SignupFormsServices {
 
   public static async create(
     eventId: string,
-    body: CreateSignupFormDto
+    body: CreateSignupFormDto,
   ): Promise<SignupFormsResponse> {
     try {
       const event: Event | undefined = await Event.findOne({
@@ -165,23 +144,18 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
       if (!event) {
-        throw new NotFoundError("Event");
+        throw new NotFoundError('Event');
       }
       if (event.isPrivate) {
-        throw new ForbiddenError(
-          "You cannot create signup forms for private events."
-        );
+        throw new ForbiddenError('You cannot create signup forms for private events.');
       }
       let random = Math.floor(100000 + Math.random() * 900000).toString();
 
-      const companyName = (
-        event.owner?.additionalHostInformation?.companyName || ""
-      )
-        .split(" ")
-        .join("");
+      const companyName = (event.owner?.additionalHostInformation?.companyName || '')
+        .split(' ')
+        .join('');
       const signupForm = new EventSignupForms();
-      signupForm.hasAccessForAdditionalGuests =
-        body.hasAccessForAdditionalGuests;
+      signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
       signupForm.description = body.description;
       signupForm.name = body.name || `${companyName} 's`;
       signupForm.styling = body.styling;
@@ -208,9 +182,9 @@ export class SignupFormsServices {
       }
       const savedQuestions = SignupFormQuestions.create(questionList);
       await SignupFormQuestions.insert(savedQuestions);
-      signupForm.questionIds = savedQuestions.map((q) => q.id);
+      signupForm.questionIds = savedQuestions.map(q => q.id);
       await signupForm.save();
-      const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
       const response = buildSignupFormsResponse(event, signupForm, baseUrl, 0);
       return response;
     } catch (error) {
@@ -221,19 +195,18 @@ export class SignupFormsServices {
   public static async update(
     id: string,
     eventId: string,
-    body: CreateSignupFormDto
+    body: CreateSignupFormDto,
   ): Promise<SignupFormsResponse> {
-    const signupForm: EventSignupForms | undefined =
-      await EventSignupForms.findOne({
-        where: { id: id, event: { id: eventId } },
-        relations: { event: true, createdBy: true },
-      });
+    const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
+      where: { id: id, event: { id: eventId } },
+      relations: { event: true, createdBy: true },
+    });
     if (!signupForm) {
-      throw new ForbiddenError("Signup Forms does not exists.");
+      throw new ForbiddenError('Signup Forms does not exists.');
     }
 
     const oldQuestionIds: string[] = [];
-    body.questions.forEach((q) => q.id && oldQuestionIds.push(q.id));
+    body.questions.forEach(q => q.id && oldQuestionIds.push(q.id));
     // const oldQuestions: FindOperator<string> = In(oldQuestionIds);
     // const questonList = await SignupFormQuestions.find({
     //   where: { id: oldQuestions },
@@ -241,13 +214,11 @@ export class SignupFormsServices {
 
     const existingQuestions = await SignupFormQuestions.getRepository()
       .createQueryBuilder()
-      .where("id IN (:...ids)", { ids: oldQuestionIds })
+      .where('id IN (:...ids)', { ids: oldQuestionIds })
       .getMany();
 
     const questionsMap = new Map<string, boolean>();
-    existingQuestions.forEach((q) =>
-      questionsMap.set(q.id.toString(), q.isDefault)
-    );
+    existingQuestions.forEach(q => questionsMap.set(q.id.toString(), q.isDefault));
 
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
@@ -268,25 +239,25 @@ export class SignupFormsServices {
         question.name = q.name;
         question.isRequired = q.isRequired;
         switch (q.action.toLowerCase()) {
-          case "create":
+          case 'create':
             question.ordering = index;
             question.signupForms = { id: id } as EventSignupForms;
             questionList.push(question);
             break;
-          case "update":
+          case 'update':
             ids.push(q.id);
             question.ordering = index;
             const updatesQuestion = SignupFormQuestions.update(q.id, question);
             questionPromises.push(updatesQuestion);
             break;
-          case "delete":
+          case 'delete':
             const deleteQuestions = SignupFormQuestions.delete(q.id);
             questionPromises.push(deleteQuestions);
             break;
         }
       }
       if (!body.hasAccessForAdditionalGuests) {
-        if (q.name === "Request Access for Additional Guests") {
+        if (q.name === 'Request Access for Additional Guests') {
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
         } else {
@@ -301,16 +272,11 @@ export class SignupFormsServices {
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
     await SignupFormQuestions.insert(newQuestions);
-    ids.push(...newQuestions.map((q) => q.id));
+    ids.push(...newQuestions.map(q => q.id));
     signupForm.questionIds = ids;
-    const baseUrl: string = config.get("SIGNUP_FORM_BASE_URL") || "";
+    const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
     await signupForm.save();
-    const response = buildSignupFormsResponse(
-      signupForm.event,
-      signupForm,
-      baseUrl,
-      0
-    );
+    const response = buildSignupFormsResponse(signupForm.event, signupForm, baseUrl, 0);
     return response;
   }
 
@@ -318,36 +284,35 @@ export class SignupFormsServices {
     requestPayload: SignupFormAnswersDto[],
     answerList: SignupFormAnswersDto[],
     userPayload: User,
-    requestedGuests: any
+    requestedGuests: any,
   ) {
     requestPayload.forEach((ans: SignupFormAnswersDto) => {
       const answer = new SignupFormAnswersDto();
-      answer.answers = ans.answers || "";
+      answer.answers = ans.answers || '';
       answer.id = ans.id;
       answer.isRequired = ans.isRequired;
       answer.name = ans.name;
       if (ans.isRequired) {
         switch (answer.name.toLowerCase()) {
-          case "first name":
+          case 'first name':
             userPayload.firstName = ans.answers;
             break;
-          case "last name":
+          case 'last name':
             userPayload.lastName = ans.answers;
             break;
-          case "email":
+          case 'email':
             userPayload.email = ans.answers;
             if (!isValidEmail(userPayload.email)) {
               throw new BadRequestError('Invalid Email format');
-        
             }
             break;
-          case "phone":
+          case 'phone':
             userPayload.phoneNumber = ans.answers;
             if (!isValidPhoneNumber(userPayload.phoneNumber)) {
               throw new BadRequestError('Invalid Phone Number format');
-              }             
-              break;
-          case "request access for additional guests":
+            }
+            break;
+          case 'request access for additional guests':
             requestedGuests.additional = Number(ans.answers);
             break;
         }
@@ -356,15 +321,12 @@ export class SignupFormsServices {
     });
   }
 
-  private static async registerUserAsNonMember(
-    payload: User,
-    queryRunner: QueryRunner
-  ) {
+  private static async registerUserAsNonMember(payload: User, queryRunner: QueryRunner) {
     await queryRunner.manager.save(payload);
 
     const nonMemberRole: Role[] = await this.dbConnection
       .getRepository(Role)
-      .find({ where: { name: "non_member" } });
+      .find({ where: { name: 'non_member' } });
 
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
@@ -376,7 +338,7 @@ export class SignupFormsServices {
 
   private static async validateUserAsGuest(
     eventId: string,
-    userPayload: User
+    userPayload: User,
   ): Promise<[User, Guest]> {
     let user = null;
     if (userPayload.email) {
@@ -388,9 +350,7 @@ export class SignupFormsServices {
         where: { email: userPayload.phoneNumber },
       });
     } else {
-      throw new BadRequestError(
-        "User information missing to apply for an event."
-      );
+      throw new BadRequestError('User information missing to apply for an event.');
     }
     if (!user) {
       return [userPayload, new Guest()];
@@ -402,48 +362,37 @@ export class SignupFormsServices {
       });
       if (guest && guest.status !== GuestStatus.DRAFT) {
         throw new ForbiddenError(
-          "You are already part of this event. Please log into application and check your event status."
+          'You are already part of this event. Please log into application and check your event status.',
         );
       }
       return [user, guest];
     }
     return [user, new Guest()];
-
   }
 
-  public static async answers(
-    id: string,
-    eventId: string,
-    payload: SignupFormAnswersDto[]
-  ) {
+  public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
     try {
-      const signupForm: EventSignupForms | undefined =
-        await EventSignupForms.findOne({
-          where: { id: id, event: { id: eventId } },
-          relations: { event: true },
-        });
+      const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
+        where: { id: id, event: { id: eventId } },
+        relations: { event: { owner: true } },
+      });
       if (!signupForm) {
-        throw new ForbiddenError("Signup Forms");
+        throw new ForbiddenError('Signup Forms');
       }
 
       if (!signupForm.event) {
-        throw new ForbiddenError("Event does not exists.");
+        throw new ForbiddenError('Event does not exists.');
       }
 
       // Step 5: Ensure invites can only be sent for approved events
       if (signupForm.event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new ForbiddenError("You can apply only for approved event.");
+        throw new ForbiddenError('You can apply only for approved event.');
       }
       let userPayload = new User();
       const answerList: SignupFormAnswersDto[] = [];
       let requestedGuests: any = { additional: 0 };
 
-      this.extractUserPayloadAndAnswers(
-        payload,
-        answerList,
-        userPayload,
-        requestedGuests
-      );
+      this.extractUserPayloadAndAnswers(payload, answerList, userPayload, requestedGuests);
       let inviteGuestPayload = null;
       [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
@@ -476,6 +425,13 @@ export class SignupFormsServices {
 
       submissions.guestId = inviteGuestPayload.id;
       await queryRunner.manager.save(submissions);
+
+      /**-- Create Host User Mapping */
+      const hostUserMapping = new HostUserMapping();
+      hostUserMapping.user = { id: userPayload.id } as User;
+      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+      await queryRunner.manager.save(hostUserMapping);
+
       await queryRunner.commitTransaction();
 
       try {
@@ -486,10 +442,10 @@ export class SignupFormsServices {
             NotificationType.RSVP_SIGNUP_FORM_REQUEST,
             signupForm.event.owner.id,
             signupForm.event.id,
-            userPayload.id
+            userPayload.id,
           );
       } catch (error) {
-        console.log("🚀 ~ SignupFormsServices ~ error:", error);
+        console.log('🚀 ~ SignupFormsServices ~ error:', error);
       }
       return submissions;
     } catch (err) {
@@ -518,56 +474,51 @@ export class SignupFormsServices {
    * Host profile pictures.
    */
 
-  public static async listSubmissionsWithPerformanceOptimisations(
-    id: string,
-    payload: any
-  ) {
+  public static async listSubmissionsWithPerformanceOptimisations(id: string, payload: any) {
     try {
       const parsedQuery = parse(payload);
-      const take = parsedQuery?.take
-        ? parseInt(parsedQuery.take as string)
-        : undefined;
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const lastIndex =
-        parsedQuery?.lastIndex && isUUID(parsedQuery.lastIndex)
-          ? parsedQuery.lastIndex
-          : undefined;
+        parsedQuery?.lastIndex && isUUID(parsedQuery.lastIndex) ? parsedQuery.lastIndex : undefined;
 
       const searchValue =
-        parsedQuery.findByName && typeof parsedQuery.findByName === "string"
+        parsedQuery.findByName && typeof parsedQuery.findByName === 'string'
           ? parsedQuery.findByName.toLowerCase()
-          : "";
+          : '';
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
-        .createQueryBuilder("sfs")
-        .innerJoin("sfs.attendees", "atd")
-        .innerJoin("sfs.guest", "gst")
+        .createQueryBuilder('sfs')
+        .innerJoin('sfs.attendees', 'atd')
+        .innerJoin('sfs.guest', 'gst')
         .select([])
-        .addSelect("sfs.id", "id")
-        .addSelect("atd.firstName", "firstName")
-        .addSelect("atd.lastName", "lastName")
-        .addSelect("atd.email", "email")
-        .addSelect("atd.phone_number", "phone")
-        .addSelect("gst.status", "status")
-        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+        .addSelect('sfs.id', 'id')
+        .addSelect('atd.firstName', 'firstName')
+        .addSelect('atd.lastName', 'lastName')
+        .addSelect('atd.email', 'email')
+        .addSelect('atd.phone_number', 'phone')
+        .addSelect('gst.status', 'status')
+        .addSelect('gst.guest_id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
+        .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
 
       if (lastIndex && isUUID(lastIndex)) {
-        submissionsQuery.andWhere("sfs.id < :id", {
+        submissionsQuery.andWhere('sfs.id < :id', {
           id: lastIndex,
         });
       }
-      submissionsQuery.orderBy("sfs.id", "DESC").limit(take);
+      submissionsQuery.orderBy('sfs.id', 'DESC').limit(take);
 
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
         submissionsQuery.andWhere(
-          new Brackets((qb) => {
-            searchWords.forEach((word) => {
-              qb.orWhere("atd.firstName ILIKE :word", {
+          new Brackets(qb => {
+            searchWords.forEach(word => {
+              qb.orWhere('atd.firstName ILIKE :word', {
                 word: `%${word}%`,
-              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+              }).orWhere('atd.lastName ILIKE :word', { word: `%${word}%` });
             });
-          })
+          }),
         );
       }
 
@@ -583,18 +534,14 @@ export class SignupFormsServices {
   public static async listSubmissions(id: string, payload: any) {
     try {
       const parsedQuery = parse(payload);
-      const take = parsedQuery?.take
-        ? parseInt(parsedQuery.take as string)
-        : undefined;
+      const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
 
-      const skip = parsedQuery?.skip
-        ? parseInt(parsedQuery.skip as string)
-        : undefined;
+      const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
 
       const searchValue =
-        parsedQuery.findByName && typeof parsedQuery.findByName === "string"
+        parsedQuery.findByName && typeof parsedQuery.findByName === 'string'
           ? parsedQuery.findByName.toLowerCase()
-          : "";
+          : '';
 
       // const count = await SignupFormSubmissions.count({
       //   where: {
@@ -604,49 +551,49 @@ export class SignupFormsServices {
 
       const getCountQuery = database
         .getRepository(SignupFormSubmissions)
-        .createQueryBuilder("sfs")
-        .innerJoin("sfs.attendees", "atd")
-        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+        .createQueryBuilder('sfs')
+        .innerJoin('sfs.attendees', 'atd')
+        .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
 
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
-        .createQueryBuilder("sfs")
-        .innerJoin("sfs.attendees", "atd")
-        .innerJoin("sfs.guest", "gst")
+        .createQueryBuilder('sfs')
+        .innerJoin('sfs.attendees', 'atd')
+        .innerJoin('sfs.guest', 'gst')
         .select([])
-        .addSelect("sfs.id", "id")
-        .addSelect("atd.firstName", "firstName")
-        .addSelect("atd.profilePicture", "profilePicture")
-        .addSelect("atd.id", "userId")
-        .addSelect("atd.lastName", "lastName")
-        .addSelect("atd.email", "email")
-        .addSelect("atd.phone_number", "phone")
-        .addSelect("gst.status", "status")
-        .addSelect("gst.id", "guestId")
-        .addSelect("gst.additionalRequestedGuests + 1", "partySize")
-        .where("sfs.signup_form_id = :signupFormId", { signupFormId: id });
+        .addSelect('sfs.id', 'id')
+        .addSelect('atd.firstName', 'firstName')
+        .addSelect('atd.profilePicture', 'profilePicture')
+        .addSelect('atd.lastName', 'lastName')
+        .addSelect('atd.email', 'email')
+        .addSelect('atd.phone_number', 'phone')
+        .addSelect('gst.status', 'status')
+        .addSelect('gst.id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
+        .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
+        .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
         getCountQuery.andWhere(
-          new Brackets((qb) => {
-            searchWords.forEach((word) => {
-              qb.orWhere("atd.firstName ILIKE :word", {
+          new Brackets(qb => {
+            searchWords.forEach(word => {
+              qb.orWhere('atd.firstName ILIKE :word', {
                 word: `%${word}%`,
-              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+              }).orWhere('atd.lastName ILIKE :word', { word: `%${word}%` });
             });
-          })
+          }),
         );
         submissionsQuery.andWhere(
-          new Brackets((qb) => {
-            searchWords.forEach((word) => {
-              qb.orWhere("atd.firstName ILIKE :word", {
+          new Brackets(qb => {
+            searchWords.forEach(word => {
+              qb.orWhere('atd.firstName ILIKE :word', {
                 word: `%${word}%`,
-              }).orWhere("atd.lastName ILIKE :word", { word: `%${word}%` });
+              }).orWhere('atd.lastName ILIKE :word', { word: `%${word}%` });
             });
-          })
+          }),
         );
       }
-      submissionsQuery.orderBy("sfs.id", "DESC").offset(skip).limit(take);
+      submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
