@@ -1,16 +1,11 @@
-import { RumorBaseEntity } from "../../entities/rumor-base.entity";
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  JoinColumn, OneToOne
-} from "typeorm";
-import { EventSignupForms } from "./event-signup-forms.entity";
-import { User } from "../../users/entities/user.entity";
-import { ISignupFormQuestionsRequest } from "../grpc/events/general.pb";
-import { Guest } from "./guest.entity";
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { Entity, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
+import { EventSignupForms } from './event-signup-forms.entity';
+import { User } from '../../users/entities/user.entity';
+import { ISignupFormQuestionsRequest } from '../grpc/events/general.pb';
+import { Guest } from './guest.entity';
 
-@Entity("signup_form_submissions")
+@Entity('signup_form_submissions')
 export class SignupFormSubmissions extends RumorBaseEntity {
   @Column({ type: "jsonb", nullable: false, name: "answers" })
   answers: ISignupFormQuestionsRequest[];

@@ -10,7 +10,7 @@ export class PushNotificationToken extends RumorBaseEntity {
   @Column({ type: 'varchar', name: 'device_id' })
   deviceId: string;
 
-  @ManyToOne(() => User, (user) => user.pushNotificationToken, { nullable: true })
+  @ManyToOne(() => User, user => user.pushNotificationToken, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

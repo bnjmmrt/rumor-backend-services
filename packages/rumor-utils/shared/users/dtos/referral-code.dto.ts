@@ -1,5 +1,9 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
-import { CreateReferralCodeRequest, ReferredUserRequest, UpdateReferralCodeRequest } from '../grpc/platform/platform.pb';
+import {
+  CreateReferralCodeRequest,
+  ReferredUserRequest,
+  UpdateReferralCodeRequest,
+} from '../grpc/platform/platform.pb';
 
 export class CreateReferralCodeRequestDto implements CreateReferralCodeRequest {
   @IsNotEmpty()

@@ -1,28 +1,23 @@
-import { FileResponse } from "rumor-utils/shared/users/grpc/files/files.pb";
-import { RequestByIdDto } from "rumor-utils/shared/users/dtos/get-file.dto";
-import { UploadFileDto } from "rumor-utils/shared/users/dtos/upload-file.dto";
-import { UpdateFileDto } from "rumor-utils/shared/users/dtos/update-file.dto";
-import { GetSignedUploadUrlRequestDto } from "rumor-utils/shared/users/dtos/get-upload-url-dto";
-import { v4 as uuidv4 } from "uuid";
-import config from "../config";
+import { FileResponse } from 'rumor-utils/shared/users/grpc/files/files.pb';
+import { RequestByIdDto } from 'rumor-utils/shared/users/dtos/get-file.dto';
+import { UploadFileDto } from 'rumor-utils/shared/users/dtos/upload-file.dto';
+import { UpdateFileDto } from 'rumor-utils/shared/users/dtos/update-file.dto';
+import { GetSignedUploadUrlRequestDto } from 'rumor-utils/shared/users/dtos/get-upload-url-dto';
+import { v4 as uuidv4 } from 'uuid';
+import config from '../config';
 
-import filesService from "../services/files.service";
-import {
-  CreateResponse,
-  GetResponse,
-  UpdateResponse,
-  DeleteResponse,
-} from "rumor-utils/success";
-import { generateUniqueFileName } from "../common/helpers";
-import S3Service from "../utils/aws/s3";
-import asyncWrapper from "../server/helpers/asyncWrapper";
+import filesService from '../services/files.service';
+import { CreateResponse, GetResponse, UpdateResponse, DeleteResponse } from 'rumor-utils/success';
+import { generateUniqueFileName } from '../common/helpers';
+import S3Service from '../utils/aws/s3';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 
 export class FilesControllerHandler {
   async handleFileResponse(fileKeyId: string): Promise<any> {
     const fileMetadata = await S3Service.getFile(fileKeyId);
 
     if (!fileMetadata.Metadata) {
-      throw new Error("Metadata not found");
+      throw new Error('Metadata not found');
     }
 
     const dataFile = {
@@ -40,15 +35,15 @@ export class FilesControllerHandler {
   //'UploadFile'
   uploadFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: any = req.file;
-    const maxFileSizeMB = config.get("FILE_SIZE_IN_BYTES");
+    const maxFileSizeMB = config.get('FILE_SIZE_IN_BYTES');
     const fileSizeBytes = Number(payload.size);
     if (fileSizeBytes > maxFileSizeMB) {
-      throw new Error("File size exceeds the maximum limit of 0.5 MB");
+      throw new Error('File size exceeds the maximum limit of 0.5 MB');
     }
 
     const fileKeyId = generateUniqueFileName(payload.originalname);
-  
-    await S3Service.uploadFile({ ...payload, fileKeyId, file:payload.buffer});
+
+    await S3Service.uploadFile({ ...payload, fileKeyId, file: payload.buffer });
     const response = await this.handleFileResponse(fileKeyId);
     const getResponse = new GetResponse(response);
     res.status(getResponse.statusCode).json(getResponse);
@@ -67,14 +62,14 @@ export class FilesControllerHandler {
   viewFile = asyncWrapper(async (req, res): Promise<any> => {
     const payload: string = req.params[0];
 
-    const fileResponse:any =  await S3Service.getFileStream(payload)
+    const fileResponse: any = await S3Service.getFileStream(payload);
 
     if (!fileResponse.Body) {
-      return res.status(404).json({ error: "File not found" });
+      return res.status(404).json({ error: 'File not found' });
     }
 
-    res.setHeader("Content-Type", fileResponse.ContentType || "application/octet-stream");
-    res.setHeader("Content-Disposition", `inline; filename="${payload}"`);
+    res.setHeader('Content-Type', fileResponse.ContentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${payload}"`);
 
     // Pipe the S3 file stream to the response
     fileResponse.Body.pipe(res);
@@ -104,11 +99,11 @@ export class FilesControllerHandler {
     let { contentType } = payload;
     const fileName = extension != null ? `${uuidv4()}.${extension}` : uuidv4();
     const uploadUrlPath = `${path}/${fileName}`;
-    contentType = contentType || "text/csv";
-    const maxFileSizeMB = config.get("FILE_SIZE_IN_BYTES");
+    contentType = contentType || 'text/csv';
+    const maxFileSizeMB = config.get('FILE_SIZE_IN_BYTES');
     const fileSizeBytes = Number(payload.size);
     if (fileSizeBytes > maxFileSizeMB) {
-      throw new Error("File size exceeds the maximum limit of 0.5 MB");
+      throw new Error('File size exceeds the maximum limit of 0.5 MB');
     }
 
     const uri = await S3Service.UploadFileUrl(uploadUrlPath, contentType); // Ensure file exists before updating

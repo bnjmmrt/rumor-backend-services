@@ -1,4 +1,10 @@
-import { ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments, registerDecorator, ValidationOptions } from 'class-validator';
+import {
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
+  registerDecorator,
+  ValidationOptions,
+} from 'class-validator';
 import { CreateEventRequestDto } from '../dtos/events.dto';
 
 @ValidatorConstraint({ async: false })
@@ -19,7 +25,8 @@ export class IsPublishDateValidConstraint implements ValidatorConstraintInterfac
   }
 
   private parsePublishDate(dateString: string): Date | null {
-    const regex = /^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):([0-5][0-9])$/;
+    const regex =
+      /^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):([0-5][0-9])$/;
     const match = dateString.match(regex);
     if (!match) return null;
 

@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
-import { RumorBaseEntity } from '../../entities/rumor-base.entity';import { Event } from './event.entity';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { Event } from './event.entity';
 
 @Entity({ name: 'talents' })
 export class Talent extends RumorBaseEntity {
@@ -22,7 +23,7 @@ export class Talent extends RumorBaseEntity {
   enabled: boolean;
 
   @Index()
-  @ManyToOne(() => Event, (event) => event.talents, {
+  @ManyToOne(() => Event, event => event.talents, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })

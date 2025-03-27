@@ -25,7 +25,7 @@ export class SocialStats extends RumorBaseEntity {
   @Column({ type: 'int', default: 0, name: 'snapchat_followers_count' })
   snapchatFollowersCount: number;
 
-  @OneToOne(() => User, (user) => user.socialStats, { nullable: true })
+  @OneToOne(() => User, user => user.socialStats, { nullable: true })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }
