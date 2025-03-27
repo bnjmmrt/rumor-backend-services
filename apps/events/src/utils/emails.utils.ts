@@ -385,3 +385,18 @@ export const sendGuestEventApproval = (
       );
   } catch (err) {}
 };
+
+export const sendEventAnnouncement = (firstName: string, hostName: string, eventName: string, eventId: string, email: string): Promise<AxiosResponse<any, any>> => {
+    const redirectPath = `event-announcement?id=${eventId}`;
+    const params = [
+      { key: 'event', value: eventName },
+      { key: 'host', value: hostName },
+      { key: 'recipient_first_name', value: firstName },
+      { key: 'url_button', value: redirectPath },
+    ];
+    try {
+      return serviceMesh
+        .notificationService()
+        .sendEmailFromTemplate(params, 'New Event Announcement', [email.trim()], null);
+    } catch (error) {}
+  };

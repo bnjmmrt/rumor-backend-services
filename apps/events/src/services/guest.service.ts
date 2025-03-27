@@ -3536,20 +3536,29 @@ export class GuestService {
 
     let checkExistingUser;
     // Step 6: Check if the user already exists in the system
-    if (payload.email && !payload.phoneNumber) {
-      try {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
-          .data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) {}
-    } else if (payload.phoneNumber && !payload.email) {
-      try {
-        checkExistingUser = (
-          await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
-        ).data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) {}
-    }
+    try {
+      if (payload.email && !payload.phoneNumber) {
+          checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
+            .data;
+          if (checkExistingUser) {
+            const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
+              where: { user: { id: checkExistingUser.id } },
+            });
+            if (checkGuest) throw new BadRequestError('Guest already exists');
+          }
+        } else if (payload.phoneNumber && !payload.email) {
+            checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)).data;
+            if (checkExistingUser) 
+              if (checkExistingUser) {
+                const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
+                  where: { user: { id: checkExistingUser.id } },
+                });
+                if (checkGuest) throw new BadRequestError('Guest already exists');
+              }
+        }
+      } catch (e) {
+        throw new BadRequestError(e)
+      }
 
     // Step 7: Register a new guest user
     let guest = new Guest();
