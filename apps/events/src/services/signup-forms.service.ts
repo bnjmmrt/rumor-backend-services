@@ -568,7 +568,7 @@ export class SignupFormsServices {
         .addSelect('atd.email', 'email')
         .addSelect('atd.phone_number', 'phone')
         .addSelect('gst.status', 'status')
-        .addSelect('gst.guest_id', 'guestId')
+        .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
         .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
