@@ -5,9 +5,9 @@
 // source: grpc/communication/communication.proto
 
 /* eslint-disable */
-import { Observable } from "rxjs";
+import { Observable } from 'rxjs';
 
-export const protobufPackage = "communication";
+export const protobufPackage = 'communication';
 
 export interface RequestById {
   id: string;
@@ -105,8 +105,7 @@ export interface EmailTemplate {
   id?: string | undefined;
 }
 
-export interface EmptyRequest {
-}
+export interface EmptyRequest {}
 
 export interface ListEmailTemplatesResponse {
   status: number;
@@ -130,7 +129,7 @@ export interface SendPushNotificationRequest {
   body: string;
 }
 
-export const COMMUNICATION_PACKAGE_NAME = "communication";
+export const COMMUNICATION_PACKAGE_NAME = 'communication';
 
 export interface CommunicationServiceClient {
   /** SendGrid */
@@ -167,7 +166,9 @@ export interface CommunicationServiceClient {
 export interface CommunicationServiceController {
   /** SendGrid */
 
-  sendEmail(request: SendEmailRequest): Promise<SendEmailResponse> | Observable<SendEmailResponse> | SendEmailResponse;
+  sendEmail(
+    request: SendEmailRequest,
+  ): Promise<SendEmailResponse> | Observable<SendEmailResponse> | SendEmailResponse;
 
   /** Twilio */
 
@@ -175,7 +176,9 @@ export interface CommunicationServiceController {
     request: SendVerificationCodeRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  verifyCode(request: VerifyCodeRequest): Promise<VerifyResponse> | Observable<VerifyResponse> | VerifyResponse;
+  verifyCode(
+    request: VerifyCodeRequest,
+  ): Promise<VerifyResponse> | Observable<VerifyResponse> | VerifyResponse;
 
   sendInvitationMessages(
     request: SendInvitationMessagesRequest,
@@ -191,11 +194,16 @@ export interface CommunicationServiceController {
     request: SendEmailFromTemplateRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  createEmailTemplate(request: EmailTemplate): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  createEmailTemplate(
+    request: EmailTemplate,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   listEmailTemplates(
     request: EmptyRequest,
-  ): Promise<ListEmailTemplatesResponse> | Observable<ListEmailTemplatesResponse> | ListEmailTemplatesResponse;
+  ):
+    | Promise<ListEmailTemplatesResponse>
+    | Observable<ListEmailTemplatesResponse>
+    | ListEmailTemplatesResponse;
 
   deleteEmailTemplate(
     request: DeleteEmailTemplateRequest,
@@ -212,4 +220,4 @@ export interface CommunicationServiceController {
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 }
 
-export const COMMUNICATION_SERVICE_NAME = "CommunicationService";
+export const COMMUNICATION_SERVICE_NAME = 'CommunicationService';

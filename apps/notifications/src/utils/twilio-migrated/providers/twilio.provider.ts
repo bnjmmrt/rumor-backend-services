@@ -10,8 +10,8 @@
 //   };
 // }
 
-import { createTwilioClient } from "../common";
-import { TwilioModuleOptions } from "../interfaces";
+import { createTwilioClient } from '../common';
+import { TwilioModuleOptions } from '../interfaces';
 
 export function createTwilioProvider(options: TwilioModuleOptions) {
   return createTwilioClient(options); // Just return the Twilio client

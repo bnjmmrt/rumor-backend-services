@@ -1,6 +1,9 @@
-import { Collaborator, TicketType, Event } from "../../packages/rumor-utils/shared/entities";
-import { CreateCollaboratorDto, UpdateCollaboratorDto } from "packages/rumor-utils/shared/events/dtos";
-import { CollaboratorTicket } from "../../packages/rumor-utils/shared/events/grpc/events/general.pb";
+import { Collaborator, TicketType, Event } from '../../packages/rumor-utils/shared/entities';
+import {
+  CreateCollaboratorDto,
+  UpdateCollaboratorDto,
+} from 'packages/rumor-utils/shared/events/dtos';
+import { CollaboratorTicket } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 interface RoleEntity {
   id: string;

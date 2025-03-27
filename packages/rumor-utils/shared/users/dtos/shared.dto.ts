@@ -1,5 +1,11 @@
 import { ParsedQs } from 'qs';
-import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest, RequestByUserAndEventRequest } from '../grpc/auth/shared.pb';
+import {
+  TokenRequest,
+  PaginatedRequest,
+  UserAndIdRequest,
+  IdRequest,
+  RequestByUserAndEventRequest,
+} from '../grpc/auth/shared.pb';
 import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
 import { UserStatus } from '../interfaces/shared.interface';
 

@@ -10,6 +10,6 @@ export class TemporaryPasswordToken extends RumorBaseEntity {
   @Column({ type: 'timestamp', name: 'expires_at' })
   expiresAt: Date;
 
-  @OneToOne(() => User, (user) => user.temporaryPasswordToken, { onDelete: 'CASCADE' })
+  @OneToOne(() => User, user => user.temporaryPasswordToken, { onDelete: 'CASCADE' })
   user: User;
 }

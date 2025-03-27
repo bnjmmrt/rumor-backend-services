@@ -1,4 +1,12 @@
-import { IsBoolean, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { CreateTicketTypeRequest, UpdateTicketTypeRequest } from '../grpc/events/events.pb';
 import { TicketReassignToDto } from './collaborator.dto';
 

@@ -1,5 +1,20 @@
-import { IsArray, IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
-import { CreateCollaboratorRequest, GetDefaultRoleConfigByRoleRequest, UpdateCollaboratorRequest } from '../grpc/events/events.pb';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
+import {
+  CreateCollaboratorRequest,
+  GetDefaultRoleConfigByRoleRequest,
+  UpdateCollaboratorRequest,
+} from '../grpc/events/events.pb';
 import { RoleCollaboratorEnum } from '../grpc/events/general.pb';
 import { Type } from 'class-transformer';
 
@@ -226,4 +241,3 @@ export class TicketReassignToDto {
   @IsOptional()
   name: string;
 }
-

@@ -6,7 +6,11 @@ type GenericResponse = {
   error?: { type?: string; message?: string };
 };
 
-export const unpackGenericResponse = async (observable: Observable<GenericResponse>, action: string, logger: any) => {
+export const unpackGenericResponse = async (
+  observable: Observable<GenericResponse>,
+  action: string,
+  logger: any,
+) => {
   try {
     const response = await firstValueFrom(observable);
     if (response.error) {
@@ -30,7 +34,12 @@ type Response<T> = {
   data?: T;
 };
 
-export const unpackResponse = async <T>(observable: Observable<Response<T>>, action: string, logger: any, allowNull = false) => {
+export const unpackResponse = async <T>(
+  observable: Observable<Response<T>>,
+  action: string,
+  logger: any,
+  allowNull = false,
+) => {
   try {
     const response = await firstValueFrom(observable);
     if (response.error) {
@@ -56,7 +65,11 @@ type StatusResponse = {
   success: boolean;
 };
 
-export const unpackStatusResponse = async (observable: Observable<StatusResponse>, action: string, logger: any) => {
+export const unpackStatusResponse = async (
+  observable: Observable<StatusResponse>,
+  action: string,
+  logger: any,
+) => {
   try {
     const response = await firstValueFrom(observable);
     if (!response.success) {
@@ -77,7 +90,11 @@ type SuccessResponse = {
 /**
  * Should be the same as status response
  */
-export const unpackSuccessResponse = async (observable: Observable<SuccessResponse>, action: string, logger: any) => {
+export const unpackSuccessResponse = async (
+  observable: Observable<SuccessResponse>,
+  action: string,
+  logger: any,
+) => {
   try {
     const response = await firstValueFrom(observable);
     if (!response.success) {
@@ -91,20 +108,27 @@ export const unpackSuccessResponse = async (observable: Observable<SuccessRespon
   }
 };
 
-export const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+export const haversineDistance = (
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number => {
   const toRad = (value: number) => (value * Math.PI) / 180;
   const R = 3958.8; // Radio of earth on miles
 
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
 
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
-export const calculateAge = (birthDate) => {
+export const calculateAge = birthDate => {
   if (!birthDate) return 0;
   const today = new Date();
   const birthDateObj = new Date(birthDate);

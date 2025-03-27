@@ -6,12 +6,9 @@ import {
   IsString,
   IsUUID,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
-import {
-  CreateSignupFormRequest,
-  ISignupFormQuestionsRequest,
-} from "../grpc/events/general.pb";
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateSignupFormRequest, ISignupFormQuestionsRequest } from '../grpc/events/general.pb';
 
 export class CreateSignupFormDto implements CreateSignupFormRequest {
   @IsOptional()

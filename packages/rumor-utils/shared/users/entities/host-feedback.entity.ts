@@ -11,7 +11,7 @@ export class HostFeedback extends RumorBaseEntity {
   @Column({ type: 'varchar', name: 'description' })
   description: string;
 
-  @ManyToOne(() => User, (user) => user.hostFeedbacks, { onDelete: 'CASCADE' }) // Define the relationship
+  @ManyToOne(() => User, user => user.hostFeedbacks, { onDelete: 'CASCADE' }) // Define the relationship
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' }) // Specify the join column
   user: User; // Define the user property
 }

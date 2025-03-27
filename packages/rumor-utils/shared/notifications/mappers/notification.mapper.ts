@@ -1,4 +1,4 @@
-import { Notification } from "../entities/notification.entity";
+import { Notification } from '../entities/notification.entity';
 interface NotificationResponse {
   id: string;
   title: string;
@@ -11,10 +11,8 @@ interface NotificationResponse {
   createdDate: Date;
 }
 
-function toNotificationslisting(
-  notifications: Partial<Notification>[]
-): NotificationResponse[] {
-  return notifications.map((notification) => ({
+function toNotificationslisting(notifications: Partial<Notification>[]): NotificationResponse[] {
+  return notifications.map(notification => ({
     id: notification.id,
     title: notification.title,
     message: notification.message,
@@ -27,9 +25,7 @@ function toNotificationslisting(
   }));
 }
 
-function toNotification(
-  notification: Partial<Notification>
-): NotificationResponse {
+function toNotification(notification: Partial<Notification>): NotificationResponse {
   return {
     id: notification.id,
     title: notification.title,
@@ -39,9 +35,8 @@ function toNotification(
     image: eval(`notification.${notification.notificationImage}`),
     isSeen: notification.isSeen,
     body: notification.body,
-    createdDate: notification.createdAt
+    createdDate: notification.createdAt,
   };
 }
 
-
-export { toNotificationslisting , toNotification};
+export { toNotificationslisting, toNotification };

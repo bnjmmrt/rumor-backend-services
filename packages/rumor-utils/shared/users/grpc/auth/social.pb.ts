@@ -4,12 +4,11 @@
 //   protoc               v5.29.1
 // source: grpc/auth/social.proto
 
-/* eslint-disable */
 // import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
-import { Observable } from "rxjs";
-import { Error, ProviderAuth, ProviderType } from "./shared.pb";
+import { Observable } from 'rxjs';
+import { Error, ProviderAuth, ProviderType } from './shared.pb';
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 export interface UserIdAuthRequest {
   userId: string;
@@ -196,7 +195,7 @@ export interface SocialMediaStatsResponse {
   data: SocialMediaStatsData[];
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';
 
 export interface SocialServiceClient {
   /** Facebook */
@@ -245,7 +244,9 @@ export interface SocialServiceClient {
 
   getLinkedInAuthUrl(request: LinkedInUserIdAuthRequest): Observable<GetLinkedInAuthUrlResponse>;
 
-  linkedInAuthCallback(request: LinkedInAuthCallbackRequest): Observable<LinkedInAuthCallbackResponse>;
+  linkedInAuthCallback(
+    request: LinkedInAuthCallbackRequest,
+  ): Observable<LinkedInAuthCallbackResponse>;
 
   getLinkedInAuthData(request: UserIdAuthRequest): Observable<GetLinkedInAuthDataResponse>;
 
@@ -253,7 +254,9 @@ export interface SocialServiceClient {
 
   getSnapchatAuthUrl(request: UserIdAuthRequest): Observable<GetSnapchatAuthUrlResponse>;
 
-  snapchatAuthCallback(request: SnapchatAuthCallbackRequest): Observable<SnapchatAuthCallbackResponse>;
+  snapchatAuthCallback(
+    request: SnapchatAuthCallbackRequest,
+  ): Observable<SnapchatAuthCallbackResponse>;
 
   getSnapchatAuthData(request: UserIdAuthRequest): Observable<GetSnapchatAuthDataResponse>;
 
@@ -279,15 +282,24 @@ export interface SocialServiceController {
 
   facebookAuthCallback(
     request: MetaAuthCallbackRequest,
-  ): Promise<MetaAuthCallbackResponse> | Observable<MetaAuthCallbackResponse> | MetaAuthCallbackResponse;
+  ):
+    | Promise<MetaAuthCallbackResponse>
+    | Observable<MetaAuthCallbackResponse>
+    | MetaAuthCallbackResponse;
 
   setFacebookAuthToken(
     request: SetMetaAuthTokenRequest,
-  ): Promise<SetMetaAuthTokenResponse> | Observable<SetMetaAuthTokenResponse> | SetMetaAuthTokenResponse;
+  ):
+    | Promise<SetMetaAuthTokenResponse>
+    | Observable<SetMetaAuthTokenResponse>
+    | SetMetaAuthTokenResponse;
 
   getFacebookAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetMetaAuthDataResponse> | Observable<GetMetaAuthDataResponse> | GetMetaAuthDataResponse;
+  ):
+    | Promise<GetMetaAuthDataResponse>
+    | Observable<GetMetaAuthDataResponse>
+    | GetMetaAuthDataResponse;
 
   /** Instagram */
 
@@ -297,19 +309,31 @@ export interface SocialServiceController {
 
   instagramAuthCallback(
     request: MetaAuthCallbackRequest,
-  ): Promise<MetaAuthCallbackResponse> | Observable<MetaAuthCallbackResponse> | MetaAuthCallbackResponse;
+  ):
+    | Promise<MetaAuthCallbackResponse>
+    | Observable<MetaAuthCallbackResponse>
+    | MetaAuthCallbackResponse;
 
   instagramRedirect(
     request: MetaAuthCallbackRequest,
-  ): Promise<MetaAuthCallbackResponse> | Observable<MetaAuthCallbackResponse> | MetaAuthCallbackResponse;
+  ):
+    | Promise<MetaAuthCallbackResponse>
+    | Observable<MetaAuthCallbackResponse>
+    | MetaAuthCallbackResponse;
 
   setInstagramAuthToken(
     request: SetMetaAuthTokenRequest,
-  ): Promise<SetMetaAuthTokenResponse> | Observable<SetMetaAuthTokenResponse> | SetMetaAuthTokenResponse;
+  ):
+    | Promise<SetMetaAuthTokenResponse>
+    | Observable<SetMetaAuthTokenResponse>
+    | SetMetaAuthTokenResponse;
 
   getInstagramAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetMetaAuthDataResponse> | Observable<GetMetaAuthDataResponse> | GetMetaAuthDataResponse;
+  ):
+    | Promise<GetMetaAuthDataResponse>
+    | Observable<GetMetaAuthDataResponse>
+    | GetMetaAuthDataResponse;
 
   setInstagramUser(
     request: InstagramUserRequest,
@@ -323,57 +347,93 @@ export interface SocialServiceController {
 
   getGoogleAuthUrl(
     request: UserIdAuthRequest,
-  ): Promise<GetGoogleAuthUrlResponse> | Observable<GetGoogleAuthUrlResponse> | GetGoogleAuthUrlResponse;
+  ):
+    | Promise<GetGoogleAuthUrlResponse>
+    | Observable<GetGoogleAuthUrlResponse>
+    | GetGoogleAuthUrlResponse;
 
   googleAuthCallback(
     request: GoogleAuthCallbackRequest,
-  ): Promise<GoogleAuthCallbackResponse> | Observable<GoogleAuthCallbackResponse> | GoogleAuthCallbackResponse;
+  ):
+    | Promise<GoogleAuthCallbackResponse>
+    | Observable<GoogleAuthCallbackResponse>
+    | GoogleAuthCallbackResponse;
 
   getGoogleAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetMetaAuthDataResponse> | Observable<GetMetaAuthDataResponse> | GetMetaAuthDataResponse;
+  ):
+    | Promise<GetMetaAuthDataResponse>
+    | Observable<GetMetaAuthDataResponse>
+    | GetMetaAuthDataResponse;
 
   /** TikTok */
 
   getTiktokAuthUrl(
     request: UserIdAuthRequest,
-  ): Promise<GetTiktokAuthUrlResponse> | Observable<GetTiktokAuthUrlResponse> | GetTiktokAuthUrlResponse;
+  ):
+    | Promise<GetTiktokAuthUrlResponse>
+    | Observable<GetTiktokAuthUrlResponse>
+    | GetTiktokAuthUrlResponse;
 
   tiktokAuthCallback(
     request: TiktokAuthCallbackRequest,
-  ): Promise<TiktokAuthCallbackResponse> | Observable<TiktokAuthCallbackResponse> | TiktokAuthCallbackResponse;
+  ):
+    | Promise<TiktokAuthCallbackResponse>
+    | Observable<TiktokAuthCallbackResponse>
+    | TiktokAuthCallbackResponse;
 
   getTiktokAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetTiktokAuthDataResponse> | Observable<GetTiktokAuthDataResponse> | GetTiktokAuthDataResponse;
+  ):
+    | Promise<GetTiktokAuthDataResponse>
+    | Observable<GetTiktokAuthDataResponse>
+    | GetTiktokAuthDataResponse;
 
   /** LinkedIn */
 
   getLinkedInAuthUrl(
     request: LinkedInUserIdAuthRequest,
-  ): Promise<GetLinkedInAuthUrlResponse> | Observable<GetLinkedInAuthUrlResponse> | GetLinkedInAuthUrlResponse;
+  ):
+    | Promise<GetLinkedInAuthUrlResponse>
+    | Observable<GetLinkedInAuthUrlResponse>
+    | GetLinkedInAuthUrlResponse;
 
   linkedInAuthCallback(
     request: LinkedInAuthCallbackRequest,
-  ): Promise<LinkedInAuthCallbackResponse> | Observable<LinkedInAuthCallbackResponse> | LinkedInAuthCallbackResponse;
+  ):
+    | Promise<LinkedInAuthCallbackResponse>
+    | Observable<LinkedInAuthCallbackResponse>
+    | LinkedInAuthCallbackResponse;
 
   getLinkedInAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetLinkedInAuthDataResponse> | Observable<GetLinkedInAuthDataResponse> | GetLinkedInAuthDataResponse;
+  ):
+    | Promise<GetLinkedInAuthDataResponse>
+    | Observable<GetLinkedInAuthDataResponse>
+    | GetLinkedInAuthDataResponse;
 
   /** snapchat */
 
   getSnapchatAuthUrl(
     request: UserIdAuthRequest,
-  ): Promise<GetSnapchatAuthUrlResponse> | Observable<GetSnapchatAuthUrlResponse> | GetSnapchatAuthUrlResponse;
+  ):
+    | Promise<GetSnapchatAuthUrlResponse>
+    | Observable<GetSnapchatAuthUrlResponse>
+    | GetSnapchatAuthUrlResponse;
 
   snapchatAuthCallback(
     request: SnapchatAuthCallbackRequest,
-  ): Promise<SnapchatAuthCallbackResponse> | Observable<SnapchatAuthCallbackResponse> | SnapchatAuthCallbackResponse;
+  ):
+    | Promise<SnapchatAuthCallbackResponse>
+    | Observable<SnapchatAuthCallbackResponse>
+    | SnapchatAuthCallbackResponse;
 
   getSnapchatAuthData(
     request: UserIdAuthRequest,
-  ): Promise<GetSnapchatAuthDataResponse> | Observable<GetSnapchatAuthDataResponse> | GetSnapchatAuthDataResponse;
+  ):
+    | Promise<GetSnapchatAuthDataResponse>
+    | Observable<GetSnapchatAuthDataResponse>
+    | GetSnapchatAuthDataResponse;
 
   /** X */
 
@@ -393,7 +453,10 @@ export interface SocialServiceController {
 
   syncSocialStats(
     request: UserIdAuthRequest,
-  ): Promise<SocialMediaStatsResponse> | Observable<SocialMediaStatsResponse> | SocialMediaStatsResponse;
+  ):
+    | Promise<SocialMediaStatsResponse>
+    | Observable<SocialMediaStatsResponse>
+    | SocialMediaStatsResponse;
 }
 
 // export function SocialServiceControllerMethods() {
@@ -439,4 +502,4 @@ export interface SocialServiceController {
 //   };
 // }
 
-export const SOCIAL_SERVICE_NAME = "SocialService";
+export const SOCIAL_SERVICE_NAME = 'SocialService';

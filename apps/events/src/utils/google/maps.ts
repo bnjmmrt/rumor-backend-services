@@ -1,5 +1,5 @@
 import axios from 'axios';
-import config from '../../config'
+import config from '../../config';
 
 class GoogleAddressClient {
   static GOOGLE_MAPS_API_KEY: string;
@@ -10,14 +10,17 @@ class GoogleAddressClient {
 
   static async findPlaceFromText(address: string) {
     try {
-      const response = await axios.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json', {
-        params: {
-          input: encodeURIComponent(address),
-          inputtype: 'textquery',
-          fields: 'place_id',
-          key: this.GOOGLE_MAPS_API_KEY,
+      const response = await axios.get(
+        'https://maps.googleapis.com/maps/api/place/findplacefromtext/json',
+        {
+          params: {
+            input: encodeURIComponent(address),
+            inputtype: 'textquery',
+            fields: 'place_id',
+            key: this.GOOGLE_MAPS_API_KEY,
+          },
         },
-      });
+      );
       return response.data;
     } catch (error) {
       throw error;
@@ -53,4 +56,4 @@ class GoogleAddressClient {
   }
 }
 
-export default GoogleAddressClient
+export default GoogleAddressClient;
