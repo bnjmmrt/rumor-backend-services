@@ -2949,8 +2949,16 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     } else {
       // Step 8: Register non-member guest if they do not exist
+      const transformedPayload = {
+        eventId: event.id,
+        userId: event.owner.id,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        phoneNumber: payload.phoneNumber
+      };
       const member: SimpleUser = (
-        await serviceMesh.userService().registerInvitesAsNonMember(payload)
+        await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
       ).data;
       const user: User = {
         id: member.id,
@@ -3125,7 +3133,15 @@ export class GuestService {
         });
       } else {
         // Step 7: Register non-member guest
-        const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(guestPayload))
+        const transformedPayload = {
+          eventId: event.id,
+          userId: event.owner.id,
+          firstName: guestPayload.firstName,
+          lastName: guestPayload.lastName,
+          email: guestPayload.email,
+          phoneNumber: guestPayload.phoneNumber
+        };
+        const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload))
           .data;
         guest = this.dbConnection.getRepository(Guest).create({
           event: { id: guestPayload.eventId } as Event,
