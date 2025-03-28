@@ -1809,16 +1809,26 @@ export class GuestService {
     );
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+    const interests = (await serviceMesh.userService().getUserInterests(guest.user.id)).data;
+    
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { user: { id: guest.user.id }, host: { id: guest.event.owner.id } },
+    });
     const val = toGuestData(
       guest.user,
       guest,
       focuses,
+      interests,
       followsYou,
       favorite,
       additionalGuestData,
       isSpammedByHost,
     );
-    return val;
+
+    return {
+      ...val,
+      hostUserMappingId: hostUserMapping?.id ?? '',
+    };
   }
 
   public static async getUsersEventInvitees(
@@ -3930,9 +3940,6 @@ export class GuestService {
       where: { id: guestDetail.event.id },
       relations: { owner: true },
     });
-    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
-      where: { user: { id: guestDetail.user.id }, host: { id: event.owner.id } },
-    });
 
     if (!guestDetail) {
       throw new NotFoundError('Guest not found');
@@ -3986,10 +3993,7 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
-      guestProfile: {
-        ...guestProfileResponse,
-        hostUserMappingId: hostUserMapping?.id ?? ''
-      },
+      guestProfile: guestProfileResponse,
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
     };
