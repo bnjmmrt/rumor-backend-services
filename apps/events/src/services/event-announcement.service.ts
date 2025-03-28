@@ -6,6 +6,7 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import {sendEventAnnouncement, sendEventInviteMember} from '../utils/emails.utils';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -81,6 +82,7 @@ export class EventAnnouncementService {
         isPublished: true,
         deletedAt: IsNull(),
       },
+      relations: { owner: true },
     });
     if (!event) throw new NotFoundError('Event not found');
 
@@ -119,9 +121,43 @@ export class EventAnnouncementService {
      */
 
     try {
-      serviceMesh
-        .notificationService()
-        .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+      if (recipients.length > 0) {
+        serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+        const fetchUserEmails = await database.getRepository(User).find({ where: { id: In(recipients) } })
+        fetchUserEmails.map(data => {
+          if (data.email) {
+            sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+          }
+        })
+      } else {
+        const recipient = await database
+          .getRepository(Guest)
+          .createQueryBuilder('guest')
+          .where('guest.event_id = :eventId', { eventId })
+          .andWhere(
+            ticketTypes.length > 0 ? 'guest.ticket_type_id IN (:...ticketTypeIds)' : '1=1',
+            { ticketTypes },
+          )
+          .andWhere(addedByUsers.length > 0 ? 'guest.added_by_id IN (:...addedByIds)' : '1=1', {
+            addedByUsers,
+          })
+          .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+          .getMany()
+
+        if (recipient.length > 0) {
+          serviceMesh
+            .notificationService()
+            .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+          const fetchUserEmails = await database.getRepository(User).find({ where: { id: In(recipients) } })
+          fetchUserEmails.map(data => {
+            if (data.email) {
+              sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+            }
+          })
+        }
+      }
     } catch (error) {
       console.log('🚀 ~ EventAnnouncementService ~ postAnnouncement ~ error:', error);
     }
