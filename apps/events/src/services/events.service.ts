@@ -2249,8 +2249,19 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined || payload.publishDate !== null) {
-        event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+      if (payload.publishDate != undefined) {
+        if (event.status == EventStatusEnum.APPROVED_STATUS) {
+          if (payload.publishDate) {
+            event.publishDate = new Date(payload.publishDate);
+          }
+          else {
+            event.publishDate = null;
+            event.isPublished = true;
+          }
+        }
+        else {
+          event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        }
       }
       if (payload.timeZone) {
         event.timeZone = payload.timeZone;
