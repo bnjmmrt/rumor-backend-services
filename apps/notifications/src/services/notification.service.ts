@@ -113,8 +113,14 @@ class NotificationService {
           : true;
 
         // Handle push notification if enabled and user has tokens
-        if (notificationTemplate.pushNotification && userPushPreference && recipientUser?.pushNotificationToken?.length > 0) {
-          const tokens = recipientUser.pushNotificationToken.map(data => data.notificationToken).filter(Boolean);
+        if (
+          notificationTemplate.pushNotification &&
+          userPushPreference &&
+          recipientUser?.pushNotificationToken?.length > 0
+        ) {
+          const tokens = recipientUser.pushNotificationToken
+            .map(data => data.notificationToken)
+            .filter(Boolean);
           if (tokens.length > 0) {
             pushNotifications.push({
               tokens,

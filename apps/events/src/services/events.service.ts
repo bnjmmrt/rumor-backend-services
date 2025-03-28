@@ -124,7 +124,7 @@ import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils'
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
-import {CancelEventInterface} from "../interfaces/cancel-event.interface";
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -3422,9 +3422,7 @@ export class EventsService {
    * 7. If all notification attempts fail, do not update the event status.
    * 8. Commit the transaction if at least one notification is successful.
    */
-  public static async cancelEventAndNotify(
-    payload: CancelEventInterface,
-  ): Promise<string> {
+  public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3448,7 +3446,6 @@ export class EventsService {
       if (event.status !== EventStatusEnum.APPROVED_STATUS) {
         throw new Error('It is not approved event.');
       }
-
 
       // Permitir cancelar si es admin o propietario
       if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {

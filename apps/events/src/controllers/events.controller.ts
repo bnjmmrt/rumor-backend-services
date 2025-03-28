@@ -53,7 +53,7 @@ import {
 import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
-import {CancelEventInterface} from "../interfaces/cancel-event.interface";
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 export class EventsController {
   public static listEventStatus = asyncWrapper(
