@@ -643,10 +643,18 @@ export class GuestService {
   public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestDataSimple[]> {
     try {
       // Validate ticket type if provided in the request
-      const ticketType = await this.dbConnection
-        .getRepository(TicketType)
-        .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      let ticketType = null;
+      if (payload.ticketTypeId) {
+        // Fetch ticket type from the database if ticketTypeId is provided
+        ticketType = await this.dbConnection
+          .getRepository(TicketType)
+          .findOne({ where: { id: payload.ticketTypeId } });
+
+        // If ticket type is not found, throw an error
+        if (!ticketType) {
+          throw new NotFoundError('Ticket type not found');
+        }
+      }
 
       // Validate guest status if provided
       const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
@@ -1119,7 +1127,10 @@ export class GuestService {
         const [focuses, interests, vouches] = await Promise.all([
           (await serviceMesh.userService().getUserFocuses(guest.user.id)).data,
           (await serviceMesh.userService().getUserInterests(guest.user.id)).data,
-          await VouchRequestService.getUserVouches({ id: guest.user.id }),
+          await VouchRequestService.getUserVouchesByEvent({
+            requesterId: guest.user.id,
+            eventId: event.id,
+          }),
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -1798,16 +1809,26 @@ export class GuestService {
     );
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+    const interests = (await serviceMesh.userService().getUserInterests(guest.user.id)).data;
+    
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { user: { id: guest.user.id }, host: { id: guest.event.owner.id } },
+    });
     const val = toGuestData(
       guest.user,
       guest,
       focuses,
+      interests,
       followsYou,
       favorite,
       additionalGuestData,
       isSpammedByHost,
     );
-    return val;
+
+    return {
+      ...val,
+      hostUserMappingId: hostUserMapping?.id ?? '',
+    };
   }
 
   public static async getUsersEventInvitees(
@@ -3919,9 +3940,6 @@ export class GuestService {
       where: { id: guestDetail.event.id },
       relations: { owner: true },
     });
-    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
-      where: { user: { id: guestDetail.user.id }, host: { id: event.owner.id } },
-    });
 
     if (!guestDetail) {
       throw new NotFoundError('Guest not found');
@@ -3938,8 +3956,9 @@ export class GuestService {
 
     const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
 
-    const vouches = await VouchRequestService.getUserVouches({
-      id: guestDetail.user.id,
+    const vouches = await VouchRequestService.getUserVouchesByEvent({
+      requesterId: guestDetail.user.id,
+      eventId: guestDetail.event.id
     });
 
     let questions: QuizData[] = [];
@@ -3974,10 +3993,7 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
-      guestProfile: {
-        ...guestProfileResponse,
-        hostUserMappingId: hostUserMapping?.id ?? ''
-      },
+      guestProfile: guestProfileResponse,
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
     };

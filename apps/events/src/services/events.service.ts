@@ -3451,15 +3451,17 @@ export class EventsService {
       //step 7: resolve notification promices
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
-      const notificationRecipients = guests.map((data: Guest) => data.user.id);
-      serviceMesh
-        .notificationService()
-        .sendNotification(
-          NotificationType.EVENT_CANCELLED,
-          notificationRecipients,
-          eventId,
-          event.owner.id,
-        );
+      try {
+        const notificationRecipients = guests.map((data: Guest) => data.user.id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_CANCELLED,
+            notificationRecipients,
+            eventId,
+            event.owner.id,
+          );
+      } catch (err) { }
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
