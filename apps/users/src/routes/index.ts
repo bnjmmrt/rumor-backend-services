@@ -211,7 +211,7 @@ router.delete(
   AuthMiddleware.fusionAuthRequired,
   AuthController.deleteHostUserMapping,
 );
-router.get('/auth/user/:id',AuthController.getUserProfile);
+router.get('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.getUserProfile);
 router.get(
   '/auth/hosts/followers',
   AuthMiddleware.fusionAuthRequired,

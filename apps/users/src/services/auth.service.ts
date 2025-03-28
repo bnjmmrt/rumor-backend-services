@@ -212,7 +212,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
-// import { stringify } from 'csv-stringify';
+import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 
@@ -5645,16 +5645,16 @@ export class AuthService {
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
-      // stringify(
-      //   lineItems,
-      //   { header: true, columns: titleMapping.map(item => item.title) },
-      //   (err, output) => {
-      //     if (err) {
-      //       reject(err);
-      //     }
-      //     resolve(output);
-      //   },
-      // );
+      stringify(
+        lineItems,
+        { header: true, columns: titleMapping.map(item => item.title) },
+        (err, output) => {
+          if (err) {
+            reject(err);
+          }
+          resolve(output);
+        },
+      );
     });
   }
 }
