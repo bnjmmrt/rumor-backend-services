@@ -2545,6 +2545,7 @@ export class GuestService {
         declinedGuest.event = event;
         declinedGuest.user = { id: user?.id };
         declinedGuest.declinedBy = { id: event?.owner.id } as User;
+        declinedGuest.addedBy = { id: event?.owner.id } as User;
         declinedGuest.status = GuestStatus.DECLINED;
         declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
         declinedGuest.rejectedReason = 'User is marked as spam';
