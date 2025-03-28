@@ -3154,6 +3154,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: checkUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       } else {
