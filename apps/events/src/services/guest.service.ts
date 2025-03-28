@@ -2557,6 +2557,7 @@ export class GuestService {
         alreadyGuest.declinedBy = null;
         alreadyGuest.rejectedReason = null;
         alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+        alreadyGuest.maxAdditionalGuests = payload.additionalGuests;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const guest = new Guest();
@@ -2564,6 +2565,7 @@ export class GuestService {
         guest.user = { id: user?.id };
         guest.status = GuestStatus.APPLIED;
         guest.additionalRequestedGuests = payload.additionalGuests;
+        guest.maxAdditionalGuests = payload.additionalGuests;
         guest.invitationSource = UserSource.REQUEST_IN_APP;
         await this.dbConnection.getRepository(Guest).save(guest);
       }
