@@ -23,7 +23,7 @@ export class SettingsController {
 
   public static updateNotificationSettings = asyncWrapper(async (req, res): Promise<void> => {
     const payload: UpdateNotificationSettingRequestDto = {
-      userId: req.query.id,
+      userId: req.user ? req.user : req.query.id,
       enableSmsNotifications: req.body.enableSmsNotifications,
       enableAppNotifications: req.body.enableAppNotifications,
       enableEmailNotifications: req.body.enableEmailNotifications,
