@@ -1,8 +1,8 @@
-import { Router } from "express";
-import * as express from "express";
-import { CommunicationController } from "../controllers/communication.controller";
-import { NotificationController } from "../controllers/notification.controller";
-import AuthMiddleware from "../server/middleware/auth";
+import { Router } from 'express';
+import * as express from 'express';
+import { CommunicationController } from '../controllers/communication.controller';
+import { NotificationController } from '../controllers/notification.controller';
+import AuthMiddleware from '../server/middleware/auth';
 
 const router: Router = express.Router();
 
@@ -12,7 +12,10 @@ const router: Router = express.Router();
 
 router.post('/communication/send-verification-code', CommunicationController.sendVerificationCode);
 router.post('/communication/verify-code', CommunicationController.verifyCode);
-router.post('/communication/send-invitation-messages', CommunicationController.sendInvitationMessages);
+router.post(
+  '/communication/send-invitation-messages',
+  CommunicationController.sendInvitationMessages,
+);
 router.post('/communication/send-text-message', CommunicationController.sendTextMessage);
 
 /**
@@ -36,7 +39,7 @@ router.post('/notification', NotificationController.sendNotification);
 /**
  * Route for Testing the Push Notifications
  */
- router.post('/notification/push', NotificationController.sendPushNotification);
+router.post('/notification/push', NotificationController.sendPushNotification);
 
 /**
  * Route for Notification Creation - Will be used in service Mesh for interservice communication call
@@ -48,16 +51,39 @@ router.post('/notification', NotificationController.sendNotification);
  * Routes for  - User Notifications - Host, Member
  */
 
-router.get('/notifications', AuthMiddleware.fusionAuthRequired, NotificationController.getAllNotifications);
-router.get('/notification/:notificationId', AuthMiddleware.fusionAuthRequired, NotificationController.getNotificationDetail);
-router.delete('/notification/:notificationId', AuthMiddleware.fusionAuthRequired, NotificationController.deleteNotificationById);
+router.get(
+  '/notifications',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.getAllNotifications,
+);
+router.get(
+  '/notification/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.getNotificationDetail,
+);
+router.delete(
+  '/notification/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.deleteNotificationById,
+);
 
 /**
  * Routes for  - Admin Notifications
  */
-router.get('/notifications-list', AuthMiddleware.fusionAuthRequired, NotificationController.listNotifications);
-router.get('/notifications/summary', AuthMiddleware.fusionAuthRequired, NotificationController.getNotificationSummary);
-router.delete('/notifications/bulk-delete', AuthMiddleware.fusionAuthRequired, NotificationController.deleteMultipleNotifications);
-
+router.get(
+  '/notifications-list',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.listNotifications,
+);
+router.get(
+  '/notifications/summary',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.getNotificationSummary,
+);
+router.delete(
+  '/notifications/bulk-delete',
+  AuthMiddleware.fusionAuthRequired,
+  NotificationController.deleteMultipleNotifications,
+);
 
 export default router;

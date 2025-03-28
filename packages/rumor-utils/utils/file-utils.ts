@@ -21,7 +21,7 @@ export async function parseCsv(file: string): Promise<CsvRecord[]> {
 
 export async function generateErrorCsv(failedRecords: CsvRecord[]): Promise<Buffer> {
   const fileName = `/tmp/failed_records_${Date.now()}.csv`;
-  const records = failedRecords.map((record) => ({
+  const records = failedRecords.map(record => ({
     firstName: record.firstName,
     lastName: record.lastName,
     email: record.email,
@@ -64,7 +64,10 @@ export const isValidPhoneNumber = (phoneNumber: string): boolean => {
   return phoneRegex.test(cleaned);
 };
 
-export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
+export const processCsvFile = async (
+  fileUrl: string,
+  isUploadUser: boolean,
+): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
   try {
     // Step 1: Fetch the file from the S3 pre-signed URL
     const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
@@ -94,19 +97,19 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
       const rawEmail = record.email?.toString().trim() || '';
 
       if (isUploadUser) {
-         // At least one of email or phone number must be present
-         if (!rawEmail && !rawPhone) {
-           reasons.push('Either Email or Phone Number is required');
-         }
- 
-         if (rawEmail && !isValidEmail(rawEmail)) {
-           reasons.push('Invalid Email format');
-         }
- 
-         if (rawPhone && !isValidPhoneNumber(rawPhone)) {
-             reasons.push('Invalid Phone Number format');
-           } 
-       } else {
+        // At least one of email or phone number must be present
+        if (!rawEmail && !rawPhone) {
+          reasons.push('Either Email or Phone Number is required');
+        }
+
+        if (rawEmail && !isValidEmail(rawEmail)) {
+          reasons.push('Invalid Email format');
+        }
+
+        if (rawPhone && !isValidPhoneNumber(rawPhone)) {
+          reasons.push('Invalid Phone Number format');
+        }
+      } else {
         // Email is mandatory
         if (!rawEmail) {
           reasons.push('Email is required');
@@ -119,6 +122,8 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
         record.reason = reasons.join(', ');
         garbageData.push(record);
       } else {
+        record.firstName = record.firstName?.toString().trim();
+        record.lastName = record.lastName?.toString().trim();
         record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
         record.email = rawEmail.trim();
         validData.push(record);

@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { RumorBaseEntity } from '../../entities/rumor-base.entity'; import { Event } from './event.entity';
+import { RumorBaseEntity } from '../../entities/rumor-base.entity';
+import { Event } from './event.entity';
 import { Guest } from './guest.entity';
 import { Ticket } from './ticket.entity';
 import { Collaborator } from './collaborator.entity';
@@ -19,19 +20,19 @@ export class TicketType extends RumorBaseEntity {
   enabled: boolean;
 
   @Index()
-  @ManyToOne(() => Event, (event) => event.ticketTypes, {
+  @ManyToOne(() => Event, event => event.ticketTypes, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'event_id' })
   event: Event;
 
-  @OneToMany(() => Guest, (guest) => guest.ticketType)
+  @OneToMany(() => Guest, guest => guest.ticketType)
   eventGuests: Guest[];
 
-  @OneToMany(() => Ticket, (ticket) => ticket.ticketType)
+  @OneToMany(() => Ticket, ticket => ticket.ticketType)
   tickets: Ticket[];
 
-  @OneToMany(() => Collaborator, (collaborator) => collaborator.ticketType)
+  @OneToMany(() => Collaborator, collaborator => collaborator.ticketType)
   collaborators: Collaborator[];
 }

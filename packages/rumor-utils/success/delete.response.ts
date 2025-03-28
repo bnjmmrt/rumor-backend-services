@@ -1,4 +1,4 @@
-import { SuccessResponse } from "./base.success.response";
+import { SuccessResponse } from './base.success.response';
 
 export class DeleteResponse<T> implements SuccessResponse<T> {
   success: boolean = true;

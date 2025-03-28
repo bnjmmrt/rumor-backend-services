@@ -6,8 +6,8 @@
 
 /* eslint-disable */
 // import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
-import { Observable } from "rxjs";
-import {  UserRoleList } from "./role.pb";
+import { Observable } from 'rxjs';
+import { UserRoleList } from './role.pb';
 import {
   Error,
   GenericResponse,
@@ -21,9 +21,9 @@ import {
   UserIdData,
   UserSource,
   UserStatus,
-} from "./shared.pb";
+} from './shared.pb';
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 /** Gender */
 export enum Gender {
@@ -40,7 +40,7 @@ export interface CurrentUser {
   lastName: string;
   email: string;
   profilePicture?: string | undefined;
-  role: Role[] | undefined
+  role: Role[] | undefined;
 }
 
 export interface HostRole {
@@ -57,20 +57,20 @@ export interface HostRole {
   companyLogo?: string | undefined;
 }
 
-  export interface MemberRole {
-    id: string;
-    userId: string;
-    roleName: string;
-    status?: string | undefined;
-    source?: string | undefined;
-    gender?: Gender | undefined;
-    dateOfBirth?: string | undefined;
-    address?: MemberAddress | undefined;
-    focuses: Focus[];
-    socialProviders: SocialProvider[];
-    socialStats?: SocialMediaStats | undefined;
-    memberSince?: string | undefined;
-  }
+export interface MemberRole {
+  id: string;
+  userId: string;
+  roleName: string;
+  status?: string | undefined;
+  source?: string | undefined;
+  gender?: Gender | undefined;
+  dateOfBirth?: string | undefined;
+  address?: MemberAddress | undefined;
+  focuses: Focus[];
+  socialProviders: SocialProvider[];
+  socialStats?: SocialMediaStats | undefined;
+  memberSince?: string | undefined;
+}
 
 export interface UserRole {
   id: string;
@@ -257,8 +257,7 @@ export interface LoginSSOResponse {
   data?: string | undefined;
 }
 
-export interface LoginSSORequest {
-}
+export interface LoginSSORequest {}
 
 /** OAuthRedirect */
 export interface OAuthRedirectRequest {
@@ -276,7 +275,7 @@ export interface OAuthRedirectResponse {
 export interface Validity {
   isValid: boolean;
   isGuest?: boolean | undefined;
-  isDeactivated?: boolean
+  isDeactivated?: boolean;
 }
 
 export interface ValidityResponse {
@@ -418,7 +417,6 @@ export interface CurrentUserProfile {
   imageUrl?: string | undefined;
 }
 
-
 export interface CurrentUserResponse {
   status: number;
   error?: Error | undefined;
@@ -483,7 +481,7 @@ export interface Member {
   isFavourite?: boolean | undefined;
   role?: string | undefined;
   phoneNumber?: string | undefined;
-  dateOfBirth?: string | undefined
+  dateOfBirth?: string | undefined;
 }
 
 export interface GetMembersResponse {
@@ -954,6 +952,7 @@ export interface UserWithRoles {
   isFirstTimeLoggedIn?: boolean | undefined;
   phoneNumber?: string | undefined;
   profilePicture?: string | undefined;
+  instagramUserName?: string | undefined
 }
 
 export interface GetUserWithRolesByEmailResponse {
@@ -1240,7 +1239,7 @@ export interface SocialMedia {
   instagram?: string | undefined;
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';
 
 export interface AuthServiceClient {
   /** Authentication */
@@ -1269,7 +1268,9 @@ export interface AuthServiceClient {
 
   listUsersByType(request: ListUsersByTypeRequest): Observable<ListUsersByTypeResponse>;
 
-  sendVerificationCodeByEmail(request: SendVerificationCodeByEmailRequest): Observable<GenericResponse>;
+  sendVerificationCodeByEmail(
+    request: SendVerificationCodeByEmailRequest,
+  ): Observable<GenericResponse>;
 
   verifyCodeByEmail(request: VerifyCodeByEmailRequest): Observable<VerifyResponse>;
 
@@ -1283,11 +1284,15 @@ export interface AuthServiceClient {
 
   getUser(request: IdRequest): Observable<SimpleUserResponse>;
 
-  getUserWithRolesByEmail(request: GetUserWithRolesByEmailRequest): Observable<GetUserWithRolesByEmailResponse>;
+  getUserWithRolesByEmail(
+    request: GetUserWithRolesByEmailRequest,
+  ): Observable<GetUserWithRolesByEmailResponse>;
 
   getUserWithRolesById(request: IdRequest): Observable<GetUserWithRolesByIdResponse>;
 
-  getUserWithRolesByPhone(request: GetUserWithRolesByPhoneRequest): Observable<GetUserWithRolesByEmailResponse>;
+  getUserWithRolesByPhone(
+    request: GetUserWithRolesByPhoneRequest,
+  ): Observable<GetUserWithRolesByEmailResponse>;
 
   getCurrentUser(request: IdRequest): Observable<CurrentUserResponse>;
 
@@ -1311,7 +1316,9 @@ export interface AuthServiceClient {
 
   /** Generic provider Front Connection */
 
-  updateProviderAuth(request: SaveOrUpdateProviderAuthRequest): Observable<SaveOrUpdateProviderAuthResponse>;
+  updateProviderAuth(
+    request: SaveOrUpdateProviderAuthRequest,
+  ): Observable<SaveOrUpdateProviderAuthResponse>;
 
   /** Invitations */
 
@@ -1381,7 +1388,9 @@ export interface AuthServiceClient {
 
   updateUserProfile(request: UpdateUserProfileRequest): Observable<UpdateUserProfileResponse>;
 
-  updateUserProfilePicture(request: UpdateUserProfilePictureRequest): Observable<UpdateUserProfilePictureResponse>;
+  updateUserProfilePicture(
+    request: UpdateUserProfilePictureRequest,
+  ): Observable<UpdateUserProfilePictureResponse>;
 
   /** Bio Profile */
 
@@ -1401,7 +1410,9 @@ export interface AuthServiceClient {
 
   bulkUploadUser(request: BulkCreateUsersRequest): Observable<BulkCreateUsersResponse>;
 
-  createHostCollaborator(request: CreateHostCollaboratorRequest): Observable<CreateHostCollaboratorResponse>;
+  createHostCollaborator(
+    request: CreateHostCollaboratorRequest,
+  ): Observable<CreateHostCollaboratorResponse>;
 
   /** Get Followed Hosts */
 
@@ -1453,7 +1464,9 @@ export interface AuthServiceController {
     request: MemberSignUpRequest,
   ): Promise<MemberSignUpResponse> | Observable<MemberSignUpResponse> | MemberSignUpResponse;
 
-  hostSignUp(request: HostSignUpRequest): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
+  hostSignUp(
+    request: HostSignUpRequest,
+  ): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
 
   login(request: LoginRequest): Promise<LoginResponse> | Observable<LoginResponse> | LoginResponse;
 
@@ -1461,9 +1474,13 @@ export interface AuthServiceController {
     request: ForgotPasswordRequest,
   ): Promise<ForgotPasswordResponse> | Observable<ForgotPasswordResponse> | ForgotPasswordResponse;
 
-  setPassword(request: SetHostPasswordRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
+  setPassword(
+    request: SetHostPasswordRequest,
+  ): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
-  loginSso(request: LoginSSORequest): Promise<LoginSSOResponse> | Observable<LoginSSOResponse> | LoginSSOResponse;
+  loginSso(
+    request: LoginSSORequest,
+  ): Promise<LoginSSOResponse> | Observable<LoginSSOResponse> | LoginSSOResponse;
 
   oAuthRedirect(
     request: OAuthRedirectRequest,
@@ -1473,15 +1490,24 @@ export interface AuthServiceController {
     request: PhoneNumberRequest,
   ): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
 
-  checkEmail(request: CheckEmaiLRequest): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
+  checkEmail(
+    request: CheckEmaiLRequest,
+  ): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
 
-  checkAge(request: CheckAgeRequest): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
+  checkAge(
+    request: CheckAgeRequest,
+  ): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
 
-  logout(request: TokenRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  logout(
+    request: TokenRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   listUsersByType(
     request: ListUsersByTypeRequest,
-  ): Promise<ListUsersByTypeResponse> | Observable<ListUsersByTypeResponse> | ListUsersByTypeResponse;
+  ):
+    | Promise<ListUsersByTypeResponse>
+    | Observable<ListUsersByTypeResponse>
+    | ListUsersByTypeResponse;
 
   sendVerificationCodeByEmail(
     request: SendVerificationCodeByEmailRequest,
@@ -1497,11 +1523,17 @@ export interface AuthServiceController {
     request: LoginVerificationRequest,
   ): Promise<ValidityResponse> | Observable<ValidityResponse> | ValidityResponse;
 
-  memberLogin(request: MemberLoginRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
+  memberLogin(
+    request: MemberLoginRequest,
+  ): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
-  getCurrentMember(request: IdRequest): Promise<MemberResponse> | Observable<MemberResponse> | MemberResponse;
+  getCurrentMember(
+    request: IdRequest,
+  ): Promise<MemberResponse> | Observable<MemberResponse> | MemberResponse;
 
-  getUser(request: IdRequest): Promise<SimpleUserResponse> | Observable<SimpleUserResponse> | SimpleUserResponse;
+  getUser(
+    request: IdRequest,
+  ): Promise<SimpleUserResponse> | Observable<SimpleUserResponse> | SimpleUserResponse;
 
   getUserWithRolesByEmail(
     request: GetUserWithRolesByEmailRequest,
@@ -1512,7 +1544,10 @@ export interface AuthServiceController {
 
   getUserWithRolesById(
     request: IdRequest,
-  ): Promise<GetUserWithRolesByIdResponse> | Observable<GetUserWithRolesByIdResponse> | GetUserWithRolesByIdResponse;
+  ):
+    | Promise<GetUserWithRolesByIdResponse>
+    | Observable<GetUserWithRolesByIdResponse>
+    | GetUserWithRolesByIdResponse;
 
   getUserWithRolesByPhone(
     request: GetUserWithRolesByPhoneRequest,
@@ -1525,13 +1560,20 @@ export interface AuthServiceController {
     request: IdRequest,
   ): Promise<CurrentUserResponse> | Observable<CurrentUserResponse> | CurrentUserResponse;
 
-  approveMember(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  approveMember(
+    request: IdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   getConfirmedMembers(
     request: ContactsListRequest,
-  ): Promise<ConfirmedMembersResponse> | Observable<ConfirmedMembersResponse> | ConfirmedMembersResponse;
+  ):
+    | Promise<ConfirmedMembersResponse>
+    | Observable<ConfirmedMembersResponse>
+    | ConfirmedMembersResponse;
 
-  setLoginStatus(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  setLoginStatus(
+    request: IdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   deleteHostUserMapping(
     request: UserAndIdRequest,
@@ -1541,13 +1583,19 @@ export interface AuthServiceController {
     request: SupportEmailRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  switchProfile(request: switchProfileRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
+  switchProfile(
+    request: switchProfileRequest,
+  ): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
   /** Validation */
 
-  validate(request: ValidateRequest): Promise<ValidateResponse> | Observable<ValidateResponse> | ValidateResponse;
+  validate(
+    request: ValidateRequest,
+  ): Promise<ValidateResponse> | Observable<ValidateResponse> | ValidateResponse;
 
-  validateToken(request: ValidateRequest): Promise<ValidateResponse> | Observable<ValidateResponse> | ValidateResponse;
+  validateToken(
+    request: ValidateRequest,
+  ): Promise<ValidateResponse> | Observable<ValidateResponse> | ValidateResponse;
 
   /** Generic provider Front Connection */
 
@@ -1582,11 +1630,17 @@ export interface AuthServiceController {
     request: PaginatedRequest,
   ): Promise<GetMembersResponse> | Observable<GetMembersResponse> | GetMembersResponse;
 
-  getHosts(request: PaginatedRequest): Promise<GetHostsResponse> | Observable<GetHostsResponse> | GetHostsResponse;
+  getHosts(
+    request: PaginatedRequest,
+  ): Promise<GetHostsResponse> | Observable<GetHostsResponse> | GetHostsResponse;
 
-  adminLogin(request: LoginRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
+  adminLogin(
+    request: LoginRequest,
+  ): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
-  createAdmin(request: AdminSignUpRequest): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
+  createAdmin(
+    request: AdminSignUpRequest,
+  ): Promise<SignUpResponse> | Observable<SignUpResponse> | SignUpResponse;
 
   getMemberProfile(
     request: IdRequest,
@@ -1612,11 +1666,17 @@ export interface AuthServiceController {
 
   getBasicHostProfile(
     request: IdRequest,
-  ): Promise<BasicHostProfileResponse> | Observable<BasicHostProfileResponse> | BasicHostProfileResponse;
+  ):
+    | Promise<BasicHostProfileResponse>
+    | Observable<BasicHostProfileResponse>
+    | BasicHostProfileResponse;
 
   updateHostProfile(
     request: UpdateHostProfileRequest,
-  ): Promise<BasicHostProfileResponse> | Observable<BasicHostProfileResponse> | BasicHostProfileResponse;
+  ):
+    | Promise<BasicHostProfileResponse>
+    | Observable<BasicHostProfileResponse>
+    | BasicHostProfileResponse;
 
   validatePasswordToken(
     request: ValidatePasswordTokenRequest,
@@ -1630,7 +1690,9 @@ export interface AuthServiceController {
     request: UpdateHostPasswordRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  hostLogin(request: LoginRequest): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
+  hostLogin(
+    request: LoginRequest,
+  ): Promise<TokenResponse> | Observable<TokenResponse> | TokenResponse;
 
   hostFeedback(
     request: HostFeedbackRequest,
@@ -1638,7 +1700,9 @@ export interface AuthServiceController {
 
   /** Hosts and Members */
 
-  completeProfileSetup(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  completeProfileSetup(
+    request: IdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   manageUserSpam(
     request: AddHostUserSettingsRequest,
@@ -1652,19 +1716,30 @@ export interface AuthServiceController {
     request: AddHostUserSettingsRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  reportUser(request: ReportRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
+  reportUser(
+    request: ReportRequest,
+  ): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
 
-  blockHost(request: BlockHostRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
+  blockHost(
+    request: BlockHostRequest,
+  ): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
 
-  unblockHost(request: BlockHostRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  unblockHost(
+    request: BlockHostRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  reportAndBlockHost(request: ReportRequest): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
+  reportAndBlockHost(
+    request: ReportRequest,
+  ): Promise<ReportResponse> | Observable<ReportResponse> | ReportResponse;
 
   /** Update user profile */
 
   updateUserProfile(
     request: UpdateUserProfileRequest,
-  ): Promise<UpdateUserProfileResponse> | Observable<UpdateUserProfileResponse> | UpdateUserProfileResponse;
+  ):
+    | Promise<UpdateUserProfileResponse>
+    | Observable<UpdateUserProfileResponse>
+    | UpdateUserProfileResponse;
 
   updateUserProfilePicture(
     request: UpdateUserProfilePictureRequest,
@@ -1679,7 +1754,9 @@ export interface AuthServiceController {
     request: BioProfileRequest,
   ): Promise<BioProfileResponse> | Observable<BioProfileResponse> | BioProfileResponse;
 
-  getBioProfile(request: IdRequest): Promise<BioProfileResponse> | Observable<BioProfileResponse> | BioProfileResponse;
+  getBioProfile(
+    request: IdRequest,
+  ): Promise<BioProfileResponse> | Observable<BioProfileResponse> | BioProfileResponse;
 
   updateBioProfile(
     request: BioProfileRequest,
@@ -1689,7 +1766,10 @@ export interface AuthServiceController {
 
   createNonMemberUser(
     request: CreateNonMemberUserRequest,
-  ): Promise<CreateNonMemberUserResponse> | Observable<CreateNonMemberUserResponse> | CreateNonMemberUserResponse;
+  ):
+    | Promise<CreateNonMemberUserResponse>
+    | Observable<CreateNonMemberUserResponse>
+    | CreateNonMemberUserResponse;
 
   registerInvitesAsNonMember(
     request: CreateNonMemberUserRequest,
@@ -1701,7 +1781,10 @@ export interface AuthServiceController {
 
   bulkUploadUser(
     request: BulkCreateUsersRequest,
-  ): Promise<BulkCreateUsersResponse> | Observable<BulkCreateUsersResponse> | BulkCreateUsersResponse;
+  ):
+    | Promise<BulkCreateUsersResponse>
+    | Observable<BulkCreateUsersResponse>
+    | BulkCreateUsersResponse;
 
   createHostCollaborator(
     request: CreateHostCollaboratorRequest,
@@ -1714,7 +1797,10 @@ export interface AuthServiceController {
 
   getFollowedHosts(
     request: PaginatedRequest,
-  ): Promise<GetFollowedHostsResponse> | Observable<GetFollowedHostsResponse> | GetFollowedHostsResponse;
+  ):
+    | Promise<GetFollowedHostsResponse>
+    | Observable<GetFollowedHostsResponse>
+    | GetFollowedHostsResponse;
 
   manageFollowHost(
     request: ManageFollowHostRequest,
@@ -1738,11 +1824,16 @@ export interface AuthServiceController {
     request: PaginatedRequest,
   ): Promise<GetMembersResponse> | Observable<GetMembersResponse> | GetMembersResponse;
 
-  getAllUsers(request: PaginatedRequest): Promise<GetUsersResponse> | Observable<GetUsersResponse> | GetUsersResponse;
+  getAllUsers(
+    request: PaginatedRequest,
+  ): Promise<GetUsersResponse> | Observable<GetUsersResponse> | GetUsersResponse;
 
   getUserFiltersOptions(
     request: PaginatedRequest,
-  ): Promise<UserFilterOptionsResponse> | Observable<UserFilterOptionsResponse> | UserFilterOptionsResponse;
+  ):
+    | Promise<UserFilterOptionsResponse>
+    | Observable<UserFilterOptionsResponse>
+    | UserFilterOptionsResponse;
 
   getUserProfile(
     request: UserAndIdRequest,
@@ -1752,27 +1843,45 @@ export interface AuthServiceController {
 
   getCustomUsersList(
     request: CustomUsersListRequest,
-  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+  ):
+    | Promise<CustomUsersListResponse>
+    | Observable<CustomUsersListResponse>
+    | CustomUsersListResponse;
 
   getCustomUsersLists(
     request: CustomUsersListRequest,
-  ): Promise<CustomUsersListsResponse> | Observable<CustomUsersListsResponse> | CustomUsersListsResponse;
+  ):
+    | Promise<CustomUsersListsResponse>
+    | Observable<CustomUsersListsResponse>
+    | CustomUsersListsResponse;
 
   createCustomUsersList(
     request: ManageCustomUsersListRequest,
-  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+  ):
+    | Promise<CustomUsersListResponse>
+    | Observable<CustomUsersListResponse>
+    | CustomUsersListResponse;
 
   updateCustomUsersList(
     request: UpdateCustomUsersListRequest,
-  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+  ):
+    | Promise<CustomUsersListResponse>
+    | Observable<CustomUsersListResponse>
+    | CustomUsersListResponse;
 
   deleteCustomUsersList(
     request: UserAndIdRequest,
-  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+  ):
+    | Promise<CustomUsersListResponse>
+    | Observable<CustomUsersListResponse>
+    | CustomUsersListResponse;
 
   duplicateCustomList(
     request: duplicateCustomListRequest,
-  ): Promise<CustomUsersListResponse> | Observable<CustomUsersListResponse> | CustomUsersListResponse;
+  ):
+    | Promise<CustomUsersListResponse>
+    | Observable<CustomUsersListResponse>
+    | CustomUsersListResponse;
 
   /** reports and feedbacks */
 
@@ -1862,4 +1971,4 @@ export interface AuthServiceController {
 //   };
 // }
 
-export const AUTH_SERVICE_NAME = "AuthService";
+export const AUTH_SERVICE_NAME = 'AuthService';

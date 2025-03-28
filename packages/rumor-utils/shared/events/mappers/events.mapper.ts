@@ -1,7 +1,17 @@
-import { EventData, EventStatus, GuestEventData, GuestStatus as GuesStatusGRPC, CollaboratorsEvent } from '../grpc/events/general.pb';
+import {
+  EventData,
+  EventStatus,
+  GuestEventData,
+  GuestStatus as GuesStatusGRPC,
+  CollaboratorsEvent,
+} from '../grpc/events/general.pb';
 import { Event } from '../entities/event.entity';
 import * as dayjs from 'dayjs';
-import { EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface } from '../interfaces/event.interface';
+import {
+  EventStatusEnum,
+  GuestStatus,
+  HostsFollowedByGuestInterface,
+} from '../interfaces/event.interface';
 import { Collaborator, Guest } from '../entities';
 import { entityToGuestStatus } from './guest.mapper';
 import { formatDateFromDB } from '../utils/event.utils';
@@ -17,18 +27,32 @@ export const toEvent = (
 ): EventData => {
   const currentGuestStatus = guest?.status;
   const invitationDeclinedBy = guest?.declinedBy?.id || '';
-  const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators, hostsFollowedByGuest, guest, memberUserId);
-  const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+  const collaborators: CollaboratorsEvent[] = groupCollaborators(
+    event?.collaborators,
+    hostsFollowedByGuest,
+    guest,
+    memberUserId,
+  );
+  const predefinedStatuses = [
+    EventStatusEnum.DRAFT_STATUS,
+    EventStatusEnum.PENDING_STATUS,
+    EventStatusEnum.DECLINED_STATUS,
+    EventStatusEnum.CANCELLED_STATUS,
+  ];
   // const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
   const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
-  ? event.status
-  : formatEventStatusToEventStatusEnum(event);
-  const location = event.location ? { ...event.location, placeId: event.location.googlePlaceId } : undefined;
+    ? event.status
+    : formatEventStatusToEventStatusEnum(event);
+  const location = event.location
+    ? { ...event.location, placeId: event.location.googlePlaceId }
+    : undefined;
   const ownerDetails = {
     ...event.owner,
     companyLogo: event?.owner?.additionalHostInformation?.companyLogo,
     companyName: event?.owner?.additionalHostInformation?.companyName,
-    isFollowedByCurrentGuest: hostsFollowedByGuest?.some((follow) => follow.hostId === event.owner?.id && follow.followerId === memberUserId),
+    isFollowedByCurrentGuest: hostsFollowedByGuest?.some(
+      follow => follow.hostId === event.owner?.id && follow.followerId === memberUserId,
+    ),
   };
   return {
     admissionType: event.admissionType || undefined,
@@ -44,7 +68,9 @@ export const toEvent = (
     location: location,
     owner: ownerDetails,
     quizQuestions: event.quizQuestions || [],
-    rsvpDeadline: event.rsvpDeadline ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || '' : '',
+    rsvpDeadline: event.rsvpDeadline
+      ? dayjs(event.rsvpDeadline).format('YYYY-MM-DD HH:mm:ssZ') || ''
+      : '',
     showLocation: event.showLocation || false,
     startDate: formatDateFromDB(event.startDate),
     status: eventStatus,
@@ -66,14 +92,17 @@ export const toEvent = (
     invitationDeclinedBy: invitationDeclinedBy,
     featuredEventSection: event.featuredEventSection
       ? {
-        id: event.featuredEventSection?.id,
-        name: event.featuredEventSection?.name,
-        index: event.featuredEventSection?.index,
-      }
+          id: event.featuredEventSection?.id,
+          name: event.featuredEventSection?.name,
+          index: event.featuredEventSection?.index,
+        }
       : null,
     isPublished: event.isPublished || false,
     totalCheckedInGuests: totalCheckedInGuests || 0,
     totalConfirmedGuests: totalConfirmedGuests || 0,
+    guestOptionalMessage: guest?.inviteMessage || '',
+    guestNote: guest?.privateGuestNote || '',
+    invitationDate: guest?.status === 'INVITED' ? guest?.createdAt?.toISOString() || '' : '',
   };
 };
 
@@ -88,7 +117,7 @@ export const groupCollaborators = (
       return [];
     }
     const grouped = {};
-    collaborators.forEach((collab) => {
+    collaborators.forEach(collab => {
       if (!collab?.user?.id) {
         return;
       }
@@ -96,7 +125,9 @@ export const groupCollaborators = (
       if (!grouped[user.id]) {
         let isFollowedByCurrentGuest = false;
         if (guest && hostsFollowedByGuest.length) {
-          isFollowedByCurrentGuest = hostsFollowedByGuest.some((follow) => follow.hostId === user.id && follow.followerId === memberUserId);
+          isFollowedByCurrentGuest = hostsFollowedByGuest.some(
+            follow => follow.hostId === user.id && follow.followerId === memberUserId,
+          );
         }
         grouped[user.id] = {
           ...collaboratorDetails,
@@ -108,7 +139,7 @@ export const groupCollaborators = (
           role: role,
           tickets: [],
           isFollowedByCurrentGuest,
-          isApproved: false
+          isApproved: false,
           //TODO:add the status if collaborator is approved or accepted the invite
         };
       }
@@ -126,11 +157,20 @@ export const groupCollaborators = (
   }
 };
 
-export const toEventGuest = (event: Event, currentGuest?: Guest | null, currentUserId?: string): GuestEventData => {
-  const predefinedStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+export const toEventGuest = (
+  event: Event,
+  currentGuest?: Guest | null,
+  currentUserId?: string,
+): GuestEventData => {
+  const predefinedStatuses = [
+    EventStatusEnum.DRAFT_STATUS,
+    EventStatusEnum.PENDING_STATUS,
+    EventStatusEnum.DECLINED_STATUS,
+    EventStatusEnum.CANCELLED_STATUS,
+  ];
   const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
-  ? event.status
-  : formatEventStatusToEventStatusEnum(event);
+    ? event.status
+    : formatEventStatusToEventStatusEnum(event);
   return {
     description: event.description || '',
     enabled: event.enabled || false,
@@ -182,7 +222,12 @@ export const formatEventStatus = (event: Event): EventStatus => {
   const parsedEndDate = new Date(endDate);
   const parsedPublishDate = new Date(publishDate);
   let status: EventStatus;
-  if (!isPublished && eventStatus && eventStatus === EventStatusEnum.APPROVED_STATUS && parsedPublishDate <= parsedStartDate) {
+  if (
+    !isPublished &&
+    eventStatus &&
+    eventStatus === EventStatusEnum.APPROVED_STATUS &&
+    parsedPublishDate <= parsedStartDate
+  ) {
     status = EventStatus.SCHEDULED_STATUS;
   }
 
@@ -194,7 +239,8 @@ export const formatEventStatus = (event: Event): EventStatus => {
     }
   }
 
-  if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS) status = EventStatus[eventStatus];
+  if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS)
+    status = EventStatus[eventStatus];
   return status || EventStatus[eventStatus] || EventStatus.NO_EVENT_STATUS;
 };
 
@@ -207,7 +253,12 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
   const parsedPublishDate = new Date(publishDate);
   let status: EventStatus;
 
-  if (!isPublished && eventStatus && eventStatus === EventStatusEnum.APPROVED_STATUS && parsedPublishDate <= parsedStartDate) {
+  if (
+    !isPublished && publishDate && 
+    eventStatus &&
+    eventStatus === EventStatusEnum.APPROVED_STATUS &&
+    parsedPublishDate <= parsedStartDate
+  ) {
     status = EventStatus.SCHEDULED_STATUS;
   }
 

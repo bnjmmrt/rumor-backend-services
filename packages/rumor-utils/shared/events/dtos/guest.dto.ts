@@ -1,4 +1,15 @@
-import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, IsEnum } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
 import {
   AddGuestsRequest,
   GuestsRequest,
@@ -324,7 +335,7 @@ export class BulkUploadGuestsRequestDto implements BulkUploadGuestsRequest {
 
   @IsBoolean()
   @IsOptional()
-  isUploadUser?: boolean
+  isUploadUser?: boolean;
 }
 
 export class FetchBulkGuestsRequestDto implements FetchBulkGuestsRequest {

@@ -4,12 +4,18 @@
 //   protoc               v5.29.1
 // source: grpc/auth/role.proto
 
-/* eslint-disable */
 // import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
-import { Observable } from "rxjs";
-import { EmptyRequest, Error, GenericResponse, IdRequest, UserSource, UserStatus } from "./shared.pb";
+import { Observable } from 'rxjs';
+import {
+  EmptyRequest,
+  Error,
+  GenericResponse,
+  IdRequest,
+  UserSource,
+  UserStatus,
+} from './shared.pb';
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 /** Role */
 export interface SubRole {
@@ -102,7 +108,7 @@ export interface UpdateUserRoleRequest {
   source?: UserSource | undefined;
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';
 
 export interface RoleServiceClient {
   listRoles(request: EmptyRequest): Observable<ListRolesResponse>;
@@ -129,33 +135,52 @@ export interface RoleServiceClient {
 }
 
 export interface RoleServiceController {
-  listRoles(request: EmptyRequest): Promise<ListRolesResponse> | Observable<ListRolesResponse> | ListRolesResponse;
+  listRoles(
+    request: EmptyRequest,
+  ): Promise<ListRolesResponse> | Observable<ListRolesResponse> | ListRolesResponse;
 
-  assignRoleToUser(request: RoleRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  assignRoleToUser(
+    request: RoleRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   setUserPermission(
     request: PermissionRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  getUserRoleHierarchy(request: IdRequest): Promise<UserRoleResponse> | Observable<UserRoleResponse> | UserRoleResponse;
+  getUserRoleHierarchy(
+    request: IdRequest,
+  ): Promise<UserRoleResponse> | Observable<UserRoleResponse> | UserRoleResponse;
 
-  checkRole(request: RoleRequest): Promise<CheckRoleResponse> | Observable<CheckRoleResponse> | CheckRoleResponse;
+  checkRole(
+    request: RoleRequest,
+  ): Promise<CheckRoleResponse> | Observable<CheckRoleResponse> | CheckRoleResponse;
 
   checkPermission(
     request: CheckPermissionRequest,
-  ): Promise<CheckPermissionResponse> | Observable<CheckPermissionResponse> | CheckPermissionResponse;
+  ):
+    | Promise<CheckPermissionResponse>
+    | Observable<CheckPermissionResponse>
+    | CheckPermissionResponse;
 
   updateUserRole(
     request: UpdateUserRoleRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  listUserRoles(request: IdRequest): Promise<ListRolesResponse> | Observable<ListRolesResponse> | ListRolesResponse;
+  listUserRoles(
+    request: IdRequest,
+  ): Promise<ListRolesResponse> | Observable<ListRolesResponse> | ListRolesResponse;
 
-  revokeRoleFromUser(request: RoleRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  revokeRoleFromUser(
+    request: RoleRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  getRoleByName(request: RoleNameRequest): Promise<RoleResponse> | Observable<RoleResponse> | RoleResponse;
+  getRoleByName(
+    request: RoleNameRequest,
+  ): Promise<RoleResponse> | Observable<RoleResponse> | RoleResponse;
 
-  markUserAsSpam(request: IdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  markUserAsSpam(
+    request: IdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 }
 
 // export function RoleServiceControllerMethods() {
@@ -185,4 +210,4 @@ export interface RoleServiceController {
 //   };
 // }
 
-export const ROLE_SERVICE_NAME = "RoleService";
+export const ROLE_SERVICE_NAME = 'RoleService';
