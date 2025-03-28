@@ -217,8 +217,14 @@ export class SignupFormsServices {
       .where('id IN (:...ids)', { ids: oldQuestionIds })
       .getMany();
 
+    let hasAccessForAdditionalGuestQuestions: SignupFormQuestions = undefined;
     const questionsMap = new Map<string, boolean>();
-    existingQuestions.forEach(q => questionsMap.set(q.id.toString(), q.isDefault));
+    existingQuestions.forEach(q => {
+      if (q.name.toLowerCase() === 'Request Access for Additional Guests'.toLowerCase()) {
+        hasAccessForAdditionalGuestQuestions = q;
+      }
+      questionsMap.set(q.id.toString(), q.isDefault);
+    });
 
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
@@ -256,8 +262,10 @@ export class SignupFormsServices {
             break;
         }
       }
+      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
       if (!body.hasAccessForAdditionalGuests) {
         if (q.name === 'Request Access for Additional Guests') {
+          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
         } else {
@@ -268,6 +276,10 @@ export class SignupFormsServices {
           questionPromises.push(updatesQuestion);
         }
       }
+    }
+    if (!body.hasAccessForAdditionalGuests) {
+      const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuestQuestions.id);
+      questionPromises.push(deleteQuestions);
     }
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
@@ -597,6 +609,7 @@ export class SignupFormsServices {
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
+      console.log('🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:', submissionList);
       const result = { count, result: submissionList };
       return result;
     } catch (err) {

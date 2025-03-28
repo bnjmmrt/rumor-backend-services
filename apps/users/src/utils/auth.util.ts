@@ -20,6 +20,7 @@ export const newMember = (payload: MemberSignUpRequestDto, address: Address): Us
   user.dateOfBirth = standardizeDateOfBirth(payload.dateOfBirth);
   user.address = address;
   user.instagramUserName = payload.instagramUserName;
+  user.profilePicture = payload.profilePicture
   return user;
 };
 
