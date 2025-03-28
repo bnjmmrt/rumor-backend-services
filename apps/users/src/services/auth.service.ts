@@ -1230,7 +1230,6 @@ export class AuthService {
         where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
       });
     }
-    console.log(user)
 
     // Micro-service call
     if (!user) {
