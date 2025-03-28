@@ -5306,17 +5306,17 @@ export class AuthService {
   }
 
   public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
-    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
     const user = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.userId } });
+      .findOne({ where: { id: payload.id } });
     if (!user || !host) {
       throw new NotFoundError('User or Host');
     }
     let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
-        user: { id: payload.userId },
-        host: { id: payload.id },
+        user: { id: payload.id },
+        host: { id: payload.userId },
       },
     });
     if (!hostUserSettings) {
