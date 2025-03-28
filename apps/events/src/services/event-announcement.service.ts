@@ -132,26 +132,27 @@ export class EventAnnouncementService {
           }
         })
       } else {
-        const recipient = await database
-          .getRepository(Guest)
-          .createQueryBuilder('guest')
-          .where('guest.event_id = :eventId', { eventId })
-          .andWhere(
-            ticketTypes.length > 0 ? 'guest.ticket_type_id IN (:...ticketTypeIds)' : '1=1',
-            { ticketTypes },
-          )
-          .andWhere(addedByUsers.length > 0 ? 'guest.added_by_id IN (:...addedByIds)' : '1=1', {
-            addedByUsers,
-          })
-          .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
-          .getMany()
+        const recipientsData = await database.getRepository(Guest).find({
+          where: {
+            event: { id: eventId },
+            ticketType: ticketTypes.length > 0 ? In(ticketTypes) : undefined,
+            addedBy: addedByUsers.length > 0 ? In(addedByUsers) : undefined,
+            status: GuestStatus.CONFIRMED,
+          },
+          relations: {
+            user: true
+          }
+        });
 
-        if (recipient.length > 0) {
+        if (recipientsData.length > 0) {
+          const recipientsIds = recipientsData
+            .map(guest => guest.user?.id)
+            .filter(id => !!id);
           serviceMesh
             .notificationService()
-            .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
-          const fetchUserEmails = await database.getRepository(User).find({ where: { id: In(recipients) } })
-          fetchUserEmails.map(data => {
+            .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipientsIds, eventId, createdBy);
+          const fetchUsers = await database.getRepository(User).find({ where: { id: In(recipientsIds) } })
+          fetchUsers.map(data => {
             if (data.email) {
               sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
             }
