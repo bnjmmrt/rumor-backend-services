@@ -1463,12 +1463,41 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      const completedLogin = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .passwordlessLogin({ code: temporaryCode.code });
-      if (completedLogin.statusCode > 299) {
-        throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      let completedLogin
+      try {
+        completedLogin = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: temporaryCode.code });
+      } catch (error) {
+        try {
+          const verificationResult = isEmailLogin
+            ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+            : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+          const isVerified: boolean =
+            ('verified' in verificationResult && verificationResult.verified === true) ||
+            ('data' in verificationResult && verificationResult.data?.verified === true);
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } catch (error) { }
       }
+
+      // if (completedLogin.statusCode > 299) {
+      //   throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      // }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
@@ -1480,7 +1509,7 @@ export class AuthService {
       });
       return {
         id: user.id,
-        token: completedLogin.response.token,
+        token: completedLogin.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -1516,7 +1545,7 @@ export class AuthService {
       });
 
       return {
-        token: completedLogin.response.token,
+        token: completedLogin.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -2826,24 +2855,27 @@ export class AuthService {
     const queryBuilder = this.dbConnection
       .getRepository(User)
       .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'user_role');
+      .innerJoinAndSelect('user.roles', 'user_role')
+      .innerJoinAndSelect('user_role.role', 'role')
+      .where('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE })
+      .andWhere('role.name = :roleName', { roleName: 'member' });
 
     if (emails.length > 0 && phoneNumbers.length > 0) {
-      queryBuilder.where(
+      queryBuilder.andWhere(
         new Brackets(qb => {
-          qb.where('user.email IN (:...emails)', { emails }).orWhere(
+          qb.andWhere('user.email IN (:...emails)', { emails }).orWhere(
             'user.phone_number IN (:...numbers)',
             { numbers: phoneNumbers },
           );
         }),
       );
     } else if (phoneNumbers.length > 0) {
-      queryBuilder.where('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
+      queryBuilder.andWhere('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
     } else {
-      queryBuilder.where('user.email IN (:...emails)', { emails });
+      queryBuilder.andWhere('user.email IN (:...emails)', { emails });
     }
 
-    queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
+    // queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
 
     const users = await queryBuilder.getMany();
 
@@ -2911,6 +2943,7 @@ export class AuthService {
       isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
       firstName: user.firstName,
       lastName: user.lastName,
+      instagramUserName: user.instagramUserName,
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
@@ -5306,17 +5339,17 @@ export class AuthService {
   }
 
   public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
-    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
     const user = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.userId } });
+      .findOne({ where: { id: payload.id } });
     if (!user || !host) {
       throw new NotFoundError('User or Host');
     }
     let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
-        user: { id: payload.userId },
-        host: { id: payload.id },
+        user: { id: payload.id },
+        host: { id: payload.userId },
       },
     });
     if (!hostUserSettings) {

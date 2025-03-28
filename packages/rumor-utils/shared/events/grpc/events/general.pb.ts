@@ -434,7 +434,7 @@ export interface GuestData {
   gender?: string | undefined;
   age?: number | undefined;
   address?: AddressGuest | undefined;
-  interest: InterestData[];
+  interest: string[];
   // followsYou?: boolean | undefined;
   // favorite?: boolean | undefined;
   roles: UserRoleComplete[];

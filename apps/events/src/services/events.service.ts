@@ -119,7 +119,7 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
-import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils';
+import {sendEventCancellation, sendEventUpdation, sendEventInviteNonMember, sendEventRejection, sendEventPublishedApproval, sendEventPrePublishApproval} from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 
@@ -2249,8 +2249,19 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined || payload.publishDate !== null) {
-        event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+      if (payload.publishDate != undefined) {
+        if (event.status == EventStatusEnum.APPROVED_STATUS) {
+          if (payload.publishDate) {
+            event.publishDate = new Date(payload.publishDate);
+          }
+          else {
+            event.publishDate = null;
+            event.isPublished = true;
+          }
+        }
+        else {
+          event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        }
       }
       if (payload.timeZone) {
         event.timeZone = payload.timeZone;
@@ -2494,7 +2505,7 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id);
+        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
@@ -2788,60 +2799,14 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
-      const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.startDate);
-      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
-      const params = [
-        {
-          key: 'event_name',
-          value: updatedEvent.name,
-        },
-        {
-          key: 'company_name',
-          value: host.additionalHostInformation.companyName,
-        },
-        {
-          key: 'image_url',
-          value: updatedEvent.imageFlyer,
-        },
-        {
-          key: 'month',
-          value: month,
-        },
-        {
-          key: 'day',
-          value: day,
-        },
-        {
-          key: 'dayOfWeek',
-          value: dayOfWeek,
-        },
-        {
-          key: 'hour',
-          value: hour,
-        },
-        {
-          key: 'minutes',
-          value: minutes,
-        },
-        {
-          key: 'address',
-          value: updatedEvent.location.location,
-        },
-        {
-          key: 'view_event',
-          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
-        },
-      ];
-      if (updatedEvent.isPublished) {
-        await serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            params,
-            'Host Event Approved by Admin - Published',
-            [updatedEvent.owner.email],
-            null,
-          );
-      }
+      const createPayload = {
+        eventDate: updatedEvent.startDate,
+        eventName: updatedEvent.name,
+        imageFlyer: updatedEvent.imageFlyer,
+        location: updatedEvent.location.location,
+        city: updatedEvent.location.city,
+      };
+      sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
     }
     return;
   }
@@ -3025,88 +2990,35 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
-      const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.startDate);
-      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
-      const params = [
-        {
-          key: 'event_name',
-          value: updatedEvent.name,
-        },
-        {
-          key: 'company_name',
-          value: host.additionalHostInformation.companyName,
-        },
-        {
-          key: 'image_url',
-          value: updatedEvent.imageFlyer,
-        },
-        {
-          key: 'month',
-          value: month,
-        },
-        {
-          key: 'day',
-          value: day,
-        },
-        {
-          key: 'dayOfWeek',
-          value: dayOfWeek,
-        },
-        {
-          key: 'hour',
-          value: hour,
-        },
-        {
-          key: 'minutes',
-          value: minutes,
-        },
-        {
-          key: 'address',
-          value: updatedEvent.location.location,
-        },
-        {
-          key: 'view_event',
-          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
-        },
-      ];
       if (updatedEvent.isPublished) {
-        serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            params,
-            'Host Event Approved by Admin - Published',
-            [updatedEvent.owner.email],
-            null,
-          );
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+        };
+        sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
         // Send Push Notification
-        serviceMesh
-          .notificationService()
-          .sendNotification(
-            NotificationType.EVENT_APPROVED,
-            updatedEvent.owner.id,
-            updatedEvent.id,
-          );
-      } else {
-        const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.publishDate);
-        params.push(
-          {
-            key: 'publish_date',
-            value: `${dayOfWeek}, ${month} ${day} `,
-          },
-          {
-            key: 'publish_time',
-            value: `${hour}: ${minutes}`,
-          },
-        );
         try {
           serviceMesh
             .notificationService()
-            .sendEmailFromTemplate(
-              params,
-              'Host Event Approved by Admin - Pre-Publish',
-              [updatedEvent.owner.email],
-              null,
+            .sendNotification(
+              NotificationType.EVENT_APPROVED,
+              updatedEvent.owner.id,
+              updatedEvent.id,
             );
+        } catch (err) { }
+      } else {
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+        };
+        sendEventPrePublishApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.publishDate, updatedEvent.timeZone);
+        try {
           //Send Push Notifications
           serviceMesh
             .notificationService()
@@ -3124,15 +3036,7 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          { key: 'event_name', value: updatedEvent.name },
-          { key: 'host_name', value: host.firstName },
-        ],
-        'Host Event Rejected by Admin',
-        [updatedEvent.owner.email.trim()],
-        null,
-      );
+      sendEventRejection(updatedEvent.name, host.firstName, updatedEvent.owner.email);
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3504,6 +3408,7 @@ export class EventsService {
               guest.user.email,
               guestName,
               message,
+              event.timeZone
             );
             if (mailServiceResponse) {
               notificationSuccess = true;
@@ -3546,15 +3451,17 @@ export class EventsService {
       //step 7: resolve notification promices
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
-      const notificationRecipients = guests.map((data: Guest) => data.user.id);
-      serviceMesh
-        .notificationService()
-        .sendNotification(
-          NotificationType.EVENT_CANCELLED,
-          notificationRecipients,
-          eventId,
-          event.owner.id,
-        );
+      try {
+        const notificationRecipients = guests.map((data: Guest) => data.user.id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_CANCELLED,
+            notificationRecipients,
+            eventId,
+            event.owner.id,
+          );
+      } catch (err) { }
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();

@@ -103,7 +103,7 @@ export class FilesControllerHandler {
     const maxFileSizeMB = config.get('FILE_SIZE_IN_BYTES');
     const fileSizeBytes = Number(payload.size);
     if (fileSizeBytes > maxFileSizeMB) {
-      throw new Error('File size exceeds the maximum limit of 0.5 MB');
+      throw new Error('File size exceeds the maximum limit of 5 MB');
     }
 
     const uri = await S3Service.UploadFileUrl(uploadUrlPath, contentType); // Ensure file exists before updating

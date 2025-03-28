@@ -6,6 +6,7 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import {sendEventAnnouncement, sendEventInviteMember} from '../utils/emails.utils';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -81,6 +82,7 @@ export class EventAnnouncementService {
         isPublished: true,
         deletedAt: IsNull(),
       },
+      relations: { owner: true },
     });
     if (!event) throw new NotFoundError('Event not found');
 
@@ -107,10 +109,56 @@ export class EventAnnouncementService {
     eventAnnouncement.addedBy = addedByUsers;
     eventAnnouncement.ticketType = ticketTypes;
 
+    /**
+     * Sending Notification & Email
+     * Check for recipient array 
+     * if empty that means we have to fetch the guest list (to fetch) using below method
+     * and send email to all those guest.user.id and also set the guest.user.id in the recupeints array for notification
+     * 
+     * if the recipient array is not empty then send the email and notification to that person only
+     * in this case we don't need to fetch the guest.user becuase the FE team is already sending the userIds in the recipients array
+     * 
+     */
+
     try {
-      serviceMesh
-        .notificationService()
-        .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+      if (recipients.length > 0) {
+        serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
+        const fetchUserEmails = await database.getRepository(User).find({ where: { id: In(recipients) } })
+        fetchUserEmails.map(data => {
+          if (data.email) {
+            sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+          }
+        })
+      } else {
+        const recipientsData = await database.getRepository(Guest).find({
+          where: {
+            event: { id: eventId },
+            ticketType: ticketTypes.length > 0 ? In(ticketTypes) : undefined,
+            addedBy: addedByUsers.length > 0 ? In(addedByUsers) : undefined,
+            status: GuestStatus.CONFIRMED,
+          },
+          relations: {
+            user: true
+          }
+        });
+
+        if (recipientsData.length > 0) {
+          const recipientsIds = recipientsData
+            .map(guest => guest.user?.id)
+            .filter(id => !!id);
+          serviceMesh
+            .notificationService()
+            .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipientsIds, eventId, createdBy);
+          const fetchUsers = await database.getRepository(User).find({ where: { id: In(recipientsIds) } })
+          fetchUsers.map(data => {
+            if (data.email) {
+              sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+            }
+          })
+        }
+      }
     } catch (error) {
       console.log('🚀 ~ EventAnnouncementService ~ postAnnouncement ~ error:', error);
     }
