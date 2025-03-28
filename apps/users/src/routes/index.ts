@@ -365,6 +365,7 @@ router.get(
   AuthMiddleware.fusionAuth,
   SettingsController.getNotificationSettings,
 );
+
 router.put(
   '/notification-preferences',
   AuthMiddleware.fusionAuth,
