@@ -2058,7 +2058,9 @@ export class AuthService {
       where: { user: { id: In(payload.ids) } },
       relations: ['user', 'role'],
     });
-
+    // const nonMemberUserRole = userRoles.find(
+    //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
+    // );
     if (userRoles.length === 0) {
       throw new NotFoundError('UserRole');
     }
@@ -2111,22 +2113,22 @@ export class AuthService {
           break;
       }
 
-      const userRole = userRoles.find(ur => ur.user.id === user.id);
+      // const userRole = userRoles.find(ur => ur.user.id === user.id);
       // const nonMemberUserRole = userRoles.find(
       //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
       // );
 
-      if (nonMemberUserRole) {
-        usersToUpdate.push({
-          userRole: nonMemberUserRole,
-          newStatus: payload.status,
-          newRole: memberRole,
-        });
-      }
+      // if (nonMemberUserRole) {
+      //   usersToUpdate.push({
+      //     userRole: nonMemberUserRole,
+      //     newStatus: payload.status,
+      //     newRole: memberRole,
+      //   });
+      // }
 
-      if (userRole) {
-        usersToUpdate.push({ userRole, newStatus: payload.status });
-      }
+      // if (userRole) {
+      //   usersToUpdate.push({ userRole, newStatus: payload.status });
+      // }
 
       // if (payload.status === UserStatus.WAITLISTED) {
       // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
