@@ -643,10 +643,18 @@ export class GuestService {
   public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestDataSimple[]> {
     try {
       // Validate ticket type if provided in the request
-      const ticketType = await this.dbConnection
-        .getRepository(TicketType)
-        .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      let ticketType = null;
+      if (payload.ticketTypeId) {
+        // Fetch ticket type from the database if ticketTypeId is provided
+        ticketType = await this.dbConnection
+          .getRepository(TicketType)
+          .findOne({ where: { id: payload.ticketTypeId } });
+
+        // If ticket type is not found, throw an error
+        if (!ticketType) {
+          throw new NotFoundError('Ticket type not found');
+        }
+      }
 
       // Validate guest status if provided
       const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
@@ -1119,7 +1127,10 @@ export class GuestService {
         const [focuses, interests, vouches] = await Promise.all([
           (await serviceMesh.userService().getUserFocuses(guest.user.id)).data,
           (await serviceMesh.userService().getUserInterests(guest.user.id)).data,
-          await VouchRequestService.getUserVouches({ id: guest.user.id }),
+          await VouchRequestService.getUserVouchesByEvent({
+            requesterId: guest.user.id,
+            eventId: event.id,
+          }),
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -3938,8 +3949,9 @@ export class GuestService {
 
     const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
 
-    const vouches = await VouchRequestService.getUserVouches({
-      id: guestDetail.user.id,
+    const vouches = await VouchRequestService.getUserVouchesByEvent({
+      requesterId: guestDetail.user.id,
+      eventId: guestDetail.event.id
     });
 
     let questions: QuizData[] = [];
