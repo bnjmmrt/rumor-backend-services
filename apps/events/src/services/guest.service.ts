@@ -108,7 +108,7 @@ import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-cus
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { processCsvFile, generateErrorCsv, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import S3Service from '../utils/aws/s3';
-import { stringify } from 'csv-stringify';
+// import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import {
   sendEventInviteMember,
@@ -4230,16 +4230,16 @@ export class GuestService {
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
-      stringify(
-        lineItems,
-        { header: true, columns: titleMapping.map(item => item.title) },
-        (err, output) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(output);
-        },
-      );
+      // stringify(
+      //   lineItems,
+      //   { header: true, columns: titleMapping.map(item => item.title) },
+      //   (err, output) => {
+      //     if (err) {
+      //       reject(err);
+      //     }
+      //     resolve(output);
+      //   },
+      // );
     });
   }
 }

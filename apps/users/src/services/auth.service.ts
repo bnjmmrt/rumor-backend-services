@@ -212,7 +212,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
-import { stringify } from 'csv-stringify';
+// import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 
@@ -1230,6 +1230,7 @@ export class AuthService {
         where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
       });
     }
+    console.log(user)
 
     // Micro-service call
     if (!user) {
@@ -1463,12 +1464,41 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      const completedLogin = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .passwordlessLogin({ code: temporaryCode.code });
-      if (completedLogin.statusCode > 299) {
-        throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      let completedLogin
+      try {
+        completedLogin = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: temporaryCode.code });
+      } catch (error) {
+        try {
+          const verificationResult = isEmailLogin
+            ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+            : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+          const isVerified: boolean =
+            ('verified' in verificationResult && verificationResult.verified === true) ||
+            ('data' in verificationResult && verificationResult.data?.verified === true);
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } catch (error) { }
       }
+
+      // if (completedLogin.statusCode > 299) {
+      //   throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      // }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
@@ -1480,7 +1510,7 @@ export class AuthService {
       });
       return {
         id: user.id,
-        token: completedLogin.response.token,
+        token: completedLogin.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -1516,7 +1546,7 @@ export class AuthService {
       });
 
       return {
-        token: completedLogin.response.token,
+        token: completedLogin.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -2826,7 +2856,10 @@ export class AuthService {
     const queryBuilder = this.dbConnection
       .getRepository(User)
       .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'user_role');
+      .innerJoinAndSelect('user.roles', 'user_role')
+      .innerJoinAndSelect('user_role.role', 'role')
+      .where('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE })
+      .andWhere('role.name = :roleName', { roleName: 'member' });
 
     if (emails.length > 0 && phoneNumbers.length > 0) {
       queryBuilder.where(
@@ -2843,7 +2876,7 @@ export class AuthService {
       queryBuilder.where('user.email IN (:...emails)', { emails });
     }
 
-    queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
+    // queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
 
     const users = await queryBuilder.getMany();
 
@@ -2911,6 +2944,7 @@ export class AuthService {
       isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
       firstName: user.firstName,
       lastName: user.lastName,
+      instagramUsername: user.instagramUserName,
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
@@ -5611,16 +5645,16 @@ export class AuthService {
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
-      stringify(
-        lineItems,
-        { header: true, columns: titleMapping.map(item => item.title) },
-        (err, output) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(output);
-        },
-      );
+      // stringify(
+      //   lineItems,
+      //   { header: true, columns: titleMapping.map(item => item.title) },
+      //   (err, output) => {
+      //     if (err) {
+      //       reject(err);
+      //     }
+      //     resolve(output);
+      //   },
+      // );
     });
   }
 }

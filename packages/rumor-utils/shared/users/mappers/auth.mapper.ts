@@ -323,7 +323,7 @@ export const toMemberProfile = (
     interest: interests.map(interest => interest.name).join(', '),
     age: calculateAge(user.dateOfBirth),
     imageUrl: user.profilePicture || '',
-    instagramUsername: instagramUsername,
+    instagramUsername: user.instagramUserName,
     customLists: customLists,
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount: eventCount,
