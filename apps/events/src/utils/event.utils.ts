@@ -259,30 +259,50 @@ export function hasEventDateOrLocationChanged(
   }
   return { changed: changes.length > 0, changes };
 }
-export function extractDate(date: Date): {
+export function extractDate(
+  date: Date,
+  timeZone: string
+): {
   year: string;
   month: string;
   day: string;
   dayOfWeek: string;
   hour: string;
   minutes: string;
+  period: string;
+  timeZone: string;
 } {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
     throw new Error('Invalid date object provided');
   }
-  const updatedDate = new Date(date);
-  const hour = updatedDate.getUTCHours() > 0 ? updatedDate.getUTCHours().toString() : '00';
-  const minutes = updatedDate.getUTCMinutes() > 0 ? updatedDate.getUTCMinutes().toString() : '00';
+
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true, // <-- this enables AM/PM
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(date);
+
+  const lookup: Record<string, string> = {};
+  parts.forEach(({ type, value }) => {
+    lookup[type] = value;
+  });
+
   return {
-    year: updatedDate.getUTCFullYear().toString(),
-    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'][
-      updatedDate.getUTCMonth()
-    ], // Months are 0-based
-    day: updatedDate.getUTCDate().toString(),
-    dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
-      date.getUTCDay()
-    ],
-    hour,
-    minutes,
+    year: lookup.year,
+    month: lookup.month,
+    day: lookup.day,
+    dayOfWeek: lookup.weekday,
+    hour: lookup.hour,
+    minutes: lookup.minute,
+    period: lookup.dayPeriod, // "AM" or "PM"
+    timeZone,
   };
 }
