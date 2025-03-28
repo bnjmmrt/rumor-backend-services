@@ -3086,6 +3086,7 @@ export class GuestService {
         },
         relations: {
           user: true,
+          ticketType: true
         },
       });
       if (!leadGuest) throw new NotFoundError('Lead Guest not found');
@@ -3169,6 +3170,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: newUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       }
