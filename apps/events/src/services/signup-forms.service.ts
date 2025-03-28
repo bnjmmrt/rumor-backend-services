@@ -597,6 +597,7 @@ export class SignupFormsServices {
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
+      console.log("🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:", submissionList)
       const result = { count, result: submissionList };
       return result;
     } catch (err) {

@@ -122,6 +122,8 @@ export const processCsvFile = async (
         record.reason = reasons.join(', ');
         garbageData.push(record);
       } else {
+        record.firstName = record.firstName?.toString().trim();
+        record.lastName = record.lastName?.toString().trim();
         record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
         record.email = rawEmail.trim();
         validData.push(record);
