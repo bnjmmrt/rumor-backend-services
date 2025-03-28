@@ -124,6 +124,7 @@ import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils'
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+import {CancelEventInterface} from "../interfaces/cancel-event.interface";
 
 const responses = {
   conflict: (message: string) => ({
@@ -3422,7 +3423,7 @@ export class EventsService {
    * 8. Commit the transaction if at least one notification is successful.
    */
   public static async cancelEventAndNotify(
-    payload: CancelEventAndNotifyRequestDto,
+    payload: CancelEventInterface,
   ): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
@@ -3448,7 +3449,9 @@ export class EventsService {
         throw new Error('It is not approved event.');
       }
 
-      if (event.owner.id !== payload.ownerId) {
+
+      // Permitir cancelar si es admin o propietario
+      if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
       }
       // Step 2: Collect unique collaborators
