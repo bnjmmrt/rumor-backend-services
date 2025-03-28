@@ -2249,8 +2249,19 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined || payload.publishDate !== null) {
-        event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+      if (payload.publishDate != undefined) {
+        if (event.status == EventStatusEnum.APPROVED_STATUS) {
+          if (payload.publishDate) {
+            event.publishDate = new Date(payload.publishDate);
+          }
+          else {
+            event.publishDate = null;
+            event.isPublished = true;
+          }
+        }
+        else {
+          event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        }
       }
       if (payload.timeZone) {
         event.timeZone = payload.timeZone;
@@ -3440,15 +3451,17 @@ export class EventsService {
       //step 7: resolve notification promices
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
-      const notificationRecipients = guests.map((data: Guest) => data.user.id);
-      serviceMesh
-        .notificationService()
-        .sendNotification(
-          NotificationType.EVENT_CANCELLED,
-          notificationRecipients,
-          eventId,
-          event.owner.id,
-        );
+      try {
+        const notificationRecipients = guests.map((data: Guest) => data.user.id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_CANCELLED,
+            notificationRecipients,
+            eventId,
+            event.owner.id,
+          );
+      } catch (err) { }
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();

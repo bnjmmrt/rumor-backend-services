@@ -130,6 +130,11 @@ export const validateEventDates = (
       return { error: true, response: 'Publish date must be later than the current date.' };
     }
 
+    // Start date must be later than publish date
+    if (new Date(payload.startDate).getTime() <= new Date(payload.publishDate).getTime()) {
+      return { error: true, response: 'Start date must be later than the publish date.' };
+    }
+
     // End date must be later than publish date
     if (new Date(payload.endDate).getTime() <= new Date(payload.publishDate).getTime()) {
       return { error: true, response: 'End date must be later than the publish date.' };
