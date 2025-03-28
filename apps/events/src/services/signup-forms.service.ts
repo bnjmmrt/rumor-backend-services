@@ -229,6 +229,21 @@ export class SignupFormsServices {
 
     const ids = [];
     const questionPromises: any[] = [];
+
+    /**---------TO DO:: HACKY FIX --------------------- */
+    if (!body.hasAccessForAdditionalGuests) {
+      const guestsWithStaticQuestions = await SignupFormQuestions.find({
+        where: { signupForms: { id: id } },
+      });
+      const hasAccessForAdditionalGuests = guestsWithStaticQuestions.find(
+        g => g.name === 'Request Access for Additional Guests',
+      );
+      if (hasAccessForAdditionalGuests) {
+        const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuests.id);
+        questionPromises.push(deleteQuestions);
+      }
+    }
+
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
@@ -256,8 +271,10 @@ export class SignupFormsServices {
             break;
         }
       }
+      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
       if (!body.hasAccessForAdditionalGuests) {
         if (q.name === 'Request Access for Additional Guests') {
+          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
         } else {
@@ -423,20 +440,15 @@ export class SignupFormsServices {
       } as SignupFormSubmissions;
       await queryRunner.manager.save(inviteGuestPayload);
 
+      submissions.guestId = inviteGuestPayload.id;
+      await queryRunner.manager.save(submissions);
+
       /**-- Create Host User Mapping */
       const hostUserMapping = new HostUserMapping();
       hostUserMapping.user = { id: userPayload.id } as User;
       hostUserMapping.host = { id: signupForm.event.owner.id } as User;
       await queryRunner.manager.save(hostUserMapping);
 
-      // -- Create Guest
-      // const submissions = new SignupFormSubmissions();
-      // submissions.signupForm = { id: id } as EventSignupForms;
-      // submissions.answers = answerList;
-      // submissions.guest = { id: inviteGuestPayload.id } as Guest;
-      // submissions.attendees = { id: userPayload.id } as User;
-
-      await queryRunner.manager.save(inviteGuestPayload);
       await queryRunner.commitTransaction();
 
       try {
@@ -503,6 +515,8 @@ export class SignupFormsServices {
         .addSelect('atd.email', 'email')
         .addSelect('atd.phone_number', 'phone')
         .addSelect('gst.status', 'status')
+        .addSelect('gst.guest_id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
 
       if (lastIndex && isUUID(lastIndex)) {
@@ -571,6 +585,8 @@ export class SignupFormsServices {
         .addSelect('atd.email', 'email')
         .addSelect('atd.phone_number', 'phone')
         .addSelect('gst.status', 'status')
+        .addSelect('gst.id', 'guestId')
+        .addSelect('gst.user_id', 'userId')
         .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
@@ -598,6 +614,7 @@ export class SignupFormsServices {
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
+      console.log('🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:', submissionList);
       const result = { count, result: submissionList };
       return result;
     } catch (err) {

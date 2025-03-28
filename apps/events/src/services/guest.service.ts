@@ -523,7 +523,7 @@ export class GuestService {
             const guest = new Guest();
             guest.status = guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS;
             guest.event = event;
-            guest.maxAdditionalGuests = payload.maxAdditionalGuests || 1;
+            guest.maxAdditionalGuests = payload.maxAdditionalGuests || 0;
             guest.user = { id: userId } as User;
             guest.addedBy = { id: host.id } as User;
             guest.privateGuestNote = payload.privateGuestNote;
@@ -582,7 +582,7 @@ export class GuestService {
               console.log('🚀 ~ GuestService ~ emailsData.map ~ error:', error);
             }
 
-            sendEventInviteMember(createMailPayload);
+            sendEventInviteMember(createMailPayload, event.timeZone);
           } else if (data.role.includes('non_member')) {
             const createMailPayload = {
               eventDate: event.startDate,
@@ -609,7 +609,7 @@ export class GuestService {
                 payload.hostId,
               );
 
-            sendEventInviteNonMember(createMailPayload);
+            sendEventInviteNonMember(createMailPayload, event.timeZone);
           }
         }),
       );
@@ -643,10 +643,18 @@ export class GuestService {
   public static async updateGuests(payload: UpdateGuestsRequestDto): Promise<GuestDataSimple[]> {
     try {
       // Validate ticket type if provided in the request
-      const ticketType = await this.dbConnection
-        .getRepository(TicketType)
-        .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      let ticketType = null;
+      if (payload.ticketTypeId) {
+        // Fetch ticket type from the database if ticketTypeId is provided
+        ticketType = await this.dbConnection
+          .getRepository(TicketType)
+          .findOne({ where: { id: payload.ticketTypeId } });
+
+        // If ticket type is not found, throw an error
+        if (!ticketType) {
+          throw new NotFoundError('Ticket type not found');
+        }
+      }
 
       // Validate guest status if provided
       const guestStatus = payload.guestStatus?.toString().trim().toUpperCase();
@@ -810,7 +818,7 @@ export class GuestService {
                   payload.hostId,
                 );
 
-              sendEventInviteMember(createMailPayload);
+              sendEventInviteMember(createMailPayload, event.timeZone);
             } else if (data.role.includes('non_member')) {
               const createMailPayload = {
                 eventDate: event.startDate,
@@ -826,7 +834,7 @@ export class GuestService {
                   email: data.email,
                 },
               };
-              sendEventInviteNonMember(createMailPayload);
+              sendEventInviteNonMember(createMailPayload, event.timeZone);
               // Send Push for Non Member
               serviceMesh
                 .notificationService()
@@ -864,7 +872,7 @@ export class GuestService {
                 email: data.email,
               },
             };
-            sendGuestEventApproval(createMailPayload);
+            sendGuestEventApproval(createMailPayload, event.timeZone);
           }
         });
       }
@@ -1119,7 +1127,10 @@ export class GuestService {
         const [focuses, interests, vouches] = await Promise.all([
           (await serviceMesh.userService().getUserFocuses(guest.user.id)).data,
           (await serviceMesh.userService().getUserInterests(guest.user.id)).data,
-          await VouchRequestService.getUserVouches({ id: guest.user.id }),
+          await VouchRequestService.getUserVouchesByEvent({
+            requesterId: guest.user.id,
+            eventId: event.id,
+          }),
         ]);
         const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
           where: {
@@ -1798,16 +1809,26 @@ export class GuestService {
     );
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+    const interests = (await serviceMesh.userService().getUserInterests(guest.user.id)).data;
+    
+    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+      where: { user: { id: guest.user.id }, host: { id: guest.event.owner.id } },
+    });
     const val = toGuestData(
       guest.user,
       guest,
       focuses,
+      interests,
       followsYou,
       favorite,
       additionalGuestData,
       isSpammedByHost,
     );
-    return val;
+
+    return {
+      ...val,
+      hostUserMappingId: hostUserMapping?.id ?? '',
+    };
   }
 
   public static async getUsersEventInvitees(
@@ -2524,6 +2545,7 @@ export class GuestService {
         declinedGuest.event = event;
         declinedGuest.user = { id: user?.id };
         declinedGuest.declinedBy = { id: event?.owner.id } as User;
+        declinedGuest.addedBy = { id: event?.owner.id } as User;
         declinedGuest.status = GuestStatus.DECLINED;
         declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
         declinedGuest.rejectedReason = 'User is marked as spam';
@@ -2949,8 +2971,16 @@ export class GuestService {
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     } else {
       // Step 8: Register non-member guest if they do not exist
+      const transformedPayload = {
+        eventId: event.id,
+        userId: event.owner.id,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        phoneNumber: payload.phoneNumber
+      };
       const member: SimpleUser = (
-        await serviceMesh.userService().registerInvitesAsNonMember(payload)
+        await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
       ).data;
       const user: User = {
         id: member.id,
@@ -2987,7 +3017,7 @@ export class GuestService {
         eventId: event.id,
         leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
       };
-      sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
+      sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     } else if (payload.phoneNumber) {
       const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
       try {
@@ -3125,7 +3155,15 @@ export class GuestService {
         });
       } else {
         // Step 7: Register non-member guest
-        const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(guestPayload))
+        const transformedPayload = {
+          eventId: event.id,
+          userId: event.owner.id,
+          firstName: guestPayload.firstName,
+          lastName: guestPayload.lastName,
+          email: guestPayload.email,
+          phoneNumber: guestPayload.phoneNumber
+        };
+        const newUser = (await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload))
           .data;
         guest = this.dbConnection.getRepository(Guest).create({
           event: { id: guestPayload.eventId } as Event,
@@ -3154,7 +3192,7 @@ export class GuestService {
             eventId: event.id,
             leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
           };
-          sendEventInvitePlusOnes(createMailPayload, addOnMailPayload);
+          sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
         } else if (guest.user.phoneNumber) {
           const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
           try {
@@ -3520,21 +3558,23 @@ export class GuestService {
 
     let checkExistingUser;
     // Step 6: Check if the user already exists in the system
-    if (payload.email && !payload.phoneNumber) {
-      try {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
-          .data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) {}
-    } else if (payload.phoneNumber && !payload.email) {
-      try {
-        checkExistingUser = (
-          await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
-        ).data;
-        if (checkExistingUser) throw new BadRequestError('User already exists');
-      } catch (e) {}
+    try {
+      if (payload.email && !payload.phoneNumber) {
+        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))?.data;
+      } else if (payload.phoneNumber && !payload.email) {
+        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber))?.data;
+      }
+    } catch (e) {
+      checkExistingUser = null;
     }
-
+    if (checkExistingUser) {
+      const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
+        where: { user: { id: checkExistingUser.id } },
+      });
+      if (checkGuest) {
+        throw new BadRequestError('Guest already exists');
+      }
+    }
     // Step 7: Register a new guest user
     let guest = new Guest();
     let emailData;
@@ -3563,7 +3603,7 @@ export class GuestService {
         id: uuidv4(),
         status: guestStatus ? (guestStatus as GuestStatus) : GuestStatus.NO_STATUS,
         event,
-        maxAdditionalGuests: payload.maxAdditionalGuests || 1,
+        maxAdditionalGuests: payload.maxAdditionalGuests || 0,
         user: { id: member.id } as User,
         addedBy: { id: host.id } as User,
         privateGuestNote: payload.privateGuestNote,
@@ -3588,7 +3628,7 @@ export class GuestService {
           hostName: host.firstName,
           emailsData: emailData,
         };
-        sendEventInviteNonMember(createPayload);
+        sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
         const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
         try {
@@ -3901,9 +3941,6 @@ export class GuestService {
       where: { id: guestDetail.event.id },
       relations: { owner: true },
     });
-    const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
-      where: { user: { id: guestDetail.user.id }, host: { id: event.owner.id } },
-    });
 
     if (!guestDetail) {
       throw new NotFoundError('Guest not found');
@@ -3920,8 +3957,9 @@ export class GuestService {
 
     const guestStatus = status ? guestStatusToEntity[status] : GuestStatus.NO_STATUS;
 
-    const vouches = await VouchRequestService.getUserVouches({
-      id: guestDetail.user.id,
+    const vouches = await VouchRequestService.getUserVouchesByEvent({
+      requesterId: guestDetail.user.id,
+      eventId: guestDetail.event.id
     });
 
     let questions: QuizData[] = [];
@@ -3956,10 +3994,10 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
-      guestProfile: {
-        ...guestProfileResponse,
-        hostUserMappingId: hostUserMapping?.id ?? '',
-      },
+
+
+      guestProfile: guestProfileResponse,
+
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],
     };
