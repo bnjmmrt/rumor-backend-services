@@ -2944,7 +2944,7 @@ export class AuthService {
       isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
       firstName: user.firstName,
       lastName: user.lastName,
-      instagramUsername: user.instagramUserName,
+      instagramUserName: user.instagramUserName,
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
