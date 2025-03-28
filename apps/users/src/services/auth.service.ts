@@ -2862,18 +2862,18 @@ export class AuthService {
       .andWhere('role.name = :roleName', { roleName: 'member' });
 
     if (emails.length > 0 && phoneNumbers.length > 0) {
-      queryBuilder.where(
+      queryBuilder.andWhere(
         new Brackets(qb => {
-          qb.where('user.email IN (:...emails)', { emails }).orWhere(
+          qb.andWhere('user.email IN (:...emails)', { emails }).orWhere(
             'user.phone_number IN (:...numbers)',
             { numbers: phoneNumbers },
           );
         }),
       );
     } else if (phoneNumbers.length > 0) {
-      queryBuilder.where('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
+      queryBuilder.andWhere('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
     } else {
-      queryBuilder.where('user.email IN (:...emails)', { emails });
+      queryBuilder.andWhere('user.email IN (:...emails)', { emails });
     }
 
     // queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
