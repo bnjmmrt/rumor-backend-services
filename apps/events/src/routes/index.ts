@@ -12,7 +12,7 @@ import { TicketTypeController } from '../controllers/ticket-type.controller';
 import { CollaboratorController } from '../controllers/collaborator.controller';
 import { AdmissionTypeController } from '../controllers/admission-type.controller';
 import { FeaturedEventSectionsController } from '../controllers/featured-event-sections.controller';
-import { validateRequest } from '../server/middleware/validate-request'
+import { validateRequest } from '../server/middleware/validate-request';
 
 const router: Router = express.Router();
 
