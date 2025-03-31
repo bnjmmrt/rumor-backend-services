@@ -28,7 +28,7 @@ export class ConnectionManager {
             ssl: { rejectUnauthorized: false },
           }),
           synchronize: false,
-          logging: true,
+          logging: false,
           migrationsTableName: 'users-migrations',
           migrations: ['src/database/migrations/*.ts'],
           migrationsRun: false,
