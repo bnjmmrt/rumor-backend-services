@@ -312,29 +312,49 @@ export function extractDate(
   };
 }
 
-export function extractDateWithDate(date: Date, timeZone: string): Date {
+// export function extractDateWithDate(date: Date, timeZone: string): Date {
+//   if (!(date instanceof Date) || isNaN(date.getTime())) {
+//     throw new Error('Invalid date object provided');
+//   }
+
+//   const options: Intl.DateTimeFormatOptions = {
+//     timeZone,
+//     year: 'numeric',
+//     month: 'short',
+//     day: '2-digit',
+//     weekday: 'long',
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     hour12: true, // <-- this enables AM/PM
+//   };
+
+//   const formatter = new Intl.DateTimeFormat('en-US', options);
+//   const parts = formatter.formatToParts(date);
+
+//   const lookup: Record<string, string> = {};
+//   parts.forEach(({ type, value }) => {
+//     lookup[type] = value;
+//   });
+
+// return new Date()
+// }
+
+
+
+/**
+ * Converts a given UTC date to epoch time (milliseconds) based on the provided server time zone.
+ * @param date - The UTC date to convert.
+ * @param timeZone - The target time zone for conversion.
+ * @returns The epoch time in milliseconds.
+ */
+export function convertToEpoch(date: Date, timeZone: string): number {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
     throw new Error('Invalid date object provided');
   }
 
-  const options: Intl.DateTimeFormatOptions = {
-    timeZone,
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    weekday: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true, // <-- this enables AM/PM
-  };
-
-  const formatter = new Intl.DateTimeFormat('en-US', options);
-  const parts = formatter.formatToParts(date);
-
-  const lookup: Record<string, string> = {};
-  parts.forEach(({ type, value }) => {
-    lookup[type] = value;
-  });
-
-return new Date()
+  // Convert UTC date to the target time zone and get epoch time
+  return new Date(
+    date.toLocaleString('en-US', { timeZone })
+  ).getTime();
 }
+
