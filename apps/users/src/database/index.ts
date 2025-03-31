@@ -24,7 +24,9 @@ export class ConnectionManager {
             'packages/rumor-utils/shared/events/entities/*.ts',
             'packages/rumor-utils/shared/notifications/entities/*.ts',
           ],
-          ssl: { rejectUnauthorized: false },
+          ...(['development', 'staging', 'production', 'uat'].includes(config.get('NODE_ENV')) && {
+            ssl: { rejectUnauthorized: false },
+          }),
           synchronize: false,
           logging: true,
           migrationsTableName: 'users-migrations',
