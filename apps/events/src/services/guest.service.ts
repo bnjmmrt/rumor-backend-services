@@ -1814,7 +1814,7 @@ export class GuestService {
 
     const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
     const interests = (await serviceMesh.userService().getUserInterests(guest.user.id)).data;
-    
+
     const hostUserMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
       where: { user: { id: guest.user.id }, host: { id: guest.event.owner.id } },
     });
@@ -3092,7 +3092,7 @@ export class GuestService {
         },
         relations: {
           user: true,
-          ticketType: true
+          ticketType: true,
         },
       });
       if (!leadGuest) throw new NotFoundError('Lead Guest not found');
@@ -3158,7 +3158,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: checkUser,
           status,
-          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
+          ticketType: { id: leadGuest?.ticketType?.id } as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       } else {
@@ -3178,7 +3178,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: newUser,
           status,
-          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
+          ticketType: { id: leadGuest?.ticketType?.id } as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       }
@@ -3570,9 +3570,12 @@ export class GuestService {
     // Step 6: Check if the user already exists in the system
     try {
       if (payload.email && !payload.phoneNumber) {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))?.data;
+        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
+          ?.data;
       } else if (payload.phoneNumber && !payload.email) {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber))?.data;
+        checkExistingUser = (
+          await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
+        )?.data;
       }
     } catch (e) {
       checkExistingUser = null;
@@ -3969,7 +3972,7 @@ export class GuestService {
 
     const vouches = await VouchRequestService.getUserVouchesByEvent({
       requesterId: guestDetail.user.id,
-      eventId: guestDetail.event.id
+      eventId: guestDetail.event.id,
     });
 
     let questions: QuizData[] = [];

@@ -6,7 +6,7 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
-import {sendEventAnnouncement, sendEventInviteMember} from '../utils/emails.utils';
+import { sendEventAnnouncement, sendEventInviteMember } from '../utils/emails.utils';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -125,12 +125,20 @@ export class EventAnnouncementService {
         serviceMesh
           .notificationService()
           .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
-        const fetchUserEmails = await database.getRepository(User).find({ where: { id: In(recipients) } })
+        const fetchUserEmails = await database
+          .getRepository(User)
+          .find({ where: { id: In(recipients) } });
         fetchUserEmails.map(data => {
           if (data.email) {
-            sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+            sendEventAnnouncement(
+              data.firstName,
+              event.owner.firstName,
+              event.name,
+              event.id,
+              data.email,
+            );
           }
-        })
+        });
       } else {
         const recipientsData = await database.getRepository(Guest).find({
           where: {
@@ -140,23 +148,34 @@ export class EventAnnouncementService {
             status: GuestStatus.CONFIRMED,
           },
           relations: {
-            user: true
-          }
+            user: true,
+          },
         });
 
         if (recipientsData.length > 0) {
-          const recipientsIds = recipientsData
-            .map(guest => guest.user?.id)
-            .filter(id => !!id);
+          const recipientsIds = recipientsData.map(guest => guest.user?.id).filter(id => !!id);
           serviceMesh
             .notificationService()
-            .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipientsIds, eventId, createdBy);
-          const fetchUsers = await database.getRepository(User).find({ where: { id: In(recipientsIds) } })
+            .sendNotification(
+              NotificationType.EVENT_ANNOUNCEMENT,
+              recipientsIds,
+              eventId,
+              createdBy,
+            );
+          const fetchUsers = await database
+            .getRepository(User)
+            .find({ where: { id: In(recipientsIds) } });
           fetchUsers.map(data => {
             if (data.email) {
-              sendEventAnnouncement(data.firstName, event.owner.firstName, event.name, event.id, data.email);
+              sendEventAnnouncement(
+                data.firstName,
+                event.owner.firstName,
+                event.name,
+                event.id,
+                data.email,
+              );
             }
-          })
+          });
         }
       }
     } catch (error) {
