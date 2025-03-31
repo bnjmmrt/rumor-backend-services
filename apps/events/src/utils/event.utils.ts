@@ -266,7 +266,7 @@ export function hasEventDateOrLocationChanged(
 }
 export function extractDate(
   date: Date,
-  timeZone: string
+  timeZone: string,
 ): {
   year: string;
   month: string;
@@ -310,4 +310,31 @@ export function extractDate(
     period: lookup.dayPeriod, // "AM" or "PM"
     timeZone,
   };
+}
+
+export function extractDateWithDate(date: Date, timeZone: string): Date {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error('Invalid date object provided');
+  }
+
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true, // <-- this enables AM/PM
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(date);
+
+  const lookup: Record<string, string> = {};
+  parts.forEach(({ type, value }) => {
+    lookup[type] = value;
+  });
+
+return new Date()
 }
