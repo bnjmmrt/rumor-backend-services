@@ -7,7 +7,7 @@ const config = {
   ],
   values: {
     PORT: 8000,
-    FILE_SIZE_IN_BYTES:'5000000',
+    FILE_SIZE_IN_BYTES: '5000000',
     POSTGRES_USERNAME: process.env.POSTGRES_USERNAME,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
@@ -15,7 +15,7 @@ const config = {
     POSTGRES_HOST: process.env.POSTGRES_HOST,
     USERS_SERVICE_BASE_URL: 'http://users:8000/users/v1',
     EVENTS_SERVICE_BASE_URL: 'http://events:8001/events/v1',
-    NOTIFICATIONS_SERVICE_BASE_URL: 'http://notifications:8002/notifications/v1',
+    NOTIFICATIONS_SERVICE_BASE_URL: 'http://notifications:8002/notifications/v1'
   },
 };
 

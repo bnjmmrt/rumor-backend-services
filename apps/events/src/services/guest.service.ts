@@ -2561,6 +2561,7 @@ export class GuestService {
         alreadyGuest.declinedBy = null;
         alreadyGuest.rejectedReason = null;
         alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+        alreadyGuest.maxAdditionalGuests = payload.additionalGuests;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const guest = new Guest();
@@ -2568,6 +2569,7 @@ export class GuestService {
         guest.user = { id: user?.id };
         guest.status = GuestStatus.APPLIED;
         guest.additionalRequestedGuests = payload.additionalGuests;
+        guest.maxAdditionalGuests = payload.additionalGuests;
         guest.invitationSource = UserSource.REQUEST_IN_APP;
         await this.dbConnection.getRepository(Guest).save(guest);
       }
@@ -3090,6 +3092,7 @@ export class GuestService {
         },
         relations: {
           user: true,
+          ticketType: true
         },
       });
       if (!leadGuest) throw new NotFoundError('Lead Guest not found');
@@ -3155,6 +3158,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: checkUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       } else {
@@ -3174,6 +3178,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: newUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       }
