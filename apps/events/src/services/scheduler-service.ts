@@ -1,79 +1,66 @@
 import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { Event } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from '../utils/event.utils';
-// import schedule from 'node-schedule';
 import * as schedule from 'node-schedule';
-
 
 export class SchedulerService {
   public static async scheduleEventOnServerRestart() {
-    const events: Event[] = await Event.find();
-    // console.log("🚀 ~ SchedulerService ~ scheduleEventOnServerRestart ~ events:", events.length)
-    const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    try {
+      const events: Event[] = await Event.find();
 
-    /**
-     * 1. Event with status is approved and isPublished to false. -> scheduleEventPublishDate
-     * 2. Event with endDate greater than current date. -> scheduleEventPastAndCancelledDate
-     */
-    events.forEach((e: Event) => {
-      if (e.status === EventStatusEnum.APPROVED_STATUS) {
-        const serverEndDate = convertToEpoch(e.endDate, serverTimeZone);
-        if (!e.isPublished) {
-          console.log("🚀 ~ SchedulerService ~ events.forEach ~ serverEndDate:", serverEndDate)
-          console.log('convertToEpoch(new Date(), serverTimeZone)', convertToEpoch(new Date(), serverTimeZone))
-          this.scheduleEventPublishDate({ id: e.id } as Event);
-        } else if (serverEndDate < convertToEpoch(new Date(), serverTimeZone)) {
-          this.scheduleEventPastAndCancelledDate({ id: e.id } as Event);
+      events.forEach((e: Event) => {
+        if (e.status === EventStatusEnum.APPROVED_STATUS) {
+          const eventEndDate = convertToEpoch(e.endDate);
+          if (!e.isPublished) {
+            this.scheduleEventPublishDate({ id: e.id } as Event);
+          } else if (eventEndDate > convertToEpoch(new Date())) {
+            this.scheduleEventPastAndCancelledDate({ id: e.id } as Event);
+          }
         }
-      }
-    });
+      });
+    } catch (err) {
+      console.log(`Error in scheduling events :: ${err?.message}`);
+    }
   }
 
   public static async scheduleEventPublishDate(e: Event) {
-    const savedEvent = await Event.findOne({ where: { id: e.id } });
-    if (savedEvent) {
-      const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      if (savedEvent?.publishDate) {
-        const eventTimeByTimeZone = convertToEpoch(savedEvent.publishDate, serverTimeZone);
-        schedule.scheduleJob(eventTimeByTimeZone, async () => {
-          try {
+    try {
+      if (e.publishDate) {
+        const eventTimeByTimeZone = convertToEpoch(e.publishDate);
+        schedule.scheduleJob(e.publishDate, async () => {
+          if (e.id) {
+            const savedEvent = await Event.findOne({ where: { id: e.id } });
             savedEvent.isPublished = true;
             await savedEvent.save();
-            console.log(`Event ${savedEvent?.id} is 'Published' at ${new Date()}.`);
-          } catch (error) {
-            console.error(`Error publishing event `, error);
+            this.scheduleEventPastAndCancelledDate({
+              id: savedEvent.id,
+              endDate: savedEvent.endDate,
+            } as Event);
           }
         });
-        await this.scheduleEventPastAndCancelledDate(savedEvent);
       }
+    } catch (err) {
+      console.log(`Error in publishing events ::`, err);
     }
   }
 
   public static async scheduleEventPastAndCancelledDate(e: Event) {
-    const savedEvent = await Event.findOne({ where: { id: e.id } });
-    
-    // console.log("🚀 ~ SchedulerService ~ scheduleEventPastAndCancelledDate ~ savedEvent:", savedEvent?.name)
-    if (savedEvent) {
-      const serverTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const eventTimeByTimeZone = convertToEpoch(savedEvent.endDate, serverTimeZone);
-      // console.log("🚀 ~ SchedulerService ~ scheduleEventPastAndCancelledDate ~ eventTimeByTimeZone:", eventTimeByTimeZone)
+    try {
+      const eventTimeByTimeZone = convertToEpoch(e.endDate);
+      if (e.endDate) {
+        schedule.scheduleJob(e.endDate, async () => {
+          const savedEvent = await Event.findOne({ where: { id: e.id } });
+          const st =
+            savedEvent.status === EventStatusEnum.APPROVED_STATUS
+              ? EventStatusEnum.PAST_STATUS
+              : EventStatusEnum.CANCELLED_STATUS;
 
-      const st =
-        savedEvent.status === EventStatusEnum.APPROVED_STATUS
-          ? EventStatusEnum.PAST_STATUS
-          : EventStatusEnum.CANCELLED_STATUS;
-
-      schedule.scheduleJob(eventTimeByTimeZone, async () => {
-        try {
-          console.log('inside past')
           savedEvent.status = st;
           await savedEvent.save();
-          console.log(`Event ${savedEvent?.id} updated to ${st} at ${new Date()}.`);
-        } catch (error) {
-          console.error(`Error updating event status to ${st}`, error);
-        }
-      });
+        });
+      }
+    } catch (err) {
+      console.log(`Error in setting status to cancel or past event ::`, err);
     }
   }
 

@@ -347,14 +347,14 @@ export function extractDate(
  * @param timeZone - The target time zone for conversion.
  * @returns The epoch time in milliseconds.
  */
-export function convertToEpoch(date: Date, timeZone: string): number {
+export function convertToEpoch(date: Date): number {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
     throw new Error('Invalid date object provided');
   }
 
   // Convert UTC date to the target time zone and get epoch time
   return new Date(
-    date.toLocaleString('en-US', { timeZone })
+    date.toLocaleString('en-US')
   ).getTime();
 }
 
