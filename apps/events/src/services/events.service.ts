@@ -120,7 +120,14 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
-import {sendEventCancellation, sendEventUpdation, sendEventInviteNonMember, sendEventRejection, sendEventPublishedApproval, sendEventPrePublishApproval} from '../utils/emails.utils';
+import {
+  sendEventCancellation,
+  sendEventUpdation,
+  sendEventInviteNonMember,
+  sendEventRejection,
+  sendEventPublishedApproval,
+  sendEventPrePublishApproval,
+} from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
@@ -216,9 +223,9 @@ export class EventsService {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
     const [eventTypes, total] = await this.dbConnection.getRepository(EventTypes).findAndCount({
       ...pagination,
@@ -673,7 +680,7 @@ export class EventsService {
             .userService()
             .getUserWithRolesByEmail(collaboratorDto.email);
           user = response?.data;
-        } catch (e) {}
+        } catch (e) { }
         const roleEntity = roleMap.get(collaboratorDto.role);
         if (!roleEntity) {
           throw new Error(`Failed to get collaborator role data for ${collaboratorDto.role}.`);
@@ -692,7 +699,7 @@ export class EventsService {
               );
             user = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email))
               ?.data;
-          } catch (e) {}
+          } catch (e) { }
         }
         // Assign role to user if not already assigned.
         const hasRole = user.roles.some(role => role.name === roleEntity.name);
@@ -868,9 +875,9 @@ export class EventsService {
     const parsedQuery = JSON.parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
 
     const andConditions = [];
@@ -1163,23 +1170,23 @@ export class EventsService {
 
     const order: FindOptionsOrder<Event> = parsedQuery.sortBy
       ? {
-          [String(parsedQuery.sortBy)]:
-            parsedQuery.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
-        }
+        [String(parsedQuery.sortBy)]:
+          parsedQuery.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
+      }
       : { createdAt: 'DESC' };
 
     let relations = includeRelations
       ? [
-          'owner',
-          'admissionType',
-          'location',
-          'eventType',
-          'talents',
-          'ticketTypes',
-          'collaborators',
-          'quizQuestions',
-          'ageLimit',
-        ]
+        'owner',
+        'admissionType',
+        'location',
+        'eventType',
+        'talents',
+        'ticketTypes',
+        'collaborators',
+        'quizQuestions',
+        'ageLimit',
+      ]
       : ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'ageLimit'];
 
     if (includeFeaturedEventSection) {
@@ -1325,6 +1332,7 @@ export class EventsService {
         ],
       });
     }
+
 
     if (!event) throw new NotFoundError('Event was not found!');
     const isEventApprovedAndNotEnded =
@@ -1511,7 +1519,7 @@ export class EventsService {
       users = userDataFromDb
         .filter(result => result.status === 'fulfilled')
         .map(result => (result as PromiseFulfilledResult<any>).value); // Ensure TypeScript understands this
-    } catch (e) {}
+    } catch (e) { }
     const roleNames = collaborators.map(c => c.role);
     if (roleNames.length === 0) {
       throw new Error('No valid roles found for collaborators.');
@@ -1530,7 +1538,7 @@ export class EventsService {
           async (role: any) => (await serviceMesh.userService().getRoleByName(role))?.data,
         ),
       ); //TODO: need to fix this getRoleByName(role)
-    } catch (e) {}
+    } catch (e) { }
     const validRoles = roles?.filter(role => role !== null);
     const roleMap: any = new Map(validRoles?.map((role: any) => [role.name, role]));
     // Fetch existing collaborators for the event (including roles)
@@ -1553,7 +1561,7 @@ export class EventsService {
       isEmailUpdate =
         existingCollaborator &&
         existingCollaborator.user.email.trim().toLowerCase() !==
-          collaborator.email.trim().toLowerCase();
+        collaborator.email.trim().toLowerCase();
 
       const currentRoleId = existingCollaborator?.role?.id ?? null;
       if (!user || isEmailUpdate) {
@@ -1580,7 +1588,7 @@ export class EventsService {
         try {
           user = (await serviceMesh.userService().getUserWithRolesByEmail(collaborator.email))
             ?.data;
-        } catch (e) {}
+        } catch (e) { }
         userMap.set(collaborator.email, user);
 
         //update collaboartor
@@ -1902,10 +1910,8 @@ export class EventsService {
             // If the reassigned ticket is also being deleted but has no further reassignment, it's invalid
             if (!reassignedTicket?.reassignTo?.id && !reassignedTicket?.reassignTo?.name) {
               throw new BadRequestError(
-                `Invalid reassignment: Ticket "${
-                  ticket.name
-                }" is being deleted and reassigned to "${
-                  ticket.reassignTo?.name || 'other ticket'
+                `Invalid reassignment: Ticket "${ticket.name
+                }" is being deleted and reassigned to "${ticket.reassignTo?.name || 'other ticket'
                 }", which is also being deleted.`,
               );
             }
@@ -2283,13 +2289,11 @@ export class EventsService {
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
-          }
-          else {
+          } else {
             event.publishDate = null;
             event.isPublished = true;
           }
-        }
-        else {
+        } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
         }
       }
@@ -2535,7 +2539,13 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+        sendEventUpdation(
+          createMailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone,
+        );
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
@@ -2731,9 +2741,9 @@ export class EventsService {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
 
     const eventsLocation = await this.dbConnection
@@ -2836,7 +2846,13 @@ export class EventsService {
         location: updatedEvent.location.location,
         city: updatedEvent.location.city,
       };
-      sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+      sendEventPublishedApproval(
+        createPayload,
+        updatedEvent.owner.email,
+        host.additionalHostInformation.companyName,
+        updatedEvent.id,
+        updatedEvent.timeZone,
+      );
     }
     return;
   }
@@ -2991,9 +3007,7 @@ export class EventsService {
       return responses.conflict('Event is already in the selected status');
     if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      if (event.publishDate) {
-        event.isPublished = new Date(event.publishDate) <= new Date();
-      } else {
+      if (!event.publishDate) {
         event.isPublished = true;
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
@@ -3028,7 +3042,13 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+        sendEventPublishedApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.timeZone,
+        );
         // Send Push Notification
         try {
           serviceMesh
@@ -3047,7 +3067,14 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPrePublishApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.publishDate, updatedEvent.timeZone);
+        sendEventPrePublishApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.publishDate,
+          updatedEvent.timeZone,
+        );
         try {
           //Send Push Notifications
           serviceMesh
@@ -3437,7 +3464,7 @@ export class EventsService {
               guest.user.email,
               guestName,
               message,
-              event.timeZone
+              event.timeZone,
             );
             if (mailServiceResponse) {
               notificationSuccess = true;
@@ -3529,9 +3556,9 @@ export class EventsService {
     // Check and set pagination if available
     const pagination: { take?: number; skip?: number } = hasPagination(parsedQuery)
       ? {
-          take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
-          skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
-        }
+        take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
+        skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
+      }
       : {};
 
     // Create the base query
