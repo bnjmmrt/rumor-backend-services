@@ -12,9 +12,9 @@ export class SchedulerService {
         if (e.status === EventStatusEnum.APPROVED_STATUS) {
           const eventEndDate = convertToEpoch(e.endDate);
           if (!e.isPublished) {
-            this.scheduleEventPublishDate({ id: e.id } as Event);
+            this.scheduleEventPublishDate({ id: e.id, publishDate: e.publishDate } as Event);
           } else if (eventEndDate > convertToEpoch(new Date())) {
-            this.scheduleEventPastAndCancelledDate({ id: e.id } as Event);
+            this.scheduleEventPastAndCancelledDate({ id: e.id, endDate: e.endDate } as Event);
           }
         }
       });
@@ -26,7 +26,6 @@ export class SchedulerService {
   public static async scheduleEventPublishDate(e: Event) {
     try {
       if (e.publishDate) {
-        const eventTimeByTimeZone = convertToEpoch(e.publishDate);
         schedule.scheduleJob(e.publishDate, async () => {
           if (e.id) {
             const savedEvent = await Event.findOne({ where: { id: e.id } });
@@ -46,7 +45,6 @@ export class SchedulerService {
 
   public static async scheduleEventPastAndCancelledDate(e: Event) {
     try {
-      const eventTimeByTimeZone = convertToEpoch(e.endDate);
       if (e.endDate) {
         schedule.scheduleJob(e.endDate, async () => {
           const savedEvent = await Event.findOne({ where: { id: e.id } });
