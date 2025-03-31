@@ -119,7 +119,14 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
-import {sendEventCancellation, sendEventUpdation, sendEventInviteNonMember, sendEventRejection, sendEventPublishedApproval, sendEventPrePublishApproval} from '../utils/emails.utils';
+import {
+  sendEventCancellation,
+  sendEventUpdation,
+  sendEventInviteNonMember,
+  sendEventRejection,
+  sendEventPublishedApproval,
+  sendEventPrePublishApproval,
+} from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 
@@ -1296,7 +1303,7 @@ export class EventsService {
         'csvUploads',
         'signupForms',
         'notifications',
-        'quizQuestions.answers'
+        'quizQuestions.answers',
       ],
     });
     if (!event) throw new NotFoundError('Event was not found!');
@@ -2253,13 +2260,11 @@ export class EventsService {
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
-          }
-          else {
+          } else {
             event.publishDate = null;
             event.isPublished = true;
           }
-        }
-        else {
+        } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
         }
       }
@@ -2505,7 +2510,13 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+        sendEventUpdation(
+          createMailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone,
+        );
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
@@ -2806,7 +2817,13 @@ export class EventsService {
         location: updatedEvent.location.location,
         city: updatedEvent.location.city,
       };
-      sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+      sendEventPublishedApproval(
+        createPayload,
+        updatedEvent.owner.email,
+        host.additionalHostInformation.companyName,
+        updatedEvent.id,
+        updatedEvent.timeZone,
+      );
     }
     return;
   }
@@ -2961,9 +2978,7 @@ export class EventsService {
       return responses.conflict('Event is already in the selected status');
     if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      if (event.publishDate) {
-        event.isPublished = new Date(event.publishDate) <= new Date();
-      } else {
+      if (!event.publishDate) {
         event.isPublished = true;
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
@@ -2998,7 +3013,13 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+        sendEventPublishedApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.timeZone,
+        );
         // Send Push Notification
         try {
           serviceMesh
@@ -3008,7 +3029,7 @@ export class EventsService {
               updatedEvent.owner.id,
               updatedEvent.id,
             );
-        } catch (err) { }
+        } catch (err) {}
       } else {
         const createPayload = {
           eventDate: updatedEvent.startDate,
@@ -3017,7 +3038,14 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPrePublishApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.publishDate, updatedEvent.timeZone);
+        sendEventPrePublishApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.publishDate,
+          updatedEvent.timeZone,
+        );
         try {
           //Send Push Notifications
           serviceMesh
@@ -3408,7 +3436,7 @@ export class EventsService {
               guest.user.email,
               guestName,
               message,
-              event.timeZone
+              event.timeZone,
             );
             if (mailServiceResponse) {
               notificationSuccess = true;
@@ -3461,7 +3489,7 @@ export class EventsService {
             eventId,
             event.owner.id,
           );
-      } catch (err) { }
+      } catch (err) {}
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
