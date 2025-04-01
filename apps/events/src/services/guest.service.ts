@@ -3994,6 +3994,38 @@ export class GuestService {
       questions = quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [];
     }
 
+    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+      relations: ['user', 'ticketType', 'declinedBy', 'user.address'],
+      where: { addedBy: { id: guestDetail.user.id }, event: { id: guestDetail.event.id } },
+    });
+
+    const additionalGuestData = await Promise.all(
+      additionalGuests.map(async additionalGuest => {
+        const user = await this.dbConnection.getRepository(User).findOne({
+          where: { id: additionalGuest.user.id },
+        });
+        const [plusOnesFocuses, plusOnesInterests] = await Promise.all([
+          (await serviceMesh.userService().getUserFocuses(user.id)).data,
+          (await serviceMesh.userService().getUserInterests(user.id)).data,
+        ]);
+        const hostUserSettings = await this.dbConnection
+          .getRepository(HostUserSettings)
+          .findOne({
+            where: {
+              user: { id: user.id },
+              host: { id: event.owner.id },
+            },
+          });
+        const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
+        const guestData = toAdditionalGuestData(
+          additionalGuest,
+          plusOnesFocuses,
+          plusOnesInterests,
+        );
+        return { ...guestData, isBanned };
+      }),
+    );
+
     return {
       guestDetail: {
         guestId,
@@ -4007,6 +4039,8 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
+
+      additionalGuests: additionalGuestData,
 
       guestProfile: guestProfileResponse,
 
