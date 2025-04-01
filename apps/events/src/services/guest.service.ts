@@ -4008,14 +4008,12 @@ export class GuestService {
           (await serviceMesh.userService().getUserFocuses(user.id)).data,
           (await serviceMesh.userService().getUserInterests(user.id)).data,
         ]);
-        const hostUserSettings = await this.dbConnection
-          .getRepository(HostUserSettings)
-          .findOne({
-            where: {
-              user: { id: user.id },
-              host: { id: event.owner.id },
-            },
-          });
+        const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+          where: {
+            user: { id: user.id },
+            host: { id: event.owner.id },
+          },
+        });
         const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
         const guestData = toAdditionalGuestData(
           additionalGuest,
