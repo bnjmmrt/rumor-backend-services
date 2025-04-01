@@ -2557,6 +2557,7 @@ export class GuestService {
         alreadyGuest.declinedBy = null;
         alreadyGuest.rejectedReason = null;
         alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+        alreadyGuest.maxAdditionalGuests = payload.additionalGuests;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const guest = new Guest();
@@ -2564,6 +2565,7 @@ export class GuestService {
         guest.user = { id: user?.id };
         guest.status = GuestStatus.APPLIED;
         guest.additionalRequestedGuests = payload.additionalGuests;
+        guest.maxAdditionalGuests = payload.additionalGuests;
         guest.invitationSource = UserSource.REQUEST_IN_APP;
         await this.dbConnection.getRepository(Guest).save(guest);
       }
@@ -3086,6 +3088,7 @@ export class GuestService {
         },
         relations: {
           user: true,
+          ticketType: true
         },
       });
       if (!leadGuest) throw new NotFoundError('Lead Guest not found');
@@ -3151,6 +3154,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: checkUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       } else {
@@ -3169,6 +3173,7 @@ export class GuestService {
           event: { id: guestPayload.eventId } as Event,
           user: newUser,
           status,
+          ticketType:{id: leadGuest?.ticketType?.id} as TicketType,
           addedBy: { id: guestPayload.userId } as User,
         });
       }
@@ -3981,6 +3986,38 @@ export class GuestService {
       questions = quizAnswer && quizAnswer.length ? quizAnswer.map(toQuizData) : [];
     }
 
+    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+      relations: ['user', 'ticketType', 'declinedBy', 'user.address'],
+      where: { addedBy: { id: guestDetail.user.id }, event: { id: guestDetail.event.id } },
+    });
+
+    const additionalGuestData = await Promise.all(
+      additionalGuests.map(async additionalGuest => {
+        const user = await this.dbConnection.getRepository(User).findOne({
+          where: { id: additionalGuest.user.id },
+        });
+        const [plusOnesFocuses, plusOnesInterests] = await Promise.all([
+          (await serviceMesh.userService().getUserFocuses(user.id)).data,
+          (await serviceMesh.userService().getUserInterests(user.id)).data,
+        ]);
+        const hostUserSettings = await this.dbConnection
+          .getRepository(HostUserSettings)
+          .findOne({
+            where: {
+              user: { id: user.id },
+              host: { id: event.owner.id },
+            },
+          });
+        const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
+        const guestData = toAdditionalGuestData(
+          additionalGuest,
+          plusOnesFocuses,
+          plusOnesInterests,
+        );
+        return { ...guestData, isBanned };
+      }),
+    );
+
     return {
       guestDetail: {
         guestId,
@@ -3994,6 +4031,7 @@ export class GuestService {
         guestStatus,
         signupFormName: guestDetail.signupFormSubmissions?.signupForm?.name,
       },
+      additionalGuests: additionalGuestData,
       guestProfile: guestProfileResponse,
       quizDataList: { questions },
       vouches: vouches && vouches.length ? vouches.map(toVouchesData) : [],

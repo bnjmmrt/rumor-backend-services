@@ -119,9 +119,18 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
-import {sendEventCancellation, sendEventUpdation, sendEventInviteNonMember, sendEventRejection, sendEventPublishedApproval, sendEventPrePublishApproval} from '../utils/emails.utils';
+import {
+  sendEventCancellation,
+  sendEventUpdation,
+  sendEventInviteNonMember,
+  sendEventRejection,
+  sendEventPublishedApproval,
+  sendEventPrePublishApproval,
+  sendEventReminder,
+} from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { SchedulerService } from './scheduler-service';
 
 const responses = {
   conflict: (message: string) => ({
@@ -1296,7 +1305,7 @@ export class EventsService {
         'csvUploads',
         'signupForms',
         'notifications',
-        'quizQuestions.answers'
+        'quizQuestions.answers',
       ],
     });
     if (!event) throw new NotFoundError('Event was not found!');
@@ -2253,13 +2262,12 @@ export class EventsService {
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
-          }
-          else {
+          } else {
             event.publishDate = null;
             event.isPublished = true;
+          //TODO: if removed publish date then need to remove its schedular
           }
-        }
-        else {
+        } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
         }
       }
@@ -2364,6 +2372,27 @@ export class EventsService {
 
       //ends here
       await queryRunner.commitTransaction();
+
+      //handle event scheduling
+      let eventFromDb: Event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+        relations : {
+          location : true
+        }
+      });
+      if (eventFromDb.status === EventStatusEnum.APPROVED_STATUS && eventFromDb && !eventFromDb.isPublished && eventFromDb.publishDate) {
+        SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+      }
+      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.endDate)  {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
+      }
+      //update schedular if event start date has been change
+      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.startDate)  {
+        SchedulerService.prepareEventReminderDataAndSchedule({event :eventFromDb})
+      }
+      //ends here 
+     //ends here
+
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
        * send email notification if date, time, location is updated
@@ -2451,9 +2480,43 @@ export class EventsService {
       throw new BadRequestError(`Error occurred while updating event: ${error?.message}`);
     } finally {
       // Release the query runner
-
       await queryRunner.release();
     }
+  }
+
+  /**
+ * Sends event reminder emails to all eligible guests 24 hours before the event.
+ * 
+ * This function retrieves all guests associated with the event whose statuses 
+ * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`). 
+ * It then prepares and sends email reminders to those guests.
+ * 
+ * @param {Event} event - The event for which reminders need to be sent.
+ * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
+ */
+  public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
+    const guestStatuses: GuestStatus[] = [GuestStatus.INVITED, GuestStatus.CONFIRMED, GuestStatus.APPLIED];
+    const guests = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .where('guest.event = :eventId', { eventId: event.id })
+      .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
+      .getMany();
+    if (!guests.length) return
+    const emailPromises = guests.map(guest => {
+      if (!guest?.user?.email) return;
+      const mailPayload = {
+        eventName: event.name || 'Event',
+        imageFlyer: event.imageFlyer,
+        eventDate: event.startDate,
+        location: event.location?.location,
+        city: event.location?.city,
+      };
+      // return 
+      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+    });
+    await Promise.allSettled(emailPromises);
   }
 
   /**
@@ -2505,7 +2568,13 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+        sendEventUpdation(
+          createMailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone,
+        );
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
@@ -2806,7 +2875,13 @@ export class EventsService {
         location: updatedEvent.location.location,
         city: updatedEvent.location.city,
       };
-      sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+      sendEventPublishedApproval(
+        createPayload,
+        updatedEvent.owner.email,
+        host.additionalHostInformation.companyName,
+        updatedEvent.id,
+        updatedEvent.timeZone,
+      );
     }
     return;
   }
@@ -2961,10 +3036,15 @@ export class EventsService {
       return responses.conflict('Event is already in the selected status');
     if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      if (event.publishDate) {
-        event.isPublished = new Date(event.publishDate) <= new Date();
-      } else {
+      if (!event.publishDate) {
         event.isPublished = true;
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      else {
+        SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
+      }
+      if(event?.startDate) {
+        SchedulerService.prepareEventReminderDataAndSchedule({event :event})
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -2998,7 +3078,13 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPublishedApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.timeZone);
+        sendEventPublishedApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.timeZone,
+        );
         // Send Push Notification
         try {
           serviceMesh
@@ -3008,7 +3094,7 @@ export class EventsService {
               updatedEvent.owner.id,
               updatedEvent.id,
             );
-        } catch (err) { }
+        } catch (err) {}
       } else {
         const createPayload = {
           eventDate: updatedEvent.startDate,
@@ -3017,7 +3103,14 @@ export class EventsService {
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
         };
-        sendEventPrePublishApproval(createPayload, updatedEvent.owner.email, host.additionalHostInformation.companyName, updatedEvent.id, updatedEvent.publishDate, updatedEvent.timeZone);
+        sendEventPrePublishApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.publishDate,
+          updatedEvent.timeZone,
+        );
         try {
           //Send Push Notifications
           serviceMesh
@@ -3129,6 +3222,7 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
+        ticketDescription: guest.ticketType.description ?? undefined
       };
     }
 
@@ -3140,6 +3234,7 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
+      ticketDescription: guest.ticketType.description ?? undefined
     };
   }
 
@@ -3408,7 +3503,7 @@ export class EventsService {
               guest.user.email,
               guestName,
               message,
-              event.timeZone
+              event.timeZone,
             );
             if (mailServiceResponse) {
               notificationSuccess = true;
@@ -3461,7 +3556,7 @@ export class EventsService {
             eventId,
             event.owner.id,
           );
-      } catch (err) { }
+      } catch (err) {}
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
@@ -3545,20 +3640,18 @@ export class EventsService {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
     } else if (
-      status === EventStatusEnum.UPCOMING_STATUS ||
-      status === EventStatusEnum.PAST_STATUS
-    ) {
-      // Filter for approved events first
+      status === EventStatusEnum.UPCOMING_STATUS
+      ) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-
-      // Add specific date filtering based on the requested status
-      if (status === EventStatusEnum.UPCOMING_STATUS) {
-        query.andWhere('event.end_date > :currentTime', { currentTime });
-      } else if (status === EventStatusEnum.PAST_STATUS) {
-        query.andWhere('event.end_date < :currentTime', { currentTime });
-      }
+       query.andWhere('event.end_date > :currentTime', { currentTime });
+    }
+      else if (status === EventStatusEnum.PAST_STATUS) {
+      query.andWhere('event.status = :pastStatus', {
+        pastStatus: EventStatusEnum.PAST_STATUS,
+      });
+      query.andWhere('event.end_date < :currentTime', { currentTime });
     }
 
     // Apply pagination if necessary
