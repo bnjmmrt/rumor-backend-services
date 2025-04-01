@@ -34,7 +34,7 @@ export class NotificationController {
   });
 
   public static getAllNotifications = asyncWrapper(async (req, res): Promise<void> => {
-    const recipientId = req.user;
+    const recipientId = req.user ? req.user : req.query.id;;
     const { take = 10, skip = 0 } = req.query;
 
     const response = await notificationService.getAllNotifications(
@@ -82,7 +82,7 @@ export class NotificationController {
   });
 
   public static getNotificationSummary = asyncWrapper(async (req, res): Promise<void> => {
-    const recipientId = req.user;
+    const recipientId = req.user ? req.user : req.query.id;
     const response = await notificationService.getNotificationSummary(recipientId);
 
     const getResponse = new GetResponse(response);
