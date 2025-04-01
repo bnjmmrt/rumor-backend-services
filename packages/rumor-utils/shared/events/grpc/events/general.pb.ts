@@ -665,7 +665,7 @@ export interface GenerateTicketForGuestData {
   jwtToken?: string | undefined;
   eventQr: boolean;
   checkInStatus?: boolean | undefined;
-  ticketDescription?: string | undefined
+  ticketDescription?: string | undefined;
 }
 
 export interface ToggleGuestCheckStatusData {

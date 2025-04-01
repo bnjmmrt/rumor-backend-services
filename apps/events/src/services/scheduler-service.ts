@@ -66,17 +66,21 @@ export class SchedulerService {
   public static async scheduleUserHardDelete() {}
 
   /**
- * Schedules an event reminder 24 hours before the event's start time.
- * 
- * This function calculates the reminder time (24 hours before `event.startDate` in UTC) 
- * and schedules a job using `node-schedule`. When the job executes, it triggers 
- * the `sendEventRemindersToAllGuests` function to notify all guests.
- * 
- * @param {Object} params - Function parameters.
- * @param {Event} params.event - The event for which the reminder needs to be scheduled.
- * @returns {Promise<void>} - A promise that resolves when the scheduling is complete.
- */
-  public static async prepareEventReminderDataAndSchedule({ event }: { event: Event }): Promise<void> {
+   * Schedules an event reminder 24 hours before the event's start time.
+   *
+   * This function calculates the reminder time (24 hours before `event.startDate` in UTC)
+   * and schedules a job using `node-schedule`. When the job executes, it triggers
+   * the `sendEventRemindersToAllGuests` function to notify all guests.
+   *
+   * @param {Object} params - Function parameters.
+   * @param {Event} params.event - The event for which the reminder needs to be scheduled.
+   * @returns {Promise<void>} - A promise that resolves when the scheduling is complete.
+   */
+  public static async prepareEventReminderDataAndSchedule({
+    event,
+  }: {
+    event: Event;
+  }): Promise<void> {
     const reminderTime = new Date(event.startDate);
     reminderTime.setUTCHours(reminderTime.getUTCHours() - 24); // 24 hours before event
     schedule.scheduleJob(reminderTime, async () => {

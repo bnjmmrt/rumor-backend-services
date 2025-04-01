@@ -6,7 +6,6 @@ import {
   Attendees,
   Guests,
   FetchBulkGuestsData,
-  ListEventGuestsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { VouchRequestService } from './vouch-request.service';
 import { responses } from '../common/responses';
@@ -119,6 +118,7 @@ import {
 
 export class GuestService {
   public static dbConnection = database;
+
   public static filterLocationsByDistance(
     currentLat: number,
     currentLng: number,
@@ -979,6 +979,7 @@ export class GuestService {
     const checkedInStatus = parsedQuery?.checkedIn;
     const userSource = parsedQuery?.userSource;
     const declinedBy = parsedQuery?.declinedBy;
+    const isFromAdmin = parsedQuery?.isFromAdmin ? true : false;
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
@@ -1035,17 +1036,20 @@ export class GuestService {
       .leftJoinAndSelect('guest.addedBy', 'addedBy')
       .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
-      .where({ event: { id: event.id } })
-      .andWhere(
+      .where({ event: { id: event.id } });
+
+    if (!isFromAdmin) {
+      queryBuilder.andWhere(
         new Brackets(qb => {
           qb.where('guest.addedBy.id = :hostId', { hostId: hostId }).orWhere(
             'guest.status = :status AND guest.addedBy.id IS NULL',
             { status: 'APPLIED' },
           );
         }),
-      )
-      .take(take)
-      .skip(skip);
+      );
+    }
+
+    queryBuilder.take(take).skip(skip);
 
     if (guestStatus) {
       if (guestStatus === 'DECLINED') {
@@ -4004,14 +4008,12 @@ export class GuestService {
           (await serviceMesh.userService().getUserFocuses(user.id)).data,
           (await serviceMesh.userService().getUserInterests(user.id)).data,
         ]);
-        const hostUserSettings = await this.dbConnection
-          .getRepository(HostUserSettings)
-          .findOne({
-            where: {
-              user: { id: user.id },
-              host: { id: event.owner.id },
-            },
-          });
+        const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
+          where: {
+            user: { id: user.id },
+            host: { id: event.owner.id },
+          },
+        });
         const isBanned = hostUserSettings ? hostUserSettings.isSpam : false;
         const guestData = toAdditionalGuestData(
           additionalGuest,
@@ -4104,6 +4106,7 @@ export class GuestService {
       message: errorMessage,
     };
   }
+
   public static validatePayload(payload: ManageBulkGuestsRequestDto): string | null {
     if (!payload.status) return 'GuestStatus is required';
     if (!Array.isArray(payload.guestIds) || payload.guestIds.length === 0) {
