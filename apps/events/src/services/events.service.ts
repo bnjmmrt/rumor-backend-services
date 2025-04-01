@@ -3222,6 +3222,7 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
+        ticketDescription: guest.ticketType.description ?? undefined
       };
     }
 
@@ -3233,6 +3234,7 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
+      ticketDescription: guest.ticketType.description ?? undefined
     };
   }
 
