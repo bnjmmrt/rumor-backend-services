@@ -346,6 +346,8 @@ router.get(
 );
 router.get(
   '/events/guest-details/:id',
+c
+
   AuthMiddleware.fusionAuthRequired,
   GuestController.getGuestDetails,
 );

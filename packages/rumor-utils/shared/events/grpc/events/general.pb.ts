@@ -641,6 +641,7 @@ export interface GuestDetail {
   inviteMessage?: string | undefined;
   signupFormName?: string | undefined;
   eventId?: string | undefined;
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface GuestDetails {
@@ -648,6 +649,7 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface QuizDataList {
