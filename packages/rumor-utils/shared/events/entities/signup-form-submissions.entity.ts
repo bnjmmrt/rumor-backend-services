@@ -7,30 +7,29 @@ import { Guest } from './guest.entity';
 
 @Entity('signup_form_submissions')
 export class SignupFormSubmissions extends RumorBaseEntity {
-  @Column({ type: "jsonb", nullable: false, name: "answers" })
+  @Column({ type: 'jsonb', nullable: false, name: 'answers' })
   answers: ISignupFormQuestionsRequest[];
 
-
-  @Column({ type: "uuid", nullable: true, name: "guest_id" })
+  @Column({ type: 'uuid', nullable: true, name: 'guest_id' })
   guestId: string;
 
-  @ManyToOne(() => EventSignupForms, (signupForm) => signupForm.submissions, {
-    onDelete: "CASCADE",
-    onUpdate: "CASCADE",
+  @ManyToOne(() => EventSignupForms, signupForm => signupForm.submissions, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
   })
-  @JoinColumn({ name: "signup_form_id" })
+  @JoinColumn({ name: 'signup_form_id' })
   signupForm: EventSignupForms;
 
-  @ManyToOne(() => User, (user) => user.signupFormSubmissions, {
-    onDelete: "RESTRICT",
-    onUpdate: "CASCADE",
+  @ManyToOne(() => User, user => user.signupFormSubmissions, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
   })
-  @JoinColumn({ name: "user_id" })
+  @JoinColumn({ name: 'user_id' })
   attendees: User;
 
-  @OneToOne(() => Guest, (guest) => guest.signupFormSubmissions, {
-    onDelete: "RESTRICT",
-    onUpdate: "CASCADE",
+  @OneToOne(() => Guest, guest => guest.signupFormSubmissions, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
   })
   guest: Guest;
 }

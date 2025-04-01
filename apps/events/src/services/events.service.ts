@@ -86,6 +86,7 @@ import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
+import * as dayjs from 'dayjs'; // Import dayjs as a namespace
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import {
   EventStatus,
@@ -130,7 +131,12 @@ import {
 } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+
 import { SchedulerService } from './scheduler-service';
+
 
 const responses = {
   conflict: (message: string) => ({
@@ -172,6 +178,7 @@ export class EventsService {
 
   public static googleAuthClient = new GoogleAuthJWT();
   public static dataSource: DataSource;
+
   constructor() {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
@@ -1290,27 +1297,52 @@ export class EventsService {
     return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.id, owner: { id: payload.userId } },
-      relations: [
-        'quizQuestions',
-        'collaborators',
-        'ticketTypes',
-        'talents',
-        'tickets',
-        'guests',
-        'restrictedInvites',
-        'featuredEventSection',
-        'csvUploads',
-        'signupForms',
-        'notifications',
-        'quizQuestions.answers',
-      ],
-    });
+  public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
+    let event: Event;
+
+    if (payload.fromAdmin) {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    } else {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id, owner: { id: payload.userId } },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    }
+
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status === EventStatusEnum.APPROVED_STATUS) {
-      throw new ConflictError('Cannot delete an approved event');
+    const isEventApprovedAndNotEnded =
+      event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
+    if (isEventApprovedAndNotEnded) {
+      throw new ConflictError('Cannot delete an approved event that has not ended');
     }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
@@ -1405,6 +1437,7 @@ export class EventsService {
       throw new Error(`Error updating talents: ${error.message}`);
     }
   }
+
   private static async updateCollaboratorsWithTransaction(
     collaborators: UpdateCollaboratorDto[],
     event: Event,
@@ -3391,9 +3424,7 @@ export class EventsService {
    * 7. If all notification attempts fail, do not update the event status.
    * 8. Commit the transaction if at least one notification is successful.
    */
-  public static async cancelEventAndNotify(
-    payload: CancelEventAndNotifyRequestDto,
-  ): Promise<string> {
+  public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3418,7 +3449,8 @@ export class EventsService {
         throw new Error('It is not approved event.');
       }
 
-      if (event.owner.id !== payload.ownerId) {
+      // Permitir cancelar si es admin o propietario
+      if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
       }
       // Step 2: Collect unique collaborators
@@ -3875,6 +3907,7 @@ export class EventsService {
       return [];
     }
   }
+
   // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
   //   try {
   //     if (!payload.id || !payload.userId) {

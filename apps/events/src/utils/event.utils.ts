@@ -339,8 +339,6 @@ export function extractDate(
 // return new Date()
 // }
 
-
-
 /**
  * Converts a given UTC date to epoch time (milliseconds) based on the provided server time zone.
  * @param date - The UTC date to convert.
@@ -353,8 +351,5 @@ export function convertToEpoch(date: Date): number {
   }
 
   // Convert UTC date to the target time zone and get epoch time
-  return new Date(
-    date.toLocaleString('en-US')
-  ).getTime();
+  return new Date(date.toLocaleString('en-US')).getTime();
 }
-
