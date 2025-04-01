@@ -127,11 +127,16 @@ import {
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
+  sendEventReminder,
 } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+
+import { SchedulerService } from './scheduler-service';
+
 
 const responses = {
   conflict: (message: string) => ({
@@ -2293,6 +2298,7 @@ export class EventsService {
           } else {
             event.publishDate = null;
             event.isPublished = true;
+          //TODO: if removed publish date then need to remove its schedular
           }
         } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
@@ -2399,6 +2405,27 @@ export class EventsService {
 
       //ends here
       await queryRunner.commitTransaction();
+
+      //handle event scheduling
+      let eventFromDb: Event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+        relations : {
+          location : true
+        }
+      });
+      if (eventFromDb.status === EventStatusEnum.APPROVED_STATUS && eventFromDb && !eventFromDb.isPublished && eventFromDb.publishDate) {
+        SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+      }
+      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.endDate)  {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
+      }
+      //update schedular if event start date has been change
+      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.startDate)  {
+        SchedulerService.prepareEventReminderDataAndSchedule({event :eventFromDb})
+      }
+      //ends here 
+     //ends here
+
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
        * send email notification if date, time, location is updated
@@ -2486,9 +2513,43 @@ export class EventsService {
       throw new BadRequestError(`Error occurred while updating event: ${error?.message}`);
     } finally {
       // Release the query runner
-
       await queryRunner.release();
     }
+  }
+
+  /**
+ * Sends event reminder emails to all eligible guests 24 hours before the event.
+ * 
+ * This function retrieves all guests associated with the event whose statuses 
+ * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`). 
+ * It then prepares and sends email reminders to those guests.
+ * 
+ * @param {Event} event - The event for which reminders need to be sent.
+ * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
+ */
+  public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
+    const guestStatuses: GuestStatus[] = [GuestStatus.INVITED, GuestStatus.CONFIRMED, GuestStatus.APPLIED];
+    const guests = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .where('guest.event = :eventId', { eventId: event.id })
+      .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
+      .getMany();
+    if (!guests.length) return
+    const emailPromises = guests.map(guest => {
+      if (!guest?.user?.email) return;
+      const mailPayload = {
+        eventName: event.name || 'Event',
+        imageFlyer: event.imageFlyer,
+        eventDate: event.startDate,
+        location: event.location?.location,
+        city: event.location?.city,
+      };
+      // return 
+      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+    });
+    await Promise.allSettled(emailPromises);
   }
 
   /**
@@ -3010,6 +3071,13 @@ export class EventsService {
       event.status = EventStatusEnum.APPROVED_STATUS;
       if (!event.publishDate) {
         event.isPublished = true;
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      else {
+        SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
+      }
+      if(event?.startDate) {
+        SchedulerService.prepareEventReminderDataAndSchedule({event :event})
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3187,6 +3255,7 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
+        ticketDescription: guest.ticketType.description ?? undefined
       };
     }
 
@@ -3198,6 +3267,7 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
+      ticketDescription: guest.ticketType.description ?? undefined
     };
   }
 
@@ -3602,20 +3672,18 @@ export class EventsService {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
     } else if (
-      status === EventStatusEnum.UPCOMING_STATUS ||
-      status === EventStatusEnum.PAST_STATUS
-    ) {
-      // Filter for approved events first
+      status === EventStatusEnum.UPCOMING_STATUS
+      ) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-
-      // Add specific date filtering based on the requested status
-      if (status === EventStatusEnum.UPCOMING_STATUS) {
-        query.andWhere('event.end_date > :currentTime', { currentTime });
-      } else if (status === EventStatusEnum.PAST_STATUS) {
-        query.andWhere('event.end_date < :currentTime', { currentTime });
-      }
+       query.andWhere('event.end_date > :currentTime', { currentTime });
+    }
+      else if (status === EventStatusEnum.PAST_STATUS) {
+      query.andWhere('event.status = :pastStatus', {
+        pastStatus: EventStatusEnum.PAST_STATUS,
+      });
+      query.andWhere('event.end_date < :currentTime', { currentTime });
     }
 
     // Apply pagination if necessary

@@ -572,3 +572,60 @@ export const sendEventRejection = (
       .sendEmailFromTemplate(params, 'Host Event Rejected by Admin', [email.trim()], null);
   } catch (e) {}
 };
+
+export const sendEventReminder = (
+    mailComponents: MailComponent,
+    email: string,
+    userId: string,
+    eventId: string,
+    timeZone: string
+): Promise<AxiosResponse<any, any>> => {
+    const redirectPath = `users/${userId}/events/${eventId}`;
+    const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+
+    const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
+    const params = [
+        {
+            key: 'event_name',
+            value: eventName,
+        },
+        {
+            key: 'image_url',
+            value: imageFlyer,
+        },
+        {
+            key: 'month',
+            value: month,
+        },
+        {
+            key: 'day',
+            value: day,
+        },
+        {
+            key: 'day_of_week',
+            value: dayOfWeek,
+        },
+        {
+            key: 'hour',
+            value: hour,
+        },
+        {
+            key: 'minutes',
+            value: `${minutes} ${period}`,
+        },
+        {
+            key: 'address',
+            value: `${location}, ${city}`,
+        },
+        {
+            key: 'view_event',
+            value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+        },
+    ];
+
+    try {
+        return serviceMesh
+            .notificationService()
+            .sendEmailFromTemplate(params, 'Event 24 Hour Reminder', [email.trim()], null);
+    } catch (err) { }
+};
