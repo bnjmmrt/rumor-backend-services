@@ -324,6 +324,13 @@ export class EventsService {
       if (!fullEvent) {
         throw new Error('Failed to get created event.');
       }
+
+      //schedule event for cancelled status if not approved
+      if(event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      //ends here
+
       // Fetch and return the created event with all relations
       //send email to admin for new event creation
       try {
@@ -2380,15 +2387,17 @@ export class EventsService {
           location : true
         }
       });
-      if (eventFromDb.status === EventStatusEnum.APPROVED_STATUS && eventFromDb && !eventFromDb.isPublished && eventFromDb.publishDate) {
-        SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+      if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
+        if (!eventFromDb.isPublished && eventFromDb.publishDate) {
+          SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+        }
+        //update schedular if event start date has been change
+        if (payload?.startDate) {
+          SchedulerService.prepareEventReminderDataAndSchedule({ id: eventFromDb.id, startDate: eventFromDb.startDate } as Event)
+        }
       }
-      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.endDate)  {
+      if (payload?.endDate && (eventFromDb.status === EventStatusEnum.PENDING_STATUS || eventFromDb.status === EventStatusEnum.APPROVED_STATUS)) {
         SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
-      }
-      //update schedular if event start date has been change
-      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.startDate)  {
-        SchedulerService.prepareEventReminderDataAndSchedule({event :eventFromDb})
       }
       //ends here 
      //ends here
@@ -2961,6 +2970,7 @@ export class EventsService {
     return responses.data(toEvent(createdEvent, null));
   }
 
+  //TODO: this api is being used
   public static async publishPendingEvents(): Promise<string> {
     const now = new Date();
     const status = EventStatusEnum.APPROVED_STATUS;
@@ -2984,6 +2994,7 @@ export class EventsService {
     return;
   }
 
+  //this is not being used anywhere
   public static validateEventUpdate(
     event: Event,
     payload: UpdateEventRequestDto,
@@ -3038,13 +3049,15 @@ export class EventsService {
       event.status = EventStatusEnum.APPROVED_STATUS;
       if (!event.publishDate) {
         event.isPublished = true;
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
       }
       else {
         SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
       }
-      if(event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({event :event})
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      if (event?.startDate) {
+        SchedulerService.prepareEventReminderDataAndSchedule({ id: event.id, startDate: event.startDate } as Event)
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3637,15 +3650,13 @@ export class EventsService {
     if (status && validStatuses.includes(status)) {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
-    } else if (
-      status === EventStatusEnum.UPCOMING_STATUS
-      ) {
+    } else if (status === EventStatusEnum.UPCOMING_STATUS) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-       query.andWhere('event.end_date > :currentTime', { currentTime });
+      query.andWhere('event.end_date > :currentTime', { currentTime });
     }
-      else if (status === EventStatusEnum.PAST_STATUS) {
+    else if (status === EventStatusEnum.PAST_STATUS) {
       query.andWhere('event.status = :pastStatus', {
         pastStatus: EventStatusEnum.PAST_STATUS,
       });
