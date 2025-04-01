@@ -217,14 +217,8 @@ export class SignupFormsServices {
       .where('id IN (:...ids)', { ids: oldQuestionIds })
       .getMany();
 
-    let hasAccessForAdditionalGuestQuestions: SignupFormQuestions = undefined;
     const questionsMap = new Map<string, boolean>();
-    existingQuestions.forEach(q => {
-      if (q.name.toLowerCase() === 'Request Access for Additional Guests'.toLowerCase()) {
-        hasAccessForAdditionalGuestQuestions = q;
-      }
-      questionsMap.set(q.id.toString(), q.isDefault);
-    });
+    existingQuestions.forEach(q => questionsMap.set(q.id.toString(), q.isDefault));
 
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
@@ -235,6 +229,21 @@ export class SignupFormsServices {
 
     const ids = [];
     const questionPromises: any[] = [];
+
+    /**---------TO DO:: HACKY FIX --------------------- */
+    if (!body.hasAccessForAdditionalGuests) {
+      const guestsWithStaticQuestions = await SignupFormQuestions.find({
+        where: { signupForms: { id: id } },
+      });
+      const hasAccessForAdditionalGuests = guestsWithStaticQuestions.find(
+        g => g.name === 'Request Access for Additional Guests',
+      );
+      if (hasAccessForAdditionalGuests) {
+        const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuests.id);
+        questionPromises.push(deleteQuestions);
+      }
+    }
+
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
@@ -276,10 +285,6 @@ export class SignupFormsServices {
           questionPromises.push(updatesQuestion);
         }
       }
-    }
-    if (!body.hasAccessForAdditionalGuests) {
-      const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuestQuestions.id);
-      questionPromises.push(deleteQuestions);
     }
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
