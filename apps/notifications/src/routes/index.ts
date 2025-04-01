@@ -53,7 +53,7 @@ router.post('/notification/push', NotificationController.sendPushNotification);
 
 router.get(
   '/notifications',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   NotificationController.getAllNotifications,
 );
 router.get(
@@ -77,7 +77,7 @@ router.get(
 );
 router.get(
   '/notifications/summary',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   NotificationController.getNotificationSummary,
 );
 router.delete(
