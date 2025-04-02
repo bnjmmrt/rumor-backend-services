@@ -268,7 +268,7 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
   if (isPublished) {
     if (parsedStartDate >= now || parsedEndDate >= now) {
       status = EventStatus.UPCOMING_STATUS;
-    } 
+    }
     // else if (parsedEndDate < now) {
     //   status = EventStatus.PAST_STATUS;
     // }
