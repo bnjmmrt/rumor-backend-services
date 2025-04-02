@@ -4846,7 +4846,15 @@ export class AuthService {
     const eventCount = await this.dbConnection
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
-    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists, undefined, eventCount);
+    const userData = toMemberProfile(
+      user,
+      focuses,
+      interests,
+      userRole,
+      formattedLists,
+      undefined,
+      eventCount,
+    );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;

@@ -137,7 +137,6 @@ import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
 
-
 const responses = {
   conflict: (message: string) => ({
     status: StatusCodes.CONFLICT,
@@ -333,8 +332,11 @@ export class EventsService {
       }
 
       //schedule event for cancelled status if not approved
-      if(event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
       }
       //ends here
 
@@ -2422,18 +2424,31 @@ export class EventsService {
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
         if (!eventFromDb.isPublished && eventFromDb.publishDate) {
-          SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+          SchedulerService.scheduleEventPublishDate({
+            id: eventFromDb.id,
+            publishDate: eventFromDb.publishDate,
+          } as Event);
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {
-          SchedulerService.prepareEventReminderDataAndSchedule({ id: eventFromDb.id, startDate: eventFromDb.startDate } as Event)
+          SchedulerService.prepareEventReminderDataAndSchedule({
+            id: eventFromDb.id,
+            startDate: eventFromDb.startDate,
+          } as Event);
         }
       }
-      if (payload?.endDate && (eventFromDb.status === EventStatusEnum.PENDING_STATUS || eventFromDb.status === EventStatusEnum.APPROVED_STATUS)) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
+      if (
+        payload?.endDate &&
+        (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
+      ) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: eventFromDb.id,
+          endDate: eventFromDb.endDate,
+        } as Event);
       }
-      //ends here 
-     //ends here
+      //ends here
+      //ends here
 
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
@@ -3086,15 +3101,23 @@ export class EventsService {
       event.status = EventStatusEnum.APPROVED_STATUS;
       if (!event.publishDate) {
         event.isPublished = true;
-      }
-      else {
-        SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
+      } else {
+        SchedulerService.scheduleEventPublishDate({
+          id: event.id,
+          publishDate: event.publishDate,
+        } as Event);
       }
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
       }
       if (event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({ id: event.id, startDate: event.startDate } as Event)
+        SchedulerService.prepareEventReminderDataAndSchedule({
+          id: event.id,
+          startDate: event.startDate,
+        } as Event);
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3693,8 +3716,7 @@ export class EventsService {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
       query.andWhere('event.end_date > :currentTime', { currentTime });
-    }
-    else if (status === EventStatusEnum.PAST_STATUS) {
+    } else if (status === EventStatusEnum.PAST_STATUS) {
       query.andWhere('event.status = :pastStatus', {
         pastStatus: EventStatusEnum.PAST_STATUS,
       });
