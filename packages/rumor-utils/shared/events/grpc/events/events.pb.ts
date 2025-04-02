@@ -818,6 +818,14 @@ export interface GuestCountByStatuses {
   draftedCount: number;
   totalCount: number;
 }
+export interface HostEventsCountByStatusResponse {
+  approvedStatus: number,
+  draftStatus: number,
+  pendingStatus: number,
+  cancelledStatus: number,
+  pastStatus: number,
+  rejectedStatus: number,
+}
 
 export const EVENTS_PACKAGE_NAME = 'events';
 
