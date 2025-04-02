@@ -254,7 +254,8 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
   let status: EventStatus;
 
   if (
-    !isPublished && publishDate && 
+    !isPublished &&
+    publishDate &&
     eventStatus &&
     eventStatus === EventStatusEnum.APPROVED_STATUS &&
     parsedPublishDate <= parsedStartDate

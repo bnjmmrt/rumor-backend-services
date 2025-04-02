@@ -18,7 +18,7 @@ export class UserQuizAnswer extends RumorBaseEntity {
   question?: QuizQuestion;
 
   @Index()
-  @ManyToOne(() => Event, (event) => event.quizQuestions, {
+  @ManyToOne(() => Event, event => event.quizQuestions, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })

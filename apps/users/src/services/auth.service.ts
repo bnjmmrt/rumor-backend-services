@@ -1463,7 +1463,7 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      let completedLogin
+      let completedLogin;
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
@@ -1492,7 +1492,7 @@ export class AuthService {
             user: user,
             isGuest: false,
           };
-        } catch (error) { }
+        } catch (error) {}
       }
 
       // if (completedLogin.statusCode > 299) {
@@ -5374,10 +5374,10 @@ export class AuthService {
   }
 
   public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
-    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
-    const user = await this.dbConnection
+    const host = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.id } });
+      .findOne({ where: { id: payload.userId } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
     if (!user || !host) {
       throw new NotFoundError('User or Host');
     }

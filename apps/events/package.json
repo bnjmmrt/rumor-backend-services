@@ -31,7 +31,7 @@
     "csv-parser": "^3.2.0",
     "csv-stringify": "^6.5.2",
     "csv-writer": "^1.6.0",
-    "dayjs": "^1.11.10",
+    "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-http-context": "^1.2.4",

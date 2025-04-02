@@ -387,7 +387,7 @@ router.get('/files/view/*', FilesController.viewFile);
 
 router.delete('/files:id', FilesController.removeFile);
 
-// router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
+router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
 // router.put('/files/:id', FilesController.updateFile);
 
 export default router;
