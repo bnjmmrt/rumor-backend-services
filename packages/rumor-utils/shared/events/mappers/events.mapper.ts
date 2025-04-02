@@ -38,6 +38,8 @@ export const toEvent = (
     EventStatusEnum.PENDING_STATUS,
     EventStatusEnum.DECLINED_STATUS,
     EventStatusEnum.CANCELLED_STATUS,
+    EventStatusEnum.PAST_STATUS,
+    EventStatusEnum.REJECTED_STATUS,
   ];
   // const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
   const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
@@ -266,9 +268,10 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
   if (isPublished) {
     if (parsedStartDate >= now || parsedEndDate >= now) {
       status = EventStatus.UPCOMING_STATUS;
-    } else if (parsedEndDate < now) {
-      status = EventStatus.PAST_STATUS;
-    }
+    } 
+    // else if (parsedEndDate < now) {
+    //   status = EventStatus.PAST_STATUS;
+    // }
   }
 
   if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS) {
