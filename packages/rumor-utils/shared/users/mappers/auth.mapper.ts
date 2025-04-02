@@ -330,5 +330,6 @@ export const toMemberProfile = (
     customLists: customLists,
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount: eventCount,
+    sources: user.roles?.length ? user.roles.filter(r => r.source !== null).map(item => item.source as string) : [],
   };
 };

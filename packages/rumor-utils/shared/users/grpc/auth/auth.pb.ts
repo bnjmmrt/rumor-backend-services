@@ -575,6 +575,7 @@ export interface MemberProfile {
   roleId?: string | undefined;
   placeId?: string | undefined;
   eventCount: number;
+  sources?: string[] | undefined;
 }
 
 export interface FocusProto {
