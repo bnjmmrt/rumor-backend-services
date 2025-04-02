@@ -86,6 +86,7 @@ import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
+import * as dayjs from 'dayjs'; // Import dayjs as a namespace
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import {
   EventStatus,
@@ -130,7 +131,12 @@ import {
 } from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+
 import { SchedulerService } from './scheduler-service';
+
 
 const responses = {
   conflict: (message: string) => ({
@@ -172,6 +178,7 @@ export class EventsService {
 
   public static googleAuthClient = new GoogleAuthJWT();
   public static dataSource: DataSource;
+
   constructor() {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
@@ -324,6 +331,13 @@ export class EventsService {
       if (!fullEvent) {
         throw new Error('Failed to get created event.');
       }
+
+      //schedule event for cancelled status if not approved
+      if(event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      //ends here
+
       // Fetch and return the created event with all relations
       //send email to admin for new event creation
       try {
@@ -1290,27 +1304,52 @@ export class EventsService {
     return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.id, owner: { id: payload.userId } },
-      relations: [
-        'quizQuestions',
-        'collaborators',
-        'ticketTypes',
-        'talents',
-        'tickets',
-        'guests',
-        'restrictedInvites',
-        'featuredEventSection',
-        'csvUploads',
-        'signupForms',
-        'notifications',
-        'quizQuestions.answers',
-      ],
-    });
+  public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
+    let event: Event;
+
+    if (payload.fromAdmin) {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    } else {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id, owner: { id: payload.userId } },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    }
+
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status === EventStatusEnum.APPROVED_STATUS) {
-      throw new ConflictError('Cannot delete an approved event');
+    const isEventApprovedAndNotEnded =
+      event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
+    if (isEventApprovedAndNotEnded) {
+      throw new ConflictError('Cannot delete an approved event that has not ended');
     }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
@@ -1405,6 +1444,7 @@ export class EventsService {
       throw new Error(`Error updating talents: ${error.message}`);
     }
   }
+
   private static async updateCollaboratorsWithTransaction(
     collaborators: UpdateCollaboratorDto[],
     event: Event,
@@ -2265,7 +2305,7 @@ export class EventsService {
           } else {
             event.publishDate = null;
             event.isPublished = true;
-          //TODO: if removed publish date then need to remove its schedular
+            //TODO: if removed publish date then need to remove its schedular
           }
         } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
@@ -2376,19 +2416,21 @@ export class EventsService {
       //handle event scheduling
       let eventFromDb: Event = await queryRunner.manager.findOne(Event, {
         where: { id: eventId },
-        relations : {
-          location : true
-        }
+        relations: {
+          location: true,
+        },
       });
-      if (eventFromDb.status === EventStatusEnum.APPROVED_STATUS && eventFromDb && !eventFromDb.isPublished && eventFromDb.publishDate) {
-        SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+      if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
+        if (!eventFromDb.isPublished && eventFromDb.publishDate) {
+          SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+        }
+        //update schedular if event start date has been change
+        if (payload?.startDate) {
+          SchedulerService.prepareEventReminderDataAndSchedule({ id: eventFromDb.id, startDate: eventFromDb.startDate } as Event)
+        }
       }
-      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.endDate)  {
+      if (payload?.endDate && (eventFromDb.status === EventStatusEnum.PENDING_STATUS || eventFromDb.status === EventStatusEnum.APPROVED_STATUS)) {
         SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
-      }
-      //update schedular if event start date has been change
-      if(eventFromDb.status === EventStatusEnum.APPROVED_STATUS && payload?.startDate)  {
-        SchedulerService.prepareEventReminderDataAndSchedule({event :eventFromDb})
       }
       //ends here 
      //ends here
@@ -2485,17 +2527,21 @@ export class EventsService {
   }
 
   /**
- * Sends event reminder emails to all eligible guests 24 hours before the event.
- * 
- * This function retrieves all guests associated with the event whose statuses 
- * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`). 
- * It then prepares and sends email reminders to those guests.
- * 
- * @param {Event} event - The event for which reminders need to be sent.
- * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
- */
+   * Sends event reminder emails to all eligible guests 24 hours before the event.
+   *
+   * This function retrieves all guests associated with the event whose statuses
+   * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`).
+   * It then prepares and sends email reminders to those guests.
+   *
+   * @param {Event} event - The event for which reminders need to be sent.
+   * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
+   */
   public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
-    const guestStatuses: GuestStatus[] = [GuestStatus.INVITED, GuestStatus.CONFIRMED, GuestStatus.APPLIED];
+    const guestStatuses: GuestStatus[] = [
+      GuestStatus.INVITED,
+      GuestStatus.CONFIRMED,
+      GuestStatus.APPLIED,
+    ];
     const guests = await this.dbConnection
       .getRepository(Guest)
       .createQueryBuilder('guest')
@@ -2503,7 +2549,7 @@ export class EventsService {
       .where('guest.event = :eventId', { eventId: event.id })
       .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
       .getMany();
-    if (!guests.length) return
+    if (!guests.length) return;
     const emailPromises = guests.map(guest => {
       if (!guest?.user?.email) return;
       const mailPayload = {
@@ -2513,7 +2559,7 @@ export class EventsService {
         location: event.location?.location,
         city: event.location?.city,
       };
-      // return 
+      // return
       sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
     });
     await Promise.allSettled(emailPromises);
@@ -2961,6 +3007,7 @@ export class EventsService {
     return responses.data(toEvent(createdEvent, null));
   }
 
+  //TODO: this api is being used
   public static async publishPendingEvents(): Promise<string> {
     const now = new Date();
     const status = EventStatusEnum.APPROVED_STATUS;
@@ -2984,6 +3031,7 @@ export class EventsService {
     return;
   }
 
+  //this is not being used anywhere
   public static validateEventUpdate(
     event: Event,
     payload: UpdateEventRequestDto,
@@ -3038,13 +3086,15 @@ export class EventsService {
       event.status = EventStatusEnum.APPROVED_STATUS;
       if (!event.publishDate) {
         event.isPublished = true;
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
       }
       else {
         SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
       }
-      if(event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({event :event})
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      }
+      if (event?.startDate) {
+        SchedulerService.prepareEventReminderDataAndSchedule({ id: event.id, startDate: event.startDate } as Event)
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3222,7 +3272,7 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
-        ticketDescription: guest.ticketType.description ?? undefined
+        ticketDescription: guest.ticketType.description ?? undefined,
       };
     }
 
@@ -3234,7 +3284,7 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
-      ticketDescription: guest.ticketType.description ?? undefined
+      ticketDescription: guest.ticketType.description ?? undefined,
     };
   }
 
@@ -3391,9 +3441,7 @@ export class EventsService {
    * 7. If all notification attempts fail, do not update the event status.
    * 8. Commit the transaction if at least one notification is successful.
    */
-  public static async cancelEventAndNotify(
-    payload: CancelEventAndNotifyRequestDto,
-  ): Promise<string> {
+  public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3418,7 +3466,8 @@ export class EventsService {
         throw new Error('It is not approved event.');
       }
 
-      if (event.owner.id !== payload.ownerId) {
+      // Permitir cancelar si es admin o propietario
+      if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
       }
       // Step 2: Collect unique collaborators
@@ -3639,15 +3688,13 @@ export class EventsService {
     if (status && validStatuses.includes(status)) {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
-    } else if (
-      status === EventStatusEnum.UPCOMING_STATUS
-      ) {
+    } else if (status === EventStatusEnum.UPCOMING_STATUS) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-       query.andWhere('event.end_date > :currentTime', { currentTime });
+      query.andWhere('event.end_date > :currentTime', { currentTime });
     }
-      else if (status === EventStatusEnum.PAST_STATUS) {
+    else if (status === EventStatusEnum.PAST_STATUS) {
       query.andWhere('event.status = :pastStatus', {
         pastStatus: EventStatusEnum.PAST_STATUS,
       });
@@ -3875,6 +3922,7 @@ export class EventsService {
       return [];
     }
   }
+
   // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
   //   try {
   //     if (!payload.id || !payload.userId) {

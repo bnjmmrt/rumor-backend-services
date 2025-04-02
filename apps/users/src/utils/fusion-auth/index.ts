@@ -41,7 +41,7 @@ class AuthMiddleware {
   fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
-      
+
       if (!authorization) {
         next();
         return;
