@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { SignupFormsServices } from '../services/signup-forms.service';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/entities';
-import { SignupFormsResponse } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventGuestRequest, SignupFormsResponse } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { GetResponse } from 'rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import {
@@ -63,6 +63,12 @@ export class SignupFormsController {
     const id = req.params.id;
     const payload = req.body as SignupFormAnswersDto[];
     await SignupFormsServices.answers(id, eventId, payload);
+    res.json(new GetResponse({}));
+  });
+
+  public static checkIfGuestExistsForEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload = req.body as EventGuestRequest;
+    await SignupFormsServices.validateGuestExistenceForEvent(payload);
     res.json(new GetResponse({}));
   });
 
