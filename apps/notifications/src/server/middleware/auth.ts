@@ -45,7 +45,7 @@ class AuthMiddleware {
   static fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
-      
+
       if (!authorization) {
         next();
         return;
@@ -75,9 +75,7 @@ class AuthMiddleware {
       const errMsg = new AuthorizationError(`Session has expired, Please login again `);
       res.status(401).send(errMsg);
     }
-
-}
-
+  };
 }
 
 export default AuthMiddleware;
