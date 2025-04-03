@@ -130,6 +130,11 @@ export const validateEventDates = (
       return { error: true, response: 'Publish date must be later than the current date.' };
     }
 
+    // Start date must be later than publish date
+    if (new Date(payload.startDate).getTime() <= new Date(payload.publishDate).getTime()) {
+      return { error: true, response: 'Start date must be later than the publish date.' };
+    }
+
     // End date must be later than publish date
     if (new Date(payload.endDate).getTime() <= new Date(payload.publishDate).getTime()) {
       return { error: true, response: 'End date must be later than the publish date.' };
@@ -259,30 +264,92 @@ export function hasEventDateOrLocationChanged(
   }
   return { changed: changes.length > 0, changes };
 }
-export function extractDate(date: Date): {
+export function extractDate(
+  date: Date,
+  timeZone: string,
+): {
   year: string;
   month: string;
   day: string;
   dayOfWeek: string;
   hour: string;
   minutes: string;
+  period: string;
+  timeZone: string;
 } {
   if (!(date instanceof Date) || isNaN(date.getTime())) {
     throw new Error('Invalid date object provided');
   }
-  const updatedDate = new Date(date);
-  const hour = updatedDate.getUTCHours() > 0 ? updatedDate.getUTCHours().toString() : '00';
-  const minutes = updatedDate.getUTCMinutes() > 0 ? updatedDate.getUTCMinutes().toString() : '00';
-  return {
-    year: updatedDate.getUTCFullYear().toString(),
-    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'][
-      updatedDate.getUTCMonth()
-    ], // Months are 0-based
-    day: updatedDate.getUTCDate().toString(),
-    dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
-      date.getUTCDay()
-    ],
-    hour,
-    minutes,
+
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true, // <-- this enables AM/PM
   };
+
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(date);
+
+  const lookup: Record<string, string> = {};
+  parts.forEach(({ type, value }) => {
+    lookup[type] = value;
+  });
+
+  return {
+    year: lookup.year,
+    month: lookup.month,
+    day: lookup.day,
+    dayOfWeek: lookup.weekday,
+    hour: lookup.hour,
+    minutes: lookup.minute,
+    period: lookup.dayPeriod, // "AM" or "PM"
+    timeZone,
+  };
+}
+
+// export function extractDateWithDate(date: Date, timeZone: string): Date {
+//   if (!(date instanceof Date) || isNaN(date.getTime())) {
+//     throw new Error('Invalid date object provided');
+//   }
+
+//   const options: Intl.DateTimeFormatOptions = {
+//     timeZone,
+//     year: 'numeric',
+//     month: 'short',
+//     day: '2-digit',
+//     weekday: 'long',
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     hour12: true, // <-- this enables AM/PM
+//   };
+
+//   const formatter = new Intl.DateTimeFormat('en-US', options);
+//   const parts = formatter.formatToParts(date);
+
+//   const lookup: Record<string, string> = {};
+//   parts.forEach(({ type, value }) => {
+//     lookup[type] = value;
+//   });
+
+// return new Date()
+// }
+
+/**
+ * Converts a given UTC date to epoch time (milliseconds) based on the provided server time zone.
+ * @param date - The UTC date to convert.
+ * @param timeZone - The target time zone for conversion.
+ * @returns The epoch time in milliseconds.
+ */
+export function convertToEpoch(date: Date): number {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error('Invalid date object provided');
+  }
+
+  // Convert UTC date to the target time zone and get epoch time
+  return new Date(date.toLocaleString('en-US')).getTime();
 }

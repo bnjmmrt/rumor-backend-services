@@ -20,6 +20,12 @@ class FirebaseNotificationsService {
 
   async sendPushNotification(payload: PushNotificationPayload): Promise<boolean> {
     try {
+      // Validar que haya tokens antes de enviar
+      if (!payload.tokens || payload.tokens.length === 0) {
+        console.log('There are no tokens to send notifications to.');
+        return true;
+      }
+
       const firebaseApp = this.getFirebaseApp();
       const response = await firebaseApp.messaging().sendEachForMulticast({
         tokens: payload.tokens,

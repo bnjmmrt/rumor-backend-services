@@ -2,6 +2,7 @@ require('dotenv').config();
 import config from './config';
 import server from './server';
 import connectionManager from './database';
+import { SeedDatabase } from './seeders';
 
 const start = async () => {
   console.info('[APP] - Starting application...');
@@ -16,6 +17,7 @@ const start = async () => {
       await connectionManager.runSeeders();
     }
 
+    await SeedDatabase.seed()
     await server.start();
     console.info('[APP] - Application started. 🚀');
   } catch (err) {

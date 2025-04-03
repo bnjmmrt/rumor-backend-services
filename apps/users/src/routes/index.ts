@@ -250,7 +250,7 @@ router.post(
 );
 router.get('/auth/admin/reports', AuthController.getAllReports);
 router.post('/auth/switch-profile/:id', AuthController.switchProfile);
-router.post('/auth/user/:id/note', AuthController.addUserNote);
+router.post('/auth/user/:id/note', AuthMiddleware.fusionAuthRequired, AuthController.addUserNote);
 router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
 router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
 router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
@@ -387,7 +387,7 @@ router.get('/files/view/*', FilesController.viewFile);
 
 router.delete('/files:id', FilesController.removeFile);
 
-// router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
+router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
 // router.put('/files/:id', FilesController.updateFile);
 
 export default router;

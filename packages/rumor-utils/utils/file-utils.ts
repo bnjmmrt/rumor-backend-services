@@ -4,6 +4,7 @@ import type { CsvRecord } from '../shared/users/grpc/auth/auth.pb';
 import axios from 'axios';
 import * as parse from 'csv-parser';
 import { createObjectCsvWriter } from 'csv-writer';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export async function parseCsv(file: string): Promise<CsvRecord[]> {
   const records: CsvRecord[] = [];
@@ -60,8 +61,8 @@ export const isValidEmail = (email: string): boolean => {
 
 export const isValidPhoneNumber = (phoneNumber: string): boolean => {
   const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
-  const phoneRegex = /^\+[1-9]\d{1,14}$/; // E.164 format
-  return phoneRegex.test(cleaned);
+  const parsedNumber = parsePhoneNumberFromString(cleaned);
+  return parsedNumber?.isValid() ?? false;
 };
 
 export const processCsvFile = async (
@@ -122,6 +123,8 @@ export const processCsvFile = async (
         record.reason = reasons.join(', ');
         garbageData.push(record);
       } else {
+        record.firstName = record.firstName?.toString().trim();
+        record.lastName = record.lastName?.toString().trim();
         record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
         record.email = rawEmail.trim();
         validData.push(record);

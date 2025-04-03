@@ -33,6 +33,7 @@ import {
   EventTypesData,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
+  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -86,6 +87,7 @@ import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
+import * as dayjs from 'dayjs'; // Import dayjs as a namespace
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
 import {
   EventStatus,
@@ -119,9 +121,23 @@ import { GuestService } from './guest.service';
 
 import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
-import { sendEventCancellation, sendEventUpdation } from '../utils/emails.utils';
+import {
+  sendEventCancellation,
+  sendEventUpdation,
+  sendEventInviteNonMember,
+  sendEventRejection,
+  sendEventPublishedApproval,
+  sendEventPrePublishApproval,
+  sendEventReminder,
+} from '../utils/emails.utils';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+
+import { SchedulerService } from './scheduler-service';
+import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -163,6 +179,7 @@ export class EventsService {
 
   public static googleAuthClient = new GoogleAuthJWT();
   public static dataSource: DataSource;
+
   constructor() {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
@@ -315,6 +332,16 @@ export class EventsService {
       if (!fullEvent) {
         throw new Error('Failed to get created event.');
       }
+
+      //schedule event for cancelled status if not approved
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
+      }
+      //ends here
+
       // Fetch and return the created event with all relations
       //send email to admin for new event creation
       try {
@@ -1281,27 +1308,70 @@ export class EventsService {
     return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: UserAndIdRequestDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.id, owner: { id: payload.userId } },
-      relations: [
-        'quizQuestions',
-        'collaborators',
-        'ticketTypes',
-        'talents',
-        'tickets',
-        'guests',
-        'restrictedInvites',
-        'featuredEventSection',
-        'csvUploads',
-        'signupForms',
-        'notifications',
-        'quizQuestions.answers'
-      ],
-    });
+  public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
+    let event: Event;
+
+    if (payload.fromAdmin) {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    } else {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id, owner: { id: payload.userId } },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+        ],
+      });
+    }
+
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status === EventStatusEnum.APPROVED_STATUS) {
-      throw new ConflictError('Cannot delete an approved event');
+    const isEventApprovedAndNotEnded =
+      event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
+    if (isEventApprovedAndNotEnded) {
+      throw new ConflictError('Cannot delete an approved event that has not ended');
+    }
+
+    const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
+      where: { event: { id: event.id } },
+      relations: ['uploadedUsers'],
+    });
+
+    // Set uploadedViaCsv to null for users associated with these CSV records
+    const userRepo = this.dbConnection.getRepository(User);
+    for (const csvUpload of csvUploads) {
+      if (csvUpload.uploadedUsers.length > 0) {
+        await userRepo
+          .createQueryBuilder()
+          .update(User)
+          .set({ uploadedViaCsv: null })
+          .where('uploadedViaCsv.id = :csvUploadId', { csvUploadId: csvUpload.id })
+          .execute();
+      }
     }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
@@ -1396,6 +1466,7 @@ export class EventsService {
       throw new Error(`Error updating talents: ${error.message}`);
     }
   }
+
   private static async updateCollaboratorsWithTransaction(
     collaborators: UpdateCollaboratorDto[],
     event: Event,
@@ -2193,7 +2264,7 @@ export class EventsService {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-    //Imp Note: backend is expecting publish date should come everytime from frontend
+    //Imp Note: backend is expecting publish date should come everytime from frontend if not then set to null
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.id, deletedAt: IsNull() },
@@ -2250,7 +2321,18 @@ export class EventsService {
         event.endDate = new Date(payload.endDate);
       }
       if (payload.publishDate != undefined || payload.publishDate !== null) {
-        event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        //if publish date is not in payload still this condition is true
+        if (event.status == EventStatusEnum.APPROVED_STATUS) {
+          if (payload.publishDate) {
+            event.publishDate = new Date(payload.publishDate);
+          } else {
+            event.publishDate = null;
+            event.isPublished = true;
+            //TODO: if removed publish date then need to remove its schedular
+          }
+        } else {
+          event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        }
       }
       if (payload.timeZone) {
         event.timeZone = payload.timeZone;
@@ -2353,6 +2435,42 @@ export class EventsService {
 
       //ends here
       await queryRunner.commitTransaction();
+
+      //handle event scheduling
+      let eventFromDb: Event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+        relations: {
+          location: true,
+        },
+      });
+      if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
+        if (!eventFromDb.isPublished && eventFromDb.publishDate) {
+          SchedulerService.scheduleEventPublishDate({
+            id: eventFromDb.id,
+            publishDate: eventFromDb.publishDate,
+          } as Event);
+        }
+        //update schedular if event start date has been change
+        if (payload?.startDate) {
+          SchedulerService.prepareEventReminderDataAndSchedule({
+            id: eventFromDb.id,
+            startDate: eventFromDb.startDate,
+          } as Event);
+        }
+      }
+      if (
+        payload?.endDate &&
+        (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
+      ) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: eventFromDb.id,
+          endDate: eventFromDb.endDate,
+        } as Event);
+      }
+      //ends here
+      //ends here
+
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
        * send email notification if date, time, location is updated
@@ -2440,9 +2558,47 @@ export class EventsService {
       throw new BadRequestError(`Error occurred while updating event: ${error?.message}`);
     } finally {
       // Release the query runner
-
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Sends event reminder emails to all eligible guests 24 hours before the event.
+   *
+   * This function retrieves all guests associated with the event whose statuses
+   * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`).
+   * It then prepares and sends email reminders to those guests.
+   *
+   * @param {Event} event - The event for which reminders need to be sent.
+   * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
+   */
+  public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
+    const guestStatuses: GuestStatus[] = [
+      GuestStatus.INVITED,
+      GuestStatus.CONFIRMED,
+      GuestStatus.APPLIED,
+    ];
+    const guests = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .where('guest.event = :eventId', { eventId: event.id })
+      .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
+      .getMany();
+    if (!guests.length) return;
+    const emailPromises = guests.map(guest => {
+      if (!guest?.user?.email) return;
+      const mailPayload = {
+        eventName: event.name || 'Event',
+        imageFlyer: event.imageFlyer,
+        eventDate: event.startDate,
+        location: event.location?.location,
+        city: event.location?.city,
+      };
+      // return
+      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
+    });
+    await Promise.allSettled(emailPromises);
   }
 
   /**
@@ -2494,7 +2650,13 @@ export class EventsService {
           location: event.location.location,
           city: event.location.city,
         };
-        sendEventUpdation(createMailPayload, guest.user.email, guest.user.id, event.id);
+        sendEventUpdation(
+          createMailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone,
+        );
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
@@ -2788,60 +2950,20 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
-      const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.startDate);
-      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
-      const params = [
-        {
-          key: 'event_name',
-          value: updatedEvent.name,
-        },
-        {
-          key: 'company_name',
-          value: host.additionalHostInformation.companyName,
-        },
-        {
-          key: 'image_url',
-          value: updatedEvent.imageFlyer,
-        },
-        {
-          key: 'month',
-          value: month,
-        },
-        {
-          key: 'day',
-          value: day,
-        },
-        {
-          key: 'dayOfWeek',
-          value: dayOfWeek,
-        },
-        {
-          key: 'hour',
-          value: hour,
-        },
-        {
-          key: 'minutes',
-          value: minutes,
-        },
-        {
-          key: 'address',
-          value: updatedEvent.location.location,
-        },
-        {
-          key: 'view_event',
-          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
-        },
-      ];
-      if (updatedEvent.isPublished) {
-        await serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            params,
-            'Host Event Approved by Admin - Published',
-            [updatedEvent.owner.email],
-            null,
-          );
-      }
+      const createPayload = {
+        eventDate: updatedEvent.startDate,
+        eventName: updatedEvent.name,
+        imageFlyer: updatedEvent.imageFlyer,
+        location: updatedEvent.location.location,
+        city: updatedEvent.location.city,
+      };
+      sendEventPublishedApproval(
+        createPayload,
+        updatedEvent.owner.email,
+        host.additionalHostInformation.companyName,
+        updatedEvent.id,
+        updatedEvent.timeZone,
+      );
     }
     return;
   }
@@ -2921,6 +3043,7 @@ export class EventsService {
     return responses.data(toEvent(createdEvent, null));
   }
 
+  //TODO: this api is being used
   public static async publishPendingEvents(): Promise<string> {
     const now = new Date();
     const status = EventStatusEnum.APPROVED_STATUS;
@@ -2944,6 +3067,7 @@ export class EventsService {
     return;
   }
 
+  //this is not being used anywhere
   public static validateEventUpdate(
     event: Event,
     payload: UpdateEventRequestDto,
@@ -2996,10 +3120,25 @@ export class EventsService {
       return responses.conflict('Event is already in the selected status');
     if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      if (event.publishDate) {
-        event.isPublished = new Date(event.publishDate) <= new Date();
-      } else {
+      if (!event.publishDate) {
         event.isPublished = true;
+      } else {
+        SchedulerService.scheduleEventPublishDate({
+          id: event.id,
+          publishDate: event.publishDate,
+        } as Event);
+      }
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
+      }
+      if (event?.startDate) {
+        SchedulerService.prepareEventReminderDataAndSchedule({
+          id: event.id,
+          startDate: event.startDate,
+        } as Event);
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3025,88 +3164,48 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
-      const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.startDate);
-      const redirectPath = `events/event-details?id=${updatedEvent.id}`;
-      const params = [
-        {
-          key: 'event_name',
-          value: updatedEvent.name,
-        },
-        {
-          key: 'company_name',
-          value: host.additionalHostInformation.companyName,
-        },
-        {
-          key: 'image_url',
-          value: updatedEvent.imageFlyer,
-        },
-        {
-          key: 'month',
-          value: month,
-        },
-        {
-          key: 'day',
-          value: day,
-        },
-        {
-          key: 'dayOfWeek',
-          value: dayOfWeek,
-        },
-        {
-          key: 'hour',
-          value: hour,
-        },
-        {
-          key: 'minutes',
-          value: minutes,
-        },
-        {
-          key: 'address',
-          value: updatedEvent.location.location,
-        },
-        {
-          key: 'view_event',
-          value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
-        },
-      ];
       if (updatedEvent.isPublished) {
-        serviceMesh
-          .notificationService()
-          .sendEmailFromTemplate(
-            params,
-            'Host Event Approved by Admin - Published',
-            [updatedEvent.owner.email],
-            null,
-          );
-        // Send Push Notification
-        serviceMesh
-          .notificationService()
-          .sendNotification(
-            NotificationType.EVENT_APPROVED,
-            updatedEvent.owner.id,
-            updatedEvent.id,
-          );
-      } else {
-        const { month, day, dayOfWeek, hour, minutes } = extractDate(updatedEvent.publishDate);
-        params.push(
-          {
-            key: 'publish_date',
-            value: `${dayOfWeek}, ${month} ${day} `,
-          },
-          {
-            key: 'publish_time',
-            value: `${hour}: ${minutes}`,
-          },
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+        };
+        sendEventPublishedApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.timeZone,
         );
+        // Send Push Notification
         try {
           serviceMesh
             .notificationService()
-            .sendEmailFromTemplate(
-              params,
-              'Host Event Approved by Admin - Pre-Publish',
-              [updatedEvent.owner.email],
-              null,
+            .sendNotification(
+              NotificationType.EVENT_APPROVED,
+              updatedEvent.owner.id,
+              updatedEvent.id,
             );
+        } catch (err) {}
+      } else {
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+        };
+        sendEventPrePublishApproval(
+          createPayload,
+          updatedEvent.owner.email,
+          host.additionalHostInformation.companyName,
+          updatedEvent.id,
+          updatedEvent.publishDate,
+          updatedEvent.timeZone,
+        );
+        try {
           //Send Push Notifications
           serviceMesh
             .notificationService()
@@ -3124,15 +3223,7 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          { key: 'event_name', value: updatedEvent.name },
-          { key: 'host_name', value: host.firstName },
-        ],
-        'Host Event Rejected by Admin',
-        [updatedEvent.owner.email.trim()],
-        null,
-      );
+      sendEventRejection(updatedEvent.name, host.firstName, updatedEvent.owner.email);
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3225,6 +3316,7 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
+        ticketDescription: guest.ticketType.description ?? undefined,
       };
     }
 
@@ -3236,6 +3328,7 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
+      ticketDescription: guest.ticketType.description ?? undefined,
     };
   }
 
@@ -3392,9 +3485,7 @@ export class EventsService {
    * 7. If all notification attempts fail, do not update the event status.
    * 8. Commit the transaction if at least one notification is successful.
    */
-  public static async cancelEventAndNotify(
-    payload: CancelEventAndNotifyRequestDto,
-  ): Promise<string> {
+  public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3419,7 +3510,8 @@ export class EventsService {
         throw new Error('It is not approved event.');
       }
 
-      if (event.owner.id !== payload.ownerId) {
+      // Permitir cancelar si es admin o propietario
+      if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
       }
       // Step 2: Collect unique collaborators
@@ -3504,6 +3596,7 @@ export class EventsService {
               guest.user.email,
               guestName,
               message,
+              event.timeZone,
             );
             if (mailServiceResponse) {
               notificationSuccess = true;
@@ -3546,15 +3639,17 @@ export class EventsService {
       //step 7: resolve notification promices
       let resolvedPromices = await Promise.allSettled(notificationPromises);
 
-      const notificationRecipients = guests.map((data: Guest) => data.user.id);
-      serviceMesh
-        .notificationService()
-        .sendNotification(
-          NotificationType.EVENT_CANCELLED,
-          notificationRecipients,
-          eventId,
-          event.owner.id,
-        );
+      try {
+        const notificationRecipients = guests.map((data: Guest) => data.user.id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_CANCELLED,
+            notificationRecipients,
+            eventId,
+            event.owner.id,
+          );
+      } catch (err) {}
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
@@ -3637,21 +3732,16 @@ export class EventsService {
     if (status && validStatuses.includes(status)) {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
-    } else if (
-      status === EventStatusEnum.UPCOMING_STATUS ||
-      status === EventStatusEnum.PAST_STATUS
-    ) {
-      // Filter for approved events first
+    } else if (status === EventStatusEnum.UPCOMING_STATUS) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-
-      // Add specific date filtering based on the requested status
-      if (status === EventStatusEnum.UPCOMING_STATUS) {
-        query.andWhere('event.end_date > :currentTime', { currentTime });
-      } else if (status === EventStatusEnum.PAST_STATUS) {
-        query.andWhere('event.end_date < :currentTime', { currentTime });
-      }
+      query.andWhere('event.end_date > :currentTime', { currentTime });
+    } else if (status === EventStatusEnum.PAST_STATUS) {
+      query.andWhere('event.status = :pastStatus', {
+        pastStatus: EventStatusEnum.PAST_STATUS,
+      });
+      query.andWhere('event.end_date < :currentTime', { currentTime });
     }
 
     // Apply pagination if necessary
@@ -3686,10 +3776,50 @@ export class EventsService {
         );
       },
     );
+    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,
     };
+  }
+
+  public static async getHostEventCountByStatus(
+    payload: RequestByIdDto,
+  ): Promise<HostEventsCountByStatusResponse> {
+    const { id: userId } = payload;
+    const queryResult = await this.dbConnection
+      .getRepository(Event)
+      .createQueryBuilder('event')
+      .leftJoin('event.owner', 'owner')
+      .select([
+        'COUNT(*) FILTER (WHERE event.status = :approved) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
+      ])
+      .where('event.owner_id = :userId', { userId })
+      .setParameters({
+        approved: EventStatusEnum.APPROVED_STATUS,
+        draft: EventStatusEnum.DRAFT_STATUS,
+        pending: EventStatusEnum.PENDING_STATUS,
+        cancelled: EventStatusEnum.CANCELLED_STATUS,
+        past: EventStatusEnum.PAST_STATUS,
+        rejected: EventStatusEnum.REJECTED_STATUS,
+      })
+      .getRawOne();
+
+    return (
+      queryResult || {
+        approvedStatus: 0,
+        draftStatus: 0,
+        pendingStatus: 0,
+        cancelledStatus: 0,
+        pastStatus: 0,
+        rejectedStatus: 0,
+      }
+    );
   }
 
   public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventData> {
@@ -3875,6 +4005,7 @@ export class EventsService {
       return [];
     }
   }
+
   // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
   //   try {
   //     if (!payload.id || !payload.userId) {

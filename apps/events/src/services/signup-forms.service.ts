@@ -1,4 +1,8 @@
-import { SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  EventGuestRequest,
+  SignupFormsResponse,
+  UserSource,
+} from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { buildSignupFormsResponse } from 'rumor-utils/shared/events/mappers/signup-forms.mapper';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/events/entities/signup-form-static-questions.entity';
 import {
@@ -229,6 +233,21 @@ export class SignupFormsServices {
 
     const ids = [];
     const questionPromises: any[] = [];
+
+    /**---------TO DO:: HACKY FIX --------------------- */
+    if (!body.hasAccessForAdditionalGuests) {
+      const guestsWithStaticQuestions = await SignupFormQuestions.find({
+        where: { signupForms: { id: id } },
+      });
+      const hasAccessForAdditionalGuests = guestsWithStaticQuestions.find(
+        g => g.name === 'Request Access for Additional Guests',
+      );
+      if (hasAccessForAdditionalGuests) {
+        const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuests.id);
+        questionPromises.push(deleteQuestions);
+      }
+    }
+
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
@@ -256,8 +275,10 @@ export class SignupFormsServices {
             break;
         }
       }
+      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
       if (!body.hasAccessForAdditionalGuests) {
         if (q.name === 'Request Access for Additional Guests') {
+          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
         } else {
@@ -358,16 +379,57 @@ export class SignupFormsServices {
 
     if (user.id) {
       const guest = await Guest.findOne({
-        where: { user: { id: userPayload.id }, event: { id: eventId } },
+        where: { user: { id: user.id }, event: { id: eventId } },
+      });
+      if (guest) {
+        if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'You are already part of this event. Please log into application and check your event status.',
+          );
+        }
+        return [user, guest];
+      }
+    }
+    return [user, new Guest()];
+  }
+
+  public static async validateGuestExistence(userPayload: EventGuestRequest): Promise<string> {
+    let userFoundWithEmail = null;
+    let userFoundWithPhone = null;
+    if (userPayload?.email) {
+      userFoundWithEmail = await User.findOne({
+        where: { email: userPayload.email.trim().toLowerCase() },
+      });
+    }
+    if (userPayload?.phoneNumber) {
+      userFoundWithPhone = await User.findOne({
+        where: { phoneNumber: userPayload.phoneNumber },
+      });
+    }
+    if (!userPayload || (!userPayload.email && !userPayload.phoneNumber)) {
+      throw new BadRequestError('User information (email or phone) is required.');
+    }
+    if (userFoundWithEmail?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithEmail.id }, event: { id: userPayload.id } },
       });
       if (guest && guest.status !== GuestStatus.DRAFT) {
         throw new ForbiddenError(
-          'You are already part of this event. Please log into application and check your event status.',
+          'This email address is already associated with a status on the guest list.',
         );
       }
-      return [user, guest];
     }
-    return [user, new Guest()];
+    if (userFoundWithPhone?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithPhone.id }, event: { id: userPayload.id } },
+      });
+      if (guest && guest.status !== GuestStatus.DRAFT) {
+        throw new ForbiddenError(
+          'This phone number is already associated with a status on the guest list.',
+        );
+      }
+    }
+    return '';
   }
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
@@ -427,10 +489,18 @@ export class SignupFormsServices {
       await queryRunner.manager.save(submissions);
 
       /**-- Create Host User Mapping */
-      const hostUserMapping = new HostUserMapping();
-      hostUserMapping.user = { id: userPayload.id } as User;
-      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
-      await queryRunner.manager.save(hostUserMapping);
+      const existingMapping = await HostUserMapping.findOne({
+        where: {
+          user: { id: userPayload.id },
+          host: { id: signupForm.event.owner.id },
+        },
+      });
+      if (!existingMapping) {
+        const hostUserMapping = new HostUserMapping();
+        hostUserMapping.user = { id: userPayload.id } as User;
+        hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+        await queryRunner.manager.save(hostUserMapping);
+      }
 
       await queryRunner.commitTransaction();
 
@@ -570,7 +640,7 @@ export class SignupFormsServices {
         .addSelect('gst.status', 'status')
         .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
-        .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
+        .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -593,7 +663,16 @@ export class SignupFormsServices {
           }),
         );
       }
-      submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        submissionsQuery
+          .addOrderBy('atd.firstName', sortDirection)
+          .addOrderBy('atd.lastName', sortDirection)
+          .offset(skip)
+          .limit(take);
+      } else {
+        submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      }
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();

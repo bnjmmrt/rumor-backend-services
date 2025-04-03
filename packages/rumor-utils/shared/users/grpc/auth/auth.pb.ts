@@ -952,6 +952,7 @@ export interface UserWithRoles {
   isFirstTimeLoggedIn?: boolean | undefined;
   phoneNumber?: string | undefined;
   profilePicture?: string | undefined;
+  instagramUserName?: string | undefined;
 }
 
 export interface GetUserWithRolesByEmailResponse {

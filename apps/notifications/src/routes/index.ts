@@ -51,11 +51,7 @@ router.post('/notification/push', NotificationController.sendPushNotification);
  * Routes for  - User Notifications - Host, Member
  */
 
-router.get(
-  '/notifications',
-  AuthMiddleware.fusionAuthRequired,
-  NotificationController.getAllNotifications,
-);
+router.get('/notifications', AuthMiddleware.fusionAuth, NotificationController.getAllNotifications);
 router.get(
   '/notification/:notificationId',
   AuthMiddleware.fusionAuthRequired,
@@ -77,7 +73,7 @@ router.get(
 );
 router.get(
   '/notifications/summary',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   NotificationController.getNotificationSummary,
 );
 router.delete(

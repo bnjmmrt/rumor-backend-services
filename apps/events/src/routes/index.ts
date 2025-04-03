@@ -12,7 +12,7 @@ import { TicketTypeController } from '../controllers/ticket-type.controller';
 import { CollaboratorController } from '../controllers/collaborator.controller';
 import { AdmissionTypeController } from '../controllers/admission-type.controller';
 import { FeaturedEventSectionsController } from '../controllers/featured-event-sections.controller';
-import { validateRequest } from '../server/middleware/validate-request'
+import { validateRequest } from '../server/middleware/validate-request';
 
 const router: Router = express.Router();
 
@@ -107,6 +107,8 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   SignupFormsController.listSubmissions,
 );
+
+router.post('/signup-forms/check-guest-exists', SignupFormsController.checkIfGuestExists);
 
 // router.patch(
 //   "/signup-forms/:id/set-name",
@@ -274,6 +276,13 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   EventsController.listHostEvents,
 ); /**TestStatus: working */
+
+router.get(
+  '/hosts/events/count-by-status',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getHostEventCountByStatus,
+); /**TestStatus: working */
+
 //admin status
 router.put(
   '/admin/events/:eventId/status',

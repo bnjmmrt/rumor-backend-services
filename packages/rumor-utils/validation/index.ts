@@ -3,16 +3,16 @@ import { validate as classValidate } from 'class-validator';
 import { NotFoundError } from '../errors';
 import DtoMap from './dto-map';
 
-const parseErrors = (errors) => {
+const parseErrors = errors => {
   const errorsObject = {};
 
-  errors.forEach((err) => {
+  errors.forEach(err => {
     const key = err.property;
     const messages = Object.values(err.constraints || {});
     errorsObject[key] = messages;
   });
 
-  return Object.keys(errorsObject).map((field) => ({
+  return Object.keys(errorsObject).map(field => ({
     field,
     errors: errorsObject[field],
   }));
