@@ -2301,7 +2301,8 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined || payload.publishDate !== null) {  //if publish date is not in payload still this condition is true
+      if (payload.publishDate != undefined || payload.publishDate !== null) {
+        //if publish date is not in payload still this condition is true
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
@@ -3756,14 +3757,16 @@ export class EventsService {
         );
       },
     );
-    console.log("🚀 ~ getHostEventCountByStatus ~ payload:", payload)
+    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,
     };
   }
-  
-  public static async getHostEventCountByStatus(payload: RequestByIdDto): Promise<HostEventsCountByStatusResponse> {
+
+  public static async getHostEventCountByStatus(
+    payload: RequestByIdDto,
+  ): Promise<HostEventsCountByStatusResponse> {
     const { id: userId } = payload;
     const queryResult = await this.dbConnection
       .getRepository(Event)
@@ -3788,16 +3791,18 @@ export class EventsService {
       })
       .getRawOne();
 
-    return queryResult || {
-      approvedStatus: 0,
-      draftStatus: 0,
-      pendingStatus: 0,
-      cancelledStatus: 0,
-      pastStatus: 0,
-      rejectedStatus: 0,
-    };
+    return (
+      queryResult || {
+        approvedStatus: 0,
+        draftStatus: 0,
+        pendingStatus: 0,
+        cancelledStatus: 0,
+        pastStatus: 0,
+        rejectedStatus: 0,
+      }
+    );
   }
-  
+
   public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventData> {
     try {
       if (!payload.id || !payload.userId) {

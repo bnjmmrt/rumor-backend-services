@@ -587,7 +587,7 @@ export class SignupFormsServices {
         .addSelect('gst.status', 'status')
         .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
-        .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
+        .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -610,11 +610,19 @@ export class SignupFormsServices {
           }),
         );
       }
-      submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        submissionsQuery
+          .addOrderBy('atd.firstName', sortDirection)
+          .addOrderBy('atd.lastName', sortDirection)
+          .offset(skip)
+          .limit(take);
+      } else {
+        submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      }
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
-      console.log('🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:', submissionList);
       const result = { count, result: submissionList };
       return result;
     } catch (err) {
