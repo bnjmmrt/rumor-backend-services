@@ -108,6 +108,11 @@ router.get(
   SignupFormsController.listSubmissions,
 );
 
+router.post(
+  '/signup-forms/check-guest-exists',
+  SignupFormsController.checkIfGuestExists,
+);
+
 // router.patch(
 //   "/signup-forms/:id/set-name",
 //   AuthMiddleware.fusionAuthRequired,
