@@ -274,6 +274,13 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   EventsController.listHostEvents,
 ); /**TestStatus: working */
+
+router.get(
+  '/hosts/events/count-by-status',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getHostEventCountByStatus,
+); /**TestStatus: working */
+
 //admin status
 router.put(
   '/admin/events/:eventId/status',
