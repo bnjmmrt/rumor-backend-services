@@ -13,9 +13,9 @@ const start = async () => {
     if (config.get('runMigrations')) {
       await connectionManager.runMigrations();
     }
-    // await Seeders.seedEventTypes()
-    // await Seeders.seedEventAgeLimits()
-    //  await Seeders.seedDefaultRoleSettings()
+    await Seeders.seedEventTypes()
+    await Seeders.seedEventAgeLimits()
+     await Seeders.seedDefaultRoleSettings()
     if (config.get('runSeeds')) {
       await connectionManager.runSeeders();
     }
