@@ -375,14 +375,16 @@ export class SignupFormsServices {
 
     if (user.id) {
       const guest = await Guest.findOne({
-        where: { user: { id: userPayload.id }, event: { id: eventId } },
+        where: { user: { id: user.id }, event: { id: eventId } },
       });
-      if (guest && guest.status !== GuestStatus.DRAFT) {
-        throw new ForbiddenError(
-          'You are already part of this event. Please log into application and check your event status.',
-        );
+      if (guest) {
+        if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'You are already part of this event. Please log into application and check your event status.',
+          );
+        }
+        return [user, guest];
       }
-      return [user, guest];
     }
     return [user, new Guest()];
   }
@@ -485,10 +487,18 @@ export class SignupFormsServices {
       await queryRunner.manager.save(submissions);
 
       /**-- Create Host User Mapping */
-      const hostUserMapping = new HostUserMapping();
-      hostUserMapping.user = { id: userPayload.id } as User;
-      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
-      await queryRunner.manager.save(hostUserMapping);
+      const existingMapping = await HostUserMapping.findOne({
+        where: {
+          user: { id: userPayload.id },
+          host: { id: signupForm.event.owner.id },
+        },
+      });
+      if (!existingMapping) {
+        const hostUserMapping = new HostUserMapping();
+        hostUserMapping.user = { id: userPayload.id } as User;
+        hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+        await queryRunner.manager.save(hostUserMapping);
+      }
 
       await queryRunner.commitTransaction();
 
