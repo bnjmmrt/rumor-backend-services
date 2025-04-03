@@ -321,6 +321,9 @@ export class AuthService {
   public static async memberSignUp(
     payload: MemberSignUpRequestDto,
   ): Promise<UserIdWithRolesAndToken> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let existingUser: User | null = null;
     let fusionAuthUser = null;
     let requiresFusionAuthRegistration = false;
@@ -432,9 +435,9 @@ export class AuthService {
         },
       };
 
-      fusionAuthUser = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .register(newUser.id, registrationRequest);
+        fusionAuthUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
         throw new ConflictError(
           `There was an issue creating your user: ${fusionAuthUser.exception.name}`,
@@ -1011,6 +1014,9 @@ export class AuthService {
   }
 
   public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
       throw new NotFoundError('User');
@@ -1093,6 +1099,9 @@ export class AuthService {
   }
 
   public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
       throw new NotFoundError('User');
@@ -1211,6 +1220,9 @@ export class AuthService {
   public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
     if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1346,6 +1358,9 @@ export class AuthService {
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
     if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1509,7 +1524,7 @@ export class AuthService {
       });
       return {
         id: user.id,
-        token: completedLogin.response?.token,
+        token: completedLogin?.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -1558,6 +1573,9 @@ export class AuthService {
   }
 
   public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const user = await this.dbConnection.getRepository(User).findOne({
       where: {
         email: payload.email,
@@ -3712,6 +3730,9 @@ export class AuthService {
   }
 
   public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
@@ -3765,6 +3786,9 @@ export class AuthService {
   }
 
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let nonMember: UserRole | null;
     try {
       const response = await fusionAuthClientHandler

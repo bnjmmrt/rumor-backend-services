@@ -33,6 +33,7 @@ import {
   EventTypesData,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
+  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -2242,7 +2243,7 @@ export class EventsService {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-    //Imp Note: backend is expecting publish date should come everytime from frontend
+    //Imp Note: backend is expecting publish date should come everytime from frontend if not then set to null
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.id, deletedAt: IsNull() },
@@ -2298,7 +2299,7 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined) {
+      if (payload.publishDate != undefined || payload.publishDate !== null) {  //if publish date is not in payload still this condition is true
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
@@ -3733,12 +3734,48 @@ export class EventsService {
         );
       },
     );
+    console.log("🚀 ~ getHostEventCountByStatus ~ payload:", payload)
     return {
       result: formattedEvents,
       totalCount,
     };
   }
+  
+  public static async getHostEventCountByStatus(payload: RequestByIdDto): Promise<HostEventsCountByStatusResponse> {
+    const { id: userId } = payload;
+    const queryResult = await this.dbConnection
+      .getRepository(Event)
+      .createQueryBuilder('event')
+      .leftJoin('event.owner', 'owner')
+      .select([
+        'COUNT(*) FILTER (WHERE event.status = :approved) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
+      ])
+      .where('event.owner_id = :userId', { userId })
+      .setParameters({
+        approved: EventStatusEnum.APPROVED_STATUS,
+        draft: EventStatusEnum.DRAFT_STATUS,
+        pending: EventStatusEnum.PENDING_STATUS,
+        cancelled: EventStatusEnum.CANCELLED_STATUS,
+        past: EventStatusEnum.PAST_STATUS,
+        rejected: EventStatusEnum.REJECTED_STATUS,
+      })
+      .getRawOne();
 
+    return queryResult || {
+      approvedStatus: 0,
+      draftStatus: 0,
+      pendingStatus: 0,
+      cancelledStatus: 0,
+      pastStatus: 0,
+      rejectedStatus: 0,
+    };
+  }
+  
   public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventData> {
     try {
       if (!payload.id || !payload.userId) {
