@@ -136,7 +136,11 @@ export interface EventTypeData {
 export interface QueryRequest {
   query?: string | undefined;
 }
-
+export interface EventGuestRequest {
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
+  id: string;
+}
 export interface QuizQuestion {
   id: string;
   question: string;
