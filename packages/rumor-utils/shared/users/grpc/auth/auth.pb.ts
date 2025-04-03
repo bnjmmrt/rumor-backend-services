@@ -474,6 +474,7 @@ export interface Member {
   categories: string[];
   types: string[];
   status: any;
+  source?: any;
   profilePicture?: string | undefined;
   email: string;
   instagramUsername?: string | undefined;
@@ -482,6 +483,7 @@ export interface Member {
   role?: string | undefined;
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
+  sources?: string[] | undefined;
 }
 
 export interface GetMembersResponse {
@@ -573,6 +575,7 @@ export interface MemberProfile {
   roleId?: string | undefined;
   placeId?: string | undefined;
   eventCount: number;
+  sources?: string[] | undefined;
 }
 
 export interface FocusProto {

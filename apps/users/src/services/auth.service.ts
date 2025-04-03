@@ -3679,14 +3679,19 @@ export class AuthService {
             },
           });
 
-        return toMember(
+        const sources = user?.roles.map(item => item.source as string);
+
+        const member = toMember(
           user,
           focuses,
           interests,
           user.roles[0],
           socialNetworkObject,
           socialProvider?.username,
+          sources,
         );
+
+        return member;
       }),
     );
     return responses.data(members);
@@ -3699,29 +3704,48 @@ export class AuthService {
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const allEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
-      GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const upcomingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.start_date > now()
+            GROUP BY e.owner_id
+        `;
     const pastEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.end_date < now()
+            GROUP BY e.owner_id
+        `;
     const declinedEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DECLINED_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const draftEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DRAFT_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const pendingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'PENDING_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
 
     const queryBuilder = this.dbConnection
       .getRepository(User)
