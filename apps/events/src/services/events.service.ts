@@ -1365,10 +1365,11 @@ export class EventsService {
     const userRepo = this.dbConnection.getRepository(User);
     for (const csvUpload of csvUploads) {
       if (csvUpload.uploadedUsers.length > 0) {
-        await userRepo.createQueryBuilder()
+        await userRepo
+          .createQueryBuilder()
           .update(User)
           .set({ uploadedViaCsv: null })
-          .where("uploadedViaCsv.id = :csvUploadId", { csvUploadId: csvUpload.id })
+          .where('uploadedViaCsv.id = :csvUploadId', { csvUploadId: csvUpload.id })
           .execute();
       }
     }
