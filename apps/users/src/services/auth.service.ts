@@ -2065,7 +2065,7 @@ export class AuthService {
 
     const [memberRole, nonMemberRole] = await Promise.all([
       this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } }),
-      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } })
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } }),
     ]);
 
     if (!memberRole || !nonMemberRole) {
@@ -2087,16 +2087,20 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
-      const rolesForUser = userRoles.filter((ur) => ur.user.id === user.id);
-      const memberUserRole = rolesForUser.find((ur) => ur.role.name === "member");
-      const nonMemberUserRole = rolesForUser.find((ur) => ur.role.name === "non_member");
+      const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
+      const memberUserRole = rolesForUser.find(ur => ur.role.name === 'member');
+      const nonMemberUserRole = rolesForUser.find(ur => ur.role.name === 'non_member');
 
       if (!memberUserRole && !nonMemberUserRole) continue; // Skip if no relevant role
 
       switch (payload.status) {
         case UserStatus.ACTIVE:
           if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.ACTIVE, newRole: memberRole });
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              newRole: memberRole,
+            });
           } else if (memberUserRole) {
             usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE });
           }
@@ -2110,7 +2114,11 @@ export class AuthService {
 
         case UserStatus.WAITLISTED:
           if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.WAITLISTED, newRole: nonMemberRole });
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              newRole: nonMemberRole,
+            });
           } else if (nonMemberUserRole) {
             usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED });
           }
