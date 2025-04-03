@@ -4745,7 +4745,7 @@ export class AuthService {
     }
 
     if (host.customLists.some(list => list.listName === customName)) {
-      throw new BadRequestError('customName exists');
+      throw new BadRequestError('List name already exists');
     }
 
     let existingList;
