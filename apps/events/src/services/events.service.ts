@@ -137,6 +137,7 @@ import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
+import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -1353,6 +1354,23 @@ export class EventsService {
       event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
     if (isEventApprovedAndNotEnded) {
       throw new ConflictError('Cannot delete an approved event that has not ended');
+    }
+
+    const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
+      where: { event: { id: event.id } },
+      relations: ['uploadedUsers'],
+    });
+
+    // Set uploadedViaCsv to null for users associated with these CSV records
+    const userRepo = this.dbConnection.getRepository(User);
+    for (const csvUpload of csvUploads) {
+      if (csvUpload.uploadedUsers.length > 0) {
+        await userRepo.createQueryBuilder()
+          .update(User)
+          .set({ uploadedViaCsv: null })
+          .where("uploadedViaCsv.id = :csvUploadId", { csvUploadId: csvUpload.id })
+          .execute();
+      }
     }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
