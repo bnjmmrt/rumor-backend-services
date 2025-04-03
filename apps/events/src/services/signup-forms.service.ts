@@ -1,4 +1,4 @@
-import { SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventGuestRequest, SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { buildSignupFormsResponse } from 'rumor-utils/shared/events/mappers/signup-forms.mapper';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/events/entities/signup-form-static-questions.entity';
 import {
@@ -387,6 +387,47 @@ export class SignupFormsServices {
     return [user, new Guest()];
   }
 
+  public static async validateGuestExistence(
+    userPayload: EventGuestRequest
+  ): Promise<string> {
+    let userFoundWithEmail = null
+    let userFoundWithPhone = null
+    if (userPayload?.email) {
+      userFoundWithEmail = await User.findOne({
+        where: { email: userPayload.email.trim().toLowerCase() },
+      });
+    } 
+     if (userPayload?.phoneNumber) {
+      userFoundWithPhone = await User.findOne({
+        where: { phoneNumber: userPayload.phoneNumber },
+      });
+    } 
+    if(!userPayload || (!userPayload.email && !userPayload.phoneNumber)) {
+      throw new BadRequestError('User information (email or phone) is required.');
+    }
+    if (userFoundWithEmail?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithEmail.id }, event: { id: userPayload.id } },
+      });
+      if (guest && guest.status !== GuestStatus.DRAFT) {
+        throw new ForbiddenError(
+          'This email address is already associated with a status on the guest list.',
+        );
+      }
+    }
+    if (userFoundWithPhone?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithPhone.id }, event: { id: userPayload.id } },
+      });
+      if (guest && guest.status !== GuestStatus.DRAFT) {
+        throw new ForbiddenError(
+          'This phone number is already associated with a status on the guest list.',
+        );
+      }
+    }
+    return "";
+  }
+
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
     try {
       const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
@@ -587,7 +628,7 @@ export class SignupFormsServices {
         .addSelect('gst.status', 'status')
         .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
-        .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
+        .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -610,11 +651,19 @@ export class SignupFormsServices {
           }),
         );
       }
-      submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        submissionsQuery
+          .addOrderBy('atd.firstName', sortDirection)
+          .addOrderBy('atd.lastName', sortDirection)
+          .offset(skip)
+          .limit(take);
+      } else {
+        submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      }
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
-      console.log('🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:', submissionList);
       const result = { count, result: submissionList };
       return result;
     } catch (err) {

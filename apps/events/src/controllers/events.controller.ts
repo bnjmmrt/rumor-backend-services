@@ -11,6 +11,7 @@ import {
   GenerateTicketForGuestResponse,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
+  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -433,6 +434,17 @@ export class EventsController {
       const queryParams = JSON.stringify(req.query);
       const payload: ListHostEventsDto = { userId: id, query: queryParams };
       const response: PaginatedEventsResponse = await EventsService.listHostEvents(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static getHostEventCountByStatus = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const id = (req as any).user;
+      const payload: RequestByIdDto = { id };
+      const response: HostEventsCountByStatusResponse =
+        await EventsService.getHostEventCountByStatus(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },

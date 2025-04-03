@@ -3349,7 +3349,7 @@ export class GuestService {
               firstName: row.firstName,
               lastName: row.lastName,
               email: row.email ? row.email : '',
-              phoneNumbers: row.phoneNumber ? row.phoneNumber : '',
+              phoneNumber: row.phoneNumber ? row.phoneNumber : '',
               reason: 'User already exists',
             };
             garbageData.push(user);

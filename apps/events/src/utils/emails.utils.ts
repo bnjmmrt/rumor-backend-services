@@ -580,8 +580,8 @@ export const sendEventReminder = (
   eventId: string,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-    const redirectPath = `users/${userId}/events/${eventId}`;  //TODO  : this should be view rsvp button url (need to update)
-    const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+  const redirectPath = `users/${userId}/events/${eventId}`; //TODO  : this should be view rsvp button url (need to update)
+  const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { SignupFormsServices } from '../services/signup-forms.service';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/entities';
-import { SignupFormsResponse } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { EventGuestRequest, SignupFormsResponse } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { GetResponse } from 'rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import {
@@ -10,6 +10,7 @@ import {
 } from 'rumor-utils/shared/events/dtos/signup-forms.dto';
 import { BadRequestError } from 'rumor-utils/errors';
 import { UpdateResult } from 'typeorm';
+import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 export class SignupFormsController {
   public static getStaticQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
@@ -63,6 +64,27 @@ export class SignupFormsController {
     const id = req.params.id;
     const payload = req.body as SignupFormAnswersDto[];
     await SignupFormsServices.answers(id, eventId, payload);
+    res.json(new GetResponse({}));
+  });
+
+  public static checkIfGuestExists = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const payload = req.body as EventGuestRequest;
+    if( !payload.email && !payload.phoneNumber) {
+      throw new BadRequestError('User information (email or phone) is required.');
+    }
+
+    if (payload.email) {
+      if (!isValidEmail(payload.email.trim())) {
+        throw new BadRequestError("Email is not valid");
+      }
+    }
+
+    if (payload.phoneNumber) {
+      if (!isValidPhoneNumber(payload.phoneNumber)) {
+        throw new BadRequestError("Phone number is not valid");
+      }
+    }
+    await SignupFormsServices.validateGuestExistence(payload);
     res.json(new GetResponse({}));
   });
 

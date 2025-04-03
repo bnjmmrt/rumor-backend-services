@@ -33,6 +33,7 @@ import {
   EventTypesData,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
+  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -136,7 +137,7 @@ import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
-
+import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -333,8 +334,11 @@ export class EventsService {
       }
 
       //schedule event for cancelled status if not approved
-      if(event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+      if (event.endDate) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
       }
       //ends here
 
@@ -1351,6 +1355,23 @@ export class EventsService {
     if (isEventApprovedAndNotEnded) {
       throw new ConflictError('Cannot delete an approved event that has not ended');
     }
+
+    const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
+      where: { event: { id: event.id } },
+      relations: ['uploadedUsers'],
+    });
+
+    // Set uploadedViaCsv to null for users associated with these CSV records
+    const userRepo = this.dbConnection.getRepository(User);
+    for (const csvUpload of csvUploads) {
+      if (csvUpload.uploadedUsers.length > 0) {
+        await userRepo.createQueryBuilder()
+          .update(User)
+          .set({ uploadedViaCsv: null })
+          .where("uploadedViaCsv.id = :csvUploadId", { csvUploadId: csvUpload.id })
+          .execute();
+      }
+    }
     await this.dbConnection.getRepository(Event).remove(event);
     return;
   }
@@ -2242,7 +2263,7 @@ export class EventsService {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-    //Imp Note: backend is expecting publish date should come everytime from frontend
+    //Imp Note: backend is expecting publish date should come everytime from frontend if not then set to null
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.id, deletedAt: IsNull() },
@@ -2298,7 +2319,8 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (payload.publishDate != undefined) {
+      if (payload.publishDate != undefined || payload.publishDate !== null) {
+        //if publish date is not in payload still this condition is true
         if (event.status == EventStatusEnum.APPROVED_STATUS) {
           if (payload.publishDate) {
             event.publishDate = new Date(payload.publishDate);
@@ -2422,18 +2444,31 @@ export class EventsService {
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
         if (!eventFromDb.isPublished && eventFromDb.publishDate) {
-          SchedulerService.scheduleEventPublishDate({ id: eventFromDb.id, publishDate: eventFromDb.publishDate } as Event);
+          SchedulerService.scheduleEventPublishDate({
+            id: eventFromDb.id,
+            publishDate: eventFromDb.publishDate,
+          } as Event);
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {
-          SchedulerService.prepareEventReminderDataAndSchedule({ id: eventFromDb.id, startDate: eventFromDb.startDate } as Event)
+          SchedulerService.prepareEventReminderDataAndSchedule({
+            id: eventFromDb.id,
+            startDate: eventFromDb.startDate,
+          } as Event);
         }
       }
-      if (payload?.endDate && (eventFromDb.status === EventStatusEnum.PENDING_STATUS || eventFromDb.status === EventStatusEnum.APPROVED_STATUS)) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: eventFromDb.id, endDate: eventFromDb.endDate } as Event);
+      if (
+        payload?.endDate &&
+        (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
+      ) {
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: eventFromDb.id,
+          endDate: eventFromDb.endDate,
+        } as Event);
       }
-      //ends here 
-     //ends here
+      //ends here
+      //ends here
 
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
@@ -3086,15 +3121,23 @@ export class EventsService {
       event.status = EventStatusEnum.APPROVED_STATUS;
       if (!event.publishDate) {
         event.isPublished = true;
-      }
-      else {
-        SchedulerService.scheduleEventPublishDate({ id: event.id, publishDate: event.publishDate } as Event);
+      } else {
+        SchedulerService.scheduleEventPublishDate({
+          id: event.id,
+          publishDate: event.publishDate,
+        } as Event);
       }
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({ id: event.id, endDate: event.endDate } as Event);
+        SchedulerService.scheduleEventPastAndCancelledDate({
+          id: event.id,
+          endDate: event.endDate,
+        } as Event);
       }
       if (event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({ id: event.id, startDate: event.startDate } as Event)
+        SchedulerService.prepareEventReminderDataAndSchedule({
+          id: event.id,
+          startDate: event.startDate,
+        } as Event);
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3693,8 +3736,7 @@ export class EventsService {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
       query.andWhere('event.end_date > :currentTime', { currentTime });
-    }
-    else if (status === EventStatusEnum.PAST_STATUS) {
+    } else if (status === EventStatusEnum.PAST_STATUS) {
       query.andWhere('event.status = :pastStatus', {
         pastStatus: EventStatusEnum.PAST_STATUS,
       });
@@ -3733,10 +3775,50 @@ export class EventsService {
         );
       },
     );
+    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,
     };
+  }
+
+  public static async getHostEventCountByStatus(
+    payload: RequestByIdDto,
+  ): Promise<HostEventsCountByStatusResponse> {
+    const { id: userId } = payload;
+    const queryResult = await this.dbConnection
+      .getRepository(Event)
+      .createQueryBuilder('event')
+      .leftJoin('event.owner', 'owner')
+      .select([
+        'COUNT(*) FILTER (WHERE event.status = :approved) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
+      ])
+      .where('event.owner_id = :userId', { userId })
+      .setParameters({
+        approved: EventStatusEnum.APPROVED_STATUS,
+        draft: EventStatusEnum.DRAFT_STATUS,
+        pending: EventStatusEnum.PENDING_STATUS,
+        cancelled: EventStatusEnum.CANCELLED_STATUS,
+        past: EventStatusEnum.PAST_STATUS,
+        rejected: EventStatusEnum.REJECTED_STATUS,
+      })
+      .getRawOne();
+
+    return (
+      queryResult || {
+        approvedStatus: 0,
+        draftStatus: 0,
+        pendingStatus: 0,
+        cancelledStatus: 0,
+        pastStatus: 0,
+        rejectedStatus: 0,
+      }
+    );
   }
 
   public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventData> {

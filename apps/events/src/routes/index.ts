@@ -108,6 +108,11 @@ router.get(
   SignupFormsController.listSubmissions,
 );
 
+router.post(
+  '/signup-forms/check-guest-exists',
+  SignupFormsController.checkIfGuestExists,
+);
+
 // router.patch(
 //   "/signup-forms/:id/set-name",
 //   AuthMiddleware.fusionAuthRequired,
@@ -274,6 +279,13 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   EventsController.listHostEvents,
 ); /**TestStatus: working */
+
+router.get(
+  '/hosts/events/count-by-status',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getHostEventCountByStatus,
+); /**TestStatus: working */
+
 //admin status
 router.put(
   '/admin/events/:eventId/status',
