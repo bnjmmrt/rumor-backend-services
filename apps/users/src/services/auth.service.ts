@@ -555,31 +555,6 @@ export class AuthService {
       },
     });
 
-    // if (user) {
-    //   userRoleAsMemberOrNonMember = user.roles.find(item => {
-    //     if (item.role.name == 'non_member' || item.role.name == 'member') return item;
-    //   });
-
-    //   userRoleExistsAsHost = user.roles.find(item => {
-    //     if (item.role.name == 'host') return item;
-    //   });
-
-    //   userHasOtherRoles = user.roles.some(item => item.role.name !== 'non_member' && item.role.name !== 'member');
-
-    //   if (userRoleExistsAsHost) {
-    //     if (user.phoneNumber === payload.phoneNumber) {
-    //       throw new BadRequestError('This phone number is already associated with an account. Please use a different phone number');
-    //     }
-
-    //     if (user.email === payload.email) {
-    //       throw new BadRequestError('This email is already associated with an account. Please use a different email address');
-    //     }
-    //   }
-
-    //   if (userHasOtherRoles) {
-    //     throw new BadRequestError('Users with existing roles cannot sign up as a host.');
-    //   }
-    // }
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find(item => item.role.name === 'non_member' || item.role.name === 'member');
       userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
