@@ -443,7 +443,8 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const id = (req as any).user;
       const payload: RequestByIdDto = { id };
-      const response: HostEventsCountByStatusResponse =  await EventsService.getHostEventCountByStatus(payload);
+      const response: HostEventsCountByStatusResponse =
+        await EventsService.getHostEventCountByStatus(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
