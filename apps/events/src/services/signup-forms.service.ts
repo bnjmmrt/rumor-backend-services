@@ -387,14 +387,14 @@ export class SignupFormsServices {
     return [user, new Guest()];
   }
 
-  public static async validateGuestExistenceForEvent(
+  public static async validateGuestExistence(
     userPayload: EventGuestRequest
   ): Promise<string> {
     let userFoundWithEmail = null
     let userFoundWithPhone = null
     if (userPayload?.email) {
       userFoundWithEmail = await User.findOne({
-        where: { email: userPayload.email },
+        where: { email: userPayload.email.trim().toLowerCase() },
       });
     } 
      if (userPayload?.phoneNumber) {
