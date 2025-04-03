@@ -2694,6 +2694,11 @@ export class AuthService {
     const existingUserIds = customList.usersLists.map(listUser => listUser.user.id);
     const userIdsToAdd = userIds.filter(id => !existingUserIds.includes(id));
 
+    const userIdsAlreadyExist = userIds.filter(id => existingUserIds.includes(id));
+    if (userIdsAlreadyExist.length) {
+      throw new BadRequestError(`User already exist in the custom list.`);
+    }
+
     if (userIdsToAdd.length) {
       const validUsers = await this.dbConnection
         .getRepository(User)
@@ -4862,7 +4867,18 @@ export class AuthService {
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
     const note = hostUserSettings?.note ?? '';
-    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    const eventCount = await this.dbConnection
+      .getRepository(Guest)
+      .count({ where: { user: { id: user.id } } });
+    const userData = toMemberProfile(
+      user,
+      focuses,
+      interests,
+      userRole,
+      formattedLists,
+      undefined,
+      eventCount,
+    );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;
@@ -4957,6 +4973,13 @@ export class AuthService {
     );
     const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
 
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: payload.userId } },
+      relations: ['member'],
+    });
+
+    const favoriteUserIds = favorites.map(fav => fav.member.id);
+
     const users = await Promise.all(
       followedUsers.map(async user => {
         const focuses = await PlatformService.getUserFocuses({ id: user.id });
@@ -4976,9 +4999,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        return userData;
       }),
     );
     return { result: users, totalCount };

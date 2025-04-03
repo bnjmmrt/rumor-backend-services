@@ -16,7 +16,11 @@ export class SchedulerService {
             this.scheduleEventPublishDate({ id: e.id, publishDate: e.publishDate } as Event);
           }
           if (e.startDate) {
-            SchedulerService.prepareEventReminderDataAndSchedule({ id: e.id, startDate: e.startDate, name: e.name } as Event)
+            SchedulerService.prepareEventReminderDataAndSchedule({
+              id: e.id,
+              startDate: e.startDate,
+              name: e.name,
+            } as Event);
           }
         }
         if (eventEndDate > convertToEpoch(new Date())) {
@@ -56,7 +60,10 @@ export class SchedulerService {
           if (!savedEvent) {
             return; // Stop execution if the event is deleted
           }
-          if (savedEvent.status === EventStatusEnum.APPROVED_STATUS || savedEvent.status === EventStatusEnum.PENDING_STATUS) {
+          if (
+            savedEvent.status === EventStatusEnum.APPROVED_STATUS ||
+            savedEvent.status === EventStatusEnum.PENDING_STATUS
+          ) {
             const st =
               savedEvent.status === EventStatusEnum.APPROVED_STATUS
                 ? EventStatusEnum.PAST_STATUS
@@ -75,17 +82,17 @@ export class SchedulerService {
   public static async scheduleUserHardDelete() {}
 
   /**
- * Schedules an event reminder 24 hours before the event's start time.
- * 
- * This function calculates the reminder time (24 hours before `event.startDate` in UTC) 
- * and schedules a job using `node-schedule`. If the event start time is less than 24 hours 
- * from the current time, no reminder will be scheduled. When the job executes, it checks whether 
- * the event exists and has an `APPROVED_STATUS`. If so, it triggers the `sendEventRemindersToAllGuests` 
- * function to notify all guests.
- * 
- * @param {Event} e - The event for which the reminder needs to be scheduled.
- * @returns {Promise<void>} - A promise that resolves when the scheduling is complete, or no action is taken if the event starts in less than 24 hours.
- */
+   * Schedules an event reminder 24 hours before the event's start time.
+   *
+   * This function calculates the reminder time (24 hours before `event.startDate` in UTC)
+   * and schedules a job using `node-schedule`. If the event start time is less than 24 hours
+   * from the current time, no reminder will be scheduled. When the job executes, it checks whether
+   * the event exists and has an `APPROVED_STATUS`. If so, it triggers the `sendEventRemindersToAllGuests`
+   * function to notify all guests.
+   *
+   * @param {Event} e - The event for which the reminder needs to be scheduled.
+   * @returns {Promise<void>} - A promise that resolves when the scheduling is complete, or no action is taken if the event starts in less than 24 hours.
+   */
   public static async prepareEventReminderDataAndSchedule(e: Event): Promise<void> {
     try {
       const reminderTime = new Date(e.startDate);
@@ -96,7 +103,10 @@ export class SchedulerService {
         return;
       }
       schedule.scheduleJob(reminderTime, async () => {
-        const savedEvent = await Event.findOne({ where: { id: e.id }, relations: { location: true } });
+        const savedEvent = await Event.findOne({
+          where: { id: e.id },
+          relations: { location: true },
+        });
         if (!savedEvent) {
           return; // Stop execution if the event is deleted
         }
