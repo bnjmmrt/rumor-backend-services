@@ -435,9 +435,9 @@ export class AuthService {
         },
       };
 
-        fusionAuthUser = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .register(newUser.id, registrationRequest);
+      fusionAuthUser = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
         throw new ConflictError(
           `There was an issue creating your user: ${fusionAuthUser.exception.name}`,

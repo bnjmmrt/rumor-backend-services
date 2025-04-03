@@ -615,7 +615,8 @@ export class SignupFormsServices {
         submissionsQuery
           .addOrderBy('atd.firstName', sortDirection)
           .addOrderBy('atd.lastName', sortDirection)
-          .offset(skip).limit(take);;
+          .offset(skip)
+          .limit(take);
       } else {
         submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
       }
