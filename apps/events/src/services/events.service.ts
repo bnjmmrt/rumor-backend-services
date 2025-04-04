@@ -516,6 +516,15 @@ export class EventsService {
     eventLocationPayload: EventLocationDto,
     queryRunner: QueryRunner,
   ): Promise<EventLocation> {
+    if (
+      !eventLocationPayload.location ||
+      !eventLocationPayload.placeId ||
+      !eventLocationPayload.city ||
+      !eventLocationPayload.latitude ||
+      !eventLocationPayload.longitude
+    ) {
+      throw new Error('Invalid location data');
+    }
     // Create a new EventLocation entity from the payload
     const eventLocation = this.dbConnection.getRepository(EventLocation).create({
       location: eventLocationPayload.location,

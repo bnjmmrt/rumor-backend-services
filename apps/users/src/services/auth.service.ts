@@ -541,7 +541,11 @@ export class AuthService {
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
     payload.email = payload.email.toLowerCase();
-    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: UserRole | null;
+    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
+    let userHasOtherRoles: boolean = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
+
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -553,22 +557,35 @@ export class AuthService {
     });
 
     if (user) {
-      userRoleAsMemberOrNonMember = user.roles.find(item => {
-        if (item.role.name == 'non_member' || item.role.name == 'member') return item;
-      });
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
+      userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
-      userRoleExistsAsHost = user.roles.find(item => {
-        if (item.role.name == 'host') return item;
-      });
+      phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
+      emailInUse = user.email === payload.email;
 
       if (userRoleExistsAsHost) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError('Phone number is already in use.');
+        if (phoneNumberInUse && emailInUse) {
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
+        } else if (phoneNumberInUse) {
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
+        } else if (emailInUse) {
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
+      }
 
-        if (user.email === payload.email) {
-          throw new BadRequestError('Email is already in use.');
-        }
+      if (userHasOtherRoles) {
+        throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
     }
 
@@ -1303,7 +1320,13 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    try {
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ checkMemberLogin ~ error:", error)
+      throw new BadRequestError(JSON.stringify(error));
+    }
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -3672,14 +3695,19 @@ export class AuthService {
             },
           });
 
-        return toMember(
+        const sources = user?.roles.map(item => item.source as string);
+
+        const member = toMember(
           user,
           focuses,
           interests,
           user.roles[0],
           socialNetworkObject,
           socialProvider?.username,
+          sources,
         );
+
+        return member;
       }),
     );
     return responses.data(members);
@@ -3692,29 +3720,48 @@ export class AuthService {
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const allEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
-      GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const upcomingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.start_date > now()
+            GROUP BY e.owner_id
+        `;
     const pastEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.end_date < now()
+            GROUP BY e.owner_id
+        `;
     const declinedEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DECLINED_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const draftEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DRAFT_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const pendingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'PENDING_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
 
     const queryBuilder = this.dbConnection
       .getRepository(User)
@@ -3802,7 +3849,7 @@ export class AuthService {
     });
 
     const isAllowed = userRoles.find(
-      role => role.role.name === 'admin' || role.role.parentRole.name === 'admin',
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
@@ -4813,7 +4860,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }

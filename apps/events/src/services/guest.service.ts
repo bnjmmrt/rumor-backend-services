@@ -231,8 +231,13 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.result.length > 0)
-              return { message: `Guest created with status ${guestStatus}` };
+            if (createGuests.result.length > 0) {
+              if (createGuests.isExist) {
+                throw new BadRequestError(`The user already has a status on the guest list.`);
+              } else {
+                return { message: `Guest created with status ${guestStatus}` };
+              }
+            }
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -448,7 +453,7 @@ export class GuestService {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection
       .getRepository(Event)
-      .findOne({ where: { id: payload.eventId } });
+      .findOne({ where: { id: payload.eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
@@ -484,6 +489,7 @@ export class GuestService {
     }
 
     const emailsData = []; // Store guest emails for invitations
+    let isExist: boolean = false; // Flag to check if guest already exists
     const guests = await Promise.all(
       payload.users.map(async userId => {
         try {
@@ -509,6 +515,7 @@ export class GuestService {
             id: user.id,
             role: user.roles.flatMap(role => role.role.name),
           };
+          if (emailData) emailsData.push(emailData);
           // Check if the guest already exists in the event
           let guest = await this.dbConnection.getRepository(Guest).findOne({
             where: {
@@ -534,8 +541,9 @@ export class GuestService {
             }
             const data = await this.dbConnection.getRepository(Guest).save(guest);
             return data;
+          } else {
+            isExist = true;
           }
-          if (emailData) emailsData.push(emailData);
           return guest;
         } catch (err) {
           return null;
@@ -545,11 +553,8 @@ export class GuestService {
 
     // Filter out any null values from guests (failed guest additions)
     const validGuests = guests.filter(guest => guest !== null);
-
     // If guest status is "INVITED" and sendInvite is true, send invitation emails
-    // TO DO: Change email and sms template
-    if (guestStatus === GuestStatus.INVITED && payload.sendInvite) {
-      //To Do: Change email and sms template
+    if (guestStatus === GuestStatus.INVITED && payload.sendInvite && !isExist) {
       await Promise.all(
         emailsData.map(data => {
           if (data.role.includes('member')) {
@@ -624,7 +629,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return { result: guestsTransform, totalCount: guestsTransform.length };
+    return { result: guestsTransform, totalCount: guestsTransform.length, isExist };
   }
 
   /**
@@ -790,7 +795,6 @@ export class GuestService {
           where: { id: invitedGuestsEmails[0].eventId },
           relations: { location: true, owner: true },
         });
-        // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map(data => {
             if (data.role.includes('member')) {
@@ -846,7 +850,7 @@ export class GuestService {
                 );
             }
           }),
-        );
+        )
       }
 
       if (updatedGuests.length > 0 && confirmedGuestsEmails.length > 0 && payload.sendInvite) {
@@ -3576,6 +3580,8 @@ export class GuestService {
         checkExistingUser = (
           await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
         )?.data;
+      } else if (payload.email && payload.phoneNumber) {
+        throw new BadRequestError('Please provide either email or phone number, not both');
       }
     } catch (e) {
       checkExistingUser = null;

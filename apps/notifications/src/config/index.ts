@@ -3,6 +3,8 @@ import defaultConfig from './default';
 import developmentConfig from './development';
 import stagingConfig from './staging';
 import productionConfig from './production';
+import uatConfig from './uat';
+
 class Config {
   values: { [key: string]: any };
 
@@ -77,6 +79,10 @@ class Config {
 
         case 'production':
           await this.loadEnvironmentConfig(productionConfig);
+          break;
+
+        case 'uat':
+          await this.loadEnvironmentConfig(uatConfig);
           break;
 
         default:

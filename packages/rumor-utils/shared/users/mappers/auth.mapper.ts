@@ -166,6 +166,7 @@ export const toMember = (
   role: UserRole,
   socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
   instagramUsername: string = 'N/A',
+  sources?: string[],
 ): Member => {
   let totalFollowerCount = 0;
 
@@ -187,12 +188,13 @@ export const toMember = (
   return {
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
-    gender: user.gender,
+    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
     types: focuses.map(focus => focus.name),
     categories: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
     status: role.status ?? 'UNRECOGNIZED',
+    source: role.source ? entityToUserSource[role.source] : null,
     profilePicture: user.profilePicture,
     email: user.email,
     instagramUsername,
@@ -200,6 +202,7 @@ export const toMember = (
     age: calculateAge(user.dateOfBirth),
     phoneNumber: user.phoneNumber,
     dateOfBirth: user.dateOfBirth,
+    sources,
   };
 };
 
@@ -327,5 +330,8 @@ export const toMemberProfile = (
     customLists: customLists,
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount: eventCount,
+    sources: user.roles?.length
+      ? user.roles.filter(r => r.source !== null).map(item => item.source as string)
+      : [],
   };
 };

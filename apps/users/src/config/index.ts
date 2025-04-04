@@ -4,6 +4,7 @@ import developmentConfig from './development';
 import stagingConfig from './staging';
 import productionConfig from './production';
 // import { ProgrammerError } from '../utils/errors';
+import uatConfig from './uat';
 
 class Config {
   values: { [key: string]: any };
@@ -79,6 +80,10 @@ class Config {
 
         case 'production':
           await this.loadEnvironmentConfig(productionConfig);
+          break;
+
+        case 'uat':
+          await this.loadEnvironmentConfig(uatConfig);
           break;
 
         default:
