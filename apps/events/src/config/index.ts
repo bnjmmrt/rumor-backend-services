@@ -80,7 +80,7 @@ class Config {
         case 'production':
           await this.loadEnvironmentConfig(productionConfig);
           break;
-        
+
         case 'uat':
           await this.loadEnvironmentConfig(uatConfig);
           break;

@@ -118,15 +118,19 @@ export const groupCollaborators = (
     if (!Array.isArray(collaborators)) {
       return [];
     }
+
     const grouped = {};
     collaborators.forEach(collab => {
-      if (!collab?.user?.id) {
+      if (!collab?.user) {
+        console.log('Collaborator missing user object:', collab);
         return;
       }
+
       const { user, role, limitInvitationsNumber, ticketType, ...collaboratorDetails } = collab;
+
       if (!grouped[user.id]) {
         let isFollowedByCurrentGuest = false;
-        if (guest && hostsFollowedByGuest.length) {
+        if (guest && hostsFollowedByGuest?.length) {
           isFollowedByCurrentGuest = hostsFollowedByGuest.some(
             follow => follow.hostId === user.id && follow.followerId === memberUserId,
           );
@@ -134,7 +138,7 @@ export const groupCollaborators = (
         grouped[user.id] = {
           ...collaboratorDetails,
           id: user.id,
-          name: [user.firstName, user.lastName].filter(Boolean).join(' '), // Avoids "null undefined"
+          name: [user.firstName, user.lastName].filter(Boolean).join(' '),
           email: user.email || '',
           companyLogo: user.additionalHostInformation?.companyLogo || '',
           companyName: user.additionalHostInformation?.companyName || '',
@@ -142,9 +146,9 @@ export const groupCollaborators = (
           tickets: [],
           isFollowedByCurrentGuest,
           isApproved: false,
-          //TODO:add the status if collaborator is approved or accepted the invite
         };
       }
+
       if (ticketType?.id && ticketType?.name) {
         grouped[user.id].tickets.push({
           limitInvitationsNumber: limitInvitationsNumber,
