@@ -1515,7 +1515,7 @@ export class AuthService {
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
-          .passwordlessLogin({ code: temporaryCode.code });
+          .passwordlessLogin({ code: payload.code });
       } catch (error) {
         try {
           const verificationResult = isEmailLogin
