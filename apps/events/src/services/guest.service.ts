@@ -850,7 +850,7 @@ export class GuestService {
                 );
             }
           }),
-        )
+        );
       }
 
       if (updatedGuests.length > 0 && confirmedGuestsEmails.length > 0 && payload.sendInvite) {

@@ -73,7 +73,12 @@ export const sendEventInviteMember = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'Member: Event Invite Recieved', [data.email.trim()], null);
+      .sendEmailFromTemplate(
+        params,
+        'Member: Event Invite Recieved',
+        [data.email.trim().toLowerCase()],
+        null,
+      );
   } catch (error) {}
 };
 
@@ -137,7 +142,7 @@ export const sendEventInviteNonMember = (
       .sendEmailFromTemplate(
         params,
         'Non-Member: Event Invite Recieved',
-        [data.email.trim()],
+        [data.email.trim().toLowerCase()],
         null,
       );
   } catch (error) {}
@@ -201,7 +206,12 @@ export const sendEventCancellation = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'Event Cancelation Notification', [email.trim()], null);
+      .sendEmailFromTemplate(
+        params,
+        'Event Cancelation Notification',
+        [email.trim().toLowerCase()],
+        null,
+      );
   } catch (err) {}
 };
 
@@ -258,7 +268,7 @@ export const sendEventUpdation = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'Event Info Updated', [email.trim()], null);
+      .sendEmailFromTemplate(params, 'Event Info Updated', [email.trim().toLowerCase()], null);
   } catch (err) {}
 };
 
@@ -332,7 +342,7 @@ export const sendEventInvitePlusOnes = (
       .sendEmailFromTemplate(
         params,
         'Non-Member: Invited as Plus ones by Member',
-        [email.trim()],
+        [email.trim().toLowerCase()],
         null,
       );
   } catch (err) {}
@@ -394,7 +404,7 @@ export const sendGuestEventApproval = (
       .sendEmailFromTemplate(
         params,
         'User Event Request Approved',
-        [emailsData.email.trim()],
+        [emailsData.email.trim().toLowerCase()],
         null,
       );
   } catch (err) {}
@@ -417,7 +427,7 @@ export const sendEventAnnouncement = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'New Event Announcement', [email.trim()], null);
+      .sendEmailFromTemplate(params, 'New Event Announcement', [email.trim().toLowerCase()], null);
   } catch (error) {}
 };
 
@@ -479,7 +489,7 @@ export const sendEventPublishedApproval = (
       .sendEmailFromTemplate(
         params,
         'Host Event Approved by Admin - Published',
-        [email.trim()],
+        [email.trim().toLowerCase()],
         null,
       );
   } catch (e) {}
@@ -553,7 +563,7 @@ export const sendEventPrePublishApproval = (
       .sendEmailFromTemplate(
         params,
         'Host Event Approved by Admin - Pre-Publish',
-        [email.trim()],
+        [email.trim().toLowerCase()],
         null,
       );
   } catch (e) {}
@@ -577,7 +587,12 @@ export const sendEventRejection = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'Host Event Rejected by Admin', [email.trim()], null);
+      .sendEmailFromTemplate(
+        params,
+        'Host Event Rejected by Admin',
+        [email.trim().toLowerCase()],
+        null,
+      );
   } catch (e) {}
 };
 
@@ -634,6 +649,6 @@ export const sendEventReminder = (
   try {
     return serviceMesh
       .notificationService()
-      .sendEmailFromTemplate(params, 'Event 24 Hour Reminder', [email.trim()], null);
+      .sendEmailFromTemplate(params, 'Event 24 Hour Reminder', [email.trim().toLowerCase()], null);
   } catch (err) {}
 };
