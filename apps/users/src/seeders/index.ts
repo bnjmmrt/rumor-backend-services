@@ -67,7 +67,9 @@ export class Seeders {
     ];
 
     for (const interestData of interestsData) {
-      let interest = await this.dbConnection.getRepository(Interest).findOne({ where: { name: interestData.name } });
+      let interest = await this.dbConnection
+        .getRepository(Interest)
+        .findOne({ where: { name: interestData.name } });
       if (!interest) {
         interest = this.dbConnection.getRepository(Interest).create(interestData);
         await this.dbConnection.getRepository(Interest).save(interest);
@@ -97,7 +99,9 @@ export class Seeders {
     ];
 
     for (const focusData of focusesData) {
-      let focus = await this.dbConnection.getRepository(Focus).findOne({ where: { name: focusData.name } });
+      let focus = await this.dbConnection
+        .getRepository(Focus)
+        .findOne({ where: { name: focusData.name } });
       if (!focus) {
         focus = this.dbConnection.getRepository(Focus).create(focusData);
         await this.dbConnection.getRepository(Focus).save(focus);
@@ -105,4 +109,3 @@ export class Seeders {
     }
   }
 }
-
