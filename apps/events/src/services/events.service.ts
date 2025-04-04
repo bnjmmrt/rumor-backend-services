@@ -136,7 +136,10 @@ import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
-import { CsvUploadRecords, FeaturedEventSection } from '../../packages/rumor-utils/shared/events/entities';
+import {
+  CsvUploadRecords,
+  FeaturedEventSection,
+} from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -3477,7 +3480,7 @@ export class EventsService {
 
       await this.dbConnection.getRepository(Event).save(event);
 
-      return "Featured event saved successfully";
+      return 'Featured event saved successfully';
     } catch (err) {
       throw new BadRequestError('Error saving featured event');
     }
