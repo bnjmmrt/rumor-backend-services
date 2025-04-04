@@ -1320,7 +1320,15 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    
+    let code
+    try {
+     code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+
+    } catch (error) {
+      console.log(error)
+    }
+    console.log(code)
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -3879,18 +3887,19 @@ export class AuthService {
       payload.email = payload.email.trim().toLowerCase();
     }
     let nonMember: UserRole | null;
-    try {
-      const response = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .retrieveUserByEmail(payload.email);
-      if (response.statusCode == 200 && response?.response?.user) {
-        throw new ConflictError('The user with provided email already exists.');
-      }
-    } catch (e) {
-      if (e.statusCode != 404) {
-        throw new ConflictError('Than error happens when trying register an user.');
-      }
-    }
+    // try {
+    //   const response = await fusionAuthClientHandler
+    //     .fusionAuthClient()
+    //     .retrieveUserByEmail(payload.email);
+    //   if (response.statusCode == 200 && response?.response?.user) {
+    //     throw new ConflictError('The user with provided email already exists.');
+    //   }
+    // } catch (e) {
+    //   console.log(e)
+    //   if (e.statusCode != 404) {
+    //     throw new ConflictError('Than error happens when trying register an user.');
+    //   }
+    // }
 
     let user = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
@@ -3948,9 +3957,15 @@ export class AuthService {
       },
     };
 
-    const newUser = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .register(user.id, registrationRequest);
+    let newUser
+    try {
+       newUser = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .register(user.id, registrationRequest);
+    } catch (error) {
+      console.log(error)
+    }
+
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
     }
@@ -5644,8 +5659,8 @@ export class AuthService {
       } catch (error) {}
 
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
-      await this.clearAdditionalHostInfo(user.id, queryRunner);
-      await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
+      // await this.clearAdditionalHostInfo(user.id, queryRunner);
+      // await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
 
       await queryRunner.commitTransaction();
       return '';

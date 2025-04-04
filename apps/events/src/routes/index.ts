@@ -195,7 +195,7 @@ router.delete('/event-location/:id', EventsController.deleteEventLocation);
 //events routes
 router.post(
   '/event',
-  AuthMiddleware.fusionAuthRequired,
+  // AuthMiddleware.fusionAuthRequired,
   EventsController.createEvent,
 ); /**TestStatus: working */
 router.delete(

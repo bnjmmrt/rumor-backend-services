@@ -117,7 +117,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => UserQuizAnswer, answer => answer.user)
   answers: UserQuizAnswer[];
 
-  @OneToOne(() => UserSettings, userSettings => userSettings.user, { cascade: ['remove'], } )
+  @OneToOne(() => UserSettings, userSettings => userSettings.user, { cascade: ['remove'] } )
   userSettings: Relation<UserSettings>;
 
   @ManyToMany(() => Interest, { cascade: false })
