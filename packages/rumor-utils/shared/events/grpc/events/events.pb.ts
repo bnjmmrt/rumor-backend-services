@@ -492,6 +492,7 @@ export interface GuestsResponse {
 export interface Guests {
   result: Guest[];
   totalCount: number;
+  isExist?: boolean | undefined;
 }
 
 export interface GuestsQueryRequest {

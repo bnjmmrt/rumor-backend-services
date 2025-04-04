@@ -231,8 +231,13 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.result.length > 0)
-              return { message: `Guest created with status ${guestStatus}` };
+            if (createGuests.result.length > 0) {
+              if (createGuests.isExist) {
+                throw new BadRequestError(`The user already has a status on the guest list.`);
+              } else {
+                return { message: `Guest created with status ${guestStatus}` };
+              }
+            }
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -447,8 +452,8 @@ export class GuestService {
   public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<Guests> {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection
-      .getRepository(Event)
-      .findOne({ where: { id: payload.eventId } });
+    .getRepository(Event)
+    .findOne({ where: { id: payload.eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
@@ -484,6 +489,7 @@ export class GuestService {
     }
 
     const emailsData = []; // Store guest emails for invitations
+    let isExist: boolean = false; // Flag to check if guest already exists
     const guests = await Promise.all(
       payload.users.map(async userId => {
         try {
@@ -534,6 +540,8 @@ export class GuestService {
             }
             const data = await this.dbConnection.getRepository(Guest).save(guest);
             return data;
+          } else {
+            isExist = true;
           }
           if (emailData) emailsData.push(emailData);
           return guest;
@@ -624,7 +632,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return { result: guestsTransform, totalCount: guestsTransform.length };
+    return { result: guestsTransform, totalCount: guestsTransform.length, isExist };
   }
 
   /**
@@ -3570,12 +3578,13 @@ export class GuestService {
     // Step 6: Check if the user already exists in the system
     try {
       if (payload.email && !payload.phoneNumber) {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
-          ?.data;
+        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))?.data;
       } else if (payload.phoneNumber && !payload.email) {
         checkExistingUser = (
           await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
         )?.data;
+      } else if (payload.email && payload.phoneNumber) {
+        throw new BadRequestError('Please provide either email or phone number, not both');
       }
     } catch (e) {
       checkExistingUser = null;
@@ -3586,7 +3595,7 @@ export class GuestService {
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');
-      }
+      }  
     }
     // Step 7: Register a new guest user
     let guest = new Guest();
