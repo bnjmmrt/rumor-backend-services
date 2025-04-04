@@ -543,7 +543,8 @@ export class AuthService {
     payload.email = payload.email.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
-    let phoneNumberInUse = false, emailInUse = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
 
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
@@ -556,27 +557,36 @@ export class AuthService {
     });
 
     if (user) {
-      userRoleAsMemberOrNonMember = user.roles.find(item => item.role.name === 'non_member' || item.role.name === 'member');
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
       userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
-      userHasOtherRoles = user.roles.some(item => item.role.name !== 'non_member' && item.role.name !== 'member');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
       phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
       emailInUse = user.email === payload.email;
 
       if (userRoleExistsAsHost) {
         if (phoneNumberInUse && emailInUse) {
-          throw new BadRequestError('This phone number and email are already associated with a host account. Please use different credentials.');
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
         } else if (phoneNumberInUse) {
-          throw new BadRequestError('This phone number is already associated with a host account. Please use a different phone number.');
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
         } else if (emailInUse) {
-          throw new BadRequestError('This email is already associated with a host account. Please use a different email address.');
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
       }
 
       if (userHasOtherRoles) {
         throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
-
     }
 
     let newUser = newHost(payload);
@@ -4850,7 +4860,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }
