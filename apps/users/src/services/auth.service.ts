@@ -1323,7 +1323,7 @@ export class AuthService {
     try {
       var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
     } catch (error) {
-      console.log("🚀 ~ AuthService ~ checkMemberLogin ~ error:", error)
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
       throw new BadRequestError(JSON.stringify(error));
     }
 
