@@ -30,7 +30,7 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   AdminController.getHostProfile,
 ); // get host profile for admin
-router.get('/auth/host/:id', AdminController.getHostProfile); // get host profile by id (Here we might get one uissue)
+router.get('/auth/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile); // get host profile by id (Here we might get one uissue)
 router.get(
   '/auth/admin/host/:id/profile',
   AuthMiddleware.fusionAuthRequired,

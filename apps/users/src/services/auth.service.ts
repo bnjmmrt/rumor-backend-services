@@ -470,7 +470,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email.trim()], // Send email to the member
+        [newUser.email.trim().toLowerCase()], // Send email to the member
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -612,7 +612,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -846,7 +846,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
         // this.logger,
       );
@@ -867,7 +867,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       if (!mailServiceResponse) {
@@ -1103,7 +1103,12 @@ export class AuthService {
       try {
         const success = await serviceMesh
           .notificationService()
-          .sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
+          .sendEmailFromTemplate(
+            params,
+            'Invite New Member',
+            [payload.email.trim().toLowerCase()],
+            null,
+          );
         if (!success) {
           throw new BadRequestError(
             'An error occured while sending SMS invitation, please try again.',
@@ -1161,7 +1166,12 @@ export class AuthService {
     try {
       const success = await serviceMesh
         .notificationService()
-        .sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
+        .sendEmailFromTemplate(
+          params,
+          'Host Invited by Rumor Admin',
+          [payload.email.trim().toLowerCase()],
+          null,
+        );
       if (!success) {
         throw new BadRequestError(
           'An error occured while sending Email invitation, please try again.',
@@ -1320,15 +1330,13 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    
-    let code
     try {
-     code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
-
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
     } catch (error) {
-      console.log(error)
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
+      throw new BadRequestError(JSON.stringify(error));
     }
-    console.log(code)
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -1348,7 +1356,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -1507,7 +1515,7 @@ export class AuthService {
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
-          .passwordlessLogin({ code: temporaryCode.code });
+          .passwordlessLogin({ code: payload.code });
       } catch (error) {
         try {
           const verificationResult = isEmailLogin
@@ -2042,7 +2050,7 @@ export class AuthService {
           },
         ],
         'Member Approved into Rumor',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
@@ -2218,7 +2226,7 @@ export class AuthService {
                 },
               ],
               'Member Approved into Rumor',
-              [user.email.trim()], // Send email to the approved member
+              [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
           }
@@ -3257,7 +3265,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -3269,7 +3277,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       }
@@ -4289,7 +4297,12 @@ export class AuthService {
           emailsToSend.map(email =>
             serviceMesh
               .notificationService()
-              .sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null),
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim().toLowerCase()],
+                null,
+              ),
           ),
         );
       } catch (error) {}
@@ -5351,7 +5364,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}

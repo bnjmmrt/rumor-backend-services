@@ -515,6 +515,7 @@ export class GuestService {
             id: user.id,
             role: user.roles.flatMap(role => role.role.name),
           };
+          if (emailData) emailsData.push(emailData);
           // Check if the guest already exists in the event
           let guest = await this.dbConnection.getRepository(Guest).findOne({
             where: {
@@ -543,7 +544,6 @@ export class GuestService {
           } else {
             isExist = true;
           }
-          if (emailData) emailsData.push(emailData);
           return guest;
         } catch (err) {
           return null;
@@ -553,11 +553,8 @@ export class GuestService {
 
     // Filter out any null values from guests (failed guest additions)
     const validGuests = guests.filter(guest => guest !== null);
-
     // If guest status is "INVITED" and sendInvite is true, send invitation emails
-    // TO DO: Change email and sms template
-    if (guestStatus === GuestStatus.INVITED && payload.sendInvite) {
-      //To Do: Change email and sms template
+    if (guestStatus === GuestStatus.INVITED && payload.sendInvite && !isExist) {
       await Promise.all(
         emailsData.map(data => {
           if (data.role.includes('member')) {
@@ -798,7 +795,6 @@ export class GuestService {
           where: { id: invitedGuestsEmails[0].eventId },
           relations: { location: true, owner: true },
         });
-        // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map(data => {
             if (data.role.includes('member')) {

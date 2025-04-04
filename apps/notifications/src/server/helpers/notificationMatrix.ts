@@ -261,8 +261,8 @@ let notificationMatrix = {
     image: 'linkedUser.profileImage',
   },
   rsvpSignupFormRequest: {
-    pushMessage: '[Linked User Name] requested access to [Event Name]. ',
-    appMessage: '[User Name] requested access to [Event Name].',
+    pushMessage: '[Linked User Name] requested access to [Event Name].',
+    appMessage: '[Linked User Name] requested access to [Event Name].',
     appNotification: true,
     pushNotification: true,
     linkedEvent: '',
