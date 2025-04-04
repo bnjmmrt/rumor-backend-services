@@ -470,7 +470,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email.trim()], // Send email to the member
+        [newUser.email.trim().toLowerCase()], // Send email to the member
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -543,7 +543,8 @@ export class AuthService {
     payload.email = payload.email.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
-    let phoneNumberInUse = false, emailInUse = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
 
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
@@ -556,27 +557,36 @@ export class AuthService {
     });
 
     if (user) {
-      userRoleAsMemberOrNonMember = user.roles.find(item => item.role.name === 'non_member' || item.role.name === 'member');
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
       userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
-      userHasOtherRoles = user.roles.some(item => item.role.name !== 'non_member' && item.role.name !== 'member');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
       phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
       emailInUse = user.email === payload.email;
 
       if (userRoleExistsAsHost) {
         if (phoneNumberInUse && emailInUse) {
-          throw new BadRequestError('This phone number and email are already associated with a host account. Please use different credentials.');
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
         } else if (phoneNumberInUse) {
-          throw new BadRequestError('This phone number is already associated with a host account. Please use a different phone number.');
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
         } else if (emailInUse) {
-          throw new BadRequestError('This email is already associated with a host account. Please use a different email address.');
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
       }
 
       if (userHasOtherRoles) {
         throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
-
     }
 
     let newUser = newHost(payload);
@@ -602,7 +612,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -836,7 +846,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
         // this.logger,
       );
@@ -857,7 +867,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       if (!mailServiceResponse) {
@@ -1093,7 +1103,12 @@ export class AuthService {
       try {
         const success = await serviceMesh
           .notificationService()
-          .sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
+          .sendEmailFromTemplate(
+            params,
+            'Invite New Member',
+            [payload.email.trim().toLowerCase()],
+            null,
+          );
         if (!success) {
           throw new BadRequestError(
             'An error occured while sending SMS invitation, please try again.',
@@ -1151,7 +1166,12 @@ export class AuthService {
     try {
       const success = await serviceMesh
         .notificationService()
-        .sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
+        .sendEmailFromTemplate(
+          params,
+          'Host Invited by Rumor Admin',
+          [payload.email.trim().toLowerCase()],
+          null,
+        );
       if (!success) {
         throw new BadRequestError(
           'An error occured while sending Email invitation, please try again.',
@@ -1313,7 +1333,7 @@ export class AuthService {
     try {
       var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
     } catch (error) {
-      console.log("🚀 ~ AuthService ~ checkMemberLogin ~ error:", error)
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
       throw new BadRequestError(JSON.stringify(error));
     }
 
@@ -1336,7 +1356,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -1495,7 +1515,7 @@ export class AuthService {
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
-          .passwordlessLogin({ code: temporaryCode.code });
+          .passwordlessLogin({ code: payload.code });
       } catch (error) {
         try {
           const verificationResult = isEmailLogin
@@ -2030,7 +2050,7 @@ export class AuthService {
           },
         ],
         'Member Approved into Rumor',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
@@ -2206,7 +2226,7 @@ export class AuthService {
                 },
               ],
               'Member Approved into Rumor',
-              [user.email.trim()], // Send email to the approved member
+              [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
           }
@@ -3245,7 +3265,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -3257,7 +3277,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       }
@@ -4270,7 +4290,12 @@ export class AuthService {
           emailsToSend.map(email =>
             serviceMesh
               .notificationService()
-              .sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null),
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim().toLowerCase()],
+                null,
+              ),
           ),
         );
       } catch (error) {}
@@ -4850,7 +4875,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }
@@ -5332,7 +5357,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}

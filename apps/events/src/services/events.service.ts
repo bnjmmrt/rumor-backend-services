@@ -33,7 +33,6 @@ import {
   EventTypesData,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
-  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -516,6 +515,15 @@ export class EventsService {
     eventLocationPayload: EventLocationDto,
     queryRunner: QueryRunner,
   ): Promise<EventLocation> {
+    if (
+      !eventLocationPayload.location ||
+      !eventLocationPayload.placeId ||
+      !eventLocationPayload.city ||
+      !eventLocationPayload.latitude ||
+      !eventLocationPayload.longitude
+    ) {
+      throw new Error('Invalid location data');
+    }
     // Create a new EventLocation entity from the payload
     const eventLocation = this.dbConnection.getRepository(EventLocation).create({
       location: eventLocationPayload.location,
@@ -1191,19 +1199,21 @@ export class EventsService {
         }
       : { createdAt: 'DESC' };
 
-    let relations = includeRelations
-      ? [
-          'owner',
-          'admissionType',
-          'location',
-          'eventType',
-          'talents',
-          'ticketTypes',
-          'collaborators',
-          'quizQuestions',
-          'ageLimit',
-        ]
-      : ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'ageLimit'];
+    const baseRelations = [
+      'owner',
+      'admissionType',
+      'location',
+      'eventType',
+      'talents',
+      'ticketTypes',
+      'collaborators',
+      'collaborators.user',
+      'collaborators.role',
+      'collaborators.ticketType',
+      'ageLimit',
+    ];
+
+    let relations = includeRelations ? [...baseRelations, 'quizQuestions'] : baseRelations;
 
     if (includeFeaturedEventSection) {
       relations = [...relations, 'featuredEventSection'];
@@ -1278,7 +1288,9 @@ export class EventsService {
       }
       return responses.data(paginatedEvents);
     } else {
-      return responses.data(events.map(item => toEvent(item, null)));
+      const mappedEvents = events.map(item => toEvent(item, null));
+
+      return responses.data(mappedEvents);
     }
   }
 
@@ -1287,7 +1299,7 @@ export class EventsService {
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
 
-    const [totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+    const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({
         where: {
@@ -1304,8 +1316,15 @@ export class EventsService {
           status: GuestStatus.CONFIRMED,
         },
       }),
+
+      // Count total guests who wats to be in event
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: payload.id },
+        },
+      }),
     ]);
-    return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+    return toEvent(event, totalCheckedInGuests, allGuests, undefined, totalConfirmedGuests);
   }
 
   public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
@@ -3316,7 +3335,6 @@ export class EventsService {
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
-        ticketDescription: guest.ticketType.description ?? undefined,
       };
     }
 
@@ -3328,7 +3346,6 @@ export class EventsService {
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
-      ticketDescription: guest.ticketType.description ?? undefined,
     };
   }
 
@@ -3783,9 +3800,14 @@ export class EventsService {
     };
   }
 
-  public static async getHostEventCountByStatus(
-    payload: RequestByIdDto,
-  ): Promise<HostEventsCountByStatusResponse> {
+  public static async getHostEventCountByStatus(payload: RequestByIdDto): Promise<{
+    approvedStatus: number;
+    draftStatus: number;
+    pendingStatus: number;
+    cancelledStatus: number;
+    pastStatus: number;
+    rejectedStatus: number;
+  }> {
     const { id: userId } = payload;
     const queryResult = await this.dbConnection
       .getRepository(Event)

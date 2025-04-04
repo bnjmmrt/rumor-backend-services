@@ -17,7 +17,7 @@ const start = async () => {
       await connectionManager.runSeeders();
     }
 
-    await SeedDatabase.seed()
+    await SeedDatabase.seed();
     await server.start();
     console.info('[APP] - Application started. 🚀');
   } catch (err) {
