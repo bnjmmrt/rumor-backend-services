@@ -22,9 +22,10 @@ export class ConnectionManager {
             'packages/rumor-utils/shared/notifications/entities/*.ts',
             'packages/rumor-utils/shared/notifications/entities/*.js',
           ],
-          ...(['development', 'staging', 'production', 'uat'].includes(config.get('NODE_ENV')) && {
-            ssl: { rejectUnauthorized: false },
-          }),
+          // ...(['development', 'staging', 'production', 'uat'].includes(config.get('NODE_ENV')) && {
+          //   ssl: { rejectUnauthorized: false },
+          // }),
+          ssl: { rejectUnauthorized: false },
           synchronize: false,
           logging: false,
         });
