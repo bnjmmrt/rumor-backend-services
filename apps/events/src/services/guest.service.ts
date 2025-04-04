@@ -452,8 +452,8 @@ export class GuestService {
   public static async addGuests(payload: AddGuestsRequestDto, token: string): Promise<Guests> {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection
-    .getRepository(Event)
-    .findOne({ where: { id: payload.eventId }, relations: { location: true, owner: true } });
+      .getRepository(Event)
+      .findOne({ where: { id: payload.eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
@@ -3578,7 +3578,8 @@ export class GuestService {
     // Step 6: Check if the user already exists in the system
     try {
       if (payload.email && !payload.phoneNumber) {
-        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))?.data;
+        checkExistingUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email))
+          ?.data;
       } else if (payload.phoneNumber && !payload.email) {
         checkExistingUser = (
           await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
@@ -3595,7 +3596,7 @@ export class GuestService {
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');
-      }  
+      }
     }
     // Step 7: Register a new guest user
     let guest = new Guest();
