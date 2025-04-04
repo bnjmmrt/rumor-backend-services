@@ -362,21 +362,22 @@ export class SignupFormsServices {
     userPayload: User,
   ): Promise<[User, Guest]> {
     let user = null;
+    if (!userPayload.email && !userPayload.phoneNumber) {
+      throw new BadRequestError('User information missing to apply for an event.');
+    }
     if (userPayload.email) {
       user = await User.findOne({
         where: { email: userPayload.email },
       });
-    } else if (userPayload.phoneNumber) {
+    }
+    if (userPayload.phoneNumber && !user) {
       user = await User.findOne({
-        where: { email: userPayload.phoneNumber },
+        where: { phoneNumber: userPayload.phoneNumber },
       });
-    } else {
-      throw new BadRequestError('User information missing to apply for an event.');
     }
     if (!user) {
       return [userPayload, new Guest()];
     }
-
     if (user.id) {
       const guest = await Guest.findOne({
         where: { user: { id: user.id }, event: { id: eventId } },
