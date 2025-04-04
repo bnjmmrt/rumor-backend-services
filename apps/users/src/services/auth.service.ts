@@ -1320,7 +1320,13 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    try {
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ checkMemberLogin ~ error:", error)
+      throw new BadRequestError(JSON.stringify(error));
+    }
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -4854,7 +4860,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }

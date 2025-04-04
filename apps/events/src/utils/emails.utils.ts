@@ -7,7 +7,7 @@ interface MailComponent {
   eventDate: Date;
   eventName: string;
   imageFlyer: string;
-  location: string;
+  location?: string | undefined;
   city: string;
   hostName?: string | undefined;
   emailsData?:
@@ -24,7 +24,7 @@ export const sendEventInviteMember = (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city, hostName, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -57,7 +57,7 @@ export const sendEventInviteMember = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     { key: 'host_name', value: hostName },
   ];
@@ -81,7 +81,7 @@ export const sendEventInviteNonMember = (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city, hostName, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -113,8 +113,12 @@ export const sendEventInviteNonMember = (
       value: `${minutes} ${period}`,
     },
     {
+      key: 'email',
+      value: emailsData.email.trim(),
+    },
+    {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     { key: 'host_name', value: hostName },
   ];
@@ -146,7 +150,7 @@ export const sendEventCancellation = (
   message: string,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city, hostName } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -187,7 +191,7 @@ export const sendEventCancellation = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'host_name',
@@ -209,7 +213,7 @@ export const sendEventUpdation = (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = `users/${userId}/events/${eventId}`;
-  const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -243,7 +247,7 @@ export const sendEventUpdation = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'view_event',
@@ -265,7 +269,7 @@ export const sendEventInvitePlusOnes = (
 ): Promise<AxiosResponse<any, any>> => {
   const { email, userId, firstName, eventId, leadGuestName } = addOnData;
   const redirectPath = `users/${userId}/events/${eventId}`;
-  const { eventDate, eventName, imageFlyer, location, city, hostName } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -305,12 +309,16 @@ export const sendEventInvitePlusOnes = (
       value: hour,
     },
     {
+      key: 'email',
+      value: email.trim(),
+    },
+    {
       key: 'minutes',
       value: `${minutes} ${period}`,
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'link_to_application',
@@ -334,7 +342,7 @@ export const sendGuestEventApproval = (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, emailsData } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -372,7 +380,7 @@ export const sendGuestEventApproval = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'link_to_application',
@@ -420,7 +428,7 @@ export const sendEventPublishedApproval = (
   eventId: string,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
   const params = [
@@ -458,7 +466,7 @@ export const sendEventPublishedApproval = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'view_event',
@@ -485,7 +493,7 @@ export const sendEventPrePublishApproval = (
   publishDate: Date,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const publishDateData = extractDate(publishDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
@@ -524,7 +532,7 @@ export const sendEventPrePublishApproval = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'publish_date',
@@ -581,7 +589,7 @@ export const sendEventReminder = (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = `users/${userId}/events/${eventId}`; //TODO  : this should be view rsvp button url (need to update)
-  const { eventDate, eventName, imageFlyer, location, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -615,7 +623,7 @@ export const sendEventReminder = (
     },
     {
       key: 'address',
-      value: `${location}, ${city}`,
+      value: city,
     },
     {
       key: 'view_event',

@@ -55,6 +55,10 @@ export class SeedDatabase {
             mandatory: true,
           },
           {
+            key: 'email',
+            mandatory: true,
+          },
+          {
             key: 'day',
             mandatory: true,
           },
@@ -204,6 +208,10 @@ export class SeedDatabase {
           },
           {
             key: 'address',
+            mandatory: true,
+          },
+          {
+            key: 'email',
             mandatory: true,
           },
           {
