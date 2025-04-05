@@ -5667,27 +5667,28 @@ export class AuthService {
       try {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
       } catch (error) {}
+      // Step 2: Remove user from all notifications (join table cleanup)
+      if (user.notifications?.length) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .relation(User, 'notifications')
+          .of(user)
+          .remove(user.notifications);
+      }
 
-      await queryRunner.query(
-        `DELETE FROM notification_recipients WHERE user_id = $1`,
-        [user.id]
-      );
-
-      // ⚠️ DO NOT use `.relation().remove()` for notifications anymore
-      // It may re-insert the join when saving
-
-      // Step 3: Clean up orphaned notifications (no recipients)
+      // Step 3: Optionally delete orphaned notifications (no recipients)
       const orphanedNotifications = await queryRunner.manager
         .getRepository(Notification)
         .createQueryBuilder('n')
-        .leftJoin('n.recipients', 'r')
-        .groupBy('n.id')
-        .having('COUNT(r.id) = 0')
+        .leftJoinAndSelect('n.recipients', 'r')
         .getMany();
 
-      if (orphanedNotifications.length > 0) {
-        await queryRunner.manager.remove(orphanedNotifications);
+      for (const n of orphanedNotifications) {
+        if (n.recipients.length === 0) {
+          await queryRunner.manager.remove(n);
+        }
       }
+
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
       await this.clearAdditionalHostInfo(user.id, queryRunner);
       await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
