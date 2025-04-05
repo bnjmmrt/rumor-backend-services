@@ -4105,9 +4105,6 @@ export class EventsService {
   }
 
   public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    try {
-      
-
     const listHostEventsPayload: ListHostEventsDto = {
       userId: payload.id,
       query: '{}',
@@ -4120,7 +4117,6 @@ export class EventsService {
     }
 
     const events = eventsResponse.result;
-    // console.log("🚀 ~ deleteHostEvents ~ events:", events)
     // Step 2: Cancel all APPROVED events
     const eventsToCancel = events.filter(event =>
       [
@@ -4129,7 +4125,6 @@ export class EventsService {
         EventStatusEnum.UPCOMING_STATUS,
       ].includes(event.status),
     );
-    // console.log("🚀 ~ deleteHostEvents ~ eventsToCancel:", eventsToCancel)
 
     for (const event of eventsToCancel) {
       const cancelPayload: CancelEventAndNotifyRequestDto = {
@@ -4153,8 +4148,5 @@ export class EventsService {
       await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
     }
     return responses.ok;
-    } catch (error) {
-      console.log(error)
-    }
   }
 }

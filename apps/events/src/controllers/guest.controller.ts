@@ -64,7 +64,6 @@ export class GuestController {
       hostId: (req as any).user,
       ...req.body,
     };
-    console.log("🚀 ~ GuestController ~ addGuests=asyncWrapper ~ payload:", payload)
     const token = (req as any).token;
     const response: Guests = await GuestService.addGuests(payload, token);
     const successResponse = new CreateResponse(response);

@@ -256,7 +256,7 @@ router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
 router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
 router.delete(
   '/auth/hosts/:id',
-  // AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuthRequired,
   AuthController.deleteHostAccount,
 );
 
