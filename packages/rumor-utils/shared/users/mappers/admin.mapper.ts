@@ -29,7 +29,7 @@ export const toHostProfile = (
 ): HostProfile => {
   const now = new Date();
   const upcomingEvents = user.hostedEvents
-    .filter(event => event.status === EventStatusEnum.APPROVED_STATUS && !event.isPrivate && new Date(event.endDate) >= now)
+    .filter(event => event.status === EventStatusEnum.APPROVED_STATUS && !event.isPrivate && event.isPublished && new Date(event.endDate) >= now)
     .map(event => {
       return {
         id: event.id,
