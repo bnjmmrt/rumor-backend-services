@@ -32,11 +32,11 @@ export class Notification extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'is_seen', default: false })
   isSeen: boolean;
 
-  @ManyToMany(() => User, user => user.notifications, { cascade: ['insert', 'update'] })
+  @ManyToMany(() => User, user => user.notifications, { cascade: ['insert', 'update'] } )
   @JoinTable({
     name: 'notification_recipients',
-    joinColumn: { name: 'notification_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    joinColumn: { name: 'notification_id', referencedColumnName: 'id'},
+    inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id'},
   })
   recipients: User[];
 

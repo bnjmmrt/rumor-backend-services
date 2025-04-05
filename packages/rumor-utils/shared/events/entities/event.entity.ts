@@ -17,6 +17,7 @@ import { EventSignupForms } from './event-signup-forms.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { CsvUploadRecords } from './csv-upload-records.entity';
 import { RestrictedInvites } from './restricted-invites.entity';
+import { EventAnnouncement } from './event-announcement.entity';
 
 @Entity()
 export class Event extends RumorBaseEntity {
@@ -142,4 +143,7 @@ export class Event extends RumorBaseEntity {
     onDelete: 'CASCADE',
   })
   notifications: Notification[];
+
+  @OneToMany(() => EventAnnouncement, (announcement) => announcement.event, {cascade: true})
+  eventAnnouncements: EventAnnouncement[];
 }

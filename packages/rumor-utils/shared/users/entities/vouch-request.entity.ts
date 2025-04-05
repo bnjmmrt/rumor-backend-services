@@ -14,7 +14,7 @@ export class VouchRequest extends RumorBaseEntity {
   @JoinColumn({ name: 'event_id' })
   event: Event;
 
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'requester_id' })
   requester: User;
 

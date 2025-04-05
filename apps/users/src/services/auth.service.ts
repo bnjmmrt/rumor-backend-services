@@ -215,6 +215,7 @@ import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -5662,7 +5663,7 @@ export class AuthService {
     try {
       const user = await queryRunner.manager
         .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+        .findOne({ where: { id: payload.id }, relations: { roles: { role: true }, notifications: true } });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5671,6 +5672,26 @@ export class AuthService {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
       } catch (error) {}
 
+      await queryRunner.query(
+        `DELETE FROM notification_recipients WHERE user_id = $1`,
+        [user.id]
+      );
+
+      // ⚠️ DO NOT use `.relation().remove()` for notifications anymore
+      // It may re-insert the join when saving
+
+      // Step 3: Clean up orphaned notifications (no recipients)
+      const orphanedNotifications = await queryRunner.manager
+        .getRepository(Notification)
+        .createQueryBuilder('n')
+        .leftJoin('n.recipients', 'r')
+        .groupBy('n.id')
+        .having('COUNT(r.id) = 0')
+        .getMany();
+
+      if (orphanedNotifications.length > 0) {
+        await queryRunner.manager.remove(orphanedNotifications);
+      }
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
       // await this.clearAdditionalHostInfo(user.id, queryRunner);
       // await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
