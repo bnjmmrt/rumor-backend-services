@@ -5689,8 +5689,8 @@ export class AuthService {
         await queryRunner.manager.remove(orphanedNotifications);
       }
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
-      // await this.clearAdditionalHostInfo(user.id, queryRunner);
-      // await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
+      await this.clearAdditionalHostInfo(user.id, queryRunner);
+      await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
 
       await queryRunner.commitTransaction();
       return '';
