@@ -136,7 +136,10 @@ import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
-import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
+import {
+  CsvUploadRecords,
+  FeaturedEventSection,
+} from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -3467,27 +3470,21 @@ export class EventsService {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.eventId },
-        relations: {
-          featuredEventSection: true,
-        },
       });
 
       if (!event) throw new NotFoundError('Event was not found');
 
       if (!payload.featuredSectionId) {
         event.featuredEventSection = null;
-        await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-          //if (!featuredEventSection) throw new NotFoundError('Featured event section was not found');
-
-          //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
-          await this.dbConnection.getRepository(Event).save(event);
+        event.featuredEventSection = { id: payload.featuredSectionId } as FeaturedEventSection;
       }
 
-      return;
+      await this.dbConnection.getRepository(Event).save(event);
+
+      return 'Featured event saved successfully';
     } catch (err) {
-      throw new BadRequestError('Error at publish event by id');
+      throw new BadRequestError('Error saving featured event');
     }
   }
 
