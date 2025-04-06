@@ -6,7 +6,10 @@ import {
   SignupFormStaticQuestions,
 } from 'rumor-utils/shared/entities/index';
 import database from '../database';
-import { CollaboratorRoles, QuestionValueType } from 'rumor-utils/shared/events/interfaces/event.interface';
+import {
+  CollaboratorRoles,
+  QuestionValueType,
+} from 'rumor-utils/shared/events/interfaces/event.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class Seeders {
@@ -201,15 +204,52 @@ export class Seeders {
 
   public static async seedSignupFormStaticQuestions() {
     const questionsData = [
-      { name: 'First Name', type: QuestionValueType.STRING, is_default: true, is_active: true, is_required: true, key: 'firstName' },
-      { name: 'Last Name', type: QuestionValueType.STRING, is_default: true, is_active: true, is_required: true, key: 'lastName' },
-      { name: 'Email', type: QuestionValueType.STRING, is_default: true, is_active: true, is_required: true, key: 'email' },
-      { name: 'Phone', type: QuestionValueType.STRING, is_default: true, is_active: true, is_required: true, key: 'phone' },
-      { name: 'Request Access for Additional Guests', type: QuestionValueType.NUMBER, is_default: true, is_active: true, is_required: true, key: 'requestAdditionalGuests' },
+      {
+        name: 'First Name',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: true,
+        key: 'firstName',
+      },
+      {
+        name: 'Last Name',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: true,
+        key: 'lastName',
+      },
+      {
+        name: 'Email',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: true,
+        key: 'email',
+      },
+      {
+        name: 'Phone',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: true,
+        key: 'phone',
+      },
+      {
+        name: 'Request Access for Additional Guests',
+        type: QuestionValueType.NUMBER,
+        is_default: true,
+        is_active: true,
+        is_required: true,
+        key: 'requestAdditionalGuests',
+      },
     ];
 
     for (const questionData of questionsData) {
-      let question = await this.dbConnection.getRepository(SignupFormStaticQuestions).findOne({ where: { key: questionData.key } });
+      let question = await this.dbConnection
+        .getRepository(SignupFormStaticQuestions)
+        .findOne({ where: { key: questionData.key } });
       if (!question) {
         question = this.dbConnection.getRepository(SignupFormStaticQuestions).create(questionData);
         await this.dbConnection.getRepository(SignupFormStaticQuestions).save(question);

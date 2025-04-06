@@ -25,33 +25,40 @@ export const toHostProfile = (
   isMemberBlockedHost: boolean,
   roleId: string,
   roleName: string,
-  confirmedGuestEvents? :any[]
+  confirmedGuestEvents?: any[],
 ): HostProfile => {
   const now = new Date();
   const upcomingEvents = user.hostedEvents
-    .filter(event => event.status === EventStatusEnum.APPROVED_STATUS && !event.isPrivate && event.isPublished && new Date(event.endDate) >= now)
+    .filter(
+      event =>
+        event.status === EventStatusEnum.APPROVED_STATUS &&
+        !event.isPrivate &&
+        event.isPublished &&
+        new Date(event.endDate) >= now,
+    )
     .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
         name: event.name,
-        startDate:  formatDateFromDB(event.startDate),
+        startDate: formatDateFromDB(event.startDate),
         endDate: formatDateFromDB(event.endDate),
         imageFlyer: event.imageFlyer || '',
         eventLocation: event.location || undefined,
-        timeZone: event.timeZone || undefined
+        timeZone: event.timeZone || undefined,
       };
     });
-  const pastEvents = confirmedGuestEvents?.map((guest: any) => {
+  const pastEvents =
+    confirmedGuestEvents?.map((guest: any) => {
       return {
         id: guest?.event?.id,
         imageCover: guest?.event?.imageCover || '',
         name: guest?.event?.name,
-        startDate:  guest?.event?.startDate? formatDateFromDB(guest.event.startDate) : "",
-        endDate: guest?.event?.endDate? formatDateFromDB(guest.event.endDate) : "",
+        startDate: guest?.event?.startDate ? formatDateFromDB(guest.event.startDate) : '',
+        endDate: guest?.event?.endDate ? formatDateFromDB(guest.event.endDate) : '',
         imageFlyer: guest?.event?.imageFlyer || '',
         eventLocation: guest?.event?.location || undefined,
-        timeZone: guest?.event?.timeZone || undefined
+        timeZone: guest?.event?.timeZone || undefined,
       };
     }) || [];
   const pendingEvents = user.hostedEvents
@@ -61,11 +68,11 @@ export const toHostProfile = (
         id: event.id,
         imageCover: event.imageCover || '',
         name: event.name,
-         startDate:  formatDateFromDB(event.startDate),
+        startDate: formatDateFromDB(event.startDate),
         endDate: formatDateFromDB(event.endDate),
         imageFlyer: event.imageFlyer || '',
         eventLocation: event.location || undefined,
-        timeZone: event.timeZone || undefined
+        timeZone: event.timeZone || undefined,
       };
     });
 
