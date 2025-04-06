@@ -1512,6 +1512,10 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
+      if (payload.code !== temporaryCode.code) {
+        throw new BadRequestError('Invalid or expired verification code, please try again.');
+      }
+
       let completedLogin;
       try {
         completedLogin = await fusionAuthClientHandler
@@ -1541,7 +1545,7 @@ export class AuthService {
             user: user,
             isGuest: false,
           };
-        } catch (error) {}
+        } catch (error) { }
       }
 
       // if (completedLogin.statusCode > 299) {
