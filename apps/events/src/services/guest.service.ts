@@ -3019,7 +3019,6 @@ export class GuestService {
 
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
-    /*
     if (payload.email) {
       const createMailPayload = {
         eventDate: event.startDate,
@@ -3055,7 +3054,6 @@ export class GuestService {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
-    */
 
     return [guest].map(guest => toGuestDataSimple(guest, []));
   }
