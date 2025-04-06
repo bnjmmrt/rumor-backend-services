@@ -136,7 +136,10 @@ import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
 import { SchedulerService } from './scheduler-service';
-import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
+import {
+  CsvUploadRecords,
+  FeaturedEventSection,
+} from '../../packages/rumor-utils/shared/events/entities';
 
 const responses = {
   conflict: (message: string) => ({
@@ -2501,11 +2504,7 @@ export class EventsService {
       ) {
         try {
           const guestStatuses: GuestStatus[] = [
-            GuestStatus.APPLIED,
             GuestStatus.CONFIRMED,
-            GuestStatus.REVIEW,
-            GuestStatus.DECLINED,
-            GuestStatus.INVITED,
           ];
           await this.notifyGuestsOnDateOrLocationChange({
             eventPayload: payload,
@@ -2661,7 +2660,7 @@ export class EventsService {
           : 'TBD';
       const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
 
-      if (guest.user?.email) {
+      if (guest.user?.email && guest.status === GuestStatus.CONFIRMED) {
         const createMailPayload = {
           eventName,
           imageFlyer: event.imageFlyer,
@@ -2676,7 +2675,7 @@ export class EventsService {
           event.id,
           event.timeZone,
         );
-      } else if (guest.user?.phoneNumber) {
+      } else if (guest.user?.phoneNumber && guest.status === GuestStatus.CONFIRMED) {
         // Send SMS notification
         try {
           const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
@@ -3465,27 +3464,21 @@ export class EventsService {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.eventId },
-        relations: {
-          featuredEventSection: true,
-        },
       });
 
       if (!event) throw new NotFoundError('Event was not found');
 
       if (!payload.featuredSectionId) {
         event.featuredEventSection = null;
-        await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-          //if (!featuredEventSection) throw new NotFoundError('Featured event section was not found');
-
-          //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
-          await this.dbConnection.getRepository(Event).save(event);
+        event.featuredEventSection = { id: payload.featuredSectionId } as FeaturedEventSection;
       }
 
-      return;
+      await this.dbConnection.getRepository(Event).save(event);
+
+      return 'Featured event saved successfully';
     } catch (err) {
-      throw new BadRequestError('Error at publish event by id');
+      throw new BadRequestError('Error saving featured event');
     }
   }
 
@@ -3793,7 +3786,6 @@ export class EventsService {
         );
       },
     );
-    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,

@@ -401,8 +401,8 @@ export class EventsController {
 
   public static addEventToFeaturedSection = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const { id } = req.params;
-      const payload: AddEventToFeaturedSectionDto = { id, ...req.body };
+      const { eventId } = req.params;
+      const payload: AddEventToFeaturedSectionDto = { eventId, ...req.body };
       const eventResponse: string = await EventsService.addEventToFeaturedSection(payload);
       const successResponse = new CreateResponse(eventResponse);
       res.status(successResponse.statusCode).json(successResponse);
