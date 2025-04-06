@@ -4331,7 +4331,9 @@ export class AuthService {
               ),
           ),
         );
-      } catch (error) {}
+      } catch (error) {
+        console.log(`Host Status Updates failed at function updateHostStatus:: ${error}`);
+      }
       // if (skippedUsers.length > 0) {
       //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
       // }
