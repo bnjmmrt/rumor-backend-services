@@ -3616,7 +3616,7 @@ export class GuestService {
         lastName,
         email: email || '',
         phoneNumber: phoneNumber || '',
-        source: UserSource.INVITED_BY_HOST
+        source: UserSource.INVITED_BY_HOST,
       }))(payload);
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)
