@@ -4105,48 +4105,52 @@ export class EventsService {
   }
 
   public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    const listHostEventsPayload: ListHostEventsDto = {
-      userId: payload.id,
-      query: '{}',
-    };
-
-    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
-
-    if (!eventsResponse || !eventsResponse.result) {
-      throw new NotFoundError('Events');
-    }
-
-    const events = eventsResponse.result;
-    // Step 2: Cancel all APPROVED events
-    const eventsToCancel = events.filter(event =>
-      [
-        EventStatusEnum.APPROVED_STATUS,
-        EventStatusEnum.SCHEDULED_STATUS,
-        EventStatusEnum.UPCOMING_STATUS,
-      ].includes(event.status),
-    );
-
-    for (const event of eventsToCancel) {
-      const cancelPayload: CancelEventAndNotifyRequestDto = {
-        ownerId: payload.id,
-        eventId: event.id,
-        customMessage: 'This event has been canceled as the host is no longer available.',
+    try {
+      const listHostEventsPayload: ListHostEventsDto = {
+        userId: payload.id,
+        query: '{}',
       };
-      await this.cancelEventAndNotify(cancelPayload);
+
+      const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+      if (!eventsResponse || !eventsResponse.result) {
+        throw new NotFoundError('Events');
+      }
+
+      const events = eventsResponse.result;
+      // Step 2: Cancel all APPROVED events
+      const eventsToCancel = events.filter(event =>
+        [
+          EventStatusEnum.APPROVED_STATUS,
+          EventStatusEnum.SCHEDULED_STATUS,
+          EventStatusEnum.UPCOMING_STATUS,
+        ].includes(event.status),
+      );
+
+      for (const event of eventsToCancel) {
+        const cancelPayload: CancelEventAndNotifyRequestDto = {
+          ownerId: payload.id,
+          eventId: event.id,
+          customMessage: 'This event has been canceled as the host is no longer available.',
+        };
+        await this.cancelEventAndNotify(cancelPayload);
+      }
+
+      // Step 3: Delete all events (regardless of status)
+      // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+      // for (const event of events) {
+      //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      //   await this.deleteEvent(deletePayload);
+      // }
+
+      const eventIds = events.map(event => event.id);
+
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
+      console.log(error)
     }
-
-    // Step 3: Delete all events (regardless of status)
-    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
-    // for (const event of events) {
-    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-    //   await this.deleteEvent(deletePayload);
-    // }
-
-    const eventIds = events.map(event => event.id);
-
-    if (eventIds.length > 0) {
-      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-    }
-    return responses.ok;
   }
 }
