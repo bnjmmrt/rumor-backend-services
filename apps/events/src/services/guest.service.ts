@@ -2212,7 +2212,7 @@ export class GuestService {
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'PAST':
-          addCondition({ status: EventStatusEnum.PAST_STATUS,endDate: LessThan(dateNow) });
+          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) });
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'INVITED':

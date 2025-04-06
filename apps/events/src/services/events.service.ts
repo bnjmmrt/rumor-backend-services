@@ -2503,9 +2503,7 @@ export class EventsService {
         eventCurrentStatus === EventStatusEnum.APPROVED_STATUS
       ) {
         try {
-          const guestStatuses: GuestStatus[] = [
-            GuestStatus.CONFIRMED,
-          ];
+          const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
           await this.notifyGuestsOnDateOrLocationChange({
             eventPayload: payload,
             eventId,

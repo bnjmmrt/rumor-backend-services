@@ -835,9 +835,10 @@ export class AuthService {
         .fusionAuthClient()
         .forgotPassword(passwordResetRequest);
       token = forgotPasswordResponse.response?.changePasswordId;
-    }
-    catch (e) {
-      throw new BadRequestError(`Unable to send reset link, please try again later or check ${!isAdmin ? "if your profile setup successfully completed for the host role." : "if email is correct."}`);
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+      );
     }
     if (!token) {
       throw new BadRequestError('Unable to get token, please try again later.');
@@ -1550,7 +1551,7 @@ export class AuthService {
             user: user,
             isGuest: false,
           };
-        } catch (error) { }
+        } catch (error) {}
       }
 
       // if (completedLogin.statusCode > 299) {
@@ -4064,7 +4065,7 @@ export class AuthService {
       isMemberBlockedHost,
       roleId,
       roleName,
-      confirmedGuestEvents
+      confirmedGuestEvents,
     );
   }
 
