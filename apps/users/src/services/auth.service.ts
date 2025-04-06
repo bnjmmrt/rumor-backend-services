@@ -1368,10 +1368,6 @@ export class AuthService {
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
-        if (
-          config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber ||
-          !config.get('BYPASS_VERIFICATION_CODE')
-        ) {
           const message = 'Your Rumor verification code: ' + code.response.code;
           try {
             const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -1388,7 +1384,6 @@ export class AuthService {
           } catch (err) {
             console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
           }
-        }
       }
     } catch (error) {}
 
@@ -1509,16 +1504,18 @@ export class AuthService {
     }
 
     // Handle bypass verification logic for testing or review environment
-    if (
-      config.get('APP_REVIEW_LOGIN') === loginIdentifier ||
-      config.get('BYPASS_VERIFICATION_CODE')
-    ) {
+    if (config.get('BYPASS_VERIFICATION_CODE')) {
       const temporaryCode = await this.dbConnection
         .getRepository(TemporaryLoginCode)
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      if (payload.code !== temporaryCode.code) {
+      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+      
+      // Setting up Payload.code to bypass verification for below email and phone number
+      if(payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602'){
+        payload.code = temporaryCode.code;
+      }
+      else if (payload.code !== temporaryCode.code) {
         throw new BadRequestError('Invalid or expired verification code, please try again.');
       }
 
