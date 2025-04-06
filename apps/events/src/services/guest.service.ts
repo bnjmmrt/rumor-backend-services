@@ -2208,17 +2208,19 @@ export class GuestService {
     if (parsedQuery.guestEventStatus && multipleGuestStatusFilter?.length === 1) {
       switch (multipleGuestStatusFilter[0]) {
         case 'UPCOMING':
-          addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS, endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'PAST':
-          addCondition({ endDate: LessThan(dateNow) });
+          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) });
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'INVITED':
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.INVITED];
           break;
         case 'APPLIED':
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS, endDate: MoreThan(dateNow) });
           guestStatusFilter = [GuestStatus.APPLIED];
           break;
         case 'DECLINED':
@@ -2233,6 +2235,7 @@ export class GuestService {
           case 'UPCOMING':
             orCondition = {
               endDate: MoreThan(dateNow),
+              status: EventStatusEnum.APPROVED_STATUS,
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
@@ -2242,6 +2245,7 @@ export class GuestService {
           case 'PAST':
             orCondition = {
               endDate: LessThan(dateNow),
+              status: EventStatusEnum.PAST_STATUS,
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
@@ -2250,6 +2254,7 @@ export class GuestService {
             break;
           case 'INVITED':
             orCondition = {
+              status: EventStatusEnum.APPROVED_STATUS,
               guests: {
                 status: GuestStatus.INVITED,
                 user: { id: payload.userId },
@@ -2258,6 +2263,8 @@ export class GuestService {
             break;
           case 'APPLIED':
             orCondition = {
+              status: EventStatusEnum.APPROVED_STATUS,
+              endDate: MoreThan(dateNow),
               guests: {
                 status: GuestStatus.APPLIED,
                 user: { id: payload.userId },

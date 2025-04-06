@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, QueryRunner } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
 import database from '../database';
 import config from '../config';
 
@@ -209,7 +209,7 @@ import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.en
 import { Report } from 'rumor-utils/shared/users/entities/report.entity';
 import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
-import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
@@ -828,14 +828,21 @@ export class AuthService {
       email: payload.email,
       sendForgotPasswordEmail: false,
     };
-    const forgotPasswordResponse = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .forgotPassword(passwordResetRequest);
-    const token = forgotPasswordResponse.response?.changePasswordId;
-    if (!token) {
-      throw new BadRequestError('Unable to call forgot password, please try again later.');
-    }
     const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
     if (isAdmin) {
       const redirectPath = `new-password?token=${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -1511,6 +1518,10 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
+      if (payload.code !== temporaryCode.code) {
+        throw new BadRequestError('Invalid or expired verification code, please try again.');
+      }
+
       let completedLogin;
       try {
         completedLogin = await fusionAuthClientHandler
@@ -1635,10 +1646,14 @@ export class AuthService {
     try {
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
     } catch (e) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     if (!authenticatedUser) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
@@ -4024,6 +4039,23 @@ export class AuthService {
 
       if (isBlocked) isMemberBlockedHost = true;
     }
+    // Add this above the return statement
+    const confirmedGuestEvents = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        user: { id: memberId },
+        status: GuestStatus.CONFIRMED,
+        event: {
+          owner: { id: host.id },
+          endDate: LessThanOrEqual(new Date()),
+          status: EventStatusEnum.PAST_STATUS,
+        },
+      },
+      relations: {
+        event: {
+          location: true,
+        },
+      },
+    });
 
     return toHostProfile(
       host,
@@ -4033,6 +4065,7 @@ export class AuthService {
       isMemberBlockedHost,
       roleId,
       roleName,
+      confirmedGuestEvents,
     );
   }
 
