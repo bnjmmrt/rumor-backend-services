@@ -363,9 +363,10 @@ export class GuestService {
           return userIds;
         }
         // Extract main guest IDs
-        const usersData = (await serviceMesh.userService(token).getAllusers(payload.query)).data;
+        const queryString = new URLSearchParams(payload.query).toString();
+        const usersData = (await serviceMesh.userService(token).getAllusers(queryString)).data;
         if (usersData.result.length === 0 || usersData.totalCount === 0) {
-          throw new NotFoundError('Users data not found');
+          throw new NotFoundError('Users data');
         }
         let userIds: string[] = usersData.result.map(user => user.id);
         if (exclusiveIds.length > 0) {
