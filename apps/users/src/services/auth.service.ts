@@ -3141,7 +3141,7 @@ export class AuthService {
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
 
-      const source = userSourceToEntity[payload.source];
+      const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
 
       const newMapping = new HostUserMapping();
