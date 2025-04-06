@@ -1645,10 +1645,10 @@ export class AuthService {
     try {
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
     } catch (e) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(`We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`);
     }
     if (!authenticatedUser) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(`We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`);
     }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
