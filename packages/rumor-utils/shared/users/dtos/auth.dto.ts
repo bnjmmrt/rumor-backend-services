@@ -60,7 +60,7 @@ import {
   CreateHostCollaboratorRequest,
 } from '../grpc/auth/auth.pb';
 import { Type } from 'class-transformer';
-import { NewUserStatus, PaginatedRequest, ProviderType } from '../grpc/auth/shared.pb';
+import { NewUserStatus, PaginatedRequest, ProviderType, UserSource } from '../grpc/auth/shared.pb';
 import { IsPasswordMatch, IsStrongPassword } from '../../../decorators';
 import { Tag } from '../interfaces/auth.interface';
 import { UserStatus } from '../interfaces/shared.interface';
@@ -656,6 +656,10 @@ export class NonMemberSignUpRequestDto implements CreateNonMemberUserRequest {
   @IsString()
   @IsOptional()
   id: string;
+
+  @IsEnum(UserSource)
+  @IsOptional()
+  source?: UserSource;
 }
 
 export class VerifyCodeRequestDto {

@@ -2995,6 +2995,7 @@ export class GuestService {
         lastName: payload.lastName,
         email: payload.email,
         phoneNumber: payload.phoneNumber,
+        source: UserSource.PLUS_1,
       };
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
@@ -3018,6 +3019,7 @@ export class GuestService {
 
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
+    /*
     if (payload.email) {
       const createMailPayload = {
         eventDate: event.startDate,
@@ -3053,6 +3055,7 @@ export class GuestService {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
+    */
 
     return [guest].map(guest => toGuestDataSimple(guest, []));
   }
@@ -3613,6 +3616,7 @@ export class GuestService {
         lastName,
         email: email || '',
         phoneNumber: phoneNumber || '',
+        source: UserSource.INVITED_BY_HOST
       }))(payload);
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)
