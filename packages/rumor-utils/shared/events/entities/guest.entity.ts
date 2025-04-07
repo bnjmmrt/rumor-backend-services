@@ -73,6 +73,7 @@ export class Guest extends RumorBaseEntity {
   addedBy: User;
 
   @ManyToOne(() => User, user => user.declinedGuests, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'declined_by_id' })

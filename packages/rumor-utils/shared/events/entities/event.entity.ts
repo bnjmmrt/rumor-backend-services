@@ -112,7 +112,7 @@ export class Event extends RumorBaseEntity {
   @JoinColumn({ name: 'admission_type_id', referencedColumnName: 'id' })
   admissionType?: AdmissionType;
 
-  @ManyToOne(() => User, owner => owner.hostedEvents, { nullable: true, cascade: true })
+  @ManyToOne(() => User, owner => owner.hostedEvents, { nullable: true, cascade: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id', referencedColumnName: 'id' })
   owner?: User;
 

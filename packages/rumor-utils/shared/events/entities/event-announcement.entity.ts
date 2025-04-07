@@ -43,7 +43,7 @@ export class EventAnnouncement extends RumorBaseEntity {
   @JoinColumn({ name: 'event_id' })
   event?: Event;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'created_by', referencedColumnName: 'id' })
   user: User;
 }
