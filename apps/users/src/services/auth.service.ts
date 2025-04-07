@@ -185,6 +185,7 @@ import {
   entityToUserSource,
   entityToUserStatus,
   newUserStatusTosUserStatus,
+  userSourceToEntity,
 } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -3139,7 +3140,9 @@ export class AuthService {
       newUser.phoneNumber = payload.phoneNumber ?? '';
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;
