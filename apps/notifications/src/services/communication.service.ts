@@ -38,8 +38,6 @@ export class CommunicationService {
       for (const item of template.params) {
         if (item && item.mandatory && !dynamicData[item.key]) {
           throw new BadRequestError(`Parameter [${item.key}] not set`);
-        } else {
-          throw new BadRequestError(`Parameter not set for email template ${item}`);
         }
       }
       await SendGrid.sendMail(payload, template, dynamicData);
@@ -47,9 +45,9 @@ export class CommunicationService {
       const err = {
         name: 'Send Email Failed',
         message: 'CommunicationService ~ : Send email failed',
-        stack: error.stack,
+        stack: error,
       } as Error;
-      throw new InternalServerError(err);
+      console.log(err);
     }
   }
 
