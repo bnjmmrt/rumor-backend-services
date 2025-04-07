@@ -162,6 +162,7 @@ export const sendEventCancellation = async (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   const { eventDate, eventName, imageFlyer, city, hostName } = mailComponents;
+  console.log('* ** * hostname', hostName);
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -206,9 +207,10 @@ export const sendEventCancellation = async (
     },
     {
       key: 'host_name',
-      value: hostName,
+      value: hostName || 'Rumor',
     },
   ];
+  console.log('* * * ** * * * PARAMS', params);
   try {
     const emaildata = await serviceMesh
       .notificationService()
