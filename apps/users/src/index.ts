@@ -12,6 +12,7 @@ const start = async () => {
     await Seeders.seedRoles();
     await Seeders.seedInterests();
     await Seeders.seedFocuses();
+    await Seeders.seedDefaultRoleSettings();
 
     await server.start();
     console.info('[APP] - Application started. 🚀');

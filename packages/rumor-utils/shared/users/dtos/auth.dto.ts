@@ -666,7 +666,7 @@ export class VerifyCodeRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  verificationCode: string;
+  code: string;
 }
 
 export class HostFeedbackRequestDto implements HostFeedbackRequest {

@@ -35,8 +35,8 @@ export class CommunicationController {
 
   public static verifyCode = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const payload: VerifyCodeRequestDto = req.body;
-    await TwilioService.verifyCode(payload);
-    const successResponse = new GetResponse({}, 'Code verified');
+    const result = await TwilioService.verifyCode(payload);
+    const successResponse = new GetResponse({ ...result }, 'Code verified');
     res.status(successResponse.statusCode).json(successResponse);
   });
 
