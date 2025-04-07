@@ -20,7 +20,7 @@ interface MailComponent {
     | undefined;
 }
 
-export const sendEventInviteMember = (
+export const sendEventInviteMember = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
@@ -71,7 +71,7 @@ export const sendEventInviteMember = (
     },
   );
   try {
-    return serviceMesh
+    const mailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -79,10 +79,13 @@ export const sendEventInviteMember = (
         [data.email.trim().toLowerCase()],
         null,
       );
-  } catch (error) {}
+    return mailData;
+  } catch (error) {
+    console.log(`Invite New User failed at function sendEventInviteMember:: ${error}`);
+  }
 };
 
-export const sendEventInviteNonMember = (
+export const sendEventInviteNonMember = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
@@ -137,7 +140,7 @@ export const sendEventInviteNonMember = (
     },
   );
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -145,10 +148,13 @@ export const sendEventInviteNonMember = (
         [data.email.trim().toLowerCase()],
         null,
       );
-  } catch (error) {}
+    return emailData;
+  } catch (error) {
+    console.log(`Invite User as NonMember failed at function sendEventInviteNonMember:: ${error}`);
+  }
 };
 
-export const sendEventCancellation = (
+export const sendEventCancellation = async (
   mailComponents: MailComponent,
   email: string,
   guestName: string,
@@ -204,7 +210,7 @@ export const sendEventCancellation = (
     },
   ];
   try {
-    return serviceMesh
+    const emaildata = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -212,10 +218,13 @@ export const sendEventCancellation = (
         [email.trim().toLowerCase()],
         null,
       );
-  } catch (err) {}
+    return emaildata;
+  } catch (err) {
+    console.log(`Event Cancellation failed at function sendEventCancellation:: ${err}`);
+  }
 };
 
-export const sendEventUpdation = (
+export const sendEventUpdation = async (
   mailComponents: MailComponent,
   email: string,
   userId: string,
@@ -266,13 +275,16 @@ export const sendEventUpdation = (
   ];
 
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(params, 'Event Info Updated', [email.trim().toLowerCase()], null);
-  } catch (err) {}
+    return emailData;
+  } catch (err) {
+    console.log(`Event Updation failed at function sendEventUpdation:: ${err}`);
+  }
 };
 
-export const sendEventInvitePlusOnes = (
+export const sendEventInvitePlusOnes = async (
   mailComponents: MailComponent,
   addOnData: any,
   timeZone: string,
@@ -337,7 +349,7 @@ export const sendEventInvitePlusOnes = (
   ];
 
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -345,10 +357,13 @@ export const sendEventInvitePlusOnes = (
         [email.trim().toLowerCase()],
         null,
       );
-  } catch (err) {}
+    return emailData;
+  } catch (err) {
+    console.log(`Invite Plus One failed at function sendEventInvitePlusOnes:: ${err}`);
+  }
 };
 
-export const sendGuestEventApproval = (
+export const sendGuestEventApproval = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
@@ -399,7 +414,7 @@ export const sendGuestEventApproval = (
   ];
 
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -407,10 +422,13 @@ export const sendGuestEventApproval = (
         [emailsData.email.trim().toLowerCase()],
         null,
       );
-  } catch (err) {}
+    return emailData;
+  } catch (err) {
+    console.log(`Guest Approval failed at function sendGuestEventApproval:: ${err}`);
+  }
 };
 
-export const sendEventAnnouncement = (
+export const sendEventAnnouncement = async (
   firstName: string,
   hostName: string,
   eventName: string,
@@ -425,13 +443,16 @@ export const sendEventAnnouncement = (
     { key: 'url_button', value: redirectPath },
   ];
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(params, 'New Event Announcement', [email.trim().toLowerCase()], null);
-  } catch (error) {}
+    return emailData;
+  } catch (error) {
+    console.log(`Event Announcement failed at function sendEventInviteMember:: ${error}`);
+  }
 };
 
-export const sendEventPublishedApproval = (
+export const sendEventPublishedApproval = async (
   mailComponents: MailComponent,
   email: string,
   companyName: string,
@@ -484,7 +505,7 @@ export const sendEventPublishedApproval = (
     },
   ];
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -492,10 +513,13 @@ export const sendEventPublishedApproval = (
         [email.trim().toLowerCase()],
         null,
       );
-  } catch (e) {}
+    return emailData;
+  } catch (e) {
+    console.log(`Evant Published Approval failed at function sendEventPublishedApproval:: ${e}`);
+  }
 };
 
-export const sendEventPrePublishApproval = (
+export const sendEventPrePublishApproval = async (
   mailComponents: MailComponent,
   email: string,
   companyName: string,
@@ -558,7 +582,7 @@ export const sendEventPrePublishApproval = (
     },
   ];
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -566,10 +590,13 @@ export const sendEventPrePublishApproval = (
         [email.trim().toLowerCase()],
         null,
       );
-  } catch (e) {}
+    return emailData;
+  } catch (e) {
+    console.log(`Event Pre Publish Approval failed at function sendEventPrePublishApproval:: ${e}`);
+  }
 };
 
-export const sendEventRejection = (
+export const sendEventRejection = async (
   eventName: string,
   hostName: string,
   email: string,
@@ -585,7 +612,7 @@ export const sendEventRejection = (
     },
   ];
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(
         params,
@@ -593,10 +620,13 @@ export const sendEventRejection = (
         [email.trim().toLowerCase()],
         null,
       );
-  } catch (e) {}
+    return emailData;
+  } catch (e) {
+    console.log(`Event Rejection failed at function sendEventRejection:: ${e}`);
+  }
 };
 
-export const sendEventReminder = (
+export const sendEventReminder = async (
   mailComponents: MailComponent,
   email: string,
   userId: string,
@@ -647,8 +677,11 @@ export const sendEventReminder = (
   ];
 
   try {
-    return serviceMesh
+    const emailData = await serviceMesh
       .notificationService()
       .sendEmailFromTemplate(params, 'Event 24 Hour Reminder', [email.trim().toLowerCase()], null);
-  } catch (err) {}
+    return emailData;
+  } catch (err) {
+    console.log(`Event Reminder failed at function sendEventReminder:: ${err}`);
+  }
 };
