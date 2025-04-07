@@ -38,7 +38,7 @@ export interface SendVerificationCodeRequest {
 /** Verify Code */
 export interface VerifyCodeRequest {
   phoneNumber: string;
-  verificationCode: string;
+  code: string;
 }
 
 /** Verify Response */
