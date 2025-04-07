@@ -65,6 +65,9 @@ class TwilioService {
       ) {
         throw new ValidationError('Invalid verification code');
       }
+
+      return { verified : true}
+
     } catch (error) {
       console.log("🚀 ~ TwilioService ~ verifyCode ~ error:", error)
       throw new InternalServerError(error);
