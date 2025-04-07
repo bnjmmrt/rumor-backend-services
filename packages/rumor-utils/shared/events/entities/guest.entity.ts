@@ -59,6 +59,7 @@ export class Guest extends RumorBaseEntity {
 
   @ManyToOne(() => User, user => user.eventInvitations, {
     onUpdate: 'CASCADE',
+    onDelete: 'CASCADE'
   })
   @JoinColumn({ name: 'user_id' })
   user: Partial<User>;

@@ -5770,6 +5770,42 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
+
+          const fullUser = await queryRunner.manager.getRepository(User).findOne({
+            where: { id: user.id },
+            relations: ['notifications'],
+          });
+
+          // Step 1: Remove user from notification_recipients
+          if (fullUser?.notifications?.length) {
+            await queryRunner.manager
+              .createQueryBuilder()
+              .relation(User, 'notifications')
+              .of(user)
+              .remove(fullUser.notifications);
+          }
+
+          // Step 2: Nullify linkedUser in notifications
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Notification)
+            .set({ linkedUser: null })
+            .where('linked_user_id = :id', { id: user.id })
+            .execute();
+
+          // Step 3: Delete orphaned notifications (no recipients)
+          const orphanedNotifications = await queryRunner.manager
+            .getRepository(Notification)
+            .createQueryBuilder('n')
+            .leftJoinAndSelect('n.recipients', 'r')
+            .getMany();
+
+          for (const n of orphanedNotifications) {
+            if (n.recipients.length === 0) {
+              await queryRunner.manager.remove(n);
+            }
+          }
+
           await queryRunner.manager.getRepository(User).delete({ id: user.id });
         }
       }
