@@ -2505,13 +2505,7 @@ export class EventsService {
         eventCurrentStatus === EventStatusEnum.APPROVED_STATUS
       ) {
         try {
-          const guestStatuses: GuestStatus[] = [
-            GuestStatus.APPLIED,
-            GuestStatus.CONFIRMED,
-            GuestStatus.REVIEW,
-            GuestStatus.DECLINED,
-            GuestStatus.INVITED,
-          ];
+          const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
           await this.notifyGuestsOnDateOrLocationChange({
             eventPayload: payload,
             eventId,
@@ -3792,7 +3786,6 @@ export class EventsService {
         );
       },
     );
-    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,
