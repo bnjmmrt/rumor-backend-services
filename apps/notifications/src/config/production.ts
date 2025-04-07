@@ -1,6 +1,10 @@
 const config = {
   parameters: [],
-  secrets: [],
+  secrets: [
+    {
+      remoteKey: 'prod-rumor-secrets',
+    }
+  ],
   values: {
     PORT: 8002,
   },
