@@ -48,7 +48,9 @@ export class ConnectionManager {
     await this.connection.runMigrations();
   }
 
-  public async runSeeders(): Promise<void> {}
+  public async runSeeders(): Promise<void> {
+    
+  }
 }
 
 const connectionManager = new ConnectionManager();
