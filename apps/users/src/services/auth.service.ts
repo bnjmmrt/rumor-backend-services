@@ -1462,10 +1462,14 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-      try {
+      console.log('--------heheheh')
+      // try {
         const verificationResult = isEmailLogin
           ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
           : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+          console.log("🚀 ~ AuthService ~ memberLogin ~ verificationResult:", verificationResult)
+
 
         const isVerified: boolean =
           ('verified' in verificationResult && verificationResult.verified === true) ||
@@ -1474,7 +1478,9 @@ export class AuthService {
         if (!isVerified) {
           throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
-      } catch (error) {}
+      // } catch (error) {
+
+      // }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({

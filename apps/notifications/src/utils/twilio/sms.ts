@@ -44,7 +44,7 @@ class TwilioService {
     }
   }
 
-  async verifyCode(payload: { phoneNumber: string; verificationCode: string }) {
+  async verifyCode(payload: { phoneNumber: string; code: string }) {
     const client = this.getClient();
     const sid = config.get('TWILIO_VERIFY_SID');
 
@@ -55,7 +55,7 @@ class TwilioService {
     try {
       const verificationCheck = await client.verify.v2.services(sid).verificationChecks.create({
         to: payload.phoneNumber,
-        code: payload.verificationCode,
+        code: payload.code,
       });
 
       if (
@@ -66,6 +66,7 @@ class TwilioService {
         throw new ValidationError('Invalid verification code');
       }
     } catch (error) {
+      console.log("🚀 ~ TwilioService ~ verifyCode ~ error:", error)
       throw new InternalServerError(error);
     }
   }
