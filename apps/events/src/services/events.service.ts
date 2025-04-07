@@ -3343,6 +3343,7 @@ export class EventsService {
       ticketStatus: hasTicket.status ?? undefined,
       ticketTypeId: guest.ticketType.id ?? undefined,
       ticketType: guest.ticketType.name ?? undefined,
+      ticketDescription: guest.ticketType.description ?? undefined,
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
