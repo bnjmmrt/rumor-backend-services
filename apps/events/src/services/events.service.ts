@@ -2658,7 +2658,7 @@ export class EventsService {
           : 'TBD';
       const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
 
-      if (guest.user?.email && guest.status === GuestStatus.CONFIRMED) {
+      if (guest.user?.email) {
         const createMailPayload = {
           eventName,
           imageFlyer: event.imageFlyer,
@@ -2673,7 +2673,7 @@ export class EventsService {
           event.id,
           event.timeZone,
         );
-      } else if (guest.user?.phoneNumber && guest.status === GuestStatus.CONFIRMED) {
+      } else if (guest.user?.phoneNumber) {
         // Send SMS notification
         try {
           const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
