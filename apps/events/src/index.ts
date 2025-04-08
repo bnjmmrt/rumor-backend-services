@@ -15,13 +15,12 @@ const start = async () => {
     }
     await Seeders.seedEventTypes();
     await Seeders.seedEventAgeLimits();
-    await Seeders.seedDefaultRoleSettings();
     await Seeders.seedSignupFormStaticQuestions();
     if (config.get('runSeeds')) {
       await connectionManager.runSeeders();
     }
 
-    SchedulerService.scheduleEventOnServerRestart();
+    await SchedulerService.scheduleEventOnServerRestart();
     await server.start();
     console.info('[APP] - Application started. 🚀');
   } catch (err) {
