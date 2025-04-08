@@ -962,6 +962,7 @@ export class AuthService {
     if (user) {
       throw new ConflictError('This email is already taken');
     }
+    await this.sendVerificationCodeByEmail({ email: payload.email })
     return { isValid: true };
   }
 
@@ -3318,6 +3319,8 @@ export class AuthService {
 
     if (isValid) {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    }else{
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     return { verified: isValid };
