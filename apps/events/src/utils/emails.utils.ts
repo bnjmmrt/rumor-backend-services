@@ -67,7 +67,7 @@ export const sendEventInviteMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect' //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     },
   );
   try {
@@ -136,7 +136,7 @@ export const sendEventInviteNonMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect' //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     },
   );
   try {
@@ -346,7 +346,7 @@ export const sendEventInvitePlusOnes = async (
     },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect'//config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     },
   ];
 
@@ -411,7 +411,7 @@ export const sendGuestEventApproval = async (
     },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE'),
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect'//config.get('RUMOR_WEBSITE'),
     },
   ];
 
@@ -437,7 +437,7 @@ export const sendEventAnnouncement = async (
   eventId: string,
   email: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const redirectPath = `event-announcement?id=${eventId}`;
+  const redirectPath = config.get('USERS_SERVICE_BASE_URL') + '/redirect'//`event-announcement?id=${eventId}`;
   const params = [
     { key: 'event', value: eventName },
     { key: 'host', value: hostName },
@@ -679,7 +679,7 @@ export const sendEventReminder = async (
     },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect' //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     },
   ];
 
