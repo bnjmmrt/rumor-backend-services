@@ -3319,6 +3319,8 @@ export class AuthService {
 
     if (isValid) {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    }else{
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     return { verified: isValid };
