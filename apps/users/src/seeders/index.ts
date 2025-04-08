@@ -3,11 +3,8 @@ import { DefaultRoleSettings, Role } from 'rumor-utils/shared/entities/index';
 import database from '../database';
 import { Interest } from 'rumor-utils/shared/users/entities/interest.entity';
 import { Focus } from 'rumor-utils/shared/users/entities/focus.entity';
-import {
-  CollaboratorRoles,
-} from 'rumor-utils/shared/events/interfaces/event.interface';
+import { CollaboratorRoles } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { RoleService } from '../services/role.service';
-
 
 export class Seeders {
   public static dbConnection = database;
@@ -130,7 +127,7 @@ export class Seeders {
 
       //TODO: first check if data exists or not if not then only this should run also it can be move to auth service
       for (const item of data) {
-        const role: Partial<Role> = (await RoleService.getRoleByName({name: item.role}));
+        const role: Partial<Role> = await RoleService.getRoleByName({ name: item.role });
 
         if (!role) continue;
         let settingsEntry = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({

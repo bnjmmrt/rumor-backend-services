@@ -4,9 +4,7 @@ import {
   SignupFormStaticQuestions,
 } from 'rumor-utils/shared/entities/index';
 import database from '../database';
-import {
-  QuestionValueType,
-} from 'rumor-utils/shared/events/interfaces/event.interface';
+import { QuestionValueType } from 'rumor-utils/shared/events/interfaces/event.interface';
 
 export class Seeders {
   public static dbConnection = database;
