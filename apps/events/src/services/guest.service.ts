@@ -983,6 +983,9 @@ export class GuestService {
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()) || []
+    console.log("🚀 ~ AuthService ~ getAllusers ~ pastEventsIds:", pastEventsIds)
+   
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
@@ -1051,6 +1054,7 @@ export class GuestService {
 
     queryBuilder.take(take).skip(skip);
 
+
     if (guestStatus) {
       if (guestStatus === 'DECLINED') {
         queryBuilder.andWhere('guest.status IN (:...statuses)', {
@@ -1093,6 +1097,7 @@ export class GuestService {
       customListNames,
       userSource,
       checkedInStatus,
+      pastEventsIds
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -1185,6 +1190,7 @@ export class GuestService {
     customListNames,
     userSource,
     checkedInStatus,
+    pastEventsIds
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -1198,6 +1204,21 @@ export class GuestService {
           });
         }),
       );
+    }
+    console.log('pastEventsIds', pastEventsIds)
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+      queryBuilder.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+           .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN ' + subQuery;
+      });
     }
 
     if (checkedInStatus) {
@@ -1987,12 +2008,33 @@ export class GuestService {
       return null;
     };
 
-    const locationCondition = await addLocationCondition(
-      Number(parsedQuery.longitude),
-      Number(parsedQuery.latitude),
-    );
-    addCondition(locationCondition, 'AND');
+    console.log('parsedQuery.locations', parsedQuery.locations)
+   // Handle multiple locations in parsedQuery.locations
+    if (Array.isArray(parsedQuery.locations) && parsedQuery.locations.length > 0) {
+      // First, parse the stringified locations
+      let locations: { latitude: number; longitude: number }[] = [];
+      if (typeof parsedQuery.locations === 'string') {
+        locations = JSON.parse(parsedQuery.locations)
+      }
+      //catch (err) {
+      //   console.error('Invalid locations array:', err);
+      //   return responses.data([]);
+      // }
+      console.log('parsedQuery.locations two', locations)
+      const locationConditions = [];
 
+      for (const loc of locations) {
+        const condition = await addLocationCondition(Number(loc.longitude), Number(loc.latitude));
+        if (condition) {
+          locationConditions.push(condition);
+        }
+      }
+
+      if (locationConditions.length > 0) {
+        // Combine all OR-ed location conditions into an AND clause
+        addCondition({ where: locationConditions }, 'AND');
+      }
+    }
     let status: EventStatusEnum[];
     if (parsedQuery.statusName) {
       status = String(parsedQuery.statusName)

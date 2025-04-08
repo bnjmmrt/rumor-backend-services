@@ -3311,6 +3311,8 @@ export class AuthService {
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
+    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()) || []
+    console.log("🚀 ~ AuthService ~ getAllusers ~ pastEventsIds:", pastEventsIds)
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
         const allListNames = customListName.split(',').map(name => name.trim());
@@ -3321,6 +3323,7 @@ export class AuthService {
         followed = separatedLists.includes('myFollowers-systemDefault');
       }
     }
+    console.log("🚀 ~ AuthService ~ getAllusers ~ customListNames:", customListNames)
 
     const idsResult = await this.dbConnection.getRepository(HostUserMapping).find({
       where: { host: { id: hostId } },
@@ -3353,6 +3356,65 @@ export class AuthService {
       )
       .skip(skip)
       .take(take);
+
+      /**past event filter */
+      // if (pastEventsIds.length > 0) {
+      //   usersQuery.andWhere(
+      //     new Brackets(qb => {
+      //       qb.where(
+      //         `EXISTS (
+      //           SELECT 1 FROM guest
+      //           WHERE guest.user_id = user.id
+      //           AND guest.event_id IN (:...pastEventsIds)
+      //           AND guest.status = 'CONFIRMED'
+      //           AND guest.checked_in = true
+      //         )`,
+      //         { pastEventsIds },
+      //       );
+      //     }),
+      //   );
+      // }
+      console.log('pastEventsIds -----------', pastEventsIds)
+      // if (pastEventsIds.length > 0) {
+      //   const confirmedStatus = GuestStatus.CONFIRMED;
+      
+      //   usersQuery.andWhere(
+      //     new Brackets(qb => {
+      //       const subQuery = usersQuery.connection
+      //         .createQueryBuilder()
+      //         .select('1')
+      //         .from('guest', 'g')
+      //         .where('"g"."user_id" = "user"."id"')
+      //         // .andWhere('"g"."event_id" IN (:...pastEventsIds)', { pastEventsIds })
+      //         // .andWhere('"g"."status" = :confirmedStatus', { confirmedStatus })
+      //         .andWhere('"g"."check_in" = true')
+      //         .getQuery();
+      
+      //       qb.where(`EXISTS (${subQuery})`);
+      //     }),
+      //   );
+      // }
+      
+      
+      if (pastEventsIds.length) {
+        const confirmedStatus = GuestStatus.CONFIRMED;
+      
+        usersQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('g.user_id')
+            .from(Guest, 'g')
+            .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+            .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+             .andWhere('g.check_in = true')
+            .getQuery();
+          return 'user.id IN ' + subQuery;
+        });
+      }
+      
+      
+      /**ends here */
+
     if (eventId) {
       usersQuery.andWhere(
         `NOT EXISTS (
@@ -3474,6 +3536,9 @@ export class AuthService {
         });
       }
     }
+
+    
+
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
       const ageFrom =
         parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim()
@@ -3947,6 +4012,8 @@ export class AuthService {
           host: { id: host.id },
         },
       });
+      console.log("🚀 ~ AuthService ~ hostFollowing ~ hostFollowing:", hostFollowing)
+      
 
       if (hostFollowing) isMemberFollowingHost = true;
 
@@ -4593,20 +4660,33 @@ export class AuthService {
       type: FilterTypeValues.type,
     };
     const now = new Date();
+    let mappedEvents : any = [];
     //TODO: check if this logic affects on date format changes
-    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+   // const formattedDate = formatDateToMMDDYYYYHHmm(now);
     const queryParams = {
       ownerId: userId,
-      statusName: 'PAST_STATUS',
-      maxEndDate: formattedDate,
-      isPublished: true,
+      status: 'PAST_STATUS',
+      // maxEndDate: formattedDate,
+      // isPublished: true,
     };
     const queryString = prepareQueryString(queryParams);
-    const listEvents = [];
-    const mappedEvents = listEvents?.map(event => ({
+    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ queryString:", queryString)
+    try{
+    const listEvents: any =  await serviceMesh.eventService().listHostEvents(queryString)
+     console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ listEvents:", listEvents)
+      mappedEvents = listEvents?.data?.result.map(event => ({
       name: event.name,
       id: event.id,
     }));
+    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ listEvents:", listEvents)
+
+    }
+    catch(e) {
+console.log('e', e)
+    }
+    
+   
+    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ mappedEvents:", mappedEvents)
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',
