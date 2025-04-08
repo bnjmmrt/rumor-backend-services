@@ -74,7 +74,8 @@ export class EventAnnouncementService {
   public static async postAnnouncement(payload) {
     let { eventId, createdBy, recipients, announcement, attachments, ticketType, addedBy } =
       payload;
-
+    if(ticketType.length === 0) throw new NotFoundError('Ticket Type')
+    if(addedBy.length === 0) throw new NotFoundError('Added By')  
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -84,7 +85,7 @@ export class EventAnnouncementService {
       },
       relations: { owner: true },
     });
-    if (!event) throw new NotFoundError('Event not found');
+    if (!event) throw new NotFoundError('Event');
 
     const creator = await database.getRepository(User).findOne({ where: { id: createdBy } });
     if (!creator) throw new NotFoundError('Creator not found');
@@ -119,15 +120,14 @@ export class EventAnnouncementService {
      * in this case we don't need to fetch the guest.user becuase the FE team is already sending the userIds in the recipients array
      *
      */
-
     try {
       if (recipients.length > 0) {
         serviceMesh
           .notificationService()
           .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
         const fetchUserEmails = await database
-          .getRepository(User)
-          .find({ where: { id: In(recipients) } });
+        .getRepository(User)
+        .find({ where: { id: In(recipients) } });
         fetchUserEmails.map(data => {
           if (data.email) {
             sendEventAnnouncement(
@@ -143,8 +143,8 @@ export class EventAnnouncementService {
         const recipientsData = await database.getRepository(Guest).find({
           where: {
             event: { id: eventId },
-            ticketType: ticketTypes.length > 0 ? In(ticketTypes) : undefined,
-            addedBy: addedByUsers.length > 0 ? In(addedByUsers) : undefined,
+            ticketType: In(ticketType),
+            addedBy: In(addedBy),
             status: GuestStatus.CONFIRMED,
           },
           relations: {

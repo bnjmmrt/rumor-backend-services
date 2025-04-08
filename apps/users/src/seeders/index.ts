@@ -1,8 +1,13 @@
-import { Role } from 'rumor-utils/shared/entities/index';
+import { DefaultRoleSettings, Role } from 'rumor-utils/shared/entities/index';
 
 import database from '../database';
 import { Interest } from 'rumor-utils/shared/users/entities/interest.entity';
 import { Focus } from 'rumor-utils/shared/users/entities/focus.entity';
+import {
+  CollaboratorRoles,
+} from 'rumor-utils/shared/events/interfaces/event.interface';
+import { RoleService } from '../services/role.service';
+
 
 export class Seeders {
   public static dbConnection = database;
@@ -39,6 +44,108 @@ export class Seeders {
             await this.dbConnection.getRepository(Role).save(subRole);
           }
         }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  public static async seedDefaultRoleSettings() {
+    try {
+      const data = [
+        {
+          role: CollaboratorRoles.CO_HOST,
+          config: {
+            editEventDetailsSettings: true,
+            inviteGuestsToEvent: true,
+            addGuestsToDrafts: true,
+            viewFullGuestList: true,
+            manageInAppRsvpRequests: true,
+            manageDedicatedSignUpForm: true,
+            postAnnouncementsToAllGuests: true,
+            checkInGuests: true,
+            postAnnouncementsByCollaborator: true,
+            chatWithAllGuests: true,
+            chatWithGuestsByCollaborator: true,
+            generateEventReports: true,
+            defaultRoleSettingsRepository: true,
+          },
+        },
+        /**this role was asked to remove from collaborator roles */
+        // {
+        //   role: CollaboratorRoles.PROMOTER,
+        //   config: {
+        //     editEventDetailsSettings:false,
+        //     inviteGuestsToEvent: true,
+        //     addGuestsToDrafts: true,
+        //     viewFullGuestList: true,
+        //     manageInAppRsvpRequests: true,
+        //     manageDedicatedSignUpForm: true,
+        //     postAnnouncementsToAllGuests: false,
+        //     checkInGuests: true,
+        //     postAnnouncementsByCollaborator: true,
+        //     chatWithAllGuests: false,
+        //     chatWithGuestsByCollaborator: true,
+        //     generateEventReports: false,
+        //     defaultRoleSettingsRepository: false,
+        //   },
+        // },
+        {
+          role: CollaboratorRoles.CONTRIBUTOR,
+          config: {
+            editEventDetailsSettings: false,
+            inviteGuestsToEvent: true,
+            addGuestsToDrafts: true,
+            viewFullGuestList: false,
+            manageInAppRsvpRequests: false,
+            manageDedicatedSignUpForm: true,
+            postAnnouncementsToAllGuests: false,
+            checkInGuests: false,
+            chatWithAllGuests: false,
+            postAnnouncementsByCollaborator: true,
+            chatWithGuestsByCollaborator: true,
+            generateEventReports: false,
+            defaultRoleSettingsRepository: false,
+          },
+        },
+        {
+          role: CollaboratorRoles.CHECK_IN,
+          config: {
+            editEventDetailsSettings: false,
+            inviteGuestsToEvent: false,
+            addGuestsToDrafts: false,
+            viewFullGuestList: true,
+            manageInAppRsvpRequests: false,
+            manageDedicatedSignUpForm: false,
+            postAnnouncementsToAllGuests: false,
+            checkInGuests: true,
+            chatWithAllGuests: false,
+            chatWithGuestsByCollaborator: false,
+            postAnnouncementsByCollaborator: false,
+            generateEventReports: false,
+            defaultRoleSettingsRepository: false,
+          },
+        },
+      ];
+
+      //TODO: first check if data exists or not if not then only this should run also it can be move to auth service
+      for (const item of data) {
+        const role: Partial<Role> = (await RoleService.getRoleByName({name: item.role}));
+
+        if (!role) continue;
+        let settingsEntry = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
+          where: {
+            role: { name: item.role },
+            deletedAt: null,
+          },
+        });
+        if (settingsEntry) {
+          Object.assign(settingsEntry, item.config);
+        } else {
+          settingsEntry = this.dbConnection.getRepository(DefaultRoleSettings).create(item.config);
+          settingsEntry.role = role;
+        }
+        await this.dbConnection.getRepository(DefaultRoleSettings).save(settingsEntry);
       }
     } catch (error) {
       console.log(error);
