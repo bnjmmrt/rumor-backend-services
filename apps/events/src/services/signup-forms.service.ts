@@ -121,7 +121,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-
+      
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
