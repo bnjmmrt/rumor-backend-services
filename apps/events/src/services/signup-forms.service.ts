@@ -121,17 +121,19 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-
+      
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
+      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
+      if (eventSignupForm.event.status === EventStatusEnum.PAST_STATUS) {
+        return data;
+      }
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
         throw new NotFoundError('Event does not exists');
       }
-      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
-
-      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
       return data;
     } catch (err: any) {
