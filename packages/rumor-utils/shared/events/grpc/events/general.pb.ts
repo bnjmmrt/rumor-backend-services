@@ -136,7 +136,11 @@ export interface EventTypeData {
 export interface QueryRequest {
   query?: string | undefined;
 }
-
+export interface EventGuestRequest {
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
+  id: string;
+}
 export interface QuizQuestion {
   id: string;
   question: string;
@@ -434,7 +438,7 @@ export interface GuestData {
   gender?: string | undefined;
   age?: number | undefined;
   address?: AddressGuest | undefined;
-  interest: InterestData[];
+  interest: string[];
   // followsYou?: boolean | undefined;
   // favorite?: boolean | undefined;
   roles: UserRoleComplete[];
@@ -641,6 +645,7 @@ export interface GuestDetail {
   inviteMessage?: string | undefined;
   signupFormName?: string | undefined;
   eventId?: string | undefined;
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface GuestDetails {
@@ -648,6 +653,7 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface QuizDataList {
@@ -663,6 +669,7 @@ export interface GenerateTicketForGuestData {
   jwtToken?: string | undefined;
   eventQr: boolean;
   checkInStatus?: boolean | undefined;
+  ticketDescription?: string | undefined;
 }
 
 export interface ToggleGuestCheckStatusData {

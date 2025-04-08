@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, QueryRunner } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
 import database from '../database';
 import config from '../config';
 
@@ -185,6 +185,7 @@ import {
   entityToUserSource,
   entityToUserStatus,
   newUserStatusTosUserStatus,
+  userSourceToEntity,
 } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -209,7 +210,7 @@ import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.en
 import { Report } from 'rumor-utils/shared/users/entities/report.entity';
 import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
-import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
@@ -321,6 +322,9 @@ export class AuthService {
   public static async memberSignUp(
     payload: MemberSignUpRequestDto,
   ): Promise<UserIdWithRolesAndToken> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let existingUser: User | null = null;
     let fusionAuthUser = null;
     let requiresFusionAuthRegistration = false;
@@ -467,7 +471,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email.trim()], // Send email to the member
+        [newUser.email.trim().toLowerCase()], // Send email to the member
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -538,7 +542,11 @@ export class AuthService {
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
     payload.email = payload.email.toLowerCase();
-    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: UserRole | null;
+    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
+    let userHasOtherRoles: boolean = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
+
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -550,22 +558,35 @@ export class AuthService {
     });
 
     if (user) {
-      userRoleAsMemberOrNonMember = user.roles.find(item => {
-        if (item.role.name == 'non_member' || item.role.name == 'member') return item;
-      });
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
+      userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
-      userRoleExistsAsHost = user.roles.find(item => {
-        if (item.role.name == 'host') return item;
-      });
+      phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
+      emailInUse = user.email === payload.email;
 
       if (userRoleExistsAsHost) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError('Phone number is already in use.');
+        if (phoneNumberInUse && emailInUse) {
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
+        } else if (phoneNumberInUse) {
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
+        } else if (emailInUse) {
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
+      }
 
-        if (user.email === payload.email) {
-          throw new BadRequestError('Email is already in use.');
-        }
+      if (userHasOtherRoles) {
+        throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
     }
 
@@ -592,7 +613,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -808,14 +829,21 @@ export class AuthService {
       email: payload.email,
       sendForgotPasswordEmail: false,
     };
-    const forgotPasswordResponse = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .forgotPassword(passwordResetRequest);
-    const token = forgotPasswordResponse.response?.changePasswordId;
-    if (!token) {
-      throw new BadRequestError('Unable to call forgot password, please try again later.');
-    }
     const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
     if (isAdmin) {
       const redirectPath = `new-password?token=${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -826,7 +854,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
         // this.logger,
       );
@@ -847,7 +875,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       if (!mailServiceResponse) {
@@ -1011,6 +1039,9 @@ export class AuthService {
   }
 
   public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
       throw new NotFoundError('User');
@@ -1080,7 +1111,12 @@ export class AuthService {
       try {
         const success = await serviceMesh
           .notificationService()
-          .sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
+          .sendEmailFromTemplate(
+            params,
+            'Invite New Member',
+            [payload.email.trim().toLowerCase()],
+            null,
+          );
         if (!success) {
           throw new BadRequestError(
             'An error occured while sending SMS invitation, please try again.',
@@ -1093,6 +1129,9 @@ export class AuthService {
   }
 
   public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
       throw new NotFoundError('User');
@@ -1135,7 +1174,12 @@ export class AuthService {
     try {
       const success = await serviceMesh
         .notificationService()
-        .sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
+        .sendEmailFromTemplate(
+          params,
+          'Host Invited by Rumor Admin',
+          [payload.email.trim().toLowerCase()],
+          null,
+        );
       if (!success) {
         throw new BadRequestError(
           'An error occured while sending Email invitation, please try again.',
@@ -1211,6 +1255,9 @@ export class AuthService {
   public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
     if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1291,7 +1338,13 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    try {
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
+      throw new BadRequestError(JSON.stringify(error));
+    }
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -1311,15 +1364,11 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
-        if (
-          config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber ||
-          !config.get('BYPASS_VERIFICATION_CODE')
-        ) {
           const message = 'Your Rumor verification code: ' + code.response.code;
           try {
             const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -1336,7 +1385,6 @@ export class AuthService {
           } catch (err) {
             console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
           }
-        }
       }
     } catch (error) {}
 
@@ -1346,6 +1394,9 @@ export class AuthService {
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
     if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1370,7 +1421,6 @@ export class AuthService {
 
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
-      try {
         const verificationResult = isEmailLogin
           ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
           : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
@@ -1382,7 +1432,6 @@ export class AuthService {
         if (!isVerified) {
           throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
-      } catch (error) {}
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1412,7 +1461,6 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-      try {
         const verificationResult = isEmailLogin
           ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
           : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
@@ -1424,7 +1472,6 @@ export class AuthService {
         if (!isVerified) {
           throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
-      } catch (error) {}
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1454,20 +1501,26 @@ export class AuthService {
     }
 
     // Handle bypass verification logic for testing or review environment
-    if (
-      config.get('APP_REVIEW_LOGIN') === loginIdentifier ||
-      config.get('BYPASS_VERIFICATION_CODE')
-    ) {
+    if (config.get('BYPASS_VERIFICATION_CODE')) {
       const temporaryCode = await this.dbConnection
         .getRepository(TemporaryLoginCode)
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
 
-      let completedLogin
+      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+      
+      // Setting up Payload.code to bypass verification for below email and phone number
+      if(payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602'){
+        payload.code = temporaryCode.code;
+      }
+      else if (payload.code !== temporaryCode.code) {
+        throw new BadRequestError('Invalid or expired verification code, please try again.');
+      }
+
+      let completedLogin;
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
-          .passwordlessLogin({ code: temporaryCode.code });
+          .passwordlessLogin({ code: payload.code });
       } catch (error) {
         try {
           const verificationResult = isEmailLogin
@@ -1492,7 +1545,7 @@ export class AuthService {
             user: user,
             isGuest: false,
           };
-        } catch (error) { }
+        } catch (error) {}
       }
 
       // if (completedLogin.statusCode > 299) {
@@ -1509,7 +1562,7 @@ export class AuthService {
       });
       return {
         id: user.id,
-        token: completedLogin.response?.token,
+        token: completedLogin?.response?.token,
         roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
@@ -1558,6 +1611,9 @@ export class AuthService {
   }
 
   public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const user = await this.dbConnection.getRepository(User).findOne({
       where: {
         email: payload.email,
@@ -1584,10 +1640,14 @@ export class AuthService {
     try {
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
     } catch (e) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     if (!authenticatedUser) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
@@ -1999,7 +2059,7 @@ export class AuthService {
           },
         ],
         'Member Approved into Rumor',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
@@ -2045,10 +2105,12 @@ export class AuthService {
       throw new NotFoundError('Users');
     }
 
-    const memberRole = await this.dbConnection
-      .getRepository(Role)
-      .findOne({ where: { name: 'member' } });
-    if (!memberRole) {
+    const [memberRole, nonMemberRole] = await Promise.all([
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } }),
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } }),
+    ]);
+
+    if (!memberRole || !nonMemberRole) {
       throw new NotFoundError('Role');
     }
 
@@ -2056,7 +2118,9 @@ export class AuthService {
       where: { user: { id: In(payload.ids) } },
       relations: ['user', 'role'],
     });
-
+    // const nonMemberUserRole = userRoles.find(
+    //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
+    // );
     if (userRoles.length === 0) {
       throw new NotFoundError('UserRole');
     }
@@ -2065,27 +2129,74 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
-      if (payload.status === UserStatus.WAITLISTED) {
-        // Make him non-member
-        continue;
+      const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
+      const memberUserRole = rolesForUser.find(ur => ur.role.name === 'member');
+      const nonMemberUserRole = rolesForUser.find(ur => ur.role.name === 'non_member');
+
+      if (!memberUserRole && !nonMemberUserRole) continue; // Skip if no relevant role
+
+      switch (payload.status) {
+        case UserStatus.ACTIVE:
+          if (nonMemberUserRole) {
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              newRole: memberRole,
+            });
+          } else if (memberUserRole) {
+            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE });
+          }
+
+          await this.dbConnection.getRepository(User).update(user.id, {
+            isDeactivated: false,
+            deactivatedAt: null,
+          });
+
+          break;
+
+        case UserStatus.WAITLISTED:
+          if (memberUserRole) {
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              newRole: nonMemberRole,
+            });
+          } else if (nonMemberUserRole) {
+            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED });
+          }
+          break;
+
+        case UserStatus.DEACTIVATED:
+          if (memberUserRole) {
+            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.DEACTIVATED });
+          } else if (nonMemberUserRole) {
+            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.DEACTIVATED });
+          }
+
+          await this.dbConnection.getRepository(User).update(user.id, {
+            isDeactivated: true,
+            deactivatedAt: new Date(),
+          });
+
+          break;
       }
 
-      const userRole = userRoles.find(ur => ur.user.id === user.id);
-      const nonMemberUserRole = userRoles.find(
-        ur => ur.user.id === user.id && ur.role.name === 'non_member',
-      );
+      // const userRole = userRoles.find(ur => ur.user.id === user.id);
+      // const nonMemberUserRole = userRoles.find(
+      //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
+      // );
 
-      if (nonMemberUserRole) {
-        usersToUpdate.push({
-          userRole: nonMemberUserRole,
-          newStatus: payload.status,
-          newRole: memberRole,
-        });
-      }
+      // if (nonMemberUserRole) {
+      //   usersToUpdate.push({
+      //     userRole: nonMemberUserRole,
+      //     newStatus: payload.status,
+      //     newRole: memberRole,
+      //   });
+      // }
 
-      if (userRole) {
-        usersToUpdate.push({ userRole, newStatus: payload.status });
-      }
+      // if (userRole) {
+      //   usersToUpdate.push({ userRole, newStatus: payload.status });
+      // }
 
       // if (payload.status === UserStatus.WAITLISTED) {
       // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
@@ -2111,14 +2222,6 @@ export class AuthService {
       }
       await this.dbConnection.getRepository(UserRole).save(update.userRole);
 
-      // Mark user as deactivated
-      if (update.newStatus === UserStatus.DEACTIVATED) {
-        await this.dbConnection.getRepository(User).update(update.userRole.user.id, {
-          isDeactivated: true,
-          deactivatedAt: new Date(),
-        });
-      }
-
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
@@ -2132,7 +2235,7 @@ export class AuthService {
                 },
               ],
               'Member Approved into Rumor',
-              [user.email.trim()], // Send email to the approved member
+              [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
           }
@@ -2676,6 +2779,11 @@ export class AuthService {
     const existingUserIds = customList.usersLists.map(listUser => listUser.user.id);
     const userIdsToAdd = userIds.filter(id => !existingUserIds.includes(id));
 
+    const userIdsAlreadyExist = userIds.filter(id => existingUserIds.includes(id));
+    if (userIdsAlreadyExist.length) {
+      throw new BadRequestError(`User already exist in the custom list.`);
+    }
+
     if (userIdsToAdd.length) {
       const validUsers = await this.dbConnection
         .getRepository(User)
@@ -3025,7 +3133,9 @@ export class AuthService {
       newUser.phoneNumber = payload.phoneNumber ?? '';
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;
@@ -3166,7 +3276,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -3178,7 +3288,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       }
@@ -3606,14 +3716,19 @@ export class AuthService {
             },
           });
 
-        return toMember(
+        const sources = user?.roles.map(item => item.source as string);
+
+        const member = toMember(
           user,
           focuses,
           interests,
           user.roles[0],
           socialNetworkObject,
           socialProvider?.username,
+          sources,
         );
+
+        return member;
       }),
     );
     return responses.data(members);
@@ -3626,29 +3741,48 @@ export class AuthService {
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const allEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
-      GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const upcomingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.start_date > now()
+            GROUP BY e.owner_id
+        `;
     const pastEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.end_date < now()
+            GROUP BY e.owner_id
+        `;
     const declinedEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DECLINED_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const draftEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DRAFT_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const pendingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'PENDING_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
 
     const queryBuilder = this.dbConnection
       .getRepository(User)
@@ -3712,6 +3846,9 @@ export class AuthService {
   }
 
   public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
@@ -3733,7 +3870,7 @@ export class AuthService {
     });
 
     const isAllowed = userRoles.find(
-      role => role.role.name === 'admin' || role.role.parentRole.name === 'admin',
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
@@ -3765,6 +3902,9 @@ export class AuthService {
   }
 
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let nonMember: UserRole | null;
     try {
       const response = await fusionAuthClientHandler
@@ -3895,6 +4035,23 @@ export class AuthService {
 
       if (isBlocked) isMemberBlockedHost = true;
     }
+    // Add this above the return statement
+    const confirmedGuestEvents = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        user: { id: memberId },
+        status: GuestStatus.CONFIRMED,
+        event: {
+          owner: { id: host.id },
+          endDate: LessThanOrEqual(new Date()),
+          status: EventStatusEnum.PAST_STATUS,
+        },
+      },
+      relations: {
+        event: {
+          location: true,
+        },
+      },
+    });
 
     return toHostProfile(
       host,
@@ -3904,6 +4061,7 @@ export class AuthService {
       isMemberBlockedHost,
       roleId,
       roleName,
+      confirmedGuestEvents,
     );
   }
 
@@ -4161,10 +4319,17 @@ export class AuthService {
           emailsToSend.map(email =>
             serviceMesh
               .notificationService()
-              .sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null),
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim().toLowerCase()],
+                null,
+              ),
           ),
         );
-      } catch (error) {}
+      } catch (error) {
+        console.log(`Host Status Updates failed at function updateHostStatus:: ${error}`);
+      }
       // if (skippedUsers.length > 0) {
       //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
       // }
@@ -4716,7 +4881,7 @@ export class AuthService {
     }
 
     if (host.customLists.some(list => list.listName === customName)) {
-      throw new BadRequestError('customName exists');
+      throw new BadRequestError('List name already exists');
     }
 
     let existingList;
@@ -4741,7 +4906,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }
@@ -4838,7 +5003,18 @@ export class AuthService {
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
     const note = hostUserSettings?.note ?? '';
-    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    const eventCount = await this.dbConnection
+      .getRepository(Guest)
+      .count({ where: { user: { id: user.id } } });
+    const userData = toMemberProfile(
+      user,
+      focuses,
+      interests,
+      userRole,
+      formattedLists,
+      undefined,
+      eventCount,
+    );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;
@@ -4933,6 +5109,13 @@ export class AuthService {
     );
     const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
 
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: payload.userId } },
+      relations: ['member'],
+    });
+
+    const favoriteUserIds = favorites.map(fav => fav.member.id);
+
     const users = await Promise.all(
       followedUsers.map(async user => {
         const focuses = await PlatformService.getUserFocuses({ id: user.id });
@@ -4952,9 +5135,11 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        return userData;
       }),
     );
     return { result: users, totalCount };
@@ -5203,7 +5388,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
@@ -5339,10 +5524,10 @@ export class AuthService {
   }
 
   public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
-    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
-    const user = await this.dbConnection
+    const host = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.id } });
+      .findOne({ where: { id: payload.userId } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
     if (!user || !host) {
       throw new NotFoundError('User or Host');
     }

@@ -38,6 +38,8 @@ export const toEvent = (
     EventStatusEnum.PENDING_STATUS,
     EventStatusEnum.DECLINED_STATUS,
     EventStatusEnum.CANCELLED_STATUS,
+    EventStatusEnum.PAST_STATUS,
+    EventStatusEnum.REJECTED_STATUS,
   ];
   // const eventStatus: EventStatus = predefinedStatuses.includes(event.status) ? EventStatus[event.status] : formatEventStatus(event);
   const eventStatus: EventStatusEnum = predefinedStatuses.includes(event.status)
@@ -116,15 +118,19 @@ export const groupCollaborators = (
     if (!Array.isArray(collaborators)) {
       return [];
     }
+
     const grouped = {};
     collaborators.forEach(collab => {
-      if (!collab?.user?.id) {
+      if (!collab?.user) {
+        console.log('Collaborator missing user object:', collab);
         return;
       }
+
       const { user, role, limitInvitationsNumber, ticketType, ...collaboratorDetails } = collab;
+
       if (!grouped[user.id]) {
         let isFollowedByCurrentGuest = false;
-        if (guest && hostsFollowedByGuest.length) {
+        if (guest && hostsFollowedByGuest?.length) {
           isFollowedByCurrentGuest = hostsFollowedByGuest.some(
             follow => follow.hostId === user.id && follow.followerId === memberUserId,
           );
@@ -132,7 +138,7 @@ export const groupCollaborators = (
         grouped[user.id] = {
           ...collaboratorDetails,
           id: user.id,
-          name: [user.firstName, user.lastName].filter(Boolean).join(' '), // Avoids "null undefined"
+          name: [user.firstName, user.lastName].filter(Boolean).join(' '),
           email: user.email || '',
           companyLogo: user.additionalHostInformation?.companyLogo || '',
           companyName: user.additionalHostInformation?.companyName || '',
@@ -140,9 +146,9 @@ export const groupCollaborators = (
           tickets: [],
           isFollowedByCurrentGuest,
           isApproved: false,
-          //TODO:add the status if collaborator is approved or accepted the invite
         };
       }
+
       if (ticketType?.id && ticketType?.name) {
         grouped[user.id].tickets.push({
           limitInvitationsNumber: limitInvitationsNumber,
@@ -255,6 +261,7 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
 
   if (
     !isPublished &&
+    publishDate &&
     eventStatus &&
     eventStatus === EventStatusEnum.APPROVED_STATUS &&
     parsedPublishDate <= parsedStartDate
@@ -265,9 +272,10 @@ export const formatEventStatusToEventStatusEnum = (event: Event): EventStatusEnu
   if (isPublished) {
     if (parsedStartDate >= now || parsedEndDate >= now) {
       status = EventStatus.UPCOMING_STATUS;
-    } else if (parsedEndDate < now) {
-      status = EventStatus.PAST_STATUS;
     }
+    // else if (parsedEndDate < now) {
+    //   status = EventStatus.PAST_STATUS;
+    // }
   }
 
   if (!isPublished && eventStatus && eventStatus !== EventStatusEnum.APPROVED_STATUS) {

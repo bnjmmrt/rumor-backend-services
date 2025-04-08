@@ -1,4 +1,8 @@
-import { SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  EventGuestRequest,
+  SignupFormsResponse,
+  UserSource,
+} from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { buildSignupFormsResponse } from 'rumor-utils/shared/events/mappers/signup-forms.mapper';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/events/entities/signup-form-static-questions.entity';
 import {
@@ -26,6 +30,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -116,17 +121,19 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-
+      
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
+      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
+      if (eventSignupForm.event.status === EventStatusEnum.PAST_STATUS) {
+        return data;
+      }
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
         throw new NotFoundError('Event does not exists');
       }
-      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
-
-      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
       return data;
     } catch (err: any) {
@@ -229,6 +236,21 @@ export class SignupFormsServices {
 
     const ids = [];
     const questionPromises: any[] = [];
+
+    /**---------TO DO:: HACKY FIX --------------------- */
+    if (!body.hasAccessForAdditionalGuests) {
+      const guestsWithStaticQuestions = await SignupFormQuestions.find({
+        where: { signupForms: { id: id } },
+      });
+      const hasAccessForAdditionalGuests = guestsWithStaticQuestions.find(
+        g => g.name === 'Request Access for Additional Guests',
+      );
+      if (hasAccessForAdditionalGuests) {
+        const deleteQuestions = SignupFormQuestions.delete(hasAccessForAdditionalGuests.id);
+        questionPromises.push(deleteQuestions);
+      }
+    }
+
     const questionList: SignupFormQuestions[] = [];
     let index = 0;
     for (let q of body.questions) {
@@ -256,8 +278,10 @@ export class SignupFormsServices {
             break;
         }
       }
+      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
       if (!body.hasAccessForAdditionalGuests) {
         if (q.name === 'Request Access for Additional Guests') {
+          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
           const deleteQuestions = SignupFormQuestions.delete(q.id);
           questionPromises.push(deleteQuestions);
         } else {
@@ -330,6 +354,7 @@ export class SignupFormsServices {
 
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
       user: { id: payload.id },
     });
 
@@ -341,33 +366,75 @@ export class SignupFormsServices {
     userPayload: User,
   ): Promise<[User, Guest]> {
     let user = null;
+    if (!userPayload.email && !userPayload.phoneNumber) {
+      throw new BadRequestError('User information missing to apply for an event.');
+    }
     if (userPayload.email) {
       user = await User.findOne({
         where: { email: userPayload.email },
       });
-    } else if (userPayload.phoneNumber) {
+    }
+    if (userPayload.phoneNumber && !user) {
       user = await User.findOne({
-        where: { email: userPayload.phoneNumber },
+        where: { phoneNumber: userPayload.phoneNumber },
       });
-    } else {
-      throw new BadRequestError('User information missing to apply for an event.');
     }
     if (!user) {
       return [userPayload, new Guest()];
     }
-
     if (user.id) {
       const guest = await Guest.findOne({
-        where: { user: { id: userPayload.id }, event: { id: eventId } },
+        where: { user: { id: user.id }, event: { id: eventId } },
+      });
+      if (guest) {
+        if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'You are already part of this event. Please log into application and check your event status.',
+          );
+        }
+        return [user, guest];
+      }
+    }
+    return [user, new Guest()];
+  }
+
+  public static async validateGuestExistence(userPayload: EventGuestRequest): Promise<string> {
+    let userFoundWithEmail = null;
+    let userFoundWithPhone = null;
+    if (userPayload?.email) {
+      userFoundWithEmail = await User.findOne({
+        where: { email: userPayload.email.trim().toLowerCase() },
+      });
+    }
+    if (userPayload?.phoneNumber) {
+      userFoundWithPhone = await User.findOne({
+        where: { phoneNumber: userPayload.phoneNumber },
+      });
+    }
+    if (!userPayload || (!userPayload.email && !userPayload.phoneNumber)) {
+      throw new BadRequestError('User information (email or phone) is required.');
+    }
+    if (userFoundWithEmail?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithEmail.id }, event: { id: userPayload.id } },
       });
       if (guest && guest.status !== GuestStatus.DRAFT) {
         throw new ForbiddenError(
-          'You are already part of this event. Please log into application and check your event status.',
+          'This email address is already associated with a status on the guest list.',
         );
       }
-      return [user, guest];
     }
-    return [user, new Guest()];
+    if (userFoundWithPhone?.id) {
+      const guest = await Guest.findOne({
+        where: { user: { id: userFoundWithPhone.id }, event: { id: userPayload.id } },
+      });
+      if (guest && guest.status !== GuestStatus.DRAFT) {
+        throw new ForbiddenError(
+          'This phone number is already associated with a status on the guest list.',
+        );
+      }
+    }
+    return '';
   }
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
@@ -427,10 +494,18 @@ export class SignupFormsServices {
       await queryRunner.manager.save(submissions);
 
       /**-- Create Host User Mapping */
-      const hostUserMapping = new HostUserMapping();
-      hostUserMapping.user = { id: userPayload.id } as User;
-      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
-      await queryRunner.manager.save(hostUserMapping);
+      const existingMapping = await HostUserMapping.findOne({
+        where: {
+          user: { id: userPayload.id },
+          host: { id: signupForm.event.owner.id },
+        },
+      });
+      if (!existingMapping) {
+        const hostUserMapping = new HostUserMapping();
+        hostUserMapping.user = { id: userPayload.id } as User;
+        hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+        await queryRunner.manager.save(hostUserMapping);
+      }
 
       await queryRunner.commitTransaction();
 
@@ -570,7 +645,7 @@ export class SignupFormsServices {
         .addSelect('gst.status', 'status')
         .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
-        .addSelect('gst.additionalRequestedGuests + 1', 'partySize')
+        .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -593,11 +668,19 @@ export class SignupFormsServices {
           }),
         );
       }
-      submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      if (parsedQuery.sortBy === 'name') {
+        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+        submissionsQuery
+          .addOrderBy('atd.firstName', sortDirection)
+          .addOrderBy('atd.lastName', sortDirection)
+          .offset(skip)
+          .limit(take);
+      } else {
+        submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+      }
 
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
-      console.log("🚀 ~ SignupFormsServices ~ listSubmissions ~ submissionList:", submissionList)
       const result = { count, result: submissionList };
       return result;
     } catch (err) {
