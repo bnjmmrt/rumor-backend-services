@@ -395,8 +395,8 @@ router.get('/redirect', (req, res) => {
   const ANDROID_APP_LINK =
     'therumorapp://';
   const IOS_APP_LINK = 'therumorapp://';
-  const ANDROID_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397'
-  const IOS_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor'
+  const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor'
+  const IOS_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397'
 
   const userAgent = req.headers['user-agent'] || '';
   const isAndroid = /Android/i.test(userAgent);
