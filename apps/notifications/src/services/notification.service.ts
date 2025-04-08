@@ -10,6 +10,7 @@ import {
   toNotificationslisting,
   toNotification,
 } from 'rumor-utils/shared/notifications/mappers/notification.mapper';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 
 class NotificationService {
   public dbConnection = database;
@@ -74,19 +75,22 @@ class NotificationService {
             }
           : {};
         const notificationImage = eval(notificationTemplate.image) || '';
+        let linkedUserName = linkedUser?.additionalHostInformation?.companyName
+          ? linkedUser?.additionalHostInformation?.companyName
+          : `${linkedUser.firstName} ${linkedUser.lastName}`;
+        let recipientName = recipientUser.firstName
+          ? `${recipientUser.firstName} ${recipientUser.lastName}`
+          : '';
+        if (notificationType === NotificationType.EVENT_CANCELLED) {
+          recipientName = recipientUser?.firstName ? recipientUser.firstName : '';
+        }
 
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
           message
             .replace('[Event Start Time]', (linkedEvent?.startDate || '').toString())
-            .replace(
-              '[Recipient Name]',
-              recipientUser.firstName ? `${recipientUser.firstName} ${recipientUser.lastName}` : '',
-            )
-            .replace(
-              '[Linked User Name]',
-              linkedUser?.firstName ? `${linkedUser.firstName} ${linkedUser.lastName}` : '',
-            )
+            .replace('[Recipient Name]', recipientName)
+            .replace('[Linked User Name]', linkedUserName)
             .replace('[Event Name]', linkedEvent?.name || '')
             .replace('[Event City Name]', linkedEvent?.location?.city || '')
             .replace('[Member Name]', body?.name || '')
