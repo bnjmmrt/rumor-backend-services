@@ -395,8 +395,8 @@ router.get('/redirect', (req, res) => {
   const ANDROID_APP_LINK =
     'therumorapp://';
   const IOS_APP_LINK = 'therumorapp://';
-  const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.yourapp.package';
-  const IOS_STORE_URL = 'https://apps.apple.com/app/id1234567890';
+  const ANDROID_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397'
+  const IOS_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor'
 
   const userAgent = req.headers['user-agent'] || '';
   const isAndroid = /Android/i.test(userAgent);
@@ -412,7 +412,7 @@ router.get('/redirect', (req, res) => {
   const fallbackUrl = isIOS ? IOS_STORE_URL : ANDROID_STORE_URL;
   const appUrl = isIOS ? IOS_APP_LINK : ANDROID_APP_LINK;
 
-  res.redirect(appUrl);
+  res.redirect(fallbackUrl);
 
 //   res.send(`
 //     <!DOCTYPE html>
