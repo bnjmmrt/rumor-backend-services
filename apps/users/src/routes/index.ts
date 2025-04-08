@@ -391,7 +391,7 @@ router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
 
 router.get('/redirect', (req, res) => {
   // Replace these with your actual links
-  const WEBSITE_URL = 'https://www.therumor.com/';
+  const WEBSITE_URL = 'https:// therumor.com';
   const ANDROID_APP_LINK =
     'therumorapp://';
   const IOS_APP_LINK = 'therumorapp://';
@@ -399,11 +399,10 @@ router.get('/redirect', (req, res) => {
   const IOS_STORE_URL = 'https://apps.apple.com/app/id1234567890';
 
   const userAgent = req.headers['user-agent'] || '';
-
   const isAndroid = /Android/i.test(userAgent);
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
-  const isMobile = isAndroid || isIOS;
 
+  const isMobile = isAndroid || isIOS;
   if (!isMobile) {
     // Desktop browser
     return res.redirect(WEBSITE_URL);
@@ -413,25 +412,34 @@ router.get('/redirect', (req, res) => {
   const fallbackUrl = isIOS ? IOS_STORE_URL : ANDROID_STORE_URL;
   const appUrl = isIOS ? IOS_APP_LINK : ANDROID_APP_LINK;
 
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Redirecting...</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script type="text/javascript">
-          setTimeout(function() {
-            window.location.href = "${fallbackUrl}";
-          }, 2500); // fallback after 2.5s
+  res.redirect(appUrl);
 
-          window.location = "${appUrl}";
-        </script>
-      </head>
-      <body>
-        <p>Redirecting to the app...</p>
-      </body>
-    </html>
-  `);
+//   res.send(`
+//     <!DOCTYPE html>
+//     <html>
+//       <head>
+//         <title>Redirecting...</title>
+//         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//         <script type="text/javascript">
+//         try{
+// setTimeout(function() {
+//             window.location.href = "${fallbackUrl}";
+//           }, 2500); // fallback after 2.5s
+
+//           window.location = "${appUrl}";
+
+//         }
+//           catch(e){
+//           console.log('------',e)
+//           }
+          
+//         </script>
+//       </head>
+//       <body>
+//         <p>Redirecting to the app...</p>
+//       </body>
+//     </html>
+//   `);
 });
 
 export default router;
