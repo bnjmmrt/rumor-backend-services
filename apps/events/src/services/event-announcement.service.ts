@@ -74,8 +74,10 @@ export class EventAnnouncementService {
   public static async postAnnouncement(payload) {
     let { eventId, createdBy, recipients, announcement, attachments, ticketType, addedBy } =
       payload;
-    if(ticketType.length === 0) throw new NotFoundError('Ticket Type')
-    if(addedBy.length === 0) throw new NotFoundError('Added By')  
+
+    if (ticketType.length === 0) throw new NotFoundError('Ticket Type');
+    if (addedBy.length === 0) throw new NotFoundError('Added By');
+
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
