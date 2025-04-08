@@ -3650,8 +3650,8 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
+      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      .where('user.deletedAt IS NULL')
       .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
@@ -3700,7 +3700,15 @@ export class AuthService {
       );
     }
 
-    const users = await usersQuery.getMany();
+    let users = await usersQuery.getMany();
+    users = users.filter(item => {
+      const rolesList = item?.roles?.map(item => item.role.name);
+      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+        //filter users with desired roles
+        return item;
+      }
+    });
+
     const members = await Promise.all(
       users.map(async user => {
         // Micro-service call
