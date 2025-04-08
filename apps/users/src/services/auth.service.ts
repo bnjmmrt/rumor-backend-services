@@ -962,6 +962,7 @@ export class AuthService {
     if (user) {
       throw new ConflictError('This email is already taken');
     }
+    await this.sendVerificationCodeByEmail({ email: payload.email })
     return { isValid: true };
   }
 
