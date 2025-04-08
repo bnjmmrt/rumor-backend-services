@@ -391,7 +391,7 @@ router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
 
 router.get('/redirect', (req, res) => {
   // Replace these with your actual links
-  const WEBSITE_URL = 'https:// therumor.com';
+  const WEBSITE_URL = 'https://therumor.com';
   const ANDROID_APP_LINK =
     'therumorapp://';
   const IOS_APP_LINK = 'therumorapp://';
