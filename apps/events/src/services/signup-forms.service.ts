@@ -30,6 +30,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -125,17 +126,19 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-
+      
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
+      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
+      if (eventSignupForm.event.status === EventStatusEnum.PAST_STATUS) {
+        return data;
+      }
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
         throw new NotFoundError('Event does not exists');
       }
-      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
-
-      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
       return data;
     } catch (err: any) {
@@ -356,6 +359,7 @@ export class SignupFormsServices {
 
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
       user: { id: payload.id },
     });
 

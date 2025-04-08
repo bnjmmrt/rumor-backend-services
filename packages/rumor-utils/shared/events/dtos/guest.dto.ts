@@ -27,7 +27,7 @@ import {
   ManageGuestsRequest,
 } from '../grpc/events/events.pb';
 import { Type } from 'class-transformer';
-import { AnswersData, GuestStatus } from '../grpc/events/general.pb';
+import { AnswersData, GuestStatus, UserSource } from '../grpc/events/general.pb';
 
 export class ManageGuestsRequestDto implements ManageGuestsRequest {
   @IsUUID()
@@ -311,6 +311,10 @@ export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsString()
   @IsOptional()
   email?: string;
+
+  @IsEnum(UserSource)
+  @IsOptional()
+  source?: UserSource;
 }
 
 export class InvitedGuestsRequestDto {
