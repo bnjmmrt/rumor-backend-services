@@ -3113,12 +3113,6 @@ export class GuestService {
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
         }
       } catch (err) {
         console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
