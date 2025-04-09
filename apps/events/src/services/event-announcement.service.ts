@@ -6,7 +6,9 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
-import { sendEventAnnouncement, sendEventInviteMember } from '../utils/emails.utils';
+import { sendEventAnnouncement } from '../utils/emails.utils';
+import { sendSmsTextMessage } from '../utils/sms.utils';
+import config from '../config';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -123,6 +125,9 @@ export class EventAnnouncementService {
      *
      */
     try {
+      const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${(event?.name) || 'Event'}. ${link}. `;
+         
       if (recipients.length > 0) {
         serviceMesh
           .notificationService()
@@ -139,6 +144,9 @@ export class EventAnnouncementService {
               event.id,
               data.email,
             );
+          }
+          if (data?.phoneNumber) {
+             sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
           }
         });
       } else {
@@ -176,6 +184,9 @@ export class EventAnnouncementService {
                 event.id,
                 data.email,
               );
+            }
+            if (data?.phoneNumber) {
+              sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
             }
           });
         }

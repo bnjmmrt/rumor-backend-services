@@ -10,11 +10,11 @@ export class RestrictedInvites extends RumorBaseEntity {
   @JoinColumn({ name: 'event_id', referencedColumnName: 'id' })
   event: Event;
 
-  @ManyToOne(() => Guest, guest => guest.restrictedGuest, { cascade: true })
+  @ManyToOne(() => Guest, guest => guest.restrictedGuest, { cascade: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'guest_id', referencedColumnName: 'id' })
   guest: Guest; // The guest who is restricted from being invited again
 
-  @ManyToOne(() => User, user => user.restrictedByInvitee, { cascade: true })
+  @ManyToOne(() => User, user => user.restrictedByInvitee, { cascade: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'restricted_by', referencedColumnName: 'id' })
   restrictedBy: User;
 }

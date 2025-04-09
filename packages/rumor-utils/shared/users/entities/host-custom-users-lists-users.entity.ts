@@ -11,7 +11,9 @@ export class HostCustomUsersListsUsers extends RumorBaseEntity {
   @JoinColumn({ name: 'list_id' })
   list: HostCustomUsersLists;
 
-  @ManyToOne(() => User, user => user.customLists)
+  @ManyToOne(() => User, user => user.customLists, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

@@ -216,6 +216,7 @@ import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -1071,23 +1072,17 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
-
+        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
+            ? `Enter code ${payload.referralCode} to expedite your application review.`
+            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+         
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
-        }
+        } 
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1110,7 +1105,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh
+       await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1118,11 +1113,6 @@ export class AuthService {
             [payload.email.trim().toLowerCase()],
             null,
           );
-        if (!success) {
-          throw new BadRequestError(
-            'An error occured while sending SMS invitation, please try again.',
-          );
-        }
       } catch (error) {}
     }
 
@@ -1173,7 +1163,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh
+    await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1181,11 +1171,6 @@ export class AuthService {
           [payload.email.trim().toLowerCase()],
           null,
         );
-      if (!success) {
-        throw new BadRequestError(
-          'An error occured while sending Email invitation, please try again.',
-        );
-      }
     } catch (error) {}
 
     return '';
@@ -1376,13 +1361,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
@@ -1658,6 +1637,7 @@ export class AuthService {
       hostDetails: {
         companyLogo: additionalHostInformation?.companyLogo || '',
         companyName: additionalHostInformation?.companyName || '',
+        socialMedia: additionalHostInformation?.socialMedia || {},
         id: user.id,
       },
     };
@@ -3042,6 +3022,10 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: user.id } },
+    });
+
     const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
@@ -3059,6 +3043,7 @@ export class AuthService {
           id: item.role.id,
         };
       }),
+      isGuest: !!guest,
     };
 
     return data;
@@ -3179,6 +3164,7 @@ export class AuthService {
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
+          isExist: true,
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
@@ -3199,6 +3185,7 @@ export class AuthService {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
+        isExist: false,
         user: toCreateUser(existingUser),
       };
     }
@@ -3223,6 +3210,7 @@ export class AuthService {
 
     return {
       message: 'User created successfully.',
+      isExist: false,
       hasEmail,
       hasPhone,
       user: toCreateUser(user),
@@ -3391,6 +3379,7 @@ export class AuthService {
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
       .where('user.deletedAt IS NULL')
+      .andWhere('user.id != :hostId', { hostId })
       .andWhere(
         new Brackets(qb => {
           qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
@@ -3650,8 +3639,8 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
+      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      .where('user.deletedAt IS NULL')
       .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
@@ -3700,7 +3689,15 @@ export class AuthService {
       );
     }
 
-    const users = await usersQuery.getMany();
+    let users = await usersQuery.getMany();
+    users = users.filter(item => {
+      const rolesList = item?.roles?.map(item => item.role.name);
+      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+        //filter users with desired roles
+        return item;
+      }
+    });
+
     const members = await Promise.all(
       users.map(async user => {
         // Micro-service call
@@ -3916,6 +3913,7 @@ export class AuthService {
         throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
+      console.log(e);
       if (e.statusCode != 404) {
         throw new ConflictError('Than error happens when trying register an user.');
       }
@@ -3980,6 +3978,7 @@ export class AuthService {
     const newUser = await fusionAuthClientHandler
       .fusionAuthClient()
       .register(user.id, registrationRequest);
+
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
     }
@@ -5686,9 +5685,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5696,6 +5696,27 @@ export class AuthService {
       try {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
       } catch (error) {}
+      // Step 2: Remove user from all notifications (join table cleanup)
+      if (user.notifications?.length) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .relation(User, 'notifications')
+          .of(user)
+          .remove(user.notifications);
+      }
+
+      // Step 3: Optionally delete orphaned notifications (no recipients)
+      const orphanedNotifications = await queryRunner.manager
+        .getRepository(Notification)
+        .createQueryBuilder('n')
+        .leftJoinAndSelect('n.recipients', 'r')
+        .getMany();
+
+      for (const n of orphanedNotifications) {
+        if (n.recipients.length === 0) {
+          await queryRunner.manager.remove(n);
+        }
+      }
 
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
       await this.clearAdditionalHostInfo(user.id, queryRunner);
@@ -5743,6 +5764,41 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
+          const fullUser = await queryRunner.manager.getRepository(User).findOne({
+            where: { id: user.id },
+            relations: ['notifications'],
+          });
+
+          // Step 1: Remove user from notification_recipients
+          if (fullUser?.notifications?.length) {
+            await queryRunner.manager
+              .createQueryBuilder()
+              .relation(User, 'notifications')
+              .of(user)
+              .remove(fullUser.notifications);
+          }
+
+          // Step 2: Nullify linkedUser in notifications
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Notification)
+            .set({ linkedUser: null })
+            .where('linked_user_id = :id', { id: user.id })
+            .execute();
+
+          // Step 3: Delete orphaned notifications (no recipients)
+          const orphanedNotifications = await queryRunner.manager
+            .getRepository(Notification)
+            .createQueryBuilder('n')
+            .leftJoinAndSelect('n.recipients', 'r')
+            .getMany();
+
+          for (const n of orphanedNotifications) {
+            if (n.recipients.length === 0) {
+              await queryRunner.manager.remove(n);
+            }
+          }
+
           await queryRunner.manager.getRepository(User).delete({ id: user.id });
         }
       }

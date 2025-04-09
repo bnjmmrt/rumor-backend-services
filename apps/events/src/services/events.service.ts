@@ -123,7 +123,6 @@ import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto'
 import {
   sendEventCancellation,
   sendEventUpdation,
-  sendEventInviteNonMember,
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
@@ -1349,6 +1348,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     } else {
@@ -1367,6 +1367,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     }
@@ -2680,15 +2681,9 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
       }
     });
@@ -3591,8 +3586,8 @@ export class EventsService {
       const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled. \n ${message} \n If you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
@@ -3628,15 +3623,9 @@ export class EventsService {
                 if (success) {
                   notificationSuccess = true;
                 }
-              } else {
-                // Log the issue and exit early (no throw)
-                console.log(
-                  `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-                );
-                return; // or just skip sending, depending on your function structure
-              }
+              } 
             } catch (err) {
-              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {
@@ -4103,48 +4092,52 @@ export class EventsService {
   }
 
   public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    const listHostEventsPayload: ListHostEventsDto = {
-      userId: payload.id,
-      query: '{}',
-    };
-
-    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
-
-    if (!eventsResponse || !eventsResponse.result) {
-      throw new NotFoundError('Events');
-    }
-
-    const events = eventsResponse.result;
-    // Step 2: Cancel all APPROVED events
-    const eventsToCancel = events.filter(event =>
-      [
-        EventStatusEnum.APPROVED_STATUS,
-        EventStatusEnum.SCHEDULED_STATUS,
-        EventStatusEnum.UPCOMING_STATUS,
-      ].includes(event.status),
-    );
-
-    for (const event of eventsToCancel) {
-      const cancelPayload: CancelEventAndNotifyRequestDto = {
-        ownerId: payload.id,
-        eventId: event.id,
-        customMessage: 'This event has been canceled as the host is no longer available.',
+    try {
+      const listHostEventsPayload: ListHostEventsDto = {
+        userId: payload.id,
+        query: '{}',
       };
-      await this.cancelEventAndNotify(cancelPayload);
+
+      const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+      if (!eventsResponse || !eventsResponse.result) {
+        throw new NotFoundError('Events');
+      }
+
+      const events = eventsResponse.result;
+      // Step 2: Cancel all APPROVED events
+      const eventsToCancel = events.filter(event =>
+        [
+          EventStatusEnum.APPROVED_STATUS,
+          EventStatusEnum.SCHEDULED_STATUS,
+          EventStatusEnum.UPCOMING_STATUS,
+        ].includes(event.status),
+      );
+
+      for (const event of eventsToCancel) {
+        const cancelPayload: CancelEventAndNotifyRequestDto = {
+          ownerId: payload.id,
+          eventId: event.id,
+          customMessage: 'This event has been canceled as the host is no longer available.',
+        };
+        await this.cancelEventAndNotify(cancelPayload);
+      }
+
+      // Step 3: Delete all events (regardless of status)
+      // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+      // for (const event of events) {
+      //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      //   await this.deleteEvent(deletePayload);
+      // }
+
+      const eventIds = events.map(event => event.id);
+
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
+      console.log(error);
     }
-
-    // Step 3: Delete all events (regardless of status)
-    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
-    // for (const event of events) {
-    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-    //   await this.deleteEvent(deletePayload);
-    // }
-
-    const eventIds = events.map(event => event.id);
-
-    if (eventIds.length > 0) {
-      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-    }
-    return responses.ok;
   }
 }
