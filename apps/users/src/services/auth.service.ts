@@ -3398,6 +3398,7 @@ export class AuthService {
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
       .where('user.deletedAt IS NULL')
+      .andWhere('user.id != :hostId', { hostId })
       .andWhere(
         new Brackets(qb => {
           qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
