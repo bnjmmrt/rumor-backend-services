@@ -123,7 +123,6 @@ import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto'
 import {
   sendEventCancellation,
   sendEventUpdation,
-  sendEventInviteNonMember,
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
@@ -2690,7 +2689,7 @@ export class EventsService {
             return; // or just skip sending, depending on your function structure
           }
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
       }
     });
@@ -3638,7 +3637,7 @@ export class EventsService {
                 return; // or just skip sending, depending on your function structure
               }
             } catch (err) {
-              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {

@@ -601,7 +601,7 @@ export class GuestService {
                   serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
                 }
               } catch (err) {
-                console.error(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
               }
             }
           } else if (data.role.includes('non_member')) {
@@ -642,7 +642,7 @@ export class GuestService {
                   serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
                 }
               } catch (err) {
-                console.error(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
               }
             }
           }
@@ -726,6 +726,7 @@ export class GuestService {
               firstName: guest.user.firstName,
               role: user.roles.flatMap(role => role.role.name),
               invitationSource: guest.invitationSource,
+              phoneNumber: guest.user.phoneNumber ?? undefined
             };
             // Update max additional guests and private notes if provided
             guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
@@ -853,6 +854,19 @@ export class GuestService {
                 );
 
               sendEventInviteMember(createMailPayload, event.timeZone);
+              if (data.phoneNumber) {
+                const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                // Send SMS notification
+                try {
+                  const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                  if (validateNumber) {
+                    const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                    serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                  }
+                } catch (err) {
+                  console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                }
+              }
             } else if (data.role.includes('non_member')) {
               const createMailPayload = {
                 eventDate: event.startDate,
@@ -878,6 +892,19 @@ export class GuestService {
                   data.eventId,
                   payload.hostId,
                 );
+                if (data.phoneNumber) {
+                  const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                  // Send SMS notification
+                  try {
+                    const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                    if (validateNumber) {
+                      const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                      serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                    }
+                  } catch (err) {
+                    console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                  }
+                }
             }
           }),
         );
@@ -3067,7 +3094,7 @@ export class GuestService {
       };
       sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     } else if (payload.phoneNumber) {
-      const message = `Hi, ${payload.firstName} we would like to invite you to join our upcoming event. Download the app here. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+      const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
@@ -3081,7 +3108,7 @@ export class GuestService {
           return; // or just skip sending, depending on your function structure
         }
       } catch (err) {
-        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
 
@@ -3246,21 +3273,15 @@ export class GuestService {
           };
           sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
         } else if (guest.user.phoneNumber) {
-          const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.  ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+          const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
           try {
             const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
             if (validateNumber) {
               const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
               await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-            } else {
-              // Log the issue and exit early (no throw)
-              console.log(
-                `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-              );
-              return; // or just skip sending, depending on your function structure
             }
           } catch (err) {
-            console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+            console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
           }
         }
         return toGuestDataSimple(guest, []);
@@ -3688,21 +3709,15 @@ export class GuestService {
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
-        const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        const message = `Hi ${emailData.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {
-            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '').trim();
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
           }
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
     }
