@@ -103,8 +103,8 @@ export class SignupFormsServices {
 
   /**
    * Get By urlcode
-   * @param code 
-   * @returns 
+   * @param code
+   * @returns
    */
   public static async getByUrl(code: string) {
     try {
@@ -126,7 +126,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-      
+
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
