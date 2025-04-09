@@ -1072,12 +1072,10 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} we would like to invite you to join our community on Rumor. Download the app today to start discovering events. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'} \n` +
-        (payload.referralCode
-          ? `Enter Referral code: ${payload.referralCode} to expedite your application review.`
-          : ``);
-
+        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
+            ? `Enter code ${payload.referralCode} to expedite your application review.`
+            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+         
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
