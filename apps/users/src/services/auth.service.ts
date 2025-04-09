@@ -92,6 +92,7 @@ import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-cus
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
 import { TemporaryPasswordToken } from 'rumor-utils/shared/users/entities/temporary-password-token.entity';
+import { ReferredUser } from 'rumor-utils/shared/users/entities/referred-user.entity';
 
 import {
   LoginRequest,
@@ -4467,6 +4468,8 @@ export class AuthService {
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
 
+    const referredUser = await this.dbConnection.getRepository(ReferredUser).findOneBy({userId : user.id});
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4476,6 +4479,7 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         eventCount,
+        referredUser?.referralCode
       ),
     );
   }
