@@ -21,14 +21,14 @@ export class SignupFormSubmissions extends RumorBaseEntity {
   signupForm: EventSignupForms;
 
   @ManyToOne(() => User, user => user.signupFormSubmissions, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
   attendees: User;
 
   @OneToOne(() => Guest, guest => guest.signupFormSubmissions, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   guest: Guest;

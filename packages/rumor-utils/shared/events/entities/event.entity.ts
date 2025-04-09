@@ -17,6 +17,7 @@ import { EventSignupForms } from './event-signup-forms.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { CsvUploadRecords } from './csv-upload-records.entity';
 import { RestrictedInvites } from './restricted-invites.entity';
+import { EventAnnouncement } from './event-announcement.entity';
 
 @Entity()
 export class Event extends RumorBaseEntity {
@@ -111,7 +112,11 @@ export class Event extends RumorBaseEntity {
   @JoinColumn({ name: 'admission_type_id', referencedColumnName: 'id' })
   admissionType?: AdmissionType;
 
-  @ManyToOne(() => User, owner => owner.hostedEvents, { nullable: true, cascade: true })
+  @ManyToOne(() => User, owner => owner.hostedEvents, {
+    nullable: true,
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'owner_id', referencedColumnName: 'id' })
   owner?: User;
 
@@ -142,4 +147,7 @@ export class Event extends RumorBaseEntity {
     onDelete: 'CASCADE',
   })
   notifications: Notification[];
+
+  @OneToMany(() => EventAnnouncement, announcement => announcement.event, { cascade: true })
+  eventAnnouncements: EventAnnouncement[];
 }

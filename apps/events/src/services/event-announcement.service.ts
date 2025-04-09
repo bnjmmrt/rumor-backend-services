@@ -6,7 +6,8 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
-import { sendEventAnnouncement, sendEventInviteMember } from '../utils/emails.utils';
+import { sendEventAnnouncement } from '../utils/emails.utils';
+import { sendSmsTextMessage } from '../utils/sms.utils';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -140,6 +141,10 @@ export class EventAnnouncementService {
               data.email,
             );
           }
+          if (data?.phoneNumber) {
+            let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for [Event]. Click to view. `;
+            sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
+          }
         });
       } else {
         const recipientsData = await database.getRepository(Guest).find({
@@ -176,6 +181,10 @@ export class EventAnnouncementService {
                 event.id,
                 data.email,
               );
+            }
+            if (data?.phoneNumber) {
+              let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for [Event]. Click to view. `;
+              sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
             }
           });
         }
