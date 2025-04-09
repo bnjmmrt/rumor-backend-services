@@ -1073,8 +1073,8 @@ export class AuthService {
 
     if (payload.phoneNumber) {
       const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'} ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
+        `Hi, ${invitee.firstName} we would like to invite you to join our community on Rumor. Download the app today to start discovering events. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'} \n` +
+        (payload.referralCode ? `Enter Referral code: ${payload.referralCode} to expedite your application review.` : ``);
 
       //Micro-service call
       try {
