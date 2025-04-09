@@ -5697,12 +5697,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({
-          where: { id: payload.id },
-          relations: { roles: { role: true }, notifications: true },
-        });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
