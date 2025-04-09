@@ -501,6 +501,19 @@ export class GuestService {
           });
           // const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
+          const existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+            where: {
+              host: { id: payload.hostId },
+              user: { id: userId },
+            }
+          });
+
+          if (!existingMapping) {
+            const newMapping = new HostUserMapping();
+            newMapping.user = user;
+            newMapping.host = { id: payload.hostId } as User;
+            await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+          }
 
           // Extract user data and email
           let emailData: {
