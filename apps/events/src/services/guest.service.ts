@@ -460,7 +460,10 @@ export class GuestService {
     // Fetch host profile using the provided host ID
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
     if (!host) throw new NotFoundError('Host not found');
-
+    // Check if the host ID is in the users array and throw an error if present
+    if (payload.users.includes(payload.hostId)) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
     // Fetch ticket type details if a ticketTypeId is provided
     let ticketType = await this.dbConnection
       .getRepository(TicketType)
@@ -3603,6 +3606,9 @@ export class GuestService {
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
+    if (payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
 
     if (!payload.email && !payload.phoneNumber) {
       throw new ValidationError('Atleast phoneNumber or email should be there');
@@ -3692,6 +3698,7 @@ export class GuestService {
         maxAdditionalGuests: payload.maxAdditionalGuests || 0,
         user: { id: member.id } as User,
         addedBy: { id: host.id } as User,
+        inviteMessage: payload.inviteMessage,
         privateGuestNote: payload.privateGuestNote,
         invitationSource: UserSource.INVITED_BY_HOST,
         ticketType: ticketType ? ({ id: ticketType.id } as TicketType) : undefined,
