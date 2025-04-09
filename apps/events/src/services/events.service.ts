@@ -1349,7 +1349,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
-          'eventAnnouncements'
+          'eventAnnouncements',
         ],
       });
     } else {
@@ -1368,7 +1368,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
-          'eventAnnouncements'
+          'eventAnnouncements',
         ],
       });
     }
@@ -4150,7 +4150,7 @@ export class EventsService {
       }
       return responses.ok;
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 }

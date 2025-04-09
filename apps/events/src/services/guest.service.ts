@@ -592,15 +592,13 @@ export class GuestService {
 
             sendEventInviteMember(createMailPayload, event.timeZone);
             if (data.phoneNumber) {
-              const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+              const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
               // Send SMS notification
               try {
                 const validateNumber = isValidPhoneNumber(data.phoneNumber);
                 if (validateNumber) {
                   const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
-                  serviceMesh
-                    .notificationService()
-                    .sendTextMessage(cleanedNumber, message);
+                  serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
                 }
               } catch (err) {
                 console.error(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
@@ -635,15 +633,13 @@ export class GuestService {
             sendEventInviteNonMember(createMailPayload, event.timeZone);
 
             if (data.phoneNumber) {
-              const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+              const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
               // Send SMS notification
               try {
                 const validateNumber = isValidPhoneNumber(data.phoneNumber);
                 if (validateNumber) {
                   const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
-                  serviceMesh
-                    .notificationService()
-                    .sendTextMessage(cleanedNumber, message);
+                  serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
                 }
               } catch (err) {
                 console.error(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);

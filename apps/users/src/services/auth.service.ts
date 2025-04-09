@@ -3925,7 +3925,7 @@ export class AuthService {
         throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
-      console.log(e)
+      console.log(e);
       if (e.statusCode != 404) {
         throw new ConflictError('Than error happens when trying register an user.');
       }
@@ -3987,10 +3987,9 @@ export class AuthService {
       },
     };
 
-      const newUser = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .register(user.id, registrationRequest);
-
+    const newUser = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .register(user.id, registrationRequest);
 
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
@@ -5700,7 +5699,10 @@ export class AuthService {
     try {
       const user = await queryRunner.manager
         .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true }, notifications: true } });
+        .findOne({
+          where: { id: payload.id },
+          relations: { roles: { role: true }, notifications: true },
+        });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5776,7 +5778,6 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
-
           const fullUser = await queryRunner.manager.getRepository(User).findOne({
             where: { id: user.id },
             relations: ['notifications'],
