@@ -2681,13 +2681,7 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
           console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
@@ -3629,13 +3623,7 @@ export class EventsService {
                 if (success) {
                   notificationSuccess = true;
                 }
-              } else {
-                // Log the issue and exit early (no throw)
-                console.log(
-                  `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-                );
-                return; // or just skip sending, depending on your function structure
-              }
+              } 
             } catch (err) {
               console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }

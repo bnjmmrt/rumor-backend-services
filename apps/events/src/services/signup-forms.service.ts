@@ -530,13 +530,7 @@ export class SignupFormsServices {
             const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `:warning: Skipping SMS: Invalid phone number "${userPayload?.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {}
       }
 
