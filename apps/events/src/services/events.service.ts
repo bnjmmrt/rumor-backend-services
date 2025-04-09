@@ -3518,8 +3518,11 @@ export class EventsService {
       if (!event) {
         throw new NotFoundError('Event not found');
       }
-      if (event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new Error('It is not approved event.');
+
+      const validStatuses = [EventStatusEnum.APPROVED_STATUS, EventStatusEnum.UPCOMING_STATUS];
+
+      if (!validStatuses.includes(event.status)) {
+        throw new Error('Event is not approved.');
       }
 
       // Permitir cancelar si es admin o propietario
@@ -3596,12 +3599,13 @@ export class EventsService {
           if (guest.user?.email) {
             // Send email notification
             const createPayload = {
-              eventDate: event.startDate,
+              eventDate: event.startDate || new Date(),
               eventName,
-              imageFlyer: event.imageFlyer,
-              location: event.location.location,
-              city: event.location.city,
-              hostName: event.owner?.additionalHostInformation?.companyName,
+              imageFlyer: event.imageFlyer || ' ',
+              location: event.location.location || ' ',
+              city: event.location.city || ' ',
+              hostName:
+                event.owner?.additionalHostInformation?.companyName || event.owner.email || '',
             };
             let mailServiceResponse = sendEventCancellation(
               createPayload,
@@ -3610,6 +3614,7 @@ export class EventsService {
               message,
               event.timeZone,
             );
+
             if (mailServiceResponse) {
               notificationSuccess = true;
             }

@@ -963,6 +963,7 @@ export class AuthService {
     if (user) {
       throw new ConflictError('This email is already taken');
     }
+    await this.sendVerificationCodeByEmail({ email: payload.email });
     return { isValid: true };
   }
 
@@ -1370,22 +1371,22 @@ export class AuthService {
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
-          const message = 'Your Rumor verification code: ' + code.response.code;
-          try {
-            const validateNumber = isValidPhoneNumber(payload.phoneNumber);
-            if (validateNumber) {
-              const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
-              await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-            } else {
-              // Log the issue and exit early (no throw)
-              console.log(
-                `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-              );
-              return; // or just skip sending, depending on your function structure
-            }
-          } catch (err) {
-            console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        const message = 'Your Rumor verification code: ' + code.response.code;
+        try {
+          const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          } else {
+            // Log the issue and exit early (no throw)
+            console.log(
+              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
+            );
+            return; // or just skip sending, depending on your function structure
           }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        }
       }
     } catch (error) {}
 
@@ -1422,17 +1423,17 @@ export class AuthService {
 
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1462,17 +1463,17 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1508,12 +1509,11 @@ export class AuthService {
         .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
 
       if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
-      
+
       // Setting up Payload.code to bypass verification for below email and phone number
-      if(payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602'){
+      if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
         payload.code = temporaryCode.code;
-      }
-      else if (payload.code !== temporaryCode.code) {
+      } else if (payload.code !== temporaryCode.code) {
         throw new BadRequestError('Invalid or expired verification code, please try again.');
       }
 
@@ -3319,6 +3319,8 @@ export class AuthService {
 
     if (isValid) {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    } else {
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     return { verified: isValid };
@@ -3649,8 +3651,8 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
+      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      .where('user.deletedAt IS NULL')
       .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
@@ -3699,7 +3701,15 @@ export class AuthService {
       );
     }
 
-    const users = await usersQuery.getMany();
+    let users = await usersQuery.getMany();
+    users = users.filter(item => {
+      const rolesList = item?.roles?.map(item => item.role.name);
+      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+        //filter users with desired roles
+        return item;
+      }
+    });
+
     const members = await Promise.all(
       users.map(async user => {
         // Micro-service call
