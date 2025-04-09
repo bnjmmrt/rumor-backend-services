@@ -797,6 +797,7 @@ export interface AdditionalHostInformation {
   bio?: string | undefined;
   companyLogo?: string | undefined;
   id?: string | undefined;
+  socialMedia?: SocialMedia | undefined
 }
 
 export interface BioProfileResponse {

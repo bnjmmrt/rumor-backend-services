@@ -1658,6 +1658,7 @@ export class AuthService {
       hostDetails: {
         companyLogo: additionalHostInformation?.companyLogo || '',
         companyName: additionalHostInformation?.companyName || '',
+        socialMedia: additionalHostInformation?.socialMedia || {},
         id: user.id,
       },
     };
