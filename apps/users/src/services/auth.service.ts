@@ -3181,6 +3181,7 @@ export class AuthService {
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
+          isExist: true,
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
@@ -3201,6 +3202,7 @@ export class AuthService {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
+        isExist: false,
         user: toCreateUser(existingUser),
       };
     }
@@ -3225,6 +3227,7 @@ export class AuthService {
 
     return {
       message: 'User created successfully.',
+      isExist: false,
       hasEmail,
       hasPhone,
       user: toCreateUser(user),

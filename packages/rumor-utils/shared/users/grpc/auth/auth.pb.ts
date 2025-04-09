@@ -975,6 +975,7 @@ export interface UserResponseData {
   message: string;
   hasEmail: boolean;
   hasPhone: boolean;
+  isExist?: boolean;
   user?: SimpleUser | undefined;
 }
 
