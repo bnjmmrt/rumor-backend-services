@@ -16,7 +16,7 @@ export class Invitation extends RumorBaseEntity {
   @Column({ type: 'bool', name: 'sign_up_complete', default: 'false' })
   signUpComplete: boolean;
 
-  @ManyToOne(() => User, user => user.invitations, {onDelete: 'CASCADE'})
+  @ManyToOne(() => User, user => user.invitations, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'invitee_user_id' })
   inviteeUser: User;
 }

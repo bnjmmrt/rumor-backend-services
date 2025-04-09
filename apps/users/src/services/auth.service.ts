@@ -1073,8 +1073,10 @@ export class AuthService {
 
     if (payload.phoneNumber) {
       const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
+        `Hi, ${invitee.firstName} we would like to invite you to join our community on Rumor. Download the app today to start discovering events. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'} \n` +
+        (payload.referralCode
+          ? `Enter Referral code: ${payload.referralCode} to expedite your application review.`
+          : ``);
 
       //Micro-service call
       try {
@@ -3929,7 +3931,7 @@ export class AuthService {
         throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
-      console.log(e)
+      console.log(e);
       if (e.statusCode != 404) {
         throw new ConflictError('Than error happens when trying register an user.');
       }
@@ -3991,10 +3993,9 @@ export class AuthService {
       },
     };
 
-      const newUser = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .register(user.id, registrationRequest);
-
+    const newUser = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .register(user.id, registrationRequest);
 
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
@@ -5702,9 +5703,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true }, notifications: true } });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5780,7 +5782,6 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
-
           const fullUser = await queryRunner.manager.getRepository(User).findOne({
             where: { id: user.id },
             relations: ['notifications'],

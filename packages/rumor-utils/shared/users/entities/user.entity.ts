@@ -117,7 +117,7 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => UserQuizAnswer, answer => answer.user)
   answers: UserQuizAnswer[];
 
-  @OneToOne(() => UserSettings, userSettings => userSettings.user, { cascade: ['remove'] } )
+  @OneToOne(() => UserSettings, userSettings => userSettings.user, { cascade: ['remove'] })
   userSettings: Relation<UserSettings>;
 
   @ManyToMany(() => Interest, { cascade: false })
@@ -209,7 +209,7 @@ export class User extends RumorBaseEntity {
 
   @ManyToMany(() => Notification, notification => notification.recipients)
   notifications: Notification[];
-  
+
   @OneToMany(() => HostFeedback, hostFeedback => hostFeedback.user)
   hostFeedbacks: Relation<HostFeedback[]>;
 
@@ -229,8 +229,10 @@ export class User extends RumorBaseEntity {
   csvUploads: CsvUploadRecords[];
 
   // New Relation: Tracks which CSV upload created this user
-  @ManyToOne(() => CsvUploadRecords, csvUpload => csvUpload.uploadedUsers, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({  name: 'csv_upload_id' })
+  @ManyToOne(() => CsvUploadRecords, csvUpload => csvUpload.uploadedUsers, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'csv_upload_id' })
   uploadedViaCsv: CsvUploadRecords | null;
 }
-

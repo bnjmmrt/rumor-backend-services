@@ -30,6 +30,6 @@ export class CsvUploadRecords extends RumorBaseEntity {
   errorCsvPath?: string; // S3 path of the error CSV (garbageData), if applicable
 
   // New Relation: Users uploaded via this CSV
-  @OneToMany(() => User, user => user.uploadedViaCsv, {onDelete: 'CASCADE'})
+  @OneToMany(() => User, user => user.uploadedViaCsv, { onDelete: 'CASCADE' })
   uploadedUsers: User[];
 }
