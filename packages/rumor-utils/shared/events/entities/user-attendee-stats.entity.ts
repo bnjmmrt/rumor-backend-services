@@ -30,7 +30,7 @@ export class UserAttendeeStats extends RumorBaseEntity {
 
   @OneToOne(() => User, user => user.attendeeStats, {
     nullable: true,
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
