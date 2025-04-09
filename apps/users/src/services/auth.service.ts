@@ -3044,6 +3044,10 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: user.id } },
+    });
+
     const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
@@ -3061,6 +3065,7 @@ export class AuthService {
           id: item.role.id,
         };
       }),
+      isGuest: !!guest,
     };
 
     return data;
