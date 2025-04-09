@@ -216,6 +216,7 @@ import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -3925,6 +3926,7 @@ export class AuthService {
         throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
+      console.log(e)
       if (e.statusCode != 404) {
         throw new ConflictError('Than error happens when trying register an user.');
       }
@@ -3986,9 +3988,11 @@ export class AuthService {
       },
     };
 
-    const newUser = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .register(user.id, registrationRequest);
+      const newUser = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .register(user.id, registrationRequest);
+
+
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
     }
@@ -5697,7 +5701,7 @@ export class AuthService {
     try {
       const user = await queryRunner.manager
         .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+        .findOne({ where: { id: payload.id }, relations: { roles: { role: true }, notifications: true } });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5705,6 +5709,27 @@ export class AuthService {
       try {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
       } catch (error) {}
+      // Step 2: Remove user from all notifications (join table cleanup)
+      if (user.notifications?.length) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .relation(User, 'notifications')
+          .of(user)
+          .remove(user.notifications);
+      }
+
+      // Step 3: Optionally delete orphaned notifications (no recipients)
+      const orphanedNotifications = await queryRunner.manager
+        .getRepository(Notification)
+        .createQueryBuilder('n')
+        .leftJoinAndSelect('n.recipients', 'r')
+        .getMany();
+
+      for (const n of orphanedNotifications) {
+        if (n.recipients.length === 0) {
+          await queryRunner.manager.remove(n);
+        }
+      }
 
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
       await this.clearAdditionalHostInfo(user.id, queryRunner);
@@ -5752,6 +5777,42 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
+
+          const fullUser = await queryRunner.manager.getRepository(User).findOne({
+            where: { id: user.id },
+            relations: ['notifications'],
+          });
+
+          // Step 1: Remove user from notification_recipients
+          if (fullUser?.notifications?.length) {
+            await queryRunner.manager
+              .createQueryBuilder()
+              .relation(User, 'notifications')
+              .of(user)
+              .remove(fullUser.notifications);
+          }
+
+          // Step 2: Nullify linkedUser in notifications
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Notification)
+            .set({ linkedUser: null })
+            .where('linked_user_id = :id', { id: user.id })
+            .execute();
+
+          // Step 3: Delete orphaned notifications (no recipients)
+          const orphanedNotifications = await queryRunner.manager
+            .getRepository(Notification)
+            .createQueryBuilder('n')
+            .leftJoinAndSelect('n.recipients', 'r')
+            .getMany();
+
+          for (const n of orphanedNotifications) {
+            if (n.recipients.length === 0) {
+              await queryRunner.manager.remove(n);
+            }
+          }
+
           await queryRunner.manager.getRepository(User).delete({ id: user.id });
         }
       }
