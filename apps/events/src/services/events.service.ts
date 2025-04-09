@@ -3593,8 +3593,8 @@ export class EventsService {
       const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled. \n ${message} \n If you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification

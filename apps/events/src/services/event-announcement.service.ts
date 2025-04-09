@@ -6,7 +6,7 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
-import { sendEventAnnouncement, sendEventInviteMember } from '../utils/emails.utils';
+import { sendEventAnnouncement } from '../utils/emails.utils';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
