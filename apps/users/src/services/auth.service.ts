@@ -1072,25 +1072,17 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} we would like to invite you to join our community on Rumor. Download the app today to start discovering events. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'} \n` +
-        (payload.referralCode
-          ? `Enter Referral code: ${payload.referralCode} to expedite your application review.`
-          : ``);
-
+        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
+            ? `Enter code ${payload.referralCode} to expedite your application review.`
+            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+         
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
-        }
+        } 
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1113,7 +1105,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh
+       await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1121,11 +1113,6 @@ export class AuthService {
             [payload.email.trim().toLowerCase()],
             null,
           );
-        if (!success) {
-          throw new BadRequestError(
-            'An error occured while sending SMS invitation, please try again.',
-          );
-        }
       } catch (error) {}
     }
 
@@ -1176,7 +1163,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh
+    await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1184,11 +1171,6 @@ export class AuthService {
           [payload.email.trim().toLowerCase()],
           null,
         );
-      if (!success) {
-        throw new BadRequestError(
-          'An error occured while sending Email invitation, please try again.',
-        );
-      }
     } catch (error) {}
 
     return '';
@@ -1379,13 +1361,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
