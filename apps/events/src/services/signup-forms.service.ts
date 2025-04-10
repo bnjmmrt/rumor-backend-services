@@ -15,7 +15,12 @@ import {
   Role,
   Guest,
 } from 'rumor-utils/shared/entities';
-import { BadRequestError, ForbiddenError, NotFoundError, ValidationError } from 'rumor-utils/errors';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from 'rumor-utils/errors';
 import database from '../database';
 import {
   CreateSignupFormDto,
@@ -121,7 +126,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-      
+
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
@@ -533,7 +538,7 @@ export class SignupFormsServices {
             const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {}
       }
 

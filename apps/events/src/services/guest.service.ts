@@ -275,7 +275,7 @@ export class GuestService {
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {
-              const recipientIds = updateGuests.map(data=>data.userId).filter(Boolean);
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
 
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)

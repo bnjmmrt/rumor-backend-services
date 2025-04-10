@@ -671,7 +671,7 @@ export class AuthService {
   public static async logout(payload: TokenRequestDto): Promise<string> {
     let response;
     try {
-       response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+      response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
     } catch (error) {}
 
     if (!response.wasSuccessful()) {
@@ -680,8 +680,8 @@ export class AuthService {
 
     await this.dbConnection.getRepository(PushNotificationToken).delete({
       notificationToken: payload.fcmToken,
-      deviceId: payload.deviceId
-    })
+      deviceId: payload.deviceId,
+    });
     return '';
   }
 
@@ -1504,7 +1504,9 @@ export class AuthService {
 
       if (!temporaryCode) {
         if (!isEmailLogin) {
-          const verificationResult = await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+          const verificationResult = await serviceMesh
+            .notificationService()
+            .verifyCode(payload.phoneNumber, payload.code);
           const isVerified = verificationResult?.data?.verified === true;
 
           if (!isVerified) {
@@ -1525,7 +1527,7 @@ export class AuthService {
           throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
       }
-      
+
       // Setting up Payload.code to bypass verification for below email and phone number
       if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
         payload.code = temporaryCode.code;
@@ -4512,7 +4514,9 @@ export class AuthService {
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
 
-    const referredUser = await this.dbConnection.getRepository(ReferredUser).findOneBy({userId : user.id});
+    const referredUser = await this.dbConnection
+      .getRepository(ReferredUser)
+      .findOneBy({ userId: user.id });
 
     return responses.data(
       toMemberProfile(
@@ -4523,7 +4527,7 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         eventCount,
-        referredUser?.referralCode
+        referredUser?.referralCode,
       ),
     );
   }
