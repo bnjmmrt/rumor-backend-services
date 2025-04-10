@@ -227,7 +227,7 @@ export class GuestController {
 
   public static cancelEventInvitation = asyncWrapper(async (req, res): Promise<void> => {
     const payload: CancelEventInvitationRequestDto = {
-      id: req.params.id,
+      userId: req.params.id,
       eventId: req.params.eventId,
       ...req.body,
     };
