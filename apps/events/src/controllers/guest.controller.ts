@@ -174,7 +174,7 @@ export class GuestController {
 
   public static requestBecomeGuest = asyncWrapper(async (req, res): Promise<void> => {
     const payload: RequestBecomeGuestRequestDto = {
-      id: (req as any).user,
+      id: (req as any).user || req.query.id,
       ...req.body,
     };
     const response: string = await GuestService.requestBecomeGuest(payload);

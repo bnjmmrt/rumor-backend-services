@@ -1491,12 +1491,37 @@ export class AuthService {
 
     // Handle bypass verification logic for testing or review environment
     if (config.get('BYPASS_VERIFICATION_CODE')) {
-      const temporaryCode = await this.dbConnection
-        .getRepository(TemporaryLoginCode)
-        .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          code: payload.code,
+        },
+      });
 
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+      if (!temporaryCode) {
+        if (!isEmailLogin) {
+          const verificationResult = await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+          const isVerified = verificationResult?.data?.verified === true;
 
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } else {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      }
+      
       // Setting up Payload.code to bypass verification for below email and phone number
       if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
         payload.code = temporaryCode.code;
@@ -2055,7 +2080,8 @@ export class AuthService {
 
     try {
       // Send Notification
-      serviceMesh
+
+      await serviceMesh
         .notificationService()
         .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     } catch (error) {
@@ -2215,6 +2241,7 @@ export class AuthService {
       try {
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
+          console.log("🚀 ~ AuthService ~ updateUsersStatus ~ user:", user)
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
@@ -2227,6 +2254,11 @@ export class AuthService {
               [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
+
+            // Send Notification
+            await serviceMesh
+              .notificationService()
+              .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
           }
         }
       } catch (error) {}
@@ -5694,10 +5726,12 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager.getRepository(User).findOne({
-        where: { id: payload.id },
-        relations: { roles: { role: true }, notifications: true },
-      });
+      const user = await queryRunner.manager
+        .getRepository(User)
+        .findOne({
+          where: { id: payload.id },
+          relations: { roles: { role: true }, notifications: true },
+        });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
