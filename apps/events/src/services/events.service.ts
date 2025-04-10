@@ -4090,6 +4090,46 @@ export class EventsService {
       totalCount: parseInt(guestCounts.totalcount) || 0,
     };
   }
+  public static async getGuestCountsByStatus(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `SUM(CASE WHEN guest.status = :invited THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN guest.status = :declined OR guest.status = :refused THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
+      ])
+      .where('(guest.event_id = :eventId)', {
+        eventId,
+        userId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
+
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
+    };
+  }
 
   public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
     try {
