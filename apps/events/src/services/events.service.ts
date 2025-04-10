@@ -118,7 +118,7 @@ import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
-import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import {
   sendEventCancellation,
@@ -2303,7 +2303,10 @@ export class EventsService {
           'quizQuestions',
         ],
       });
-
+      if (!event) throw new NotFoundError('Item of Event not found');
+      if(event.owner?.id !== payload.ownerId) {
+        throw new ForbiddenError('You are not authorized to update this event');
+      }
       const eventCopy = JSON.parse(JSON.stringify(event));
       /**date validations */
       if (!payload.startDate) {
@@ -2323,7 +2326,7 @@ export class EventsService {
       }
       /**date validations ends here */
 
-      if (!event) throw new NotFoundError('Item of Event not found');
+    
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -2681,7 +2684,7 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {
           console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
@@ -3234,7 +3237,7 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      sendEventRejection(updatedEvent.name, host.firstName, updatedEvent.owner.email);
+      sendEventRejection(updatedEvent.name, (host?.additionalHostInformation?.companyName) || host?.firstName, updatedEvent.owner.email);
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3611,7 +3614,8 @@ export class EventsService {
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } else if (guest.user?.phoneNumber) {
+          } 
+           if (guest.user?.phoneNumber) {
             // Send SMS notification
             try {
               const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
@@ -3623,7 +3627,7 @@ export class EventsService {
                 if (success) {
                   notificationSuccess = true;
                 }
-              } 
+              }
             } catch (err) {
               console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
@@ -4068,6 +4072,48 @@ export class EventsService {
         `COUNT(CASE WHEN guest.status = :declined OR guest.status = :refused THEN 1 END) AS declinedCount`,
         `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
         `COUNT(guest.id) AS totalCount`,
+      ])
+      .where('(guest.event_id = :eventId)', {
+        eventId,
+        userId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
+
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
+    };
+  }
+
+  //Get guests count by sum of party size
+  public static async getGuestCountsByStatus(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `SUM(CASE WHEN guest.status = :invited THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN guest.status = :declined OR guest.status = :refused THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
       ])
       .where('(guest.event_id = :eventId)', {
         eventId,

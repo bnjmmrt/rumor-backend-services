@@ -246,7 +246,14 @@ router.get(
   '/events/:eventId/guest-status-counts',
   AuthMiddleware.fusionAuthRequired,
   EventsController.GetGuestCountForGuestStatuses,
-); /**TODO: TestStatus: not working */
+);
+router.get(
+  '/events/:eventId/guest-counts',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getGuestCountsByStatus,
+); 
+
+/**TODO: TestStatus: not working */
 
 // router.get("/events", AuthMiddleware.fusionAuthRequired, EventsController.listEvents)  /**TestStatus: working */
 // router.get("/feed", EventsController.listEventsFeed)
