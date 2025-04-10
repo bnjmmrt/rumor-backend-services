@@ -957,6 +957,7 @@ export interface UserWithRoles {
   phoneNumber?: string | undefined;
   profilePicture?: string | undefined;
   instagramUserName?: string | undefined;
+  isGuest?: boolean | undefined
 }
 
 export interface GetUserWithRolesByEmailResponse {
@@ -975,6 +976,7 @@ export interface UserResponseData {
   message: string;
   hasEmail: boolean;
   hasPhone: boolean;
+  isExist?: boolean;
   user?: SimpleUser | undefined;
 }
 

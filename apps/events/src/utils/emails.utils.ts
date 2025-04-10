@@ -447,12 +447,14 @@ export const sendEventAnnouncement = async (
   try {
     const emailData = await serviceMesh
       .notificationService()
+
       .sendEmailFromTemplate(
         params,
         'Non-Member: New Event Announcement',
         [email.trim().toLowerCase()],
         null,
       );
+
     return emailData;
   } catch (error) {
     console.log(`Event Announcement failed at function sendEventInviteMember:: ${error}`);

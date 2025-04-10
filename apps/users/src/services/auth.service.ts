@@ -1072,23 +1072,17 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
-
+        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
+            ? `Enter code ${payload.referralCode} to expedite your application review.`
+            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
+         
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
-        }
+        } 
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1111,7 +1105,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh
+       await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1119,11 +1113,6 @@ export class AuthService {
             [payload.email.trim().toLowerCase()],
             null,
           );
-        if (!success) {
-          throw new BadRequestError(
-            'An error occured while sending SMS invitation, please try again.',
-          );
-        }
       } catch (error) {}
     }
 
@@ -1174,7 +1163,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh
+    await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1182,11 +1171,6 @@ export class AuthService {
           [payload.email.trim().toLowerCase()],
           null,
         );
-      if (!success) {
-        throw new BadRequestError(
-          'An error occured while sending Email invitation, please try again.',
-        );
-      }
     } catch (error) {}
 
     return '';
@@ -1377,13 +1361,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
@@ -3051,6 +3029,10 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: user.id } },
+    });
+
     const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
@@ -3068,6 +3050,7 @@ export class AuthService {
           id: item.role.id,
         };
       }),
+      isGuest: !!guest,
     };
 
     return data;
@@ -3188,6 +3171,7 @@ export class AuthService {
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
+          isExist: true,
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
@@ -3208,6 +3192,7 @@ export class AuthService {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
+        isExist: false,
         user: toCreateUser(existingUser),
       };
     }
@@ -3232,6 +3217,7 @@ export class AuthService {
 
     return {
       message: 'User created successfully.',
+      isExist: false,
       hasEmail,
       hasPhone,
       user: toCreateUser(user),
@@ -3400,6 +3386,7 @@ export class AuthService {
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
       .where('user.deletedAt IS NULL')
+      .andWhere('user.id != :hostId', { hostId })
       .andWhere(
         new Brackets(qb => {
           qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(

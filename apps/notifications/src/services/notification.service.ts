@@ -85,12 +85,13 @@ class NotificationService {
           recipientName = recipientUser?.firstName ? recipientUser.firstName : '';
         }
 
+
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
           message
             .replace('[Event Start Time]', (linkedEvent?.startDate || '').toString())
             .replace('[Recipient Name]', recipientName)
-            .replace('[Linked User Name]', linkedUserName)
+            .replace('[Linked User Name]',  linkedUserName)
             .replace('[Event Name]', linkedEvent?.name || '')
             .replace('[Event City Name]', linkedEvent?.location?.city || '')
             .replace('[Member Name]', body?.name || '')

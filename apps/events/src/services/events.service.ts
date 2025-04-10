@@ -123,7 +123,6 @@ import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto'
 import {
   sendEventCancellation,
   sendEventUpdation,
-  sendEventInviteNonMember,
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
@@ -1349,7 +1348,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
-          'eventAnnouncements'
+          'eventAnnouncements',
         ],
       });
     } else {
@@ -1368,7 +1367,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
-          'eventAnnouncements'
+          'eventAnnouncements',
         ],
       });
     }
@@ -2682,15 +2681,9 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
-          }
+          } 
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
       }
     });
@@ -3593,8 +3586,8 @@ export class EventsService {
       const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled. \n ${message} \n If you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
@@ -3630,15 +3623,9 @@ export class EventsService {
                 if (success) {
                   notificationSuccess = true;
                 }
-              } else {
-                // Log the issue and exit early (no throw)
-                console.log(
-                  `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-                );
-                return; // or just skip sending, depending on your function structure
-              }
+              } 
             } catch (err) {
-              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {
@@ -4150,7 +4137,7 @@ export class EventsService {
       }
       return responses.ok;
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   }
 }

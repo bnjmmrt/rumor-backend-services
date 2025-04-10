@@ -121,7 +121,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-
+      
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
@@ -522,6 +522,18 @@ export class SignupFormsServices {
       } catch (error) {
         console.log('🚀 ~ SignupFormsServices ~ error:', error);
       }
+      if (userPayload?.phoneNumber) {
+        try {
+          const validateNumber = isValidPhoneNumber(userPayload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = userPayload.phoneNumber.replace(/[\s\-()]/g, '').trim();
+            const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+            let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          } 
+        } catch (err) {}
+      }
+
       return submissions;
     } catch (err) {
       throw err;
