@@ -528,6 +528,8 @@ export interface MemberEvent {
   startDate: string;
   endDate: string;
   name: string;
+  imageCover?: string | undefined;
+  imageFlyer?: string | undefined;
   eventCover?: string | undefined;
 }
 

@@ -175,7 +175,7 @@ export class GuestController {
 
   public static listSimpleGuestEvents = asyncWrapper(async (req, res): Promise<void> => {
     const userId = req.params.id;
-    
+
     const response: SimpleGuestEventsResponse = await GuestService.listSimpleGuestEvents(userId);
     const successResponse = new GetResponse(response);
     res.status(successResponse.statusCode).json(successResponse);

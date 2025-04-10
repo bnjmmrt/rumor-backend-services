@@ -299,12 +299,12 @@ export const toMemberProfile = (
   role: UserRole,
   customLists: customListData[],
   instagramUsername?: string,
+  referralCode: string = '',
   eventCount: number = 0,
   upcomingEvents?: MemberEvent[],
   pastEvents?: MemberEvent[],
   invitedEvents?: MemberEvent[],
   requestedEvents?: MemberEvent[],
-  referralCode: string = '',
 ): MemberProfile => {
   return {
     id: user.id,

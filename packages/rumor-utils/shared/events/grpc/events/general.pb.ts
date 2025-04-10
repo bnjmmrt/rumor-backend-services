@@ -548,7 +548,8 @@ export interface SimpleGuestEventData {
   name: string;
   startDate: Date | undefined;
   endDate: Date | undefined;
-  status: EventStatusEnum;
+  imageFlyer: string | undefined;
+  imageCover: string | undefined;
 }
 export interface GuestEventData {
   id: string;

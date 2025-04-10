@@ -4510,10 +4510,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-    const eventCount = 3;
-
-    const ev = await serviceMesh.eventService().getSimpleGuestEvents(user.id);
-    console.log("EVENTS in users: ", ev)
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -4527,8 +4524,12 @@ export class AuthService {
         userRole,
         undefined,
         socialProvider?.username,
-        eventCount,
         referredUser?.referralCode,
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
       ),
     );
   }
@@ -5066,6 +5067,7 @@ export class AuthService {
       interests,
       userRole,
       formattedLists,
+      undefined,
       undefined,
       eventCount,
     );

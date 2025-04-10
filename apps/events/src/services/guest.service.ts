@@ -1434,9 +1434,9 @@ export class GuestService {
           : 0;
       const ageTo =
         parsedQuery.ageTo &&
-        typeof parsedQuery.ageTo === 'string' &&
-        parsedQuery.ageTo.trim() &&
-        parsedQuery.ageTo !== 'No Max'
+          typeof parsedQuery.ageTo === 'string' &&
+          parsedQuery.ageTo.trim() &&
+          parsedQuery.ageTo !== 'No Max'
           ? parseInt(parsedQuery.ageTo, 10)
           : null;
       const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
@@ -1680,9 +1680,9 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
 
     const andConditions = [];
@@ -1780,8 +1780,8 @@ export class GuestService {
     const orClause = orConditions.length > 0 ? orConditions : undefined;
     const order = parsedQuery.sortBy
       ? {
-          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-        }
+        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+      }
       : undefined;
     const relations = {
       user: {
@@ -2021,7 +2021,7 @@ export class GuestService {
           },
           status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
         },
-        status: In([EventStatusEnum.APPROVED_STATUS, EventStatusEnum.PAST_STATUS]),
+        status: EventStatusEnum.APPROVED_STATUS,
       },
       relations: ['guests'],
     });
@@ -2040,35 +2040,27 @@ export class GuestService {
       const simpleEvent: SimpleGuestEventData = {
         id: event.id,
         name: event.name,
-        startDate: event.startDate ? event.startDate : null,
-        endDate: event.endDate ? event.endDate : null,
-        status: event.status,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        imageCover: event.imageCover,
+        imageFlyer: event.imageFlyer,
       };
 
-      console.log('Event status: ', event.status, ', Guest status: ', event.guests[0].status, {
-        simpleEvent,
-      });
+      const guest = event.guests[0];
 
-      switch (event.status) {
-        case EventStatusEnum.APPROVED_STATUS:
-          const guest = event.guests[0];
-          if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isAfter(dateNow)) {
-            response.upcoming.push(simpleEvent);
-          }
-          if (guest.status === GuestStatus.APPLIED && dayjs(event.endDate).isAfter(dateNow)) {
-            response.requested.push(simpleEvent);
-          }
-          if (guest.status === GuestStatus.INVITED && dayjs(event.endDate).isAfter(dateNow)) {
-            response.invited.push(simpleEvent);
-          }
-          break;
-
-        //PAST
-        //          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) }); guestStatusFilter = [GuestStatus.CONFIRMED];
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.upcoming.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.APPLIED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.requested.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.INVITED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.invited.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isBefore(dateNow)) {
+        response.past.push(simpleEvent);
       }
     });
-
-    console.log('RESPONSE: ', response);
 
     return response;
   }
@@ -2087,9 +2079,9 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
 
     const andConditions = [];
@@ -2466,14 +2458,14 @@ export class GuestService {
     const [userEvents, publicEvents] = await Promise.all([
       !parsedQuery.feed //if it is not for feed then only filter by userstatuses
         ? await this.dbConnection.getRepository(Event).find({
-            where: {
-              ...whereClause,
-              ...userFilter, //to get the events based on provided status of guest
-            },
-            relations: {
-              guests: { user: true },
-            },
-          })
+          where: {
+            ...whereClause,
+            ...userFilter, //to get the events based on provided status of guest
+          },
+          relations: {
+            guests: { user: true },
+          },
+        })
         : Promise.resolve([]), //if it is for feed then filter by isprivate (get only public events)
       await this.dbConnection.getRepository(Event).find({
         where: {
@@ -2488,10 +2480,10 @@ export class GuestService {
 
     const filteredPublicEvents = parsedQuery.guestEventStatus
       ? publicEvents.filter(event =>
-          event.guests.some(
-            guest => guest.user.id === payload.userId && guest.status === guestStatusFilter[0],
-          ),
-        )
+        event.guests.some(
+          guest => guest.user.id === payload.userId && guest.status === guestStatusFilter[0],
+        ),
+      )
       : publicEvents;
 
     const eventsPrefiltered = [...userEvents];
@@ -2550,8 +2542,8 @@ export class GuestService {
 
     const order = parsedQuery.sortBy
       ? {
-          [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-        }
+        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
+      }
       : undefined;
 
     const finalWhereClause = orConditions.length > 0 ? orConditions : filter;
@@ -3068,13 +3060,13 @@ export class GuestService {
     if (payload.email) {
       try {
         checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(payload.email)).data;
-      } catch (e) {}
+      } catch (e) { }
     } else if (payload.phoneNumber) {
       try {
         checkUser = (await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber))
           .data;
         checkUser = checkUser ? { ...checkUser, phoneNumber: payload.phoneNumber } : null;
-      } catch (e) {}
+      } catch (e) { }
     } else {
       throw new ValidationError('Phone number or email is required');
     }
@@ -3280,14 +3272,14 @@ export class GuestService {
         try {
           checkUser = (await serviceMesh.userService().getUserWithRolesByEmail(guestPayload.email))
             .data;
-        } catch (e) {}
+        } catch (e) { }
       } else if (guestPayload.phoneNumber) {
         try {
           checkUser = (
             await serviceMesh.userService().getUserWithRolesByPhone(guestPayload.phoneNumber)
           ).data;
           if (checkUser) checkUser = { ...checkUser, phoneNumber: guestPayload.phoneNumber };
-        } catch (e) {}
+        } catch (e) { }
       } else {
         throw new ValidationError('Phone number or email is required');
       }
