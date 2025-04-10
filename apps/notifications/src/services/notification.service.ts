@@ -31,10 +31,10 @@ class NotificationService {
       }
 
       // Fetch linked entities in a single query each
-
       const linkedUser: User = linkedUserId
         ? await User.getRepository().findOne({ where: { id: linkedUserId } })
         : null;
+
       const linkedEvent: Event = linkedEventId
         ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
         : null;
@@ -74,10 +74,10 @@ class NotificationService {
               action: notificationTemplate.action,
             }
           : {};
-        const notificationImage = eval(notificationTemplate.image) || '';
-        let linkedUserName = linkedUser?.additionalHostInformation?.companyName
-          ? linkedUser?.additionalHostInformation?.companyName
-          : `${linkedUser.firstName} ${linkedUser.lastName}`;
+        const notificationImage = eval(notificationTemplate.image)
+        let linkedUserName = linkedUser ? linkedUser?.additionalHostInformation?.companyName
+        ? linkedUser?.additionalHostInformation?.companyName
+        : `${linkedUser.firstName} ${linkedUser.lastName}`: '';
         let recipientName = recipientUser.firstName
           ? `${recipientUser.firstName} ${recipientUser.lastName}`
           : '';
@@ -110,11 +110,20 @@ class NotificationService {
         notification.notificationModule = notificationTemplate.notificationModule;
         notification.recipients = [recipientUser];
         notification.notificationImage = notificationTemplate.image;
-        notificationsToSave.push(notification);
+
+        if(notificationTemplate.appNotification){
+          notificationsToSave.push(notification);
+        }
 
         const userPushPreference = recipientUser.userSettings
           ? recipientUser.userSettings.enableAppNotifications
           : true;
+
+
+          console.log("🚀 ~ NotificationService ~ recipientUser?.pushNotificationToken?.length:", recipientUser?.pushNotificationToken?.length)
+          console.log("🚀 ~ NotificationService ~ userPushPreference:", userPushPreference)
+          console.log("🚀 ~ NotificationService ~ notificationTemplate.pushNotification:", notificationTemplate.pushNotification)
+
 
         // Handle push notification if enabled and user has tokens
         if (
@@ -125,12 +134,13 @@ class NotificationService {
           const tokens = recipientUser.pushNotificationToken
             .map(data => data.notificationToken)
             .filter(Boolean);
+            
           if (tokens.length > 0) {
             pushNotifications.push({
               tokens,
               body: pushMessage,
               title: 'The Rumor',
-              image: notificationImage,
+              image: notificationImage ? notificationImage : 'https://host.therumor.com/images/app/rumor_icon.svg',
               data: { ...body, notificationType },
             });
           }
@@ -150,6 +160,7 @@ class NotificationService {
           });
         }
       }
+
       return { success: true, message: 'Notifications sent successfully.' };
     } catch (error) {
       console.log('🚀 ~ NotificationService ~ error:', error);
