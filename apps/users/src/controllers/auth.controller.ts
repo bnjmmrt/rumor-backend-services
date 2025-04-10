@@ -129,7 +129,7 @@ export class AuthController {
   });
 
   public static logout = asyncWrapper(async (req, res): Promise<void> => {
-    const payload: TokenRequestDto = req.token;
+    const payload: TokenRequestDto = req.body;
     const response: string = await AuthService.logout(payload);
     const createResponse = new CreateResponse(response, 'Logged out successfully.');
     res.status(createResponse.statusCode).json(createResponse);
