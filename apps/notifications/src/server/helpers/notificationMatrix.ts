@@ -261,8 +261,7 @@ let notificationMatrix = {
     role:'admin'
   },
   eventApproved: {
-    pushMessage:
-      '[Event Name] is live on Rumor! Tap to send invites and manage your guest list.',
+    pushMessage: '[Event Name] is live on Rumor! Tap to send invites and manage your guest list.',
     appMessage: 'Rumor has approved your event [Event Name]',
     appNotification: true,
     pushNotification: true,

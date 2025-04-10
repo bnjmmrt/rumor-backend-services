@@ -15,7 +15,12 @@ import {
   Role,
   Guest,
 } from 'rumor-utils/shared/entities';
-import { BadRequestError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from 'rumor-utils/errors';
 import database from '../database';
 import {
   CreateSignupFormDto,
@@ -75,14 +80,17 @@ export class SignupFormsServices {
     return data;
   }
 
-  public static async getByEventId(eventId: string): Promise<SignupFormsResponse[]> {
+  public static async getByEventId(
+    eventId: string,
+    hostId: string,
+  ): Promise<SignupFormsResponse[]> {
     try {
       const event: Event | undefined = await Event.findOne({
-        where: { id: eventId },
+        where: { id: eventId, owner: { id: hostId } },
         relations: { owner: true },
       });
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event');
       }
       const signupForms = await EventSignupForms.find({
         where: { event: { id: eventId } },
@@ -121,7 +129,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-      
+
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
@@ -462,6 +470,9 @@ export class SignupFormsServices {
       this.extractUserPayloadAndAnswers(payload, answerList, userPayload, requestedGuests);
       let inviteGuestPayload = null;
       [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
+      if (signupForm.event.owner.id === userPayload?.id) {
+        throw new ValidationError('Host cannot apply to their own event.');
+      }
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
@@ -530,7 +541,7 @@ export class SignupFormsServices {
             const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {}
       }
 

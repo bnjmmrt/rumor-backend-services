@@ -150,7 +150,9 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId }, relations: { location: true, owner: true } } );
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
@@ -510,7 +512,7 @@ export class GuestService {
             where: {
               host: { id: payload.hostId },
               user: { id: userId },
-            }
+            },
           });
 
           if (!existingMapping) {
@@ -2558,6 +2560,9 @@ export class GuestService {
     if (!user) {
       throw new NotFoundError('User not found');
     }
+    if (event.owner.id === payload.id) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
     const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
         user: { id: user?.id },
@@ -2958,6 +2963,13 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
+    if (
+      payload.email?.trim().toLowerCase() === event.owner.email.trim().toLowerCase() ||
+      payload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+    ) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
+
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -3161,7 +3173,14 @@ export class GuestService {
         where: { id: guestPayload.eventId, deletedAt: IsNull() },
         relations: { location: true, owner: true },
       });
-      if (!event) throw new NotFoundError('Event not found');
+      if (!event) throw new NotFoundError('Event');
+
+      if (
+        guestPayload.email?.trim().toLowerCase() === event.owner.email?.trim().toLowerCase() ||
+        guestPayload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+      ) {
+        throw new ValidationError('The host cannot be invited in event');
+      }
 
       // Step 2: Check lead guest presence and confirmation
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -3415,9 +3434,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        const existingUserData = existingUsers.find(
-          user => user.email === row.email || user.phoneNumber === row.phoneNumber,
-        );
+        let existingUserData;
+        if (payload.isUploadUser) {
+          existingUserData = existingUsers.find(
+            user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+          );
+        } else {
+          existingUserData = existingUsers.find(user => user.email === row.email);
+        }
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3425,7 +3449,7 @@ export class GuestService {
               lastName: row.lastName,
               email: row.email ? row.email : '',
               phoneNumber: row.phoneNumber ? row.phoneNumber : '',
-              reason: 'User already exists',
+              reason: 'User already exists in users list',
             };
             garbageData.push(user);
             if (row.email) userMap.delete(row.email);
@@ -3503,13 +3527,19 @@ export class GuestService {
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
 
-    if (newMappings.length !== 0)
+    if (newMappings.length !== 0) {
       await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      newMappings.map(async mapping => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: mapping.user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length,
+      SuccessUserCount: users.length + newMappings.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
@@ -3609,6 +3639,13 @@ export class GuestService {
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 

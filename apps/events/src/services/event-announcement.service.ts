@@ -126,15 +126,15 @@ export class EventAnnouncementService {
      */
     try {
       const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
-      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${(event?.name) || 'Event'}. ${link}. `;
-         
+      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${event?.name || 'Event'}. ${link}. `;
+
       if (recipients.length > 0) {
         serviceMesh
           .notificationService()
           .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
         const fetchUserEmails = await database
-        .getRepository(User)
-        .find({ where: { id: In(recipients) } });
+          .getRepository(User)
+          .find({ where: { id: In(recipients) } });
         fetchUserEmails.map(data => {
           if (data.email) {
             sendEventAnnouncement(
@@ -146,7 +146,7 @@ export class EventAnnouncementService {
             );
           }
           if (data?.phoneNumber) {
-             sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
+            sendSmsTextMessage({ phoneNumber: data.phoneNumber, textMessage });
           }
         });
       } else {

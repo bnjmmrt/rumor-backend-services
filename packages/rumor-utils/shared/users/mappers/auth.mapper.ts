@@ -299,6 +299,7 @@ export const toMemberProfile = (
   customLists: customListData[],
   instagramUsername?: string,
   eventCount: number = 0,
+  referralCode: string = '',
 ): MemberProfile => {
   return {
     id: user.id,
@@ -333,5 +334,6 @@ export const toMemberProfile = (
     sources: user.roles?.length
       ? user.roles.filter(r => r.source !== null).map(item => item.source as string)
       : [],
+    referralCode,
   };
 };
