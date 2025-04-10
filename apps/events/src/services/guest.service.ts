@@ -6,6 +6,7 @@ import {
   Attendees,
   Guests,
   FetchBulkGuestsData,
+  SimpleGuestEventsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { VouchRequestService } from './vouch-request.service';
 import { responses } from '../common/responses';
@@ -94,6 +95,7 @@ import {
   BulkUserData,
   UserEventInviteesData,
   QuizData,
+  SimpleGuestEventData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
@@ -115,6 +117,8 @@ import {
   sendEventInvitePlusOnes,
   sendGuestEventApproval,
 } from '../utils/emails.utils';
+import * as dayjs from 'dayjs';
+
 
 export class GuestService {
   public static dbConnection = database;
@@ -2002,6 +2006,67 @@ export class GuestService {
         };
       }),
     );
+  }
+
+  public static async listSimpleGuestEvents(userId: string): Promise<SimpleGuestEventsResponse> {
+    const events = await this.dbConnection
+      .getRepository(Event)
+      .find({
+        where: {
+          guests: {
+            user: {
+              id: userId,
+            },
+            status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
+          },
+          status: In([EventStatusEnum.APPROVED_STATUS, EventStatusEnum.PAST_STATUS]),
+        },
+        relations: ['guests'],
+      });
+
+    const response = {
+      upcoming: [] as Array<SimpleGuestEventData>,
+      invited: [] as Array<SimpleGuestEventData>,
+      past: [] as Array<SimpleGuestEventData>,
+      requested: [] as Array<SimpleGuestEventData>,
+      totalEvents: events.length,
+    }
+
+    const dateNow = new Date();
+
+    events.forEach((event) => {
+      const simpleEvent: SimpleGuestEventData = {
+        id: event.id,
+        name: event.name,
+        startDate: event.startDate ? event.startDate : null,
+        endDate: event.endDate ? event.endDate : null,
+        status: event.status,
+      };
+
+      console.log("Event status: ", event.status, ", Guest status: ", event.guests[0].status, {simpleEvent})
+
+      switch (event.status) {
+        case EventStatusEnum.APPROVED_STATUS:
+          const guest = event.guests[0];
+          if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isAfter(dateNow)) {
+            response.upcoming.push(simpleEvent);
+          }
+          if (guest.status === GuestStatus.APPLIED && dayjs(event.endDate).isAfter(dateNow)) {
+            response.requested.push(simpleEvent);
+          }
+          if (guest.status === GuestStatus.INVITED && dayjs(event.endDate).isAfter(dateNow)) {
+            response.invited.push(simpleEvent);
+          }
+          break;
+
+          //PAST
+          //          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) }); guestStatusFilter = [GuestStatus.CONFIRMED];
+      }
+    });
+
+    console.log("RESPONSE: ", response);
+
+    return response;
   }
 
   public static async listEventGuests(

@@ -7,6 +7,7 @@ import {
   Attendees,
   Guests,
   FetchBulkGuestsData,
+  SimpleGuestEventsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import {
   GuestsRequestDto,
@@ -168,6 +169,14 @@ export class GuestController {
       ...req.body,
     };
     const response: PaginatedGuestEventsResponse = await GuestService.listEventGuests(payload);
+    const successResponse = new GetResponse(response);
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static listSimpleGuestEvents = asyncWrapper(async (req, res): Promise<void> => {
+    const userId = req.params.id;
+    
+    const response: SimpleGuestEventsResponse = await GuestService.listSimpleGuestEvents(userId);
     const successResponse = new GetResponse(response);
     res.status(successResponse.statusCode).json(successResponse);
   });

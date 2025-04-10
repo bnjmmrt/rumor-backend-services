@@ -17,3 +17,6 @@ export const getTicketTypes = (eventId: string) =>
 
 export const deleteHostEvents = (id: string) =>
   apiService.getApi().delete(`/delete-host-events/${id}`);
+
+export const getSimpleGuestEvents = (userId: string) =>
+  apiService.getApi().get(`/events/users/${userId}/simple-events`)

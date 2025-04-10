@@ -4463,9 +4463,10 @@ export class AuthService {
         relations: ['user'],
       });
 
-    const eventCount = await this.dbConnection
-      .getRepository(Guest)
-      .count({ where: { user: { id: user.id } } });
+    const eventCount = 3;
+
+    const ev = await serviceMesh.eventService().getSimpleGuestEvents(user.id);
+    console.log("EVENTS in users: ", ev)
 
     return responses.data(
       toMemberProfile(

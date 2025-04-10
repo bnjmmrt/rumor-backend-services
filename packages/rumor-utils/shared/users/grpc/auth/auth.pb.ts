@@ -525,6 +525,9 @@ export interface GetHostsResponse {
 /** Get Member Profile */
 export interface MemberEvent {
   id: string;
+  startDate: string;
+  endDate: string;
+  name: string;
   eventCover?: string | undefined;
 }
 
