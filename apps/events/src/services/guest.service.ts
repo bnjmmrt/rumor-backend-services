@@ -150,14 +150,14 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
-    if (!event) throw new NotFoundError('Event not found');
+    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId }, relations: { location: true, owner: true } } );
+    if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
     let ticketType = await this.dbConnection
       .getRepository(TicketType)
       .findOne({ where: { id: payload.ticketTypeId } });
-    if (!ticketType) throw new NotFoundError('Ticket type not found');
+    if (!ticketType) throw new NotFoundError('Ticket type');
 
     // Fetch the host profile
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
@@ -428,7 +428,7 @@ export class GuestService {
       if (guestData.length > 0) {
         return guestData.map(guest => guest.id);
       } else {
-        throw new NotFoundError('Guest data not found');
+        throw new NotFoundError('Guest data');
       }
     }
 
@@ -774,7 +774,7 @@ export class GuestService {
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
                   if ([GuestStatus.APPLIED].includes(guest.status)) {
                     confirmedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
+                  } else if ([GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
                   }
                   guest.status = GuestStatus.CONFIRMED;
@@ -3599,14 +3599,14 @@ export class GuestService {
     // Step 1: Check if the event exists and is not deleted
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.eventId, deletedAt: IsNull() },
-      relations: { location: true },
+      relations: { location: true, owner: true },
     });
-    if (!event) throw new NotFoundError('Event not found');
+    if (!event) throw new NotFoundError('Event');
 
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
-    if (payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+    if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
@@ -3620,7 +3620,7 @@ export class GuestService {
       ticketType = await this.dbConnection
         .getRepository(TicketType)
         .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      if (!ticketType) throw new NotFoundError('Ticket type');
     }
 
     // Step 4: Normalize and validate guest status
@@ -3723,7 +3723,7 @@ export class GuestService {
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
-        const message = `Hi ${emailData.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {
