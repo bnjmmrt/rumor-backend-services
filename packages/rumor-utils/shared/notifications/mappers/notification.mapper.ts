@@ -8,6 +8,7 @@ interface NotificationResponse {
   isSeen: boolean;
   body?: object;
   notificationModule?: string;
+  role?: string;
   createdDate: Date;
 }
 
@@ -23,6 +24,7 @@ function toNotificationslisting(notifications: Partial<Notification>[]): Notific
       : 'https://host.therumor.com/images/app/rumor_icon.svg',
     isSeen: notification.isSeen,
     body: notification.body,
+    role: notification.role,
     createdDate: notification.createdAt,
   }));
 }
@@ -39,6 +41,7 @@ function toNotification(notification: Partial<Notification>): NotificationRespon
       : 'https://host.therumor.com/images/app/rumor_icon.svg',
     isSeen: notification.isSeen,
     body: notification.body,
+    role: notification.role,
     createdDate: notification.createdAt,
   };
 }
