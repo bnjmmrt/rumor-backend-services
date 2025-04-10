@@ -80,14 +80,14 @@ export class SignupFormsServices {
     return data;
   }
 
-  public static async getByEventId(eventId: string): Promise<SignupFormsResponse[]> {
+  public static async getByEventId(eventId: string, hostId: string): Promise<SignupFormsResponse[]> {
     try {
       const event: Event | undefined = await Event.findOne({
-        where: { id: eventId },
+        where: { id: eventId, owner: { id: hostId } },
         relations: { owner: true },
       });
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event');
       }
       const signupForms = await EventSignupForms.find({
         where: { event: { id: eventId } },
@@ -467,7 +467,7 @@ export class SignupFormsServices {
       this.extractUserPayloadAndAnswers(payload, answerList, userPayload, requestedGuests);
       let inviteGuestPayload = null;
       [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
-      if (signupForm.event.owner.id === userPayload.id) {
+      if (signupForm.event.owner.id === userPayload?.id) {
         throw new ValidationError('Host cannot apply to their own event.');
       }
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
