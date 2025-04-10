@@ -70,6 +70,8 @@ export interface IdRequest {
 /** Token Request */
 export interface TokenRequest {
   token: string;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 export interface UserAndIdRequest {
