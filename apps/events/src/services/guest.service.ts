@@ -150,14 +150,16 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
-    if (!event) throw new NotFoundError('Event not found');
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: eventId }, relations: { location: true, owner: true } });
+    if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
     let ticketType = await this.dbConnection
       .getRepository(TicketType)
       .findOne({ where: { id: payload.ticketTypeId } });
-    if (!ticketType) throw new NotFoundError('Ticket type not found');
+    if (!ticketType) throw new NotFoundError('Ticket type');
 
     // Fetch the host profile
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
@@ -271,14 +273,17 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
+
             if (updateGuests.length > 0) {
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
+
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_DENIED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
@@ -287,7 +292,7 @@ export class GuestService {
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_APPROVED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
@@ -428,7 +433,7 @@ export class GuestService {
       if (guestData.length > 0) {
         return guestData.map(guest => guest.id);
       } else {
-        throw new NotFoundError('Guest data not found');
+        throw new NotFoundError('Guest data');
       }
     }
 
@@ -508,7 +513,7 @@ export class GuestService {
             where: {
               host: { id: payload.hostId },
               user: { id: userId },
-            }
+            },
           });
 
           if (!existingMapping) {
@@ -774,7 +779,7 @@ export class GuestService {
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
                   if ([GuestStatus.APPLIED].includes(guest.status)) {
                     confirmedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
+                  } else if ([GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
                   }
                   guest.status = GuestStatus.CONFIRMED;
@@ -2556,6 +2561,9 @@ export class GuestService {
     if (!user) {
       throw new NotFoundError('User not found');
     }
+    if (event.owner.id === payload.id) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
     const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
         user: { id: user?.id },
@@ -2956,6 +2964,10 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
+    if (payload.email.trim().toLowerCase() === event.owner.email.trim().toLowerCase()) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
+
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -3160,6 +3172,10 @@ export class GuestService {
         relations: { location: true, owner: true },
       });
       if (!event) throw new NotFoundError('Event not found');
+
+      if (guestPayload.email.trim().toLowerCase() === event.owner.email.trim().toLowerCase()) {
+        throw new ValidationError('The host cannot be invited in event');
+      }
 
       // Step 2: Check lead guest presence and confirmation
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -3413,9 +3429,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        const existingUserData = existingUsers.find(
-          user => user.email === row.email || user.phoneNumber === row.phoneNumber,
-        );
+        let existingUserData;
+        if (payload.isUploadUser) {
+          existingUserData = existingUsers.find(
+            user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+          );
+        } else {
+          existingUserData = existingUsers.find(user => user.email === row.email);
+        }
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3423,7 +3444,7 @@ export class GuestService {
               lastName: row.lastName,
               email: row.email ? row.email : '',
               phoneNumber: row.phoneNumber ? row.phoneNumber : '',
-              reason: 'User already exists',
+              reason: 'User already exists in users list',
             };
             garbageData.push(user);
             if (row.email) userMap.delete(row.email);
@@ -3501,13 +3522,19 @@ export class GuestService {
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
 
-    if (newMappings.length !== 0)
+    if (newMappings.length !== 0) {
       await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      newMappings.map(async mapping => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: mapping.user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length,
+      SuccessUserCount: users.length + newMappings.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
@@ -3599,14 +3626,21 @@ export class GuestService {
     // Step 1: Check if the event exists and is not deleted
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.eventId, deletedAt: IsNull() },
-      relations: { location: true },
+      relations: { location: true, owner: true },
     });
-    if (!event) throw new NotFoundError('Event not found');
+    if (!event) throw new NotFoundError('Event');
 
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
-    if (payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+    if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
@@ -3620,7 +3654,7 @@ export class GuestService {
       ticketType = await this.dbConnection
         .getRepository(TicketType)
         .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      if (!ticketType) throw new NotFoundError('Ticket type');
     }
 
     // Step 4: Normalize and validate guest status
@@ -3723,7 +3757,7 @@ export class GuestService {
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
-        const message = `Hi ${emailData.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {

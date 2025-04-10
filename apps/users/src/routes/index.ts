@@ -79,7 +79,7 @@ router.get('/check-service-call', AuthController.checkService);
 
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
-router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
+router.post('/auth/logout', AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
 router.put(

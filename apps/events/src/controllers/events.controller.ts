@@ -145,6 +145,8 @@ export class EventsController {
   public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     req.body.id = id;
+    const userId = (req as any).user;
+    req.body.ownerId = userId;
     const payload: UpdateEventRequestDto = req.body;
     const event: EventData = await EventsService.updateEvent(payload);
     const successResponse = new UpdateResponse(event);
@@ -471,6 +473,19 @@ export class EventsController {
       };
       const response: GuestCountByStatuses =
         await EventsService.getGuestCountForGuestStatuses(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static getGuestCountsByStatus = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UserAndIdRequestDto = {
+        userId: id,
+        id: req.params.eventId,
+      };
+      const response: GuestCountByStatuses = await EventsService.getGuestCountsByStatus(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },

@@ -797,7 +797,7 @@ export interface AdditionalHostInformation {
   bio?: string | undefined;
   companyLogo?: string | undefined;
   id?: string | undefined;
-  socialMedia?: SocialMedia | undefined
+  socialMedia?: SocialMedia | undefined;
 }
 
 export interface BioProfileResponse {
@@ -957,7 +957,7 @@ export interface UserWithRoles {
   phoneNumber?: string | undefined;
   profilePicture?: string | undefined;
   instagramUserName?: string | undefined;
-  isGuest?: boolean | undefined
+  isGuest?: boolean | undefined;
 }
 
 export interface GetUserWithRolesByEmailResponse {

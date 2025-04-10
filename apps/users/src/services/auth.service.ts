@@ -92,6 +92,7 @@ import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-cus
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
 import { TemporaryPasswordToken } from 'rumor-utils/shared/users/entities/temporary-password-token.entity';
+import { ReferredUser } from 'rumor-utils/shared/users/entities/referred-user.entity';
 
 import {
   LoginRequest,
@@ -217,6 +218,7 @@ import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -667,11 +669,19 @@ export class AuthService {
   }
 
   public static async logout(payload: TokenRequestDto): Promise<string> {
-    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    let response;
+    try {
+      response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    } catch (error) {}
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError('Invalid session token.');
     }
+
+    await this.dbConnection.getRepository(PushNotificationToken).delete({
+      notificationToken: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
     return '';
   }
 
@@ -1072,17 +1082,20 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
-            ? `Enter code ${payload.referralCode} to expedite your application review.`
-            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
-         
+      let message =
+        `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
+        (payload.referralCode
+          ? `Enter code ${payload.referralCode} to expedite your application review.`
+          : ``) +
+        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } 
+        }
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1105,7 +1118,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-       await serviceMesh
+        await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1163,7 +1176,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-    await serviceMesh
+      await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1361,7 +1374,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
@@ -1482,11 +1495,38 @@ export class AuthService {
 
     // Handle bypass verification logic for testing or review environment
     if (config.get('BYPASS_VERIFICATION_CODE')) {
-      const temporaryCode = await this.dbConnection
-        .getRepository(TemporaryLoginCode)
-        .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          code: payload.code,
+        },
+      });
 
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+      if (!temporaryCode) {
+        if (!isEmailLogin) {
+          const verificationResult = await serviceMesh
+            .notificationService()
+            .verifyCode(payload.phoneNumber, payload.code);
+          const isVerified = verificationResult?.data?.verified === true;
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } else {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      }
 
       // Setting up Payload.code to bypass verification for below email and phone number
       if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
@@ -2046,7 +2086,8 @@ export class AuthService {
 
     try {
       // Send Notification
-      serviceMesh
+
+      await serviceMesh
         .notificationService()
         .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     } catch (error) {
@@ -2206,6 +2247,7 @@ export class AuthService {
       try {
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
+          console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
@@ -2218,6 +2260,11 @@ export class AuthService {
               [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
+
+            // Send Notification
+            await serviceMesh
+              .notificationService()
+              .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
           }
         }
       } catch (error) {}
@@ -4467,6 +4514,10 @@ export class AuthService {
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
 
+    const referredUser = await this.dbConnection
+      .getRepository(ReferredUser)
+      .findOneBy({ userId: user.id });
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4476,6 +4527,7 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         eventCount,
+        referredUser?.referralCode,
       ),
     );
   }
