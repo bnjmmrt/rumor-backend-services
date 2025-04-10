@@ -2681,7 +2681,7 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {
           console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
@@ -3623,7 +3623,7 @@ export class EventsService {
                 if (success) {
                   notificationSuccess = true;
                 }
-              } 
+              }
             } catch (err) {
               console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
@@ -4090,6 +4090,8 @@ export class EventsService {
       totalCount: parseInt(guestCounts.totalcount) || 0,
     };
   }
+
+  //Get guests count by sum of party size
   public static async getGuestCountsByStatus(
     payload: UserAndIdRequestDto,
   ): Promise<GuestCountByStatuses> {

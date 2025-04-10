@@ -476,7 +476,6 @@ export class EventsController {
     },
   );
 
-
   public static getGuestCountsByStatus = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const id = (req as any).user;
@@ -484,8 +483,7 @@ export class EventsController {
         userId: id,
         id: req.params.eventId,
       };
-      const response: GuestCountByStatuses =
-        await EventsService.getGuestCountsByStatus(payload);
+      const response: GuestCountByStatuses = await EventsService.getGuestCountsByStatus(payload);
       const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
