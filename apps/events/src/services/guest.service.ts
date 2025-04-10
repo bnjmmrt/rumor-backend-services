@@ -278,8 +278,7 @@ export class GuestService {
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {
-              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
-
+              const recipientIds = updateGuests.map(data=>data.userId).filter(Boolean);
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)
                 serviceMesh
@@ -290,7 +289,7 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.INVITED)
+              if (guestStatus === GuestStatus.CONFIRMED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
