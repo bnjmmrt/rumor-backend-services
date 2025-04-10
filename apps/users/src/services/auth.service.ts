@@ -217,6 +217,7 @@ import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -667,11 +668,19 @@ export class AuthService {
   }
 
   public static async logout(payload: TokenRequestDto): Promise<string> {
-    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    let response;
+    try {
+       response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    } catch (error) {}
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError('Invalid session token.');
     }
+
+    await this.dbConnection.getRepository(PushNotificationToken).delete({
+      notificationToken: payload.fcmToken,
+      deviceId: payload.deviceId
+    })
     return '';
   }
 
