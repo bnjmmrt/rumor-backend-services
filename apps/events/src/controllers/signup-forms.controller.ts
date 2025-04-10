@@ -30,8 +30,9 @@ export class SignupFormsController {
   });
 
   public static getByEventId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const hostId = (req as any).user;
     const eventId = req.params.id;
-    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId);
+    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId, hostId);
     res.json(new GetResponse(data));
   });
 
