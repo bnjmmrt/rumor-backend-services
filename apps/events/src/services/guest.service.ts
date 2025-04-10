@@ -271,14 +271,17 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
+
             if (updateGuests.length > 0) {
+              const recipientIds = updateGuests.map(data=>data.userId).filter(Boolean);
+
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_DENIED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
@@ -287,7 +290,7 @@ export class GuestService {
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_APPROVED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
