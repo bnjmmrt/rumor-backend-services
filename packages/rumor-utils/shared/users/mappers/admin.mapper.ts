@@ -125,6 +125,8 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
   };
 };
 
+/*
+TODO: remove
 export const toMemberProfile = (
   user: User,
   focuses: FocusProto[],
@@ -165,4 +167,4 @@ export const toMemberProfile = (
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount,
   };
-};
+}; */
