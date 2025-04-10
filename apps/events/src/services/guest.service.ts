@@ -3270,6 +3270,7 @@ export class GuestService {
           lastName: guestPayload.lastName,
           email: guestPayload.email,
           phoneNumber: guestPayload.phoneNumber,
+          source: UserSource.PLUS_1,
         };
         const newUser = (
           await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
