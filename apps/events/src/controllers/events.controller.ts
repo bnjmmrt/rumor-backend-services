@@ -145,6 +145,8 @@ export class EventsController {
   public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     req.body.id = id;
+    const userId = (req as any).user;
+    req.body.ownerId = userId;
     const payload: UpdateEventRequestDto = req.body;
     const event: EventData = await EventsService.updateEvent(payload);
     const successResponse = new UpdateResponse(event);
