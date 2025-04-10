@@ -1482,12 +1482,37 @@ export class AuthService {
 
     // Handle bypass verification logic for testing or review environment
     if (config.get('BYPASS_VERIFICATION_CODE')) {
-      const temporaryCode = await this.dbConnection
-        .getRepository(TemporaryLoginCode)
-        .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          code: payload.code,
+        },
+      });
 
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+      if (!temporaryCode) {
+        if (!isEmailLogin) {
+          const verificationResult = await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+          const isVerified = verificationResult?.data?.verified === true;
 
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } else {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      }
+      
       // Setting up Payload.code to bypass verification for below email and phone number
       if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
         payload.code = temporaryCode.code;
