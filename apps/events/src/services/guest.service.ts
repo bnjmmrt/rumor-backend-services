@@ -119,7 +119,6 @@ import {
 } from '../utils/emails.utils';
 import * as dayjs from 'dayjs';
 
-
 export class GuestService {
   public static dbConnection = database;
 
@@ -512,7 +511,7 @@ export class GuestService {
             where: {
               host: { id: payload.hostId },
               user: { id: userId },
-            }
+            },
           });
 
           if (!existingMapping) {
@@ -2009,20 +2008,18 @@ export class GuestService {
   }
 
   public static async listSimpleGuestEvents(userId: string): Promise<SimpleGuestEventsResponse> {
-    const events = await this.dbConnection
-      .getRepository(Event)
-      .find({
-        where: {
-          guests: {
-            user: {
-              id: userId,
-            },
-            status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
+    const events = await this.dbConnection.getRepository(Event).find({
+      where: {
+        guests: {
+          user: {
+            id: userId,
           },
-          status: In([EventStatusEnum.APPROVED_STATUS, EventStatusEnum.PAST_STATUS]),
+          status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
         },
-        relations: ['guests'],
-      });
+        status: In([EventStatusEnum.APPROVED_STATUS, EventStatusEnum.PAST_STATUS]),
+      },
+      relations: ['guests'],
+    });
 
     const response = {
       upcoming: [] as Array<SimpleGuestEventData>,
@@ -2030,11 +2027,11 @@ export class GuestService {
       past: [] as Array<SimpleGuestEventData>,
       requested: [] as Array<SimpleGuestEventData>,
       totalEvents: events.length,
-    }
+    };
 
     const dateNow = new Date();
 
-    events.forEach((event) => {
+    events.forEach(event => {
       const simpleEvent: SimpleGuestEventData = {
         id: event.id,
         name: event.name,
@@ -2043,7 +2040,9 @@ export class GuestService {
         status: event.status,
       };
 
-      console.log("Event status: ", event.status, ", Guest status: ", event.guests[0].status, {simpleEvent})
+      console.log('Event status: ', event.status, ', Guest status: ', event.guests[0].status, {
+        simpleEvent,
+      });
 
       switch (event.status) {
         case EventStatusEnum.APPROVED_STATUS:
@@ -2059,12 +2058,12 @@ export class GuestService {
           }
           break;
 
-          //PAST
-          //          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) }); guestStatusFilter = [GuestStatus.CONFIRMED];
+        //PAST
+        //          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) }); guestStatusFilter = [GuestStatus.CONFIRMED];
       }
     });
 
-    console.log("RESPONSE: ", response);
+    console.log('RESPONSE: ', response);
 
     return response;
   }
