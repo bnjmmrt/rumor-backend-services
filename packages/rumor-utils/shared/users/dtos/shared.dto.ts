@@ -13,6 +13,14 @@ export class TokenRequestDto implements TokenRequest {
   @IsString()
   @IsNotEmpty()
   token: string;
+
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
+
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
 }
 
 export class IdRequestDto implements IdRequest {

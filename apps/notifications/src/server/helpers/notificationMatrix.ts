@@ -1,9 +1,7 @@
-import { NotificationModules } from 'packages/rumor-utils/shared/notifications/interfaces/notification.interface';
-
 let notificationMatrix = {
   applicationAppoved: {
     pushMessage: 'Welcome to Rumor. Your application has been approved!',
-    PushNotification: true,
+    pushNotification: true,
     appNotification: false,
     action: 'Approved into Rumor',
   },
@@ -14,6 +12,7 @@ let notificationMatrix = {
     pushNotification: true,
     body: { userId: '' },
     linkedUser: '',
+    action: 'Non Member Requesting Referral',
     image: 'linkedUser.profilePicture',
   },
   eventReminder: {
@@ -154,7 +153,7 @@ let notificationMatrix = {
     body: { userId: '' },
     linkedUser: '',
     notificationModule: 'user',
-    image: 'linkedUser.profileImage',
+    image: 'linkedUser.profilePicture',
     action: 'New Rumor Member Application',
   },
   hostApplication: {
@@ -165,7 +164,7 @@ let notificationMatrix = {
     body: { userId: '' },
     linkedUser: '',
     notificationModule: 'user',
-    image: 'linkedUser.profileImage',
+    image: 'linkedUser.profilePicture',
     action: 'New Host Application',
   },
   eventSubmitted: {
@@ -237,8 +236,7 @@ let notificationMatrix = {
     action: 'User Feedback',
   },
   eventApproved: {
-    pushMessage:
-      '[Event Name] is live on Rumor! Tap to send invites and manage your guest list. (Links to Event details page in host app)',
+    pushMessage: '[Event Name] is live on Rumor! Tap to send invites and manage your guest list.',
     appMessage: 'Rumor has approved your event [Event Name]',
     appNotification: true,
     pushNotification: true,
@@ -258,7 +256,7 @@ let notificationMatrix = {
     body: { eventId: '' },
     notificationModule: 'event',
     action: 'New Guest Request',
-    image: 'linkedUser.profileImage',
+    image: 'linkedUser.profilePicture',
   },
   rsvpSignupFormRequest: {
     pushMessage: '[Linked User Name] requested access to [Event Name].',
@@ -270,7 +268,7 @@ let notificationMatrix = {
     body: { eventId: '', signupFormId: '' },
     notificationModule: 'event',
     action: 'New RSVP Sign up Form Request',
-    image: 'linkedEvent.imageFlyer',
+    image: '',
   },
   eventSubmissionApproved: {
     pushMessage: '',
