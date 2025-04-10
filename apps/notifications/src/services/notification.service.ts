@@ -23,9 +23,11 @@ class NotificationService {
   ) {
     try {
       const recipientList = Array.isArray(recipients) ? recipients : [recipients];
+      console.log("🚀 ~ NotificationService ~ recipientList:", recipientList)
 
       // Fetch notification template
       const notificationTemplate = getNotificationDetails(notificationType);
+      console.log("🚀 ~ NotificationService ~ notificationTemplate:", notificationTemplate)
       if (!notificationTemplate) {
         throw new Error(`Invalid notification type: ${notificationType}`);
       }
@@ -71,7 +73,8 @@ class NotificationService {
           ? {
               eventId: linkedEvent ? linkedEvent.id : '',
               userId: linkedUser ? linkedUser.id : '',
-              action: notificationTemplate.action,
+              action: notificationTemplate.action || '',
+              role: notificationTemplate.role || '',
             }
           : {};
         const notificationImage = eval(notificationTemplate.image);
@@ -112,6 +115,8 @@ class NotificationService {
         notification.notificationModule = notificationTemplate.notificationModule;
         notification.recipients = [recipientUser];
         notification.notificationImage = notificationTemplate.image;
+        notification.role = notificationTemplate.role;
+
 
         if (notificationTemplate.appNotification) {
           notificationsToSave.push(notification);
@@ -160,6 +165,7 @@ class NotificationService {
         await this.dbConnection.getRepository(Notification).save(notificationsToSave);
       }
 
+
       // Send push notifications in bulk, ensuring different messages per recipient
       if (pushNotifications.length > 0) {
         for (const push of pushNotifications) {
@@ -177,6 +183,7 @@ class NotificationService {
 
   async getAllNotifications(
     recipientId: string,
+    role: string,
     take = 10,
     skip = 0,
   ): Promise<{ totalCount: number; result: Partial<Notification>[] }> {
@@ -190,6 +197,12 @@ class NotificationService {
       .leftJoinAndSelect('notification.linkedEvent', 'linkedEvent')
       .orderBy('notification.createdAt', 'DESC');
 
+    
+      if (role) {
+        role = role === 'non_member' ? 'member' : role;
+        queryBuilder.andWhere('notification.role = :role', { role });
+      }
+    
     const totalCount = await queryBuilder.getCount();
 
     const notifications = await queryBuilder.take(take).skip(skip).getMany();
