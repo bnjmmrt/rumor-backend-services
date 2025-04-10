@@ -65,6 +65,7 @@ import {
   TicketType,
   Collaborator,
   QuizQuestion,
+  UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -1300,7 +1301,12 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-    if (event.owner.id !== payload.userId) {
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: payload.userId } },
+      relations: { role: true },
+    });
+    const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+    if (!isAdmin && event.owner.id !== payload.userId) {
       throw new ForbiddenError('Permission denied: You can only access events you host.');
     }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
@@ -2306,7 +2312,13 @@ export class EventsService {
         ],
       });
       if (!event) throw new NotFoundError('Item of Event not found');
-      if (event.owner?.id !== payload.ownerId) {
+      const userRoles = await UserRole.find({
+        where: { user: { id: payload.ownerId } },
+        relations: { role: true },
+      });
+
+      const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+      if (!isAdmin && event.owner?.id !== payload.ownerId) {
         throw new ForbiddenError('You are not authorized to update this event');
       }
       const eventCopy = JSON.parse(JSON.stringify(event));
