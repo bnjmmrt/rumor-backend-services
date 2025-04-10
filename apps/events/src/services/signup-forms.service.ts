@@ -101,6 +101,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Get By urlcode
+   * @param code
+   * @returns
+   */
   public static async getByUrl(code: string) {
     try {
       const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
@@ -121,7 +126,7 @@ export class SignupFormsServices {
           questions: true,
         },
       });
-      
+
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
