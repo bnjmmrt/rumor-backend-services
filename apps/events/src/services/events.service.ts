@@ -1300,7 +1300,9 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
+    if (event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.');
+    }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({
@@ -2304,7 +2306,7 @@ export class EventsService {
         ],
       });
       if (!event) throw new NotFoundError('Item of Event not found');
-      if(event.owner?.id !== payload.ownerId) {
+      if (event.owner?.id !== payload.ownerId) {
         throw new ForbiddenError('You are not authorized to update this event');
       }
       const eventCopy = JSON.parse(JSON.stringify(event));
@@ -2326,7 +2328,6 @@ export class EventsService {
       }
       /**date validations ends here */
 
-    
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -3237,7 +3238,11 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      sendEventRejection(updatedEvent.name, (host?.additionalHostInformation?.companyName) || host?.firstName, updatedEvent.owner.email);
+      sendEventRejection(
+        updatedEvent.name,
+        host?.additionalHostInformation?.companyName || host?.firstName,
+        updatedEvent.owner.email,
+      );
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3614,8 +3619,8 @@ export class EventsService {
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } 
-           if (guest.user?.phoneNumber) {
+          }
+          if (guest.user?.phoneNumber) {
             // Send SMS notification
             try {
               const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
