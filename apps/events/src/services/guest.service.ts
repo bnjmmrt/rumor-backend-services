@@ -2964,8 +2964,10 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
-    if (payload.email?.trim().toLowerCase() === event.owner.email.trim().toLowerCase() ||
-      (payload.phoneNumber?.trim() === event.owner.phoneNumber?.trim())) {
+    if (
+      payload.email?.trim().toLowerCase() === event.owner.email.trim().toLowerCase() ||
+      payload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+    ) {
       throw new ValidationError('The host cannot be invited in event');
     }
 
@@ -3174,8 +3176,9 @@ export class GuestService {
       });
       if (!event) throw new NotFoundError('Event');
 
-      if (guestPayload.email?.trim().toLowerCase() === event.owner.email?.trim().toLowerCase() ||
-        (guestPayload.phoneNumber?.trim() === event.owner.phoneNumber?.trim())
+      if (
+        guestPayload.email?.trim().toLowerCase() === event.owner.email?.trim().toLowerCase() ||
+        guestPayload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
       ) {
         throw new ValidationError('The host cannot be invited in event');
       }

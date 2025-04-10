@@ -80,7 +80,10 @@ export class SignupFormsServices {
     return data;
   }
 
-  public static async getByEventId(eventId: string, hostId: string): Promise<SignupFormsResponse[]> {
+  public static async getByEventId(
+    eventId: string,
+    hostId: string,
+  ): Promise<SignupFormsResponse[]> {
     try {
       const event: Event | undefined = await Event.findOne({
         where: { id: eventId, owner: { id: hostId } },

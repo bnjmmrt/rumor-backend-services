@@ -65,7 +65,7 @@ import {
   TicketType,
   Collaborator,
   QuizQuestion,
-  UserRole
+  UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -2316,7 +2316,7 @@ export class EventsService {
         where: { user: { id: payload.ownerId } },
         relations: { role: true },
       });
-      
+
       const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
       if (!isAdmin && event.owner?.id !== payload.ownerId) {
         throw new ForbiddenError('You are not authorized to update this event');
