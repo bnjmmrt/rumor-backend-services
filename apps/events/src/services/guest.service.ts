@@ -2561,6 +2561,9 @@ export class GuestService {
     if (!user) {
       throw new NotFoundError('User not found');
     }
+    if (event.owner.id === payload.id) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
     const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
         user: { id: user?.id },
@@ -2961,6 +2964,10 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
+    if (payload.email.trim().toLowerCase() === event.owner.email.trim().toLowerCase()) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
+
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -3165,6 +3172,10 @@ export class GuestService {
         relations: { location: true, owner: true },
       });
       if (!event) throw new NotFoundError('Event not found');
+
+      if (guestPayload.email.trim().toLowerCase() === event.owner.email.trim().toLowerCase()) {
+        throw new ValidationError('The host cannot be invited in event');
+      }
 
       // Step 2: Check lead guest presence and confirmation
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({

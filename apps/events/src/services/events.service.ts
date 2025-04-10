@@ -1300,7 +1300,9 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
+    if (event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.')
+    }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({

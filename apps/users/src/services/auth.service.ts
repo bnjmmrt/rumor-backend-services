@@ -1082,17 +1082,20 @@ export class AuthService {
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
     if (payload.phoneNumber) {
-        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
-            ? `Enter code ${payload.referralCode} to expedite your application review.`
-            : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
-         
+      let message =
+        `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
+        (payload.referralCode
+          ? `Enter code ${payload.referralCode} to expedite your application review.`
+          : ``) +
+        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+
       //Micro-service call
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } 
+        }
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1115,7 +1118,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-       await serviceMesh
+        await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1173,7 +1176,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-    await serviceMesh
+      await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1371,7 +1374,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
@@ -2242,7 +2245,7 @@ export class AuthService {
       try {
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
-          console.log("🚀 ~ AuthService ~ updateUsersStatus ~ user:", user)
+          console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
@@ -5730,12 +5733,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({
-          where: { id: payload.id },
-          relations: { roles: { role: true }, notifications: true },
-        });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');

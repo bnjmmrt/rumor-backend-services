@@ -74,10 +74,12 @@ class NotificationService {
               action: notificationTemplate.action,
             }
           : {};
-        const notificationImage = eval(notificationTemplate.image)
-        let linkedUserName = linkedUser ? linkedUser?.additionalHostInformation?.companyName
-        ? linkedUser?.additionalHostInformation?.companyName
-        : `${linkedUser.firstName} ${linkedUser.lastName}`: '';
+        const notificationImage = eval(notificationTemplate.image);
+        let linkedUserName = linkedUser
+          ? linkedUser?.additionalHostInformation?.companyName
+            ? linkedUser?.additionalHostInformation?.companyName
+            : `${linkedUser.firstName} ${linkedUser.lastName}`
+          : '';
         let recipientName = recipientUser.firstName
           ? `${recipientUser.firstName} ${recipientUser.lastName}`
           : '';
@@ -85,13 +87,12 @@ class NotificationService {
           recipientName = recipientUser?.firstName ? recipientUser.firstName : '';
         }
 
-
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
           message
             .replace('[Event Start Time]', (linkedEvent?.startDate || '').toString())
             .replace('[Recipient Name]', recipientName)
-            .replace('[Linked User Name]',  linkedUserName)
+            .replace('[Linked User Name]', linkedUserName)
             .replace('[Event Name]', linkedEvent?.name || '')
             .replace('[Event City Name]', linkedEvent?.location?.city || '')
             .replace('[Member Name]', body?.name || '')
@@ -112,7 +113,7 @@ class NotificationService {
         notification.recipients = [recipientUser];
         notification.notificationImage = notificationTemplate.image;
 
-        if(notificationTemplate.appNotification){
+        if (notificationTemplate.appNotification) {
           notificationsToSave.push(notification);
         }
 
@@ -120,11 +121,15 @@ class NotificationService {
           ? recipientUser.userSettings.enableAppNotifications
           : true;
 
-
-          console.log("🚀 ~ NotificationService ~ recipientUser?.pushNotificationToken?.length:", recipientUser?.pushNotificationToken?.length)
-          console.log("🚀 ~ NotificationService ~ userPushPreference:", userPushPreference)
-          console.log("🚀 ~ NotificationService ~ notificationTemplate.pushNotification:", notificationTemplate.pushNotification)
-
+        console.log(
+          '🚀 ~ NotificationService ~ recipientUser?.pushNotificationToken?.length:',
+          recipientUser?.pushNotificationToken?.length,
+        );
+        console.log('🚀 ~ NotificationService ~ userPushPreference:', userPushPreference);
+        console.log(
+          '🚀 ~ NotificationService ~ notificationTemplate.pushNotification:',
+          notificationTemplate.pushNotification,
+        );
 
         // Handle push notification if enabled and user has tokens
         if (
@@ -135,13 +140,15 @@ class NotificationService {
           const tokens = recipientUser.pushNotificationToken
             .map(data => data.notificationToken)
             .filter(Boolean);
-            
+
           if (tokens.length > 0) {
             pushNotifications.push({
               tokens,
               body: pushMessage,
               title: 'The Rumor',
-              image: notificationImage ? notificationImage : 'https://host.therumor.com/images/app/rumor_icon.svg',
+              image: notificationImage
+                ? notificationImage
+                : 'https://host.therumor.com/images/app/rumor_icon.svg',
               data: { ...body, notificationType },
             });
           }

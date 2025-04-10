@@ -15,7 +15,7 @@ import {
   Role,
   Guest,
 } from 'rumor-utils/shared/entities';
-import { BadRequestError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError, ValidationError } from 'rumor-utils/errors';
 import database from '../database';
 import {
   CreateSignupFormDto,
@@ -462,6 +462,9 @@ export class SignupFormsServices {
       this.extractUserPayloadAndAnswers(payload, answerList, userPayload, requestedGuests);
       let inviteGuestPayload = null;
       [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
+      if (signupForm.event.owner.id === userPayload.id) {
+        throw new ValidationError('Host cannot apply to their own event.');
+      }
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
