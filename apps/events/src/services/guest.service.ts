@@ -150,7 +150,9 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId }, relations: { location: true, owner: true } } );
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
@@ -508,7 +510,7 @@ export class GuestService {
             where: {
               host: { id: payload.hostId },
               user: { id: userId },
-            }
+            },
           });
 
           if (!existingMapping) {
@@ -3413,16 +3415,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        let existingUserData
+        let existingUserData;
         if (payload.isUploadUser) {
           existingUserData = existingUsers.find(
             user => user.email === row.email || user.phoneNumber === row.phoneNumber,
           );
         } else {
-          existingUserData = existingUsers.find(
-            user => user.email === row.email,
-          );
-        } 
+          existingUserData = existingUsers.find(user => user.email === row.email);
+        }
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3508,8 +3508,14 @@ export class GuestService {
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
 
-    if (newMappings.length !== 0)
+    if (newMappings.length !== 0) {
       await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      newMappings.map(async mapping => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: mapping.user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     // Step 9: Return the response with success and failure counts
     return {
@@ -3617,7 +3623,10 @@ export class GuestService {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
-    if (payload.phoneNumber && payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')) {
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
