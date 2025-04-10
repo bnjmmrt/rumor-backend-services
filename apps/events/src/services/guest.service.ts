@@ -3413,9 +3413,16 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        const existingUserData = existingUsers.find(
-          user => user.email === row.email || user.phoneNumber === row.phoneNumber,
-        );
+        let existingUserData
+        if (payload.isUploadUser) {
+          existingUserData = existingUsers.find(
+            user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+          );
+        } else {
+          existingUserData = existingUsers.find(
+            user => user.email === row.email,
+          );
+        } 
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3423,7 +3430,7 @@ export class GuestService {
               lastName: row.lastName,
               email: row.email ? row.email : '',
               phoneNumber: row.phoneNumber ? row.phoneNumber : '',
-              reason: 'User already exists',
+              reason: 'User already exists in users list',
             };
             garbageData.push(user);
             if (row.email) userMap.delete(row.email);
@@ -3507,7 +3514,7 @@ export class GuestService {
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length,
+      SuccessUserCount: users.length + newMappings.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
@@ -3607,6 +3614,10 @@ export class GuestService {
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (payload.phoneNumber && payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
