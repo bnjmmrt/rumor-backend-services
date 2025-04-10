@@ -2046,7 +2046,8 @@ export class AuthService {
 
     try {
       // Send Notification
-      serviceMesh
+
+      await serviceMesh
         .notificationService()
         .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     } catch (error) {
@@ -2206,6 +2207,7 @@ export class AuthService {
       try {
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
+          console.log("🚀 ~ AuthService ~ updateUsersStatus ~ user:", user)
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
@@ -2218,6 +2220,11 @@ export class AuthService {
               [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
+
+            // Send Notification
+            await serviceMesh
+              .notificationService()
+              .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
           }
         }
       } catch (error) {}
@@ -5685,10 +5692,12 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager.getRepository(User).findOne({
-        where: { id: payload.id },
-        relations: { roles: { role: true }, notifications: true },
-      });
+      const user = await queryRunner.manager
+        .getRepository(User)
+        .findOne({
+          where: { id: payload.id },
+          relations: { roles: { role: true }, notifications: true },
+        });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
