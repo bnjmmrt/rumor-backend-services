@@ -3,7 +3,9 @@ let notificationMatrix = {
     pushMessage: 'Welcome to Rumor. Your application has been approved!',
     pushNotification: true,
     appNotification: false,
+    body : {},
     action: 'Approved into Rumor',
+    role: 'member'
   },
   profileReferrals: {
     pushMessage: '[Linked User Name] has requested your referral to Rumor. Tap to refer them now! ',
@@ -14,6 +16,7 @@ let notificationMatrix = {
     linkedUser: '',
     action: 'Non Member Requesting Referral',
     image: 'linkedUser.profilePicture',
+    role:'member'
   },
   eventReminder: {
     pushMessage:
@@ -24,6 +27,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Event Reminder - 24 hours prior',
     image: 'linkedEvent.imageFlyer',
+    role: 'member'
   },
   eventCancelled: {
     pushMessage: 'Hi [Recipient Name], [Event Name] has been canceled.',
@@ -35,6 +39,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Event Cancelled',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   eventInvitation: {
     pushMessage: "You've received an invite to attend [Event Name]! Tap to RSVP.",
@@ -46,6 +51,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Invite Received',
     image: 'linkedEvent.imageFlyer',
+    role: 'member'
   },
   eventInvitationNonMember: {
     pushMessage: '',
@@ -57,6 +63,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Event Invite Received ',
     image: 'linkedEvent.imageFlyer',
+    role: 'non_member'
   },
   eventPosted: {
     pushMessage: '[Linked User Name] just posted a new event. Check it out now. ',
@@ -68,6 +75,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'New Event Posted From Host you Follow',
     image: 'linkedEvent.imageFlyer',
+    role: 'member'
   },
   eventPostedCity: {
     pushMessage:
@@ -78,6 +86,7 @@ let notificationMatrix = {
     body: { eventId: '', linkedCity: '' },
     linkedUser: '',
     linkedEvent: '',
+    role:'member',
   },
   eventRequestApproved: {
     pushMessage: 'Your request for [Event Name] was approved!.',
@@ -89,6 +98,7 @@ let notificationMatrix = {
     linkedUser: '',
     action: 'Request Approved Notification',
     image: 'linkedEvent.imageFlyer',
+    role: 'member'
   },
   eventRequestDenied: {
     pushMessage: 'Your request for [Event Name] was declined. Check out other events on Rumor.',
@@ -98,7 +108,9 @@ let notificationMatrix = {
     body: { eventId: '' },
     linkedEvent: '',
     linkedUser: '',
+    action: 'Request Denied Notification',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   eventVouch: {
     pushMessage:
@@ -111,6 +123,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Event Vouch Request',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   eventAnnouncement: {
     pushMessage:
@@ -123,6 +136,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'New Event Announcements',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   signUpFormApproved: {
     pushMessage: '',
@@ -134,6 +148,7 @@ let notificationMatrix = {
     linkedEvent: '',
     action: 'Request Approved Notification (Sign up forms)',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   signUpFormRejected: {
     pushMessage: '',
@@ -143,7 +158,9 @@ let notificationMatrix = {
     body: { eventId: '' },
     linkedUser: '',
     linkedEvent: '',
+    action: 'Request Denied Notification (Sign up forms)',
     image: 'linkedEvent.imageFlyer',
+    role:'member'
   },
   userApplication: {
     pushMessage: '',
@@ -155,6 +172,7 @@ let notificationMatrix = {
     notificationModule: 'user',
     image: 'linkedUser.profilePicture',
     action: 'New Rumor Member Application',
+    role:'admin'
   },
   hostApplication: {
     pushMessage: '',
@@ -166,6 +184,7 @@ let notificationMatrix = {
     notificationModule: 'user',
     image: 'linkedUser.profilePicture',
     action: 'New Host Application',
+    role:'admin'
   },
   eventSubmitted: {
     pushMessage: '',
@@ -178,6 +197,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     image: 'linkedEvent.imageFlyer',
     action: 'New Event Submitted',
+    role:'admin'
   },
   eventEdited: {
     pushMessage: '',
@@ -190,6 +210,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     image: 'linkedEvent.imageFlyer',
     action: 'Event Edited',
+    role:'admin'
   },
   hostReport: {
     pushMessage: '',
@@ -201,6 +222,7 @@ let notificationMatrix = {
     linkedUser: '',
     linkedEvent: '',
     action: 'Host Reported a User',
+    role:'admin'
   },
   hostFeedback: {
     pushMessage: '',
@@ -212,6 +234,7 @@ let notificationMatrix = {
     linkedUser: '',
     linkedEvent: '',
     action: 'Host Feedback',
+    role:'admin'
   },
   userReport: {
     pushMessage: '',
@@ -223,6 +246,7 @@ let notificationMatrix = {
     linkedUser: '',
     linkedEvent: '',
     action: 'User Reported a Host',
+    role:'admin'
   },
   userFeedback: {
     pushMessage: '',
@@ -234,6 +258,7 @@ let notificationMatrix = {
     linkedUser: '',
     linkedEvent: '',
     action: 'User Feedback',
+    role:'admin'
   },
   eventApproved: {
     pushMessage:
@@ -246,6 +271,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     action: 'Event Submission Approved',
     image: 'linkedEvent.imageFlyer',
+    role:'host'
   },
   newGuestRequest: {
     pushMessage: '[Linked User Name] requested access to [Event Name].',
@@ -258,6 +284,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     action: 'New Guest Request',
     image: 'linkedUser.profilePicture',
+    role:'host'
   },
   rsvpSignupFormRequest: {
     pushMessage: '[Linked User Name] requested access to [Event Name].',
@@ -270,6 +297,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     action: 'New RSVP Sign up Form Request',
     image: '',
+    role:'host'
   },
   eventSubmissionApproved: {
     pushMessage: '',
@@ -281,6 +309,7 @@ let notificationMatrix = {
     notificationModule: 'event',
     action: 'Event Submission Approved (Publish Date After Approval Date)',
     image: 'linkedEvent.imageFlyer',
+    role:'host'
   },
 };
 
