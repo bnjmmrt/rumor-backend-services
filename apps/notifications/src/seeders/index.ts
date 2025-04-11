@@ -511,6 +511,10 @@ export class SeedDatabase {
             key: 'referral_code',
             mandatory: false,
           },
+          {
+            key: 'link_to_application',
+            mandatory: true,
+          },
         ],
       },
       {
@@ -573,7 +577,7 @@ export class SeedDatabase {
             mandatory: true,
           },
           {
-            key: 'view_event',
+            key: 'view_rsvp',
             mandatory: true,
           },
         ],
@@ -586,6 +590,10 @@ export class SeedDatabase {
             key: 'link_to_application',
             mandatory: true,
           },
+          {
+            key: 'first_name',
+            mandatory: true,
+          }
         ],
       },
       {
