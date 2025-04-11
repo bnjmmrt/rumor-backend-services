@@ -117,9 +117,8 @@ import {
   sendEventInvitePlusOnes,
   sendGuestEventApproval,
 } from '../utils/emails.utils';
-import * as dayjs from 'dayjs';
-
 import { sendSmsNotification } from '../utils/sms.utils';
+import * as dayjs from 'dayjs';
 export class GuestService {
   public static dbConnection = database;
 
