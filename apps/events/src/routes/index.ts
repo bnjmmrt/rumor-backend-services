@@ -54,7 +54,7 @@ router.get(
 
 router.get(
   '/event/:eventId/event-announcements',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   EventAnnouncementController.getAnnouncements,
 );
 
@@ -350,7 +350,7 @@ router.delete(
 router.get('/events/:id/guests-overview', GuestController.listGuestsOverview);
 // User request,
 
-router.post('/events/request/guest', AuthMiddleware.fusionAuth, GuestController.requestBecomeGuest);
+router.post('/events/request/guest', GuestController.requestBecomeGuest);
 
 router.put('/events/request/guest', GuestController.updateRequestBecomeGuest);
 //Guests Profiles

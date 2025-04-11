@@ -202,7 +202,7 @@ import * as tz from 'dayjs/plugin/timezone';
 import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, AuthorizationError } from 'rumor-utils/errors';
 import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
 
@@ -1406,6 +1406,18 @@ export class AuthService {
         where: [{ phoneNumber: payload.phoneNumber, deletedAt: IsNull() }],
         relations: { roles: { role: true } },
       });
+    }
+
+    if (user && user.roles.length) {
+      const isUnapprovedHost =
+        user.roles.length === 1 &&
+        user.roles.filter(
+          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
+        ).length > 0;
+
+        if(isUnapprovedHost){
+          throw new AuthorizationError('Your host application is still under review. Please check back later.');
+        }
     }
 
     if (payload.isDeactivated && user.isDeactivated) {
