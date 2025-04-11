@@ -109,6 +109,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Get By urlcode
+   * @param code
+   * @returns
+   */
   public static async getByUrl(code: string) {
     try {
       const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
@@ -333,7 +338,7 @@ export class SignupFormsServices {
             userPayload.lastName = ans.answers;
             break;
           case 'email':
-            userPayload.email = ans.answers;
+            userPayload.email = ans.answers.trim().toLowerCase();
             if (!isValidEmail(userPayload.email)) {
               throw new BadRequestError('Invalid Email format');
             }

@@ -4132,7 +4132,7 @@ export class EventsService {
         `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
         `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
       ])
-      .where('(guest.event_id = :eventId)', {
+      .where('(guest.event_id = :eventId AND guest.added_by_id = :userId)', {
         eventId,
         userId,
         invited: GuestStatus.INVITED,
