@@ -24,12 +24,13 @@ export class Survey extends RumorBaseEntity {
   @Column({ type: 'timestamptz', name: 'event_end_date' })
   eventEndDate: Date;
 
-  @Column({ type: 'timestamptz', name: 'survey_start_date' })
+  @Column({type: 'timestamptz', name: 'survey_start_date' })
   surveyStartDate: Date;
 
-  @Column({ type: 'timestamptz', name: 'survey_end_date' })
+  @Column({type: 'timestamptz', name: 'survey_end_date' })
   surveyEndDate: Date;
 
   @OneToMany(() => SurveyResponses, response => response.survey)
   responses: SurveyResponses[];
+
 }

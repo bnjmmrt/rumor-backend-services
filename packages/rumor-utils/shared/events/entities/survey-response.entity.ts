@@ -6,7 +6,7 @@ import { Survey } from './survey.entity';
 @Entity('survey_responses')
 export class SurveyResponses extends RumorBaseEntity {
   @Column({ type: 'jsonb', name: 'response' })
-  response: string;
+  response: Record<string, any>;
 
   @Column({ type: 'timestamptz', name: 'responded_at' })
   respondedAt: Date;
@@ -16,6 +16,6 @@ export class SurveyResponses extends RumorBaseEntity {
   survey: Survey;
 
   @ManyToOne(() => User, user => user.surveyResponses)
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({ name: 'user_id' })  
   user: User;
 }
