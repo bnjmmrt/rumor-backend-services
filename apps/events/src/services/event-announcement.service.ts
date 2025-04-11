@@ -1,4 +1,4 @@
-import { In, IsNull } from 'typeorm';
+import { In, IsNull, Brackets } from 'typeorm';
 import database from '../database';
 import { NotFoundError } from 'rumor-utils/errors';
 import { Event, User, TicketType, EventAnnouncement, Guest } from 'rumor-utils/shared/entities';
@@ -27,42 +27,56 @@ export class EventAnnouncementService {
 
     if (!event) throw new NotFoundError('Event not found');
 
-    let guestQueryParams: any = {
-      event: { id: eventId },
-      deletedAt: IsNull(),
-      status: GuestStatus.CONFIRMED,
-    };
+    take = take ? parseInt(take) : 20;
+    skip = skip ? parseInt(skip) : 0;
+
+    // Build base filters for subquery
+    const subQuery = database
+      .getRepository(Guest)
+      .createQueryBuilder('pg')
+      .select('pg.user.id', 'userId')
+      .where('pg.event = :eventId', { eventId })
+      .andWhere('pg.deletedAt IS NULL')
+      .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
 
     if (ticketType) {
       ticketType = Array.isArray(ticketType) ? ticketType : [ticketType];
-      guestQueryParams.ticketType = { id: In(ticketType) };
+      subQuery.andWhere('pg.ticketType.id IN (:...ticketType)', { ticketType });
     }
 
     if (addedBy) {
       addedBy = Array.isArray(addedBy) ? addedBy : [addedBy];
-      guestQueryParams.addedBy = { id: In(addedBy) };
+      subQuery.andWhere('pg.addedBy.id IN (:...addedBy)', { addedBy });
     }
 
-    take = take ? parseInt(take) : 20;
-    skip = skip ? parseInt(skip) : 0;
+    if (findByName) {
+      const searchTerm = `%${findByName.toLowerCase()}%`;
+      subQuery.leftJoin('pg.user', 'u').andWhere(
+        `(LOWER(u.firstName) LIKE :searchTerm OR 
+            LOWER(u.lastName) LIKE :searchTerm OR 
+            LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE :searchTerm)`,
+        { searchTerm },
+      );
+    }
 
-    let query = database
+    // Main query combining primary and secondary guests
+    const query = database
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
       .leftJoinAndSelect('guest.addedBy', 'addedBy')
-      .where(guestQueryParams);
-
-    if (findByName) {
-      const searchTerm = `%${findByName.toLowerCase()}%`;
-      query.andWhere(
-        `(LOWER(user.firstName) LIKE :searchTerm OR 
-                LOWER(user.lastName) LIKE :searchTerm OR 
-                LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :searchTerm)`,
-        { searchTerm },
-      );
-    }
+      .where('guest.event = :eventId', { eventId })
+      .andWhere('guest.deletedAt IS NULL')
+      .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+      .andWhere(
+        new Brackets(qb => {
+          qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+            `guest.addedBy.id IN (${subQuery.getQuery()})`,
+          );
+        }),
+      )
+      .setParameters(subQuery.getParameters());
 
     const totalCount = await query.getCount();
     const guests = await query.skip(skip).take(take).getMany();
@@ -126,31 +140,46 @@ export class EventAnnouncementService {
      */
     try {
       const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
-      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${(event?.name) || 'Event'}. ${link}. `;
-         
-      if (recipients.length > 0) {
-        serviceMesh
-          .notificationService()
-          .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipients, eventId, createdBy);
-        const fetchUserEmails = await database
-        .getRepository(User)
-        .find({ where: { id: In(recipients) } });
-        fetchUserEmails.map(data => {
-          if (data.email) {
-            sendEventAnnouncement(
-              data.firstName,
-              event.owner.firstName,
-              event.name,
-              event.id,
-              data.email,
-            );
-          }
-          if (data?.phoneNumber) {
-             sendSmsNotification({ phoneNumber: data.phoneNumber, textMessage });
-          }
-        });
+      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${event?.name || 'Event'}. ${link}. `;
+
+      let recipientsData: Guest[] = [];
+
+      if (recipients.length === 0) {
+        const subQuery = database
+          .getRepository(Guest)
+          .createQueryBuilder('pg')
+          .select('pg.user.id', 'userId')
+          .where('pg.event = :eventId', { eventId })
+          .andWhere('pg.deletedAt IS NULL')
+          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+
+        if (ticketType?.length) {
+          subQuery.andWhere('pg.ticketType.id IN (:...ticketType)', { ticketType });
+        }
+
+        if (addedBy?.length) {
+          subQuery.andWhere('pg.addedBy.id IN (:...addedBy)', { addedBy });
+        }
+
+        recipientsData = await database
+          .getRepository(Guest)
+          .createQueryBuilder('guest')
+          .leftJoinAndSelect('guest.user', 'user')
+          .where('guest.event = :eventId', { eventId })
+          .andWhere('guest.deletedAt IS NULL')
+          .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+          .andWhere(
+            new Brackets(qb => {
+              qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+                `guest.addedBy.id IN (${subQuery.getQuery()})`,
+              );
+            }),
+          )
+          .setParameters(subQuery.getParameters())
+          .getMany();
       } else {
-        const recipientsData = await database.getRepository(Guest).find({
+        // If recipients are already provided, fallback to your existing logic
+        recipientsData = await database.getRepository(Guest).find({
           where: {
             event: { id: eventId },
             ticketType: In(ticketType),
@@ -161,35 +190,28 @@ export class EventAnnouncementService {
             user: true,
           },
         });
+      }
 
-        if (recipientsData.length > 0) {
-          const recipientsIds = recipientsData.map(guest => guest.user?.id).filter(id => !!id);
-          serviceMesh
-            .notificationService()
-            .sendNotification(
-              NotificationType.EVENT_ANNOUNCEMENT,
-              recipientsIds,
-              eventId,
-              createdBy,
+      if (recipientsData.length > 0) {
+        const recipientsIds = recipientsData.map(guest => guest.user?.id).filter(id => !!id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.EVENT_ANNOUNCEMENT, recipientsIds, eventId, createdBy);
+
+        recipientsData.map(data => {
+          if (data.user.email) {
+            sendEventAnnouncement(
+              data.user.firstName,
+              event.owner.firstName,
+              event.name,
+              event.id,
+              data.user.email,
             );
-          const fetchUsers = await database
-            .getRepository(User)
-            .find({ where: { id: In(recipientsIds) } });
-          fetchUsers.map(data => {
-            if (data.email) {
-              sendEventAnnouncement(
-                data.firstName,
-                event.owner.firstName,
-                event.name,
-                event.id,
-                data.email,
-              );
-            }
-            if (data?.phoneNumber) {
-              sendSmsNotification({ phoneNumber: data.phoneNumber, textMessage });
-            }
-          });
-        }
+          }
+          if (data?.user?.phoneNumber) {
+            sendSmsNotification({ phoneNumber: data.user.phoneNumber, textMessage });
+          }
+        });
       }
     } catch (error) {
       console.log('🚀 ~ EventAnnouncementService ~ postAnnouncement ~ error:', error);
@@ -215,54 +237,74 @@ export class EventAnnouncementService {
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
 
-    let query = database
+    const query = database
       .getRepository(EventAnnouncement)
       .createQueryBuilder('announcement')
       .leftJoinAndSelect('announcement.user', 'user')
       .leftJoinAndSelect('announcement.event', 'event')
       .leftJoinAndSelect('announcement.addedBy', 'addedBy')
       .leftJoinAndSelect('announcement.ticketType', 'ticketType')
-      .leftJoin('announcement.recipients', 'recipients')
-      .where('announcement.event_id = :eventId', { eventId })
+      .leftJoinAndSelect('announcement.recipients', 'recipients')
+      .where('announcement.event.id = :eventId', { eventId })
       .andWhere('announcement.deletedAt IS NULL')
-      .orderBy('announcement.createdAt', 'DESC')
-      .addSelect('COUNT(recipients.id)', 'recipientCount')
-      .groupBy(
-        'announcement.id, announcement.createdAt, user.id, event.id, addedBy.id, ticketType.id',
-      );
+      .orderBy('announcement.createdAt', 'DESC');
 
+    const announcements = await query.skip(skip).take(take).getMany();
     const totalCount = await query.getCount();
 
-    let announcements = await query.skip(skip).take(take).getRawAndEntities();
+    for (let announcement of announcements) {
+      let recipientCount = 0;
 
-    for (let i = 0; i < announcements.entities.length; i++) {
-      let announcement = announcements.entities[i];
-      let recipientCount = parseInt(announcements.raw[i].recipientCount) || 0;
+      const recipientsExist = announcement.recipients?.length > 0;
 
-      if (recipientCount === 0) {
+      if (recipientsExist) {
+        recipientCount = announcement.recipients.length;
+      } else {
         const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
         const addedByIds = announcement.addedBy?.map(a => a.id) || [];
 
-        recipientCount = await database
+        // Build subquery to find user IDs of primary guests
+        const subQuery = database
+          .getRepository(Guest)
+          .createQueryBuilder('pg')
+          .select('pg.user.id')
+          .where('pg.event.id = :eventId', { eventId })
+          .andWhere('pg.deletedAt IS NULL')
+          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+
+        if (ticketTypeIds.length > 0) {
+          subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
+        }
+
+        if (addedByIds.length > 0) {
+          subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
+        }
+
+        // Main recipient count query (primary + secondary guests)
+        const countQuery = database
           .getRepository(Guest)
           .createQueryBuilder('guest')
-          .where('guest.event_id = :eventId', { eventId })
-          .andWhere(
-            ticketTypeIds.length > 0 ? 'guest.ticket_type_id IN (:...ticketTypeIds)' : '1=1',
-            { ticketTypeIds },
-          )
-          .andWhere(addedByIds.length > 0 ? 'guest.added_by_id IN (:...addedByIds)' : '1=1', {
-            addedByIds,
-          })
+          .where('guest.event.id = :eventId', { eventId })
+          .andWhere('guest.deletedAt IS NULL')
           .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
-          .getCount();
+          .andWhere(
+            new Brackets(qb => {
+              qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+                `guest.addedBy.id IN (${subQuery.getQuery()})`,
+              );
+            }),
+          )
+          .setParameters(subQuery.getParameters());
+
+        recipientCount = await countQuery.getCount();
       }
+
       Object.assign(announcement, { recipientCount });
     }
 
     return {
       totalCount,
-      result: announcements.entities,
+      result: announcements,
     };
   }
 
@@ -280,34 +322,54 @@ export class EventAnnouncementService {
 
     if (!event) throw new NotFoundError('Event not found');
 
-    // Fetch the announcement along with relations
     const announcement = await database.getRepository(EventAnnouncement).findOne({
-      where: { id, event: { id: eventId }, deletedAt: IsNull() },
-      order: { createdAt: 'DESC' },
+      where: {
+        id,
+        event: { id: eventId },
+        deletedAt: IsNull(),
+      },
       relations: ['user', 'event', 'addedBy', 'ticketType', 'recipients'],
     });
 
     if (!announcement) throw new NotFoundError('Announcement not found');
 
-    // Get the recipient count
-    let recipientCount = announcement.recipients?.length || 0;
+    const recipientsExist = announcement.recipients?.length > 0;
+    const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
+    const addedByIds = announcement.addedBy?.map(a => a.id) || [];
 
-    if (recipientCount === 0) {
-      const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
-      const addedByIds = announcement.addedBy?.map(a => a.id) || [];
+    let recipientCount = recipientsExist ? announcement.recipients.length : 0;
+
+    if (!recipientsExist) {
+      const subQuery = database
+        .getRepository(Guest)
+        .createQueryBuilder('pg')
+        .select('pg.user.id')
+        .where('pg.event = :eventId', { eventId })
+        .andWhere('pg.deletedAt IS NULL')
+        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+
+      if (ticketTypeIds.length > 0) {
+        subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
+      }
+
+      if (addedByIds.length > 0) {
+        subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
+      }
 
       recipientCount = await database
         .getRepository(Guest)
         .createQueryBuilder('guest')
-        .where('guest.event_id = :eventId', { eventId })
-        .andWhere(
-          ticketTypeIds.length > 0 ? 'guest.ticket_type_id IN (:...ticketTypeIds)' : '1=1',
-          { ticketTypeIds },
-        )
-        .andWhere(addedByIds.length > 0 ? 'guest.added_by_id IN (:...addedByIds)' : '1=1', {
-          addedByIds,
-        })
+        .where('guest.event = :eventId', { eventId })
+        .andWhere('guest.deletedAt IS NULL')
         .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          new Brackets(qb => {
+            qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+              `guest.addedBy.id IN (${subQuery.getQuery()})`,
+            );
+          }),
+        )
+        .setParameters(subQuery.getParameters())
         .getCount();
     }
 
@@ -365,43 +427,64 @@ export class EventAnnouncementService {
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
 
-    let recipientIds = announcement.recipients?.map(r => r.id) || [];
-    let ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
-    let addedByIds = announcement.addedBy?.map(a => a.id) || [];
+    const recipientIds = announcement.recipients?.map(r => r.id) || [];
+    const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
+    const addedByIds = announcement.addedBy?.map(a => a.id) || [];
 
-    let query = database
-      .getRepository(Guest)
+    const guestRepo = database.getRepository(Guest);
+
+    let query = guestRepo
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
-      .where('guest.event_id = :eventId', { eventId })
+      .leftJoinAndSelect('guest.addedBy', 'addedBy')
+      .where('guest.event.id = :eventId', { eventId })
       .andWhere('guest.deletedAt IS NULL')
       .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED });
-
-    if (recipientIds.length === 0) {
-      if (ticketTypeIds.length > 0) {
-        query.andWhere('guest.ticket_type_id IN (:...ticketTypeIds)', {
-          ticketTypeIds,
-        });
-      }
-      if (addedByIds.length > 0) {
-        query.andWhere('guest.added_by_id IN (:...addedByIds)', { addedByIds });
-      }
-    } else {
-      query.andWhere('guest.id IN (:...recipientIds)', { recipientIds });
-    }
 
     if (findByName) {
       const searchTerm = `%${findByName.toLowerCase()}%`;
       query.andWhere(
         `(LOWER(user.firstName) LIKE :searchTerm OR 
-              LOWER(user.lastName) LIKE :searchTerm OR 
-              LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :searchTerm)`,
+          LOWER(user.lastName) LIKE :searchTerm OR 
+          LOWER(CONCAT(user.firstName, ' ', user.lastName)) LIKE :searchTerm)`,
         { searchTerm },
       );
     }
 
+    if (recipientIds.length === 0) {
+      // Subquery to get user IDs of primary guests based on ticketType & addedBy
+      const subQuery = guestRepo
+        .createQueryBuilder('pg')
+        .select('pg.user.id')
+        .where('pg.event = :eventId', { eventId })
+        .andWhere('pg.deletedAt IS NULL')
+        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+
+      if (ticketTypeIds.length > 0) {
+        subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
+      }
+
+      if (addedByIds.length > 0) {
+        subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
+      }
+
+      // Combine primary and secondary guest logic
+      query
+        .andWhere(
+          new Brackets(qb => {
+            qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+              `guest.addedBy.id IN (${subQuery.getQuery()})`,
+            );
+          }),
+        )
+        .setParameters(subQuery.getParameters());
+    } else {
+      query.andWhere('guest.id IN (:...recipientIds)', { recipientIds });
+    }
+
     const totalCount = await query.getCount();
+
     const recipients = await query.skip(skip).take(take).getMany();
 
     return {

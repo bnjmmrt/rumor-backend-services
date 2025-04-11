@@ -150,7 +150,9 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId }, relations: { location: true, owner: true } } );
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
@@ -271,23 +273,25 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             // Check if guests were successfully created
+
             if (updateGuests.length > 0) {
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_DENIED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.INVITED)
+              if (guestStatus === GuestStatus.CONFIRMED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_APPROVED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
@@ -508,7 +512,7 @@ export class GuestService {
             where: {
               host: { id: payload.hostId },
               user: { id: userId },
-            }
+            },
           });
 
           if (!existingMapping) {
@@ -2556,6 +2560,9 @@ export class GuestService {
     if (!user) {
       throw new NotFoundError('User not found');
     }
+    if (event.owner.id === payload.id) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
     const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
         user: { id: user?.id },
@@ -2956,6 +2963,13 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
+    if (
+      payload.email?.trim().toLowerCase() === event.owner.email.trim().toLowerCase() ||
+      payload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+    ) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
+
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -3159,7 +3173,14 @@ export class GuestService {
         where: { id: guestPayload.eventId, deletedAt: IsNull() },
         relations: { location: true, owner: true },
       });
-      if (!event) throw new NotFoundError('Event not found');
+      if (!event) throw new NotFoundError('Event');
+
+      if (
+        guestPayload.email?.trim().toLowerCase() === event.owner.email?.trim().toLowerCase() ||
+        guestPayload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+      ) {
+        throw new ValidationError('The host cannot be invited in event');
+      }
 
       // Step 2: Check lead guest presence and confirmation
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -3413,16 +3434,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        let existingUserData
+        let existingUserData;
         if (payload.isUploadUser) {
           existingUserData = existingUsers.find(
             user => user.email === row.email || user.phoneNumber === row.phoneNumber,
           );
         } else {
-          existingUserData = existingUsers.find(
-            user => user.email === row.email,
-          );
-        } 
+          existingUserData = existingUsers.find(user => user.email === row.email);
+        }
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3508,8 +3527,14 @@ export class GuestService {
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
 
-    if (newMappings.length !== 0)
+    if (newMappings.length !== 0) {
       await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      newMappings.map(async mapping => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: mapping.user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     // Step 9: Return the response with success and failure counts
     return {
@@ -3617,7 +3642,10 @@ export class GuestService {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
-    if (payload.phoneNumber && payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')) {
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
       throw new ValidationError('You cannot add yourself to an event');
     }
 
@@ -3671,7 +3699,7 @@ export class GuestService {
     }
     if (checkExistingUser) {
       const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: checkExistingUser.id } },
+        where: { user: { id: checkExistingUser.id }, event: { id: event.id } },
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');

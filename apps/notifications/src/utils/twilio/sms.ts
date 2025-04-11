@@ -61,10 +61,9 @@ class TwilioService {
       const isVerified =
         verificationCheck?.status === 'approved' && verificationCheck?.valid === true;
 
-      if(!isVerified){
-        throw new BadRequestError('Invalid verification code')
+      if (!isVerified) {
+        throw new BadRequestError('Invalid verification code');
       }
-
 
       return { verified: true };
     } catch (error) {

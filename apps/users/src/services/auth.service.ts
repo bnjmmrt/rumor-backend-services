@@ -671,7 +671,7 @@ export class AuthService {
   public static async logout(payload: TokenRequestDto): Promise<string> {
     let response;
     try {
-       response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+      response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
     } catch (error) {}
 
     if (!response.wasSuccessful()) {
@@ -680,8 +680,8 @@ export class AuthService {
 
     await this.dbConnection.getRepository(PushNotificationToken).delete({
       notificationToken: payload.fcmToken,
-      deviceId: payload.deviceId
-    })
+      deviceId: payload.deviceId,
+    });
     return '';
   }
 
@@ -1092,7 +1092,7 @@ export class AuthService {
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } 
+        }
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
@@ -1119,7 +1119,7 @@ export class AuthService {
 
       //Micro-service call
       try {
-       await serviceMesh
+        await serviceMesh
           .notificationService()
           .sendEmailFromTemplate(
             params,
@@ -1177,7 +1177,7 @@ export class AuthService {
 
     // Micro-service call
     try {
-    await serviceMesh
+      await serviceMesh
         .notificationService()
         .sendEmailFromTemplate(
           params,
@@ -1375,7 +1375,7 @@ export class AuthService {
           if (validateNumber) {
             const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } 
+          }
         } catch (err) {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
@@ -1505,7 +1505,9 @@ export class AuthService {
 
       if (!temporaryCode) {
         if (!isEmailLogin) {
-          const verificationResult = await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+          const verificationResult = await serviceMesh
+            .notificationService()
+            .verifyCode(payload.phoneNumber, payload.code);
           const isVerified = verificationResult?.data?.verified === true;
 
           if (!isVerified) {
@@ -1526,7 +1528,7 @@ export class AuthService {
           throw new NotFoundError('Invalid or expired verification code, please try again.');
         }
       }
-      
+
       // Setting up Payload.code to bypass verification for below email and phone number
       if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
         payload.code = temporaryCode.code;
@@ -2267,7 +2269,7 @@ export class AuthService {
         let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'     
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
-          console.log("🚀 ~ AuthService ~ updateUsersStatus ~ user:", user)
+          console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
@@ -4576,7 +4578,9 @@ export class AuthService {
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
 
-    const referredUser = await this.dbConnection.getRepository(ReferredUser).findOneBy({userId : user.id});
+    const referredUser = await this.dbConnection
+      .getRepository(ReferredUser)
+      .findOneBy({ userId: user.id });
 
     return responses.data(
       toMemberProfile(
@@ -4587,7 +4591,7 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         eventCount,
-        referredUser?.referralCode
+        referredUser?.referralCode,
       ),
     );
   }
@@ -5797,12 +5801,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({
-          where: { id: payload.id },
-          relations: { roles: { role: true }, notifications: true },
-        });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');

@@ -65,6 +65,7 @@ import {
   TicketType,
   Collaborator,
   QuizQuestion,
+  UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -1302,7 +1303,14 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: payload.userId } },
+      relations: { role: true },
+    });
+    const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+    if (!isAdmin && event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.');
+    }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({
@@ -2306,7 +2314,13 @@ export class EventsService {
         ],
       });
       if (!event) throw new NotFoundError('Item of Event not found');
-      if(event.owner?.id !== payload.ownerId) {
+      const userRoles = await UserRole.find({
+        where: { user: { id: payload.ownerId } },
+        relations: { role: true },
+      });
+
+      const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+      if (!isAdmin && event.owner?.id !== payload.ownerId) {
         throw new ForbiddenError('You are not authorized to update this event');
       }
       const eventCopy = JSON.parse(JSON.stringify(event));
@@ -2328,7 +2342,6 @@ export class EventsService {
       }
       /**date validations ends here */
 
-    
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -3289,7 +3302,11 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      sendEventRejection(updatedEvent.name, (host?.additionalHostInformation?.companyName) || host?.firstName, updatedEvent.owner.email);
+      sendEventRejection(
+        updatedEvent.name,
+        host?.additionalHostInformation?.companyName || host?.firstName,
+        updatedEvent.owner.email,
+      );
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3674,8 +3691,8 @@ export class EventsService {
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } 
-           if (guest.user?.phoneNumber) {
+          }
+          if (guest.user?.phoneNumber) {
             // Send SMS notification
              try {
                const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
@@ -3952,6 +3969,7 @@ export class EventsService {
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({
@@ -4174,7 +4192,7 @@ export class EventsService {
         `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
         `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
       ])
-      .where('(guest.event_id = :eventId)', {
+      .where('(guest.event_id = :eventId AND guest.added_by_id = :userId)', {
         eventId,
         userId,
         invited: GuestStatus.INVITED,
