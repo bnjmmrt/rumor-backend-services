@@ -281,20 +281,29 @@ export class GuestService {
                 if (!phoneNumber) return;
 
                 let textMessage: string | null = null;
-                //TODO 
+                //TODO
                 // if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
                 //   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences [link to event download].`;
                 // }
 
-                if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.SIGN_UP_FORM) {
+                if (
+                  guestStatus === GuestStatus.DECLINED &&
+                  guest?.invitationSource == UserSource.SIGN_UP_FORM
+                ) {
                   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}. `;
                 }
 
-                if (guestStatus === GuestStatus.CONFIRMED && guest?.invitationSource == UserSource.SIGN_UP_FORM) {
+                if (
+                  guestStatus === GuestStatus.CONFIRMED &&
+                  guest?.invitationSource == UserSource.SIGN_UP_FORM
+                ) {
                   textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details. `;
                 }
 
-                if (guestStatus === GuestStatus.CONFIRMED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
+                if (
+                  guestStatus === GuestStatus.CONFIRMED &&
+                  guest?.invitationSource == UserSource.REQUEST_IN_APP
+                ) {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
                 }
 
@@ -302,9 +311,9 @@ export class GuestService {
                   phoneNumber,
                   textMessage,
                 });
-              })
+              }),
             );
-            
+
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {

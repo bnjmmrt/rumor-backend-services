@@ -222,8 +222,8 @@ export class EventAnnouncementService {
 
   public static async getAnnouncements(payload) {
     let { eventId, take, skip, userId, role } = payload;
-  
-    if(!userId) throw new NotFoundError('Requesting User not found');
+
+    if (!userId) throw new NotFoundError('Requesting User not found');
 
     // Check if the event exists
     const event = await database.getRepository(Event).findOne({
@@ -237,7 +237,7 @@ export class EventAnnouncementService {
     });
 
     if (!event) throw new NotFoundError('Event not found');
-  
+
     // Role-based access control
     if (role === 'host') {
       if (event.owner?.id !== userId) {
@@ -245,25 +245,25 @@ export class EventAnnouncementService {
       }
     } else if (role === 'member' || role === 'non_member') {
       // Check if the user is a guest (either directly or as +1)
-      const isGuest = await database.getRepository(Guest)
+      const isGuest = await database
+        .getRepository(Guest)
         .createQueryBuilder('guest')
         .where('guest.event.id = :eventId', { eventId })
         .andWhere('guest.deletedAt IS NULL')
         .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
         .andWhere(
           new Brackets(qb => {
-            qb.where('guest.user.id = :userId')
-              .orWhere('guest.addedBy.id = :userId');
+            qb.where('guest.user.id = :userId').orWhere('guest.addedBy.id = :userId');
           }),
         )
         .setParameter('userId', userId)
         .getCount();
-  
+
       if (!isGuest) {
         throw new ForbiddenError('You are not authorized to view announcements for this event');
       }
     }
-  
+
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
 
@@ -281,7 +281,7 @@ export class EventAnnouncementService {
 
     const announcements = await query.skip(skip).take(take).getMany();
     const totalCount = await query.getCount();
-  
+
     for (let announcement of announcements) {
       let recipientCount = 0;
 
@@ -341,7 +341,7 @@ export class EventAnnouncementService {
   public static async getAnnouncement(payload) {
     const { id, eventId, role, userId } = payload;
 
-    if(!userId) throw new NotFoundError('Requesting User not found');
+    if (!userId) throw new NotFoundError('Requesting User not found');
 
     const event = await database.getRepository(Event).findOne({
       where: {
@@ -354,32 +354,32 @@ export class EventAnnouncementService {
     });
 
     if (!event) throw new NotFoundError('Event not found');
-  
+
     // Role-based access control
     if (role === 'host') {
       if (event.owner?.id !== userId) {
         throw new ForbiddenError('You are not authorized to view this announcement');
       }
     } else if (role === 'member' || role === 'non_member') {
-      const isGuest = await database.getRepository(Guest)
+      const isGuest = await database
+        .getRepository(Guest)
         .createQueryBuilder('guest')
         .where('guest.event.id = :eventId', { eventId })
         .andWhere('guest.deletedAt IS NULL')
         .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
         .andWhere(
           new Brackets(qb => {
-            qb.where('guest.user.id = :userId')
-              .orWhere('guest.addedBy.id = :userId');
+            qb.where('guest.user.id = :userId').orWhere('guest.addedBy.id = :userId');
           }),
         )
         .setParameter('userId', userId)
         .getCount();
-  
+
       if (!isGuest) {
         throw new ForbiddenError('You are not authorized to view this announcement');
       }
     }
-  
+
     const announcement = await database.getRepository(EventAnnouncement).findOne({
       where: {
         id,
