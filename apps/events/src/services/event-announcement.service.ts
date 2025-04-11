@@ -222,7 +222,7 @@ export class EventAnnouncementService {
 
   public static async getAnnouncements(payload) {
     let { eventId, take, skip } = payload;
-  
+
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -231,12 +231,12 @@ export class EventAnnouncementService {
         deletedAt: IsNull(),
       },
     });
-  
+
     if (!event) throw new NotFoundError('Event not found');
-  
+
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
-  
+
     const query = database
       .getRepository(EventAnnouncement)
       .createQueryBuilder('announcement')
@@ -248,21 +248,21 @@ export class EventAnnouncementService {
       .where('announcement.event.id = :eventId', { eventId })
       .andWhere('announcement.deletedAt IS NULL')
       .orderBy('announcement.createdAt', 'DESC');
-  
+
     const announcements = await query.skip(skip).take(take).getMany();
     const totalCount = await query.getCount();
 
     for (let announcement of announcements) {
       let recipientCount = 0;
-  
+
       const recipientsExist = announcement.recipients?.length > 0;
-  
+
       if (recipientsExist) {
         recipientCount = announcement.recipients.length;
       } else {
         const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
         const addedByIds = announcement.addedBy?.map(a => a.id) || [];
-  
+
         // Build subquery to find user IDs of primary guests
         const subQuery = database
           .getRepository(Guest)
@@ -271,15 +271,15 @@ export class EventAnnouncementService {
           .where('pg.event.id = :eventId', { eventId })
           .andWhere('pg.deletedAt IS NULL')
           .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
-  
+
         if (ticketTypeIds.length > 0) {
           subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
         }
-  
+
         if (addedByIds.length > 0) {
           subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
         }
-  
+
         // Main recipient count query (primary + secondary guests)
         const countQuery = database
           .getRepository(Guest)
@@ -289,27 +289,28 @@ export class EventAnnouncementService {
           .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
           .andWhere(
             new Brackets(qb => {
-              qb.where(`guest.user.id IN (${subQuery.getQuery()})`)
-                .orWhere(`guest.addedBy.id IN (${subQuery.getQuery()})`);
+              qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+                `guest.addedBy.id IN (${subQuery.getQuery()})`,
+              );
             }),
           )
           .setParameters(subQuery.getParameters());
-  
+
         recipientCount = await countQuery.getCount();
       }
-  
+
       Object.assign(announcement, { recipientCount });
     }
-  
+
     return {
       totalCount,
       result: announcements,
     };
   }
-  
+
   public static async getAnnouncement(payload) {
     const { id, eventId } = payload;
-  
+
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -318,9 +319,9 @@ export class EventAnnouncementService {
         deletedAt: IsNull(),
       },
     });
-  
+
     if (!event) throw new NotFoundError('Event not found');
-  
+
     const announcement = await database.getRepository(EventAnnouncement).findOne({
       where: {
         id,
@@ -329,15 +330,15 @@ export class EventAnnouncementService {
       },
       relations: ['user', 'event', 'addedBy', 'ticketType', 'recipients'],
     });
-  
+
     if (!announcement) throw new NotFoundError('Announcement not found');
-  
+
     const recipientsExist = announcement.recipients?.length > 0;
     const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
     const addedByIds = announcement.addedBy?.map(a => a.id) || [];
-  
+
     let recipientCount = recipientsExist ? announcement.recipients.length : 0;
-  
+
     if (!recipientsExist) {
       const subQuery = database
         .getRepository(Guest)
@@ -346,15 +347,15 @@ export class EventAnnouncementService {
         .where('pg.event = :eventId', { eventId })
         .andWhere('pg.deletedAt IS NULL')
         .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
-  
+
       if (ticketTypeIds.length > 0) {
         subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
       }
-  
+
       if (addedByIds.length > 0) {
         subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
       }
-  
+
       recipientCount = await database
         .getRepository(Guest)
         .createQueryBuilder('guest')
@@ -363,14 +364,15 @@ export class EventAnnouncementService {
         .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
         .andWhere(
           new Brackets(qb => {
-            qb.where(`guest.user.id IN (${subQuery.getQuery()})`)
-              .orWhere(`guest.addedBy.id IN (${subQuery.getQuery()})`);
+            qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+              `guest.addedBy.id IN (${subQuery.getQuery()})`,
+            );
           }),
         )
         .setParameters(subQuery.getParameters())
         .getCount();
     }
-  
+
     return {
       ...announcement,
       recipientCount,
@@ -399,7 +401,7 @@ export class EventAnnouncementService {
 
   public static async getRecipientList(payload): Promise<any> {
     let { eventId, announcementId, take, skip, findByName } = payload;
-  
+
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -408,9 +410,9 @@ export class EventAnnouncementService {
         deletedAt: IsNull(),
       },
     });
-  
+
     if (!event) throw new NotFoundError('Event not found');
-  
+
     const announcement: any = await database.getRepository(EventAnnouncement).findOne({
       where: {
         id: announcementId,
@@ -419,18 +421,18 @@ export class EventAnnouncementService {
       },
       relations: ['recipients', 'ticketType', 'addedBy'],
     });
-  
+
     if (!announcement) throw new NotFoundError('Announcement not found');
-  
+
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
-  
+
     const recipientIds = announcement.recipients?.map(r => r.id) || [];
     const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
     const addedByIds = announcement.addedBy?.map(a => a.id) || [];
-  
+
     const guestRepo = database.getRepository(Guest);
-  
+
     let query = guestRepo
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
@@ -439,7 +441,7 @@ export class EventAnnouncementService {
       .where('guest.event.id = :eventId', { eventId })
       .andWhere('guest.deletedAt IS NULL')
       .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED });
-  
+
     if (findByName) {
       const searchTerm = `%${findByName.toLowerCase()}%`;
       query.andWhere(
@@ -449,7 +451,7 @@ export class EventAnnouncementService {
         { searchTerm },
       );
     }
-  
+
     if (recipientIds.length === 0) {
       // Subquery to get user IDs of primary guests based on ticketType & addedBy
       const subQuery = guestRepo
@@ -458,36 +460,36 @@ export class EventAnnouncementService {
         .where('pg.event = :eventId', { eventId })
         .andWhere('pg.deletedAt IS NULL')
         .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
-  
+
       if (ticketTypeIds.length > 0) {
         subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
       }
-  
+
       if (addedByIds.length > 0) {
         subQuery.andWhere('pg.addedBy.id IN (:...addedByIds)', { addedByIds });
       }
-  
+
       // Combine primary and secondary guest logic
       query
         .andWhere(
           new Brackets(qb => {
-            qb.where(`guest.user.id IN (${subQuery.getQuery()})`)
-              .orWhere(`guest.addedBy.id IN (${subQuery.getQuery()})`);
+            qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
+              `guest.addedBy.id IN (${subQuery.getQuery()})`,
+            );
           }),
         )
         .setParameters(subQuery.getParameters());
     } else {
       query.andWhere('guest.id IN (:...recipientIds)', { recipientIds });
     }
-    
+
     const totalCount = await query.getCount();
 
     const recipients = await query.skip(skip).take(take).getMany();
-  
+
     return {
       totalCount,
       result: toEventAnnouncementRecipients(recipients),
     };
   }
-  
 }

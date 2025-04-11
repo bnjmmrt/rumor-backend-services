@@ -3910,6 +3910,7 @@ export class EventsService {
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({
@@ -4132,7 +4133,7 @@ export class EventsService {
         `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
         `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
       ])
-      .where('(guest.event_id = :eventId)', {
+      .where('(guest.event_id = :eventId AND guest.added_by_id = :userId)', {
         eventId,
         userId,
         invited: GuestStatus.INVITED,

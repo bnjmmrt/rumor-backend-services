@@ -84,7 +84,8 @@ export class NotificationController {
 
   public static getNotificationSummary = asyncWrapper(async (req, res): Promise<void> => {
     const recipientId = req.user ? req.user : req.query.id;
-    const response = await notificationService.getNotificationSummary(recipientId);
+    const role = req.query.role;
+    const response = await notificationService.getNotificationSummary(recipientId, role);
 
     const getResponse = new GetResponse(response);
     res.status(getResponse.statusCode).json(getResponse);
