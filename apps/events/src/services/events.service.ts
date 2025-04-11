@@ -3910,6 +3910,7 @@ export class EventsService {
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({

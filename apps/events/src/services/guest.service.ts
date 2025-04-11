@@ -275,7 +275,7 @@ export class GuestService {
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {
-              const recipientIds = updateGuests.map(data=>data.userId).filter(Boolean);
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
               //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED)
                 serviceMesh
@@ -3699,7 +3699,7 @@ export class GuestService {
     }
     if (checkExistingUser) {
       const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: checkExistingUser.id } },
+        where: { user: { id: checkExistingUser.id }, event: { id: event.id } },
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');
