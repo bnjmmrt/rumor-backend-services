@@ -350,7 +350,7 @@ router.delete(
 router.get('/events/:id/guests-overview', GuestController.listGuestsOverview);
 // User request,
 
-router.post('/events/request/guest', GuestController.requestBecomeGuest);
+router.post('/events/request/guest', AuthMiddleware.fusionAuth, GuestController.requestBecomeGuest);
 
 router.put('/events/request/guest', GuestController.updateRequestBecomeGuest);
 //Guests Profiles
