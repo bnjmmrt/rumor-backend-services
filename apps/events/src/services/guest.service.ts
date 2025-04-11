@@ -322,7 +322,7 @@ export class GuestService {
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
               //"action": "UPDATE",
-              if (guestStatus === GuestStatus.DECLINED && currentStatus === GuestStatus.APPLIED)
+              if (guestStatus === GuestStatus.DECLINED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED))
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -331,7 +331,7 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.CONFIRMED && currentStatus === GuestStatus.APPLIED)
+              if (guestStatus === GuestStatus.CONFIRMED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED))
                 serviceMesh
                   .notificationService()
                   .sendNotification(
