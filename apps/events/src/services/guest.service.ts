@@ -319,7 +319,7 @@ export class GuestService {
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
               //"action": "UPDATE",
-              if (guestStatus === GuestStatus.DECLINED)
+              if (guestStatus === GuestStatus.DECLINED && currentStatus === GuestStatus.APPLIED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -328,7 +328,7 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.CONFIRMED)
+              if (guestStatus === GuestStatus.CONFIRMED && currentStatus === GuestStatus.APPLIED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -3312,6 +3312,7 @@ export class GuestService {
           lastName: guestPayload.lastName,
           email: guestPayload.email,
           phoneNumber: guestPayload.phoneNumber,
+          source: UserSource.PLUS_1,
         };
         const newUser = (
           await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
