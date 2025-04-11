@@ -7,7 +7,7 @@ import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { sendEventAnnouncement } from '../utils/emails.utils';
-import { sendSmsTextMessage } from '../utils/sms.utils';
+import { sendSmsNotification } from '../utils/sms.utils';
 import config from '../config';
 
 export class EventAnnouncementService {
@@ -209,7 +209,7 @@ export class EventAnnouncementService {
             );
           }
           if (data?.user?.phoneNumber) {
-            sendSmsTextMessage({ phoneNumber: data.user.phoneNumber, textMessage });
+            sendSmsNotification({ phoneNumber: data.user.phoneNumber, textMessage });
           }
         });
       }
