@@ -272,7 +272,7 @@ export const sendEventUpdation = async (
     },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: config.get('USERS_SERVICE_BASE_URL') + '/redirect',
     },
   ];
 
@@ -680,7 +680,7 @@ export const sendEventReminder = async (
       value: city,
     },
     {
-      key: 'view_event',
+      key: 'view_rsvp',
       value: config.get('USERS_SERVICE_BASE_URL') + '/redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
     },
   ];

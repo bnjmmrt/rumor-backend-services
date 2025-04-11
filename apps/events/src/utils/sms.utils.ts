@@ -6,7 +6,7 @@ interface SmsComponent {
   phoneNumber: string;
 }
 
-export const sendSmsTextMessage = async (
+export const sendSmsNotification = async (
   smsComponent: SmsComponent,
 ): Promise<{ success: boolean }> => {
   try {

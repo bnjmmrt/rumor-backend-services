@@ -470,7 +470,7 @@ export class AuthService {
         [
           {
             key: 'applicants_name',
-            value: `${newUser.firstName} ${newUser.lastName}`,
+            value: `${newUser.firstName}`,
           },
         ],
         'Application Submitted',
@@ -1081,8 +1081,8 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
-    if (payload.phoneNumber) {
-        let message =  `Hi ${invitee.firstName}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
+    if (payload?.phoneNumber) {
+        let message =  `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` + (payload.referralCode
             ? `Enter code ${payload.referralCode} to expedite your application review.`
             : ``)+ `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`
          
@@ -1102,7 +1102,11 @@ export class AuthService {
       const params = [
         {
           key: 'invitee_first_name',
-          value: payload.name,
+          value: payload.name?.split(' ')[0] || 'User',
+        },
+        {
+          key: 'link_to_application',
+          value: config.get('USERS_SERVICE_BASE_URL') + '/redirect', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -2070,8 +2074,12 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+            value: config.get('USERS_SERVICE_BASE_URL') + '/redirect',
           },
+          {
+            key: 'first_name',
+            value: `${user.firstName}`,
+          }
         ],
         'Member Approved into Rumor',
         [user.email.trim().toLowerCase()],
@@ -2087,6 +2095,22 @@ export class AuthService {
         .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     } catch (error) {
       console.log('🚀 ~ AuthService ~ approveMember ~ error:', error);
+    }
+
+    //send text notification
+    let userPhoneNumber = user?.phoneNumber;
+    if (userPhoneNumber) {
+      try {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'
+        let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+        const validateNumber = isValidPhoneNumber(userPhoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+      }
     }
 
     return responses.ok;
@@ -2240,6 +2264,7 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'     
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
           console.log("🚀 ~ AuthService ~ updateUsersStatus ~ user:", user)
@@ -2248,8 +2273,12 @@ export class AuthService {
               [
                 {
                   key: 'link_to_application',
-                  value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+                  value: link,
                 },
+                {
+                  key: 'first_name',
+                  value: `${user.firstName}`,
+                }
               ],
               'Member Approved into Rumor',
               [user.email.trim().toLowerCase()], // Send email to the approved member
@@ -2260,6 +2289,20 @@ export class AuthService {
             await serviceMesh
               .notificationService()
               .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+            //send text message
+            let userPhoneNumber = user?.phoneNumber;
+            if (userPhoneNumber)  {
+                try {
+                  let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+                  const validateNumber = isValidPhoneNumber(userPhoneNumber);
+                  if (validateNumber) {
+                    const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+                    await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                  }
+                } catch (err) {
+                  console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+                }
+              }
           }
         }
       } catch (error) {}
@@ -4269,7 +4312,7 @@ export class AuthService {
 
       const skippedUsers: string[] = [];
       const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-
+      const smsToSend: { phoneNumber: string, message: string }[] = []
       for (const user of users) {
         const hostRole = hostRoles.find(
           role =>
@@ -4316,6 +4359,16 @@ export class AuthService {
                 },
               ],
             });
+            if (user?.phoneNumber) {
+              //Micro-service call
+              try {
+                let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'
+                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`
+                smsToSend.push({ phoneNumber: user.phoneNumber, message: message })
+              } catch (err) {
+                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
+              }
+            }
           }
         } else if (
           newUserStatusTosUserStatus[payload.status] ===
@@ -4372,6 +4425,20 @@ export class AuthService {
         );
       } catch (error) {
         console.log(`Host Status Updates failed at function updateHostStatus:: ${error}`);
+      }
+      try {
+        await Promise.all(
+          smsToSend.map((user) => {
+            const validateNumber = isValidPhoneNumber(user.phoneNumber);
+            if (validateNumber) {
+              const cleanedNumber = user.phoneNumber.replace(/[\s\-()]/g, '');
+              serviceMesh.notificationService().sendTextMessage(cleanedNumber, user.message);
+            }
+          }
+          ),
+        );
+      } catch (err) {
+        console.error(`❌ Error while processing SMS:`, err);
       }
       // if (skippedUsers.length > 0) {
       //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);

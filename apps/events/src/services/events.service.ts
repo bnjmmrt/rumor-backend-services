@@ -139,6 +139,8 @@ import {
   CsvUploadRecords,
   FeaturedEventSection,
 } from '../../packages/rumor-utils/shared/events/entities';
+import { sendSmsNotification } from '../utils/sms.utils';
+import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -2602,23 +2604,57 @@ export class EventsService {
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
       .where('guest.event = :eventId', { eventId: event.id })
       .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
       .getMany();
     if (!guests.length) return;
     const emailPromises = guests.map(guest => {
-      if (!guest?.user?.email) return;
-      const mailPayload = {
-        eventName: event.name || 'Event',
-        imageFlyer: event.imageFlyer,
-        eventDate: event.startDate,
-        location: event.location?.location,
-        city: event.location?.city,
-      };
-      // return
-      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
-    });
+
+      if (guest?.user?.email)  {
+        const mailPayload = {
+          eventName: event.name || 'Event',
+          imageFlyer: event.imageFlyer,
+          eventDate: event.startDate,
+          location: event.location?.location,
+          city: event.location?.city,
+        };
+       return sendEventReminder(
+          mailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone
+        );
+      }
+      return null;
+    })
+      .filter(Boolean);
+
     await Promise.allSettled(emailPromises);
+    const smsPromises = guests
+      .map(guest => {
+        if (guest?.user?.phoneNumber) {
+          const { hour, minutes, period }: any = extractDate(event?.startDate, event.timeZone);
+          let textMessage = '';
+          const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.Member);
+          if (role?.role?.name === RoleType.Member) {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow at ${hour}:${minutes} ${period}.`;
+          } else {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow.`;
+          }
+          return sendSmsNotification({
+            phoneNumber: guest.user.phoneNumber,
+            textMessage,
+          });
+        }
+        // If no phone number, return undefined
+        return undefined;
+      })
+      .filter(Boolean);
+
+    await Promise.allSettled(smsPromises);
   }
 
   /**
@@ -3178,6 +3214,22 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
+      //send text notification
+      if (updatedEvent?.owner?.phoneNumber) {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'
+        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`
+        //Micro-service call
+        let number = updatedEvent?.owner?.phoneNumber
+        try {
+          const validateNumber = isValidPhoneNumber(number);
+          if (validateNumber) {
+            const cleanedNumber = number.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${number}:`, err);
+        }
+      }
       if (updatedEvent.isPublished) {
         const createPayload = {
           eventDate: updatedEvent.startDate,
@@ -3494,6 +3546,7 @@ export class EventsService {
    * 8. Commit the transaction if at least one notification is successful.
    */
   public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
+    console.log("🚀 ~ cancelEventAndNotify ~ payload:", payload)
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3521,6 +3574,7 @@ export class EventsService {
         throw new Error('Event is not approved.');
       }
 
+      console.log('event.owner', event.owner.id, payload.ownerId);
       // Permitir cancelar si es admin o propietario
       if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
@@ -3552,11 +3606,13 @@ export class EventsService {
         GuestStatus.APPLIED,
       ];
       //using query to find guests
-      const guests = await this.dbConnection
+      const guests : any = await this.dbConnection
         .getRepository(Guest)
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('guest.event', 'event')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
         .select([
           'guest.id',
           'user.id',
@@ -3567,6 +3623,9 @@ export class EventsService {
           'event.startDate',
           'event.endDate',
           'event.location',
+          'roles.id',
+          'role.id',
+          'role.name',
         ])
         .where({ event: { id: eventId } })
         .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
@@ -3590,7 +3649,8 @@ export class EventsService {
         const guestName = guest.user?.firstName || 'Guest';
 
         const message = payload.customMessage;
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled. \n ${message} \n If you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
+        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`
+        // ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
@@ -3617,20 +3677,19 @@ export class EventsService {
           } 
            if (guest.user?.phoneNumber) {
             // Send SMS notification
-            try {
-              const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
-              if (validateNumber) {
-                const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
-                const success = await serviceMesh
-                  .notificationService()
-                  .sendTextMessage(cleanedNumber, `${mobileNotificationMessage} \n${message}`);
-                if (success) {
-                  notificationSuccess = true;
-                }
-              }
-            } catch (err) {
-              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
-            }
+             try {
+               const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
+               if (role?.role?.name === RoleType.NonMember) {
+                 mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`
+               }
+               //send text message 
+               const success = sendSmsNotification({ phoneNumber: guest.user?.phoneNumber, textMessage: mobileNotificationMessage }); /** status: Tested and working fine */
+               if (success) {
+                 notificationSuccess = true;
+               }
+             } catch (err) {
+               console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+             }
           }
         } catch (error) {
           // this.logger.error(`Error sending notification to ${guestName || 'guest'} for event:`, error);

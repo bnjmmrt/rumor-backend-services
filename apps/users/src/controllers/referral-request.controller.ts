@@ -19,7 +19,7 @@ export class ReferralRequestController {
       ...req.body,
       requesterId,
     };
-    const response: GenericResponse = await ReferralRequestService.createReferralRequest(payload);
+    const response: string = await ReferralRequestService.createReferralRequest(payload);
     const createResponse = new CreateResponse(response);
     res.status(createResponse.statusCode).json(createResponse);
   });
