@@ -4185,14 +4185,14 @@ export class EventsService {
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .select([
-        `SUM(CASE WHEN guest.status = :invited THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
-        `SUM(CASE WHEN guest.status = :requested THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
-        `SUM(CASE WHEN guest.status = :confirmed THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
-        `SUM(CASE WHEN guest.status = :declined OR guest.status = :refused THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
-        `SUM(CASE WHEN guest.status = :draft THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
-        `SUM(COALESCE(guest.max_additional_guests, 0) + 1) AS totalCount`,
+        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
       ])
-      .where('(guest.event_id = :eventId AND guest.added_by_id = :userId)', {
+      .setParameters({
         eventId,
         userId,
         invited: GuestStatus.INVITED,

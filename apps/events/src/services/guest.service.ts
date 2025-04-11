@@ -115,7 +115,7 @@ import {
   sendEventInvitePlusOnes,
   sendGuestEventApproval,
 } from '../utils/emails.utils';
-
+import { sendSmsNotification } from '../utils/sms.utils';
 export class GuestService {
   public static dbConnection = database;
 
@@ -272,6 +272,39 @@ export class GuestService {
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
+            // console.log("here we go", updateGuests)
+            await Promise.all(
+              updateGuests.map(guest => {
+                const phoneNumber = guest?.phoneNumber;
+                const guestStatus = guest?.guestStatus;
+
+                if (!phoneNumber) return;
+
+                let textMessage: string | null = null;
+                //TODO 
+                // if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
+                //   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences [link to event download].`;
+                // }
+
+                if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.SIGN_UP_FORM) {
+                  textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}. `;
+                }
+
+                if (guestStatus === GuestStatus.CONFIRMED && guest?.invitationSource == UserSource.SIGN_UP_FORM) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details. `;
+                }
+
+                if (guestStatus === GuestStatus.CONFIRMED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
+                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                }
+
+                return sendSmsNotification({
+                  phoneNumber,
+                  textMessage,
+                });
+              })
+            );
+            
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {
