@@ -4,7 +4,7 @@ import type { CsvRecord } from '../shared/users/grpc/auth/auth.pb';
 import axios from 'axios';
 import * as parse from 'csv-parser';
 import { createObjectCsvWriter } from 'csv-writer';
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { COUNTRY_CALLING_CODES } from '../shared/constants/country-code.constants';
 
 export async function parseCsv(file: string): Promise<CsvRecord[]> {
   const records: CsvRecord[] = [];
@@ -61,8 +61,13 @@ export const isValidEmail = (email: string): boolean => {
 
 export const isValidPhoneNumber = (phoneNumber: string): boolean => {
   const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
-  const parsedNumber = parsePhoneNumberFromString(cleaned);
-  return parsedNumber?.isValid() ?? false;
+  const matchedPrefix = COUNTRY_CALLING_CODES.find(prefix => cleaned.startsWith(prefix));
+  if (!matchedPrefix) {
+    return false;
+  }
+  const numberWithoutPrefix = cleaned.slice(matchedPrefix.length);
+  // Check if remaining is 10 digits and numeric
+  return /^\d{10}$/.test(numberWithoutPrefix);
 };
 
 export const processCsvFile = async (

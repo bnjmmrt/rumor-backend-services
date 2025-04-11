@@ -3699,7 +3699,7 @@ export class GuestService {
     }
     if (checkExistingUser) {
       const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: checkExistingUser.id } },
+        where: { user: { id: checkExistingUser.id }, event: { id: event.id } },
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');
