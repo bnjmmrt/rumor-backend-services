@@ -29,6 +29,9 @@ export class Notification extends RumorBaseEntity {
   @Column({ type: 'varchar', name: 'notification_module', nullable: true })
   notificationModule: string;
 
+  @Column({ type: 'varchar', name: 'role', nullable: true })
+  role: string;
+
   @Column({ type: 'boolean', name: 'is_seen', default: false })
   isSeen: boolean;
 

@@ -65,6 +65,7 @@ import {
   TicketType,
   Collaborator,
   QuizQuestion,
+  UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -118,12 +119,11 @@ import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
-import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import {
   sendEventCancellation,
   sendEventUpdation,
-  sendEventInviteNonMember,
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
@@ -140,6 +140,8 @@ import {
   CsvUploadRecords,
   FeaturedEventSection,
 } from '../../packages/rumor-utils/shared/events/entities';
+import { sendSmsNotification } from '../utils/sms.utils';
+import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -1301,7 +1303,14 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: payload.userId } },
+      relations: { role: true },
+    });
+    const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+    if (!isAdmin && event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.');
+    }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({
@@ -1349,6 +1358,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     } else {
@@ -1367,6 +1377,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     }
@@ -2302,7 +2313,16 @@ export class EventsService {
           'quizQuestions',
         ],
       });
+      if (!event) throw new NotFoundError('Item of Event not found');
+      const userRoles = await UserRole.find({
+        where: { user: { id: payload.ownerId } },
+        relations: { role: true },
+      });
 
+      const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+      if (!isAdmin && event.owner?.id !== payload.ownerId) {
+        throw new ForbiddenError('You are not authorized to update this event');
+      }
       const eventCopy = JSON.parse(JSON.stringify(event));
       /**date validations */
       if (!payload.startDate) {
@@ -2322,7 +2342,6 @@ export class EventsService {
       }
       /**date validations ends here */
 
-      if (!event) throw new NotFoundError('Item of Event not found');
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -2598,23 +2617,57 @@ export class EventsService {
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
       .where('guest.event = :eventId', { eventId: event.id })
       .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
       .getMany();
     if (!guests.length) return;
-    const emailPromises = guests.map(guest => {
-      if (!guest?.user?.email) return;
-      const mailPayload = {
-        eventName: event.name || 'Event',
-        imageFlyer: event.imageFlyer,
-        eventDate: event.startDate,
-        location: event.location?.location,
-        city: event.location?.city,
-      };
-      // return
-      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
-    });
+    const emailPromises = guests
+      .map(guest => {
+        if (guest?.user?.email) {
+          const mailPayload = {
+            eventName: event.name || 'Event',
+            imageFlyer: event.imageFlyer,
+            eventDate: event.startDate,
+            location: event.location?.location,
+            city: event.location?.city,
+          };
+          return sendEventReminder(
+            mailPayload,
+            guest.user.email,
+            guest.user.id,
+            event.id,
+            event.timeZone,
+          );
+        }
+        return null;
+      })
+      .filter(Boolean);
+
     await Promise.allSettled(emailPromises);
+    const smsPromises = guests
+      .map(guest => {
+        if (guest?.user?.phoneNumber) {
+          const { hour, minutes, period }: any = extractDate(event?.startDate, event.timeZone);
+          let textMessage = '';
+          const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.Member);
+          if (role?.role?.name === RoleType.Member) {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow at ${hour}:${minutes} ${period}.`;
+          } else {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow.`;
+          }
+          return sendSmsNotification({
+            phoneNumber: guest.user.phoneNumber,
+            textMessage,
+          });
+        }
+        // If no phone number, return undefined
+        return undefined;
+      })
+      .filter(Boolean);
+
+    await Promise.allSettled(smsPromises);
   }
 
   /**
@@ -2680,15 +2733,9 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
           }
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
       }
     });
@@ -3180,6 +3227,22 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
+      //send text notification
+      if (updatedEvent?.owner?.phoneNumber) {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
+        //Micro-service call
+        let number = updatedEvent?.owner?.phoneNumber;
+        try {
+          const validateNumber = isValidPhoneNumber(number);
+          if (validateNumber) {
+            const cleanedNumber = number.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${number}:`, err);
+        }
+      }
       if (updatedEvent.isPublished) {
         const createPayload = {
           eventDate: updatedEvent.startDate,
@@ -3239,7 +3302,11 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      sendEventRejection(updatedEvent.name, host.firstName, updatedEvent.owner.email);
+      sendEventRejection(
+        updatedEvent.name,
+        host?.additionalHostInformation?.companyName || host?.firstName,
+        updatedEvent.owner.email,
+      );
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3496,6 +3563,7 @@ export class EventsService {
    * 8. Commit the transaction if at least one notification is successful.
    */
   public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
+    console.log('🚀 ~ cancelEventAndNotify ~ payload:', payload);
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3523,6 +3591,7 @@ export class EventsService {
         throw new Error('Event is not approved.');
       }
 
+      console.log('event.owner', event.owner.id, payload.ownerId);
       // Permitir cancelar si es admin o propietario
       if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
@@ -3554,11 +3623,13 @@ export class EventsService {
         GuestStatus.APPLIED,
       ];
       //using query to find guests
-      const guests = await this.dbConnection
+      const guests: any = await this.dbConnection
         .getRepository(Guest)
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('guest.event', 'event')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
         .select([
           'guest.id',
           'user.id',
@@ -3569,6 +3640,9 @@ export class EventsService {
           'event.startDate',
           'event.endDate',
           'event.location',
+          'roles.id',
+          'role.id',
+          'role.name',
         ])
         .where({ event: { id: eventId } })
         .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
@@ -3591,8 +3665,9 @@ export class EventsService {
       const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`;
+        // ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
@@ -3616,27 +3691,24 @@ export class EventsService {
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } else if (guest.user?.phoneNumber) {
+          }
+          if (guest.user?.phoneNumber) {
             // Send SMS notification
             try {
-              const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
-              if (validateNumber) {
-                const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
-                const success = await serviceMesh
-                  .notificationService()
-                  .sendTextMessage(cleanedNumber, `${mobileNotificationMessage} \n${message}`);
-                if (success) {
-                  notificationSuccess = true;
-                }
-              } else {
-                // Log the issue and exit early (no throw)
-                console.log(
-                  `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-                );
-                return; // or just skip sending, depending on your function structure
+              const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
+              if (role?.role?.name === RoleType.NonMember) {
+                mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
+              }
+              //send text message
+              const success = sendSmsNotification({
+                phoneNumber: guest.user?.phoneNumber,
+                textMessage: mobileNotificationMessage,
+              }); /** status: Tested and working fine */
+              if (success) {
+                notificationSuccess = true;
               }
             } catch (err) {
-              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {
@@ -3900,6 +3972,7 @@ export class EventsService {
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({
@@ -4102,49 +4175,95 @@ export class EventsService {
     };
   }
 
-  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    const listHostEventsPayload: ListHostEventsDto = {
-      userId: payload.id,
-      query: '{}',
+  //Get guests count by sum of party size
+  public static async getGuestCountsByStatus(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
+      ])
+      .setParameters({
+        eventId,
+        userId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
+
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
     };
+  }
 
-    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
-
-    if (!eventsResponse || !eventsResponse.result) {
-      throw new NotFoundError('Events');
-    }
-
-    const events = eventsResponse.result;
-    // Step 2: Cancel all APPROVED events
-    const eventsToCancel = events.filter(event =>
-      [
-        EventStatusEnum.APPROVED_STATUS,
-        EventStatusEnum.SCHEDULED_STATUS,
-        EventStatusEnum.UPCOMING_STATUS,
-      ].includes(event.status),
-    );
-
-    for (const event of eventsToCancel) {
-      const cancelPayload: CancelEventAndNotifyRequestDto = {
-        ownerId: payload.id,
-        eventId: event.id,
-        customMessage: 'This event has been canceled as the host is no longer available.',
+  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
+    try {
+      const listHostEventsPayload: ListHostEventsDto = {
+        userId: payload.id,
+        query: '{}',
       };
-      await this.cancelEventAndNotify(cancelPayload);
+
+      const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+      if (!eventsResponse || !eventsResponse.result) {
+        throw new NotFoundError('Events');
+      }
+
+      const events = eventsResponse.result;
+      // Step 2: Cancel all APPROVED events
+      const eventsToCancel = events.filter(event =>
+        [
+          EventStatusEnum.APPROVED_STATUS,
+          EventStatusEnum.SCHEDULED_STATUS,
+          EventStatusEnum.UPCOMING_STATUS,
+        ].includes(event.status),
+      );
+
+      for (const event of eventsToCancel) {
+        const cancelPayload: CancelEventAndNotifyRequestDto = {
+          ownerId: payload.id,
+          eventId: event.id,
+          customMessage: 'This event has been canceled as the host is no longer available.',
+        };
+        await this.cancelEventAndNotify(cancelPayload);
+      }
+
+      // Step 3: Delete all events (regardless of status)
+      // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+      // for (const event of events) {
+      //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      //   await this.deleteEvent(deletePayload);
+      // }
+
+      const eventIds = events.map(event => event.id);
+
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
+      console.log(error);
     }
-
-    // Step 3: Delete all events (regardless of status)
-    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
-    // for (const event of events) {
-    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-    //   await this.deleteEvent(deletePayload);
-    // }
-
-    const eventIds = events.map(event => event.id);
-
-    if (eventIds.length > 0) {
-      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-    }
-    return responses.ok;
   }
 }

@@ -9,7 +9,7 @@ export class UserQuizAnswer extends RumorBaseEntity {
   @Column({ type: 'varchar', name: 'answer' })
   answer: string;
 
-  @ManyToOne(() => User, user => user.answers, { nullable: true, cascade: true })
+  @ManyToOne(() => User, user => user.answers, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
   user?: Partial<User>;
 

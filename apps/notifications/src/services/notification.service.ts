@@ -31,10 +31,10 @@ class NotificationService {
       }
 
       // Fetch linked entities in a single query each
-
       const linkedUser: User = linkedUserId
         ? await User.getRepository().findOne({ where: { id: linkedUserId } })
         : null;
+
       const linkedEvent: Event = linkedEventId
         ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
         : null;
@@ -71,14 +71,16 @@ class NotificationService {
           ? {
               eventId: linkedEvent ? linkedEvent.id : '',
               userId: linkedUser ? linkedUser.id : '',
-              action: notificationTemplate.action,
+              action: notificationTemplate.action || '',
+              role: notificationTemplate.role || '',
             }
           : {};
-        const notificationImage = eval(notificationTemplate.image) || '';
-
-        let linkedUserName = linkedUser?.additionalHostInformation?.companyName
+        const notificationImage = eval(notificationTemplate.image);
+        let linkedUserName = linkedUser
           ? linkedUser?.additionalHostInformation?.companyName
-          : `${linkedUser.firstName} ${linkedUser.lastName}`;
+            ? linkedUser?.additionalHostInformation?.companyName
+            : `${linkedUser.firstName} ${linkedUser.lastName}`
+          : '';
         let recipientName = recipientUser.firstName
           ? `${recipientUser.firstName} ${recipientUser.lastName}`
           : '';
@@ -86,14 +88,12 @@ class NotificationService {
           recipientName = recipientUser?.firstName ? recipientUser.firstName : '';
         }
 
-
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
           message
             .replace('[Event Start Time]', (linkedEvent?.startDate || '').toString())
-
             .replace('[Recipient Name]', recipientName)
-
+            .replace('[Linked User Name]', linkedUserName)
             .replace('[Event Name]', linkedEvent?.name || '')
             .replace('[Event City Name]', linkedEvent?.location?.city || '')
             .replace('[Member Name]', body?.name || '')
@@ -113,11 +113,25 @@ class NotificationService {
         notification.notificationModule = notificationTemplate.notificationModule;
         notification.recipients = [recipientUser];
         notification.notificationImage = notificationTemplate.image;
-        notificationsToSave.push(notification);
+        notification.role = notificationTemplate.role;
+
+        if (notificationTemplate.appNotification) {
+          notificationsToSave.push(notification);
+        }
 
         const userPushPreference = recipientUser.userSettings
           ? recipientUser.userSettings.enableAppNotifications
           : true;
+
+        console.log(
+          '🚀 ~ NotificationService ~ recipientUser?.pushNotificationToken?.length:',
+          recipientUser?.pushNotificationToken?.length,
+        );
+        console.log('🚀 ~ NotificationService ~ userPushPreference:', userPushPreference);
+        console.log(
+          '🚀 ~ NotificationService ~ notificationTemplate.pushNotification:',
+          notificationTemplate.pushNotification,
+        );
 
         // Handle push notification if enabled and user has tokens
         if (
@@ -128,12 +142,15 @@ class NotificationService {
           const tokens = recipientUser.pushNotificationToken
             .map(data => data.notificationToken)
             .filter(Boolean);
+
           if (tokens.length > 0) {
             pushNotifications.push({
               tokens,
               body: pushMessage,
               title: 'The Rumor',
-              image: notificationImage,
+              image: notificationImage
+                ? notificationImage
+                : 'https://host.therumor.com/images/app/rumor_icon.svg',
               data: { ...body, notificationType },
             });
           }
@@ -153,6 +170,7 @@ class NotificationService {
           });
         }
       }
+
       return { success: true, message: 'Notifications sent successfully.' };
     } catch (error) {
       console.log('🚀 ~ NotificationService ~ error:', error);
@@ -161,6 +179,7 @@ class NotificationService {
 
   async getAllNotifications(
     recipientId: string,
+    role: string,
     take = 10,
     skip = 0,
   ): Promise<{ totalCount: number; result: Partial<Notification>[] }> {
@@ -173,6 +192,11 @@ class NotificationService {
       .leftJoinAndSelect('notification.linkedUser', 'linkedUser')
       .leftJoinAndSelect('notification.linkedEvent', 'linkedEvent')
       .orderBy('notification.createdAt', 'DESC');
+
+    if (role) {
+      role = role === 'non_member' ? 'member' : role;
+      queryBuilder.andWhere('notification.role = :role', { role });
+    }
 
     const totalCount = await queryBuilder.getCount();
 
@@ -250,7 +274,10 @@ class NotificationService {
     return { totalCount, result: toNotificationslisting(notifications) };
   }
 
-  async getNotificationSummary(recipientId: string): Promise<{
+  async getNotificationSummary(
+    recipientId: string,
+    role: string,
+  ): Promise<{
     totalNotifications: number;
     notificationsByModule: Record<string, number>;
     notificationsByType: Record<string, number>;
@@ -262,6 +289,11 @@ class NotificationService {
       .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', {
         recipientId,
       });
+
+    if (role) {
+      role = role === 'non_member' ? 'member' : role;
+      queryBuilder.andWhere('notification.role = :role', { role });
+    }
 
     // Get total notifications count
     const totalNotifications = await queryBuilder.getCount();

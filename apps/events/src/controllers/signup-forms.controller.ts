@@ -30,8 +30,9 @@ export class SignupFormsController {
   });
 
   public static getByEventId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const hostId = (req as any).user;
     const eventId = req.params.id;
-    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId);
+    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId, hostId);
     res.json(new GetResponse(data));
   });
 
@@ -95,7 +96,8 @@ export class SignupFormsController {
 
   public static deactivate = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id;
-    const data: UpdateResult = await SignupFormsServices.deactivate(id);
+    const hostId = (req as any).user;
+    const data: UpdateResult = await SignupFormsServices.deactivate(id, hostId);
     const successResponse = new GetResponse(data.affected);
     res.status(successResponse.statusCode).json(successResponse);
   });
@@ -104,7 +106,8 @@ export class SignupFormsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload = req.query;
       const id = req.params.id;
-      const submissions = await SignupFormsServices.listSubmissions(id, payload);
+      const hostId = (req as any).user;
+      const submissions = await SignupFormsServices.listSubmissions(id, hostId, payload);
       res.json(new GetResponse(submissions));
     },
   );

@@ -79,7 +79,7 @@ router.get('/check-service-call', AuthController.checkService);
 
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
-router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
+router.post('/auth/logout', AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
 router.put(
@@ -392,11 +392,10 @@ router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
 router.get('/redirect', (req, res) => {
   // Replace these with your actual links
   const WEBSITE_URL = 'https://therumor.com';
-  const ANDROID_APP_LINK =
-    'therumorapp://';
+  const ANDROID_APP_LINK = 'therumorapp://';
   const IOS_APP_LINK = 'therumorapp://';
-  const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor'
-  const IOS_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397'
+  const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor';
+  const IOS_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397';
 
   const userAgent = req.headers['user-agent'] || '';
   const isAndroid = /Android/i.test(userAgent);
@@ -414,32 +413,32 @@ router.get('/redirect', (req, res) => {
 
   res.redirect(fallbackUrl);
 
-//   res.send(`
-//     <!DOCTYPE html>
-//     <html>
-//       <head>
-//         <title>Redirecting...</title>
-//         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//         <script type="text/javascript">
-//         try{
-// setTimeout(function() {
-//             window.location.href = "${fallbackUrl}";
-//           }, 2500); // fallback after 2.5s
+  //   res.send(`
+  //     <!DOCTYPE html>
+  //     <html>
+  //       <head>
+  //         <title>Redirecting...</title>
+  //         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //         <script type="text/javascript">
+  //         try{
+  // setTimeout(function() {
+  //             window.location.href = "${fallbackUrl}";
+  //           }, 2500); // fallback after 2.5s
 
-//           window.location = "${appUrl}";
+  //           window.location = "${appUrl}";
 
-//         }
-//           catch(e){
-//           console.log('------',e)
-//           }
-          
-//         </script>
-//       </head>
-//       <body>
-//         <p>Redirecting to the app...</p>
-//       </body>
-//     </html>
-//   `);
+  //         }
+  //           catch(e){
+  //           console.log('------',e)
+  //           }
+
+  //         </script>
+  //       </head>
+  //       <body>
+  //         <p>Redirecting to the app...</p>
+  //       </body>
+  //     </html>
+  //   `);
 });
 
 export default router;

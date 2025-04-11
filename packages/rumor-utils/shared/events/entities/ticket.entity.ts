@@ -26,6 +26,7 @@ export class Ticket extends RumorBaseEntity {
 
   @ManyToOne(() => User, user => user.tickets, {
     onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
   user: Partial<User>;
