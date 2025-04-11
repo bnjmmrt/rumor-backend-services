@@ -1,13 +1,13 @@
 import { In, IsNull, Brackets } from 'typeorm';
 import database from '../database';
-import { NotFoundError } from 'rumor-utils/errors';
+import { NotFoundError, ForbiddenError } from 'rumor-utils/errors';
 import { Event, User, TicketType, EventAnnouncement, Guest } from 'rumor-utils/shared/entities';
 import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { toEventAnnouncementRecipients } from 'rumor-utils/shared/events/mappers/event-announcement.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { sendEventAnnouncement } from '../utils/emails.utils';
-import { sendSmsTextMessage } from '../utils/sms.utils';
+import { sendSmsNotification } from '../utils/sms.utils';
 import config from '../config';
 
 export class EventAnnouncementService {
@@ -209,7 +209,7 @@ export class EventAnnouncementService {
             );
           }
           if (data?.user?.phoneNumber) {
-            sendSmsTextMessage({ phoneNumber: data.user.phoneNumber, textMessage });
+            sendSmsNotification({ phoneNumber: data.user.phoneNumber, textMessage });
           }
         });
       }
@@ -221,8 +221,11 @@ export class EventAnnouncementService {
   }
 
   public static async getAnnouncements(payload) {
-    let { eventId, take, skip } = payload;
+    let { eventId, take, skip, userId, role } = payload;
+  
+    if(!userId) throw new NotFoundError('Requesting User not found');
 
+    // Check if the event exists
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
@@ -230,10 +233,37 @@ export class EventAnnouncementService {
         isPublished: true,
         deletedAt: IsNull(),
       },
+      relations: ['owner'],
     });
 
     if (!event) throw new NotFoundError('Event not found');
-
+  
+    // Role-based access control
+    if (role === 'host') {
+      if (event.owner?.id !== userId) {
+        throw new ForbiddenError('You are not authorized to view announcements for this event');
+      }
+    } else if (role === 'member' || role === 'non_member') {
+      // Check if the user is a guest (either directly or as +1)
+      const isGuest = await database.getRepository(Guest)
+        .createQueryBuilder('guest')
+        .where('guest.event.id = :eventId', { eventId })
+        .andWhere('guest.deletedAt IS NULL')
+        .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          new Brackets(qb => {
+            qb.where('guest.user.id = :userId')
+              .orWhere('guest.addedBy.id = :userId');
+          }),
+        )
+        .setParameter('userId', userId)
+        .getCount();
+  
+      if (!isGuest) {
+        throw new ForbiddenError('You are not authorized to view announcements for this event');
+      }
+    }
+  
     take = take ? parseInt(take) : 20;
     skip = skip ? parseInt(skip) : 0;
 
@@ -251,7 +281,7 @@ export class EventAnnouncementService {
 
     const announcements = await query.skip(skip).take(take).getMany();
     const totalCount = await query.getCount();
-
+  
     for (let announcement of announcements) {
       let recipientCount = 0;
 
@@ -309,7 +339,9 @@ export class EventAnnouncementService {
   }
 
   public static async getAnnouncement(payload) {
-    const { id, eventId } = payload;
+    const { id, eventId, role, userId } = payload;
+
+    if(!userId) throw new NotFoundError('Requesting User not found');
 
     const event = await database.getRepository(Event).findOne({
       where: {
@@ -318,10 +350,36 @@ export class EventAnnouncementService {
         isPublished: true,
         deletedAt: IsNull(),
       },
+      relations: ['owner'],
     });
 
     if (!event) throw new NotFoundError('Event not found');
-
+  
+    // Role-based access control
+    if (role === 'host') {
+      if (event.owner?.id !== userId) {
+        throw new ForbiddenError('You are not authorized to view this announcement');
+      }
+    } else if (role === 'member' || role === 'non_member') {
+      const isGuest = await database.getRepository(Guest)
+        .createQueryBuilder('guest')
+        .where('guest.event.id = :eventId', { eventId })
+        .andWhere('guest.deletedAt IS NULL')
+        .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          new Brackets(qb => {
+            qb.where('guest.user.id = :userId')
+              .orWhere('guest.addedBy.id = :userId');
+          }),
+        )
+        .setParameter('userId', userId)
+        .getCount();
+  
+      if (!isGuest) {
+        throw new ForbiddenError('You are not authorized to view this announcement');
+      }
+    }
+  
     const announcement = await database.getRepository(EventAnnouncement).findOne({
       where: {
         id,

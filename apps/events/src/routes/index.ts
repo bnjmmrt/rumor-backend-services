@@ -54,7 +54,7 @@ router.get(
 
 router.get(
   '/event/:eventId/event-announcements',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   EventAnnouncementController.getAnnouncements,
 );
 
