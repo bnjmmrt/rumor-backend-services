@@ -119,6 +119,7 @@ import {
 } from '../utils/emails.utils';
 import * as dayjs from 'dayjs';
 
+import { sendSmsNotification } from '../utils/sms.utils';
 export class GuestService {
   public static dbConnection = database;
 
@@ -275,12 +276,54 @@ export class GuestService {
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
+            // console.log("here we go", updateGuests)
+            await Promise.all(
+              updateGuests.map(guest => {
+                const phoneNumber = guest?.phoneNumber;
+                const guestStatus = guest?.guestStatus;
+
+                if (!phoneNumber) return;
+
+                let textMessage: string | null = null;
+                //TODO
+                // if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
+                //   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences [link to event download].`;
+                // }
+
+                if (
+                  guestStatus === GuestStatus.DECLINED &&
+                  guest?.invitationSource == UserSource.SIGN_UP_FORM
+                ) {
+                  textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}. `;
+                }
+
+                if (
+                  guestStatus === GuestStatus.CONFIRMED &&
+                  guest?.invitationSource == UserSource.SIGN_UP_FORM
+                ) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details. `;
+                }
+
+                if (
+                  guestStatus === GuestStatus.CONFIRMED &&
+                  guest?.invitationSource == UserSource.REQUEST_IN_APP
+                ) {
+                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                }
+
+                return sendSmsNotification({
+                  phoneNumber,
+                  textMessage,
+                });
+              }),
+            );
+
             // Check if guests were successfully created
 
             if (updateGuests.length > 0) {
-              const recipientIds = updateGuests.map(data=>data.userId).filter(Boolean);
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
               //"action": "UPDATE",
-              if (guestStatus === GuestStatus.DECLINED)
+              if (guestStatus === GuestStatus.DECLINED && currentStatus === GuestStatus.APPLIED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -289,7 +332,7 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.CONFIRMED)
+              if (guestStatus === GuestStatus.CONFIRMED && currentStatus === GuestStatus.APPLIED)
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -3326,6 +3369,7 @@ export class GuestService {
           lastName: guestPayload.lastName,
           email: guestPayload.email,
           phoneNumber: guestPayload.phoneNumber,
+          source: UserSource.PLUS_1,
         };
         const newUser = (
           await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
@@ -3755,7 +3799,7 @@ export class GuestService {
     }
     if (checkExistingUser) {
       const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: checkExistingUser.id } },
+        where: { user: { id: checkExistingUser.id }, event: { id: event.id } },
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');

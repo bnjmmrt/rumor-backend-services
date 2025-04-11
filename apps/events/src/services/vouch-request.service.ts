@@ -17,13 +17,15 @@ import {
 import { responses } from '../common/responses';
 import { Event, User } from 'rumor-utils/shared/events/entities';
 import database from '../database';
-import { BadRequestError, ConflictError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
 import {
   UserVouch,
   VouchRequest as VouchRequestResponse,
 } from 'rumor-utils/shared/events/grpc/platform/general.pb';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { sendSmsNotification } from '../utils/sms.utils';
+import config from '../config';
 
 export class VouchRequestService {
   public static dbConnection = database;
@@ -35,6 +37,10 @@ export class VouchRequestService {
         event: { id: payload.eventId },
       },
     });
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: payload.eventId } });
+    if (!event) throw new NotFoundError('Event not found');
 
     if (existingVouchRequest) throw new ConflictError('Vouch request already exists');
 
@@ -57,6 +63,20 @@ export class VouchRequestService {
     } catch (error) {
       console.log('🚀 ~ VouchRequestService ~ createVouchRequest ~ error:', error);
     }
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+    });
+    //send text message
+    if (user?.phoneNumber) {
+      let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+      let textMessage = `Hey ${user?.firstName || 'User'} - Someone has requested your vouch to attend ${event?.name || 'Event'}. Click to Refer them now! ${link}`;
+      // Send SMS notification
+      sendSmsNotification({
+        phoneNumber: user?.phoneNumber,
+        textMessage,
+      }); /** status: Tested and working fine */
+    }
+    //ends here
     return '';
   }
 

@@ -109,6 +109,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Get By urlcode
+   * @param code
+   * @returns
+   */
   public static async getByUrl(code: string) {
     try {
       const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
@@ -333,7 +338,7 @@ export class SignupFormsServices {
             userPayload.lastName = ans.answers;
             break;
           case 'email':
-            userPayload.email = ans.answers;
+            userPayload.email = ans.answers.trim().toLowerCase();
             if (!isValidEmail(userPayload.email)) {
               throw new BadRequestError('Invalid Email format');
             }
@@ -555,7 +560,15 @@ export class SignupFormsServices {
    * 1. When an event is cancelled, need to deactivate Signup Forms.
    * @param id
    */
-  public static async deactivate(id: string) {
+  public static async deactivate(id: string, hostId: string) {
+    const signupForm = await EventSignupForms.findOne({
+      where: { id: id, createdBy: { id: hostId } },
+    });
+
+    if (!signupForm) {
+      throw new ForbiddenError('SignupForm does not exists');
+    }
+
     const data: UpdateResult = await EventSignupForms.update(id, {
       isPublished: false,
       isActive: false,
@@ -629,8 +642,16 @@ export class SignupFormsServices {
     }
   }
 
-  public static async listSubmissions(id: string, payload: any) {
+  public static async listSubmissions(id: string, hostId: string, payload: any) {
     try {
+      const signupForm = await EventSignupForms.findOne({
+        where: { id: id, createdBy: { id: hostId } },
+      });
+
+      if (!signupForm) {
+        throw new ForbiddenError('SignupForm does not exists');
+      }
+
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
 
