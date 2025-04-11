@@ -38,9 +38,9 @@ export class VouchRequestService {
       },
     });
     const event = await this.dbConnection
-    .getRepository(Event)
-    .findOne({ where: { id: payload.eventId } });
-  if (!event) throw new NotFoundError('Event not found');
+      .getRepository(Event)
+      .findOne({ where: { id: payload.eventId } });
+    if (!event) throw new NotFoundError('Event not found');
 
     if (existingVouchRequest) throw new ConflictError('Vouch request already exists');
 
@@ -66,12 +66,15 @@ export class VouchRequestService {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.userId },
     });
-      //send text message
+    //send text message
     if (user?.phoneNumber) {
-      let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'
+      let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
       let textMessage = `Hey ${user?.firstName || 'User'} - Someone has requested your vouch to attend ${event?.name || 'Event'}. Click to Refer them now! ${link}`;
       // Send SMS notification
-      sendSmsNotification({ phoneNumber: user?.phoneNumber, textMessage }); /** status: Tested and working fine */
+      sendSmsNotification({
+        phoneNumber: user?.phoneNumber,
+        textMessage,
+      }); /** status: Tested and working fine */
     }
     //ends here
     return '';

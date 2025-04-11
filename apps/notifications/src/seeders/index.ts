@@ -593,7 +593,7 @@ export class SeedDatabase {
           {
             key: 'first_name',
             mandatory: true,
-          }
+          },
         ],
       },
       {
