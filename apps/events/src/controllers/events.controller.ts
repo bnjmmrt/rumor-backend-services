@@ -18,6 +18,8 @@ import {
   ToggleGuestCheckStatusResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 
+
+
 import {
   AddEventToFeaturedSectionDto,
   AddressValidationDto,
@@ -37,6 +39,8 @@ import {
   ToggleGuestCheckStatusRequestDto,
 } from 'rumor-utils/shared/events/dtos/events.dto';
 
+
+
 import { UserAndIdRequestDto, RequestByIdDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import {
   CreateResponse,
@@ -55,6 +59,8 @@ import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+import { CreateSurveyRequestDto } from 'src/interfaces/survey.interface';
+
 
 export class EventsController {
   public static listEventStatus = asyncWrapper(
@@ -517,6 +523,32 @@ export class EventsController {
       const { eventId } = req.body;
       const response = await EventsService.sendEventRemindersToAllGuests(eventId);
       const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static createSurvey = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const payload: CreateSurveyRequestDto = req.body;
+      const response = await EventsService.createSurvey(payload);
+      const successResponse = new CreateResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static listSurveys = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const response = await EventsService.listSurveys();
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static getSurveyById = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const response = await EventsService.getSurveyById(id);
+      const successResponse = new GetResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );

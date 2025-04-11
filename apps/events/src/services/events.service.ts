@@ -67,6 +67,8 @@ import {
   QuizQuestion,
   UserRole,
 } from '../../packages/rumor-utils/shared/entities';
+import { Survey } from '../../packages/rumor-utils/shared/events/entities';
+import { CreateSurveyResponse, SurveyListResponse } from '../interfaces/survey.interface';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import {
@@ -115,6 +117,7 @@ import {
   CreateQuizQuestionRequestDto,
   UpdateQuizQuestionRequestDto,
 } from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
+import { CreateSurveyRequestDto } from '../interfaces/survey.interface';
 import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role.pb';
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
@@ -147,6 +150,7 @@ import {
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { generateBranchLink } from '../utils/branch.utils';
 import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
+import { SurveyResponses } from '../../packages/rumor-utils/shared/events/entities'
 
 const responses = {
   conflict: (message: string) => ({
@@ -4429,12 +4433,59 @@ export class EventsService {
 
       const eventIds = events.map(event => event.id);
 
-      if (eventIds.length > 0) {
-        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-      }
-      return responses.ok;
-    } catch (error) {
-      console.log(error);
+    if (eventIds.length > 0) {
+      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
     }
+    return responses.ok;
+  }
+  catch (error) {
+      throw new BadRequestError('Error deleting host events');
+    }
+  }
+
+  public static async createSurvey(payload: CreateSurveyRequestDto): Promise<CreateSurveyResponse> {
+    const survey = await this.dbConnection.getRepository(Survey).create(payload);
+    const savedSurvey = await this.dbConnection.getRepository(Survey).save(survey);
+    return {
+      id: savedSurvey.id,
+      title: savedSurvey.title,
+      message: savedSurvey.message,
+      imageUrl: savedSurvey.imageUrl,
+      eventStartDate: savedSurvey.eventStartDate,
+      eventEndDate: savedSurvey.eventEndDate,
+      surveyStartDate: savedSurvey.surveyStartDate,
+      surveyEndDate: savedSurvey.surveyEndDate,
+      status: savedSurvey.status,
+    };
+  }
+
+    public static async listSurveys(): Promise<SurveyListResponse> {
+    const surveys = await this.dbConnection.getRepository(Survey).find();
+    //Add responses count to each survey as well as whether it's upcoming, live, or past
+    const surveysWithResponses = await Promise.all(surveys.map(async (survey) => {
+      const responses = await this.dbConnection.getRepository(SurveyResponses).count({ where: { survey: { id: survey.id } } });
+      return { ...survey, responses };
+    }));
+    //Add whether it's upcoming, live, or past
+    const surveysWithStatus = surveysWithResponses.map((survey) => {
+      const now = new Date();
+      if (survey.surveyStartDate > now) {
+        return { ...survey, status: 'upcoming' };
+      }
+      if (survey.surveyStartDate <= now && survey.surveyEndDate >= now) {
+        return { ...survey, status: 'live' };
+      }
+      return { ...survey, status: 'past' };
+    });
+    return {
+      past: surveysWithStatus.filter((survey) => survey.status === 'past'),
+      live: surveysWithStatus.filter((survey) => survey.status === 'live'),
+      upcoming: surveysWithStatus.filter((survey) => survey.status === 'upcoming'),
+    };
+  }
+
+  public static async getSurveyById(id: string): Promise<Survey> {
+    const survey = await this.dbConnection.getRepository(Survey).findOne({ where: { id } });
+    return survey;
   }
 }

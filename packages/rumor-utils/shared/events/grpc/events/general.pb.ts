@@ -767,4 +767,25 @@ export interface TicketBreakdown {
   collaborator: Collaborator;
 }
 
+export interface CreateSurveyRequest {
+  title: string;
+  message: string;
+  imageUrl: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  surveyStartDate: Date;
+  surveyEndDate: Date;
+}
+
+export interface CreateSurveyResponse {
+  id: string;
+  title: string;
+  message: string;
+  imageUrl: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  surveyStartDate: Date;
+  surveyEndDate: Date;
+}
+
 export const EVENTS_PACKAGE_NAME = 'events';

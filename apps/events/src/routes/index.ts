@@ -189,6 +189,18 @@ router.get(
   '/ticket-types/:id/ticket-breakdown',
   TicketTypeController.getTicketBreakdown,
 ); /**TestStatus: working */
+//Surveys
+router.post('/surveys', 
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.createSurvey);
+router.get('/surveys', 
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.listSurveys);
+
+router.get('/surveys/:id', 
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getSurveyById);
+  
 // Collaborators
 router.get(
   '/collaborators/roles',
