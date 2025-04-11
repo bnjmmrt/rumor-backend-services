@@ -214,7 +214,6 @@ export class EventsService {
       const existingItem = await this.dbConnection.getRepository(EventTypes).findOne({
         where: {
           name: item.name,
-          createdAt: IsNull(),
         },
       });
       if (existingItem) throw new ConflictError('Event type with the same name already exists');

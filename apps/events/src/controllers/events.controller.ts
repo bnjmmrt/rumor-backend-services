@@ -69,7 +69,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: CreateEventTypeRequestDto = req.body;
       const createdEventType: EventTypeData = await EventsService.createEventType(payload);
-      const successResponse = new CreateResponse(createdEventType);
+      const successResponse = new CreateResponse(createdEventType, "Event type created succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
@@ -78,7 +78,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: QueryRequestDto = req.query;
       const eventTypeResponse: EventTypesData = await EventsService.listEventTypes(payload);
-      const successResponse = new GetResponse(eventTypeResponse);
+      const successResponse = new GetResponse(eventTypeResponse, "Event types retreived succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
@@ -87,7 +87,7 @@ export class EventsController {
     const { id } = req.params;
     const payload: RequestByIdDto = { id };
     const getEventTypeResponse: EventTypeData = await EventsService.getEventType(payload);
-    const successResponse = new GetResponse(getEventTypeResponse);
+    const successResponse = new GetResponse(getEventTypeResponse, '"Event type retreived succesfully"');
     res.status(successResponse.statusCode).json(successResponse);
   });
 
@@ -95,7 +95,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: UpdateEventTypeRequestDto = { ...req.body, ...req.params };
       const updatedEventTypesData: EventTypeResponse = await EventsService.updateEventType(payload);
-      const successResponse = new UpdateResponse();
+      const successResponse = new UpdateResponse(updatedEventTypesData.data, "Event type updated succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
