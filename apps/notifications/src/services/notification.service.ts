@@ -23,11 +23,9 @@ class NotificationService {
   ) {
     try {
       const recipientList = Array.isArray(recipients) ? recipients : [recipients];
-      console.log("🚀 ~ NotificationService ~ recipientList:", recipientList)
 
       // Fetch notification template
       const notificationTemplate = getNotificationDetails(notificationType);
-      console.log("🚀 ~ NotificationService ~ notificationTemplate:", notificationTemplate)
       if (!notificationTemplate) {
         throw new Error(`Invalid notification type: ${notificationType}`);
       }
@@ -117,7 +115,6 @@ class NotificationService {
         notification.notificationImage = notificationTemplate.image;
         notification.role = notificationTemplate.role;
 
-
         if (notificationTemplate.appNotification) {
           notificationsToSave.push(notification);
         }
@@ -165,7 +162,6 @@ class NotificationService {
         await this.dbConnection.getRepository(Notification).save(notificationsToSave);
       }
 
-
       // Send push notifications in bulk, ensuring different messages per recipient
       if (pushNotifications.length > 0) {
         for (const push of pushNotifications) {
@@ -197,12 +193,11 @@ class NotificationService {
       .leftJoinAndSelect('notification.linkedEvent', 'linkedEvent')
       .orderBy('notification.createdAt', 'DESC');
 
-    
-      if (role) {
-        role = role === 'non_member' ? 'member' : role;
-        queryBuilder.andWhere('notification.role = :role', { role });
-      }
-    
+    if (role) {
+      role = role === 'non_member' ? 'member' : role;
+      queryBuilder.andWhere('notification.role = :role', { role });
+    }
+
     const totalCount = await queryBuilder.getCount();
 
     const notifications = await queryBuilder.take(take).skip(skip).getMany();
@@ -279,7 +274,10 @@ class NotificationService {
     return { totalCount, result: toNotificationslisting(notifications) };
   }
 
-  async getNotificationSummary(recipientId: string): Promise<{
+  async getNotificationSummary(
+    recipientId: string,
+    role: string,
+  ): Promise<{
     totalNotifications: number;
     notificationsByModule: Record<string, number>;
     notificationsByType: Record<string, number>;
@@ -291,6 +289,11 @@ class NotificationService {
       .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', {
         recipientId,
       });
+
+    if (role) {
+      role = role === 'non_member' ? 'member' : role;
+      queryBuilder.andWhere('notification.role = :role', { role });
+    }
 
     // Get total notifications count
     const totalNotifications = await queryBuilder.getCount();
