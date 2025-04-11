@@ -109,6 +109,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Get By urlcode
+   * @param code
+   * @returns
+   */
   public static async getByUrl(code: string) {
     try {
       const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
