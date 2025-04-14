@@ -1,13 +1,13 @@
-import { EventStatusEnum } from '../../../../packages/rumor-utils/shared/events/interfaces/event.interface';
-import { Event } from '../../../../packages/rumor-utils/shared/entities';
-import { convertToEpoch } from '../../../../packages/rumor-utils/shared/events/utils/event.utils';
+import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { Event } from 'rumor-utils/shared/entities';
+import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import {
   NotFoundError,
   BadRequestError,
   ValidationError,
-} from '../../../../packages/rumor-utils/errors';
-import { SchedulerJobType } from '../../../../packages/rumor-utils/shared/schedulars/interfaces/schedular.interface';
+} from 'rumor-utils/errors';
+import { SchedulerJobType } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 import serviceMesh from 'src/server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
@@ -132,7 +132,7 @@ export class SchedulerService {
       }
       console.log('inside scheduler rminde');
       schedule.scheduleJob(reminderTime, async () => {
-        const savedEvent = await Event.findOne({
+        const savedEvent: any = await Event.findOne({
           where: { id: e.id },
           relations: { location: true },
         });

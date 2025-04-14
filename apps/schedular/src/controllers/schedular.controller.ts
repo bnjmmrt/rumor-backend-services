@@ -7,7 +7,7 @@ import {
   DeleteResponse,
   GetResponse,
   UpdateResponse,
-} from '../../../../packages/rumor-utils/success';
+} from 'rumor-utils/success';
 
 export class SchedulerController {
   public static triggerSchedulerJob = asyncWrapper(
