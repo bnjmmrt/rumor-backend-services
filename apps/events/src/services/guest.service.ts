@@ -273,22 +273,22 @@ export class GuestService {
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             const smsPromises: Promise<{ success: boolean }>[] = [];
-        
+
             const baseRedirectUrl = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
-        
+
             for (const guest of updateGuests) {
               const { phoneNumber, invitationSource, userId } = guest;
-        
+
               if (!phoneNumber) continue;
-        
+
               const shouldSendApproval =
                 guestStatus === GuestStatus.CONFIRMED &&
                 [GuestStatus.APPLIED, GuestStatus.DECLINED].includes(currentStatus as GuestStatus);
-        
+
               const shouldSendDecline =
                 guestStatus === GuestStatus.DECLINED &&
                 [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(currentStatus as GuestStatus);
-        
+
               let textMessage: string | null = null;
               if (shouldSendDecline && invitationSource === UserSource.SIGN_UP_FORM) {
                 textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
@@ -299,18 +299,21 @@ export class GuestService {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
               }
-        
+
               if (textMessage) {
                 smsPromises.push(sendSmsNotification({ phoneNumber, textMessage }));
               }
             }
-        
+
             await Promise.all(smsPromises);
 
             // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
-              if (guestStatus === GuestStatus.DECLINED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED))
+              if (
+                guestStatus === GuestStatus.DECLINED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -319,7 +322,10 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.CONFIRMED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED))
+              if (
+                guestStatus === GuestStatus.CONFIRMED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
