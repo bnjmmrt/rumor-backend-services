@@ -51,7 +51,7 @@ import {
   GenerateTicketForGuestData,
   ToggleGuestCheckStatusData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
+import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
@@ -496,6 +496,15 @@ export class EventsController {
       const payload = { id: req.params.id };
       const response = await EventsService.deleteHostEvents(payload);
       const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static sendEventRemindersToAllGuests = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { eventId } = req.body;
+      const response = await EventsService.sendEventRemindersToAllGuests(eventId);
+      const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
