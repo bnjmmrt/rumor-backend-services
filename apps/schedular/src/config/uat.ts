@@ -6,7 +6,7 @@ const config = {
     },
   ],
   values: {
-    PORT: 8000,
+    PORT: 8003,
     NODE_ENV: 'uat',
   },
 };

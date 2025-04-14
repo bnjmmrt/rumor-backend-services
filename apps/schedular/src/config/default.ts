@@ -6,7 +6,7 @@ const config = {
     },
   ],
   values: {
-    PORT: 8000,
+    PORT: 8003,
     FILE_SIZE_IN_BYTES: '5000000',
     POSTGRES_USERNAME: "",
     POSTGRES_PASSWORD: "",
