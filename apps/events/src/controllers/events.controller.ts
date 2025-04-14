@@ -502,9 +502,8 @@ export class EventsController {
 
   public static sendEventRemindersToAllGuests = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const payload: Event = req.body;
-      console.log('inside event', payload.name);
-      const response = await EventsService.sendEventRemindersToAllGuests(payload);
+      const {eventId} = req.body;
+      const response = await EventsService.sendEventRemindersToAllGuests(eventId);
       const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },

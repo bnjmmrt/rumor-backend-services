@@ -4,5 +4,5 @@ import { SchedulerController } from '../controllers/schedular.controller';
 
  const router: Router = express.Router();
 
-router.post('/api/scheduler/trigger', SchedulerController.triggerSchedulerJob)
+router.post('/schedular/trigger', SchedulerController.triggerSchedulerJob)
 export default router;

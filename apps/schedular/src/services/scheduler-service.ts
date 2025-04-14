@@ -3,17 +3,14 @@ import { Event } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import {
-  NotFoundError,
   BadRequestError,
-  ValidationError,
 } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
-  public static async triggerJob(payload: any): Promise<any> {
+  public static async triggerJob(payload: any): Promise<string> {
     const { type, data } = payload;
-    console.log('inside scheduler payload', payload);
     if (!type || !data) {
       throw new BadRequestError('Type and data are required.');
     }
@@ -30,7 +27,7 @@ export class SchedulerService {
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
-    throw new BadRequestError(`${type} job scheduled successfully.`);
+    return ''
   }
 
   public static async scheduleEventOnServerRestart() {
@@ -130,20 +127,18 @@ export class SchedulerService {
       if (reminderTime <= currentTime) {
         return;
       }
-      console.log('inside scheduler rminde');
       schedule.scheduleJob(reminderTime, async () => {
-        const savedEvent: any = await Event.findOne({
+        const savedEvent: Event = await Event.findOne({
           where: { id: e.id },
           relations: { location: true },
         });
-        console.log('savedEvent', savedEvent.name, savedEvent.status);
         if (!savedEvent) {
           return; // Stop execution if the event is deleted
         }
         if (savedEvent.status === EventStatusEnum.APPROVED_STATUS) {
           console.log(`Executing event reminder for event: ${savedEvent?.name}`);
           try {
-            serviceMesh.eventService().sendEventRemindersToAllGuests(savedEvent);
+            serviceMesh.eventService().sendEventRemindersToAllGuests(savedEvent.id);
           } catch (err) {
             console.log(`Error in sending event reminder ::`, err);
           }
