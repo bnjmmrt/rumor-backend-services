@@ -68,7 +68,7 @@ import {
   UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { Survey } from '../../packages/rumor-utils/shared/events/entities';
-import { CreateSurveyResponse, SurveyListResponse } from '../interfaces/survey.interface';
+import { CreateSurveyResponse, SurveyListResponse, UpdateSurveyRequestDto } from '../interfaces/survey.interface';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import {
@@ -4487,5 +4487,10 @@ export class EventsService {
   public static async getSurveyById(id: string): Promise<Survey> {
     const survey = await this.dbConnection.getRepository(Survey).findOne({ where: { id } });
     return survey;
+  }
+
+  public static async updateSurveyById(id: string, payload: UpdateSurveyRequestDto): Promise<Survey> {
+    await this.dbConnection.getRepository(Survey).update(id, payload);
+    return this.getSurveyById(id);
   }
 }

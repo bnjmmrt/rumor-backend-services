@@ -200,7 +200,11 @@ router.get('/surveys',
 router.get('/surveys/:id', 
   AuthMiddleware.fusionAuthRequired,
   EventsController.getSurveyById);
-  
+
+router.put('/surveys/:id', 
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.updateSurveyById);
+
 // Collaborators
 router.get(
   '/collaborators/roles',

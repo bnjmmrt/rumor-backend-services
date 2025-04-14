@@ -16,6 +16,7 @@ import {
   customListData,
   MemberEvent,
   ReferrerMembers,
+  SurveyResponse,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -317,6 +318,7 @@ export const toMemberProfile = (
   requestedEvents?: MemberEvent[],
   referredBy?: ReferrerMembers[],
   references?: IReferenceCode,
+  surveyResponses?: SurveyResponse[]
 ): MemberProfile => {
   return {
     id: user.id,
@@ -353,6 +355,24 @@ export const toMemberProfile = (
       : [],
     referralCode,
     references,
+    surveyResponses: user.surveyResponses?.map(response => ({
+      id: response.id,
+      response: response.response,
+      user: {
+        ...response.user,
+        roles: response.user.roles.map(role => ({
+          roleId: role.role.id,
+          roleName: role.role.name,
+          status: entityToUserStatus[role.status],
+          source: role.source ? entityToUserSource[role.source] : undefined
+        }))
+      },
+      survey: {
+        ...response.survey,
+        message: response.survey.message || ''
+      },
+      respondedAt: response.respondedAt.toISOString()
+    })) || [],
     company: user.additionalHostInformation
       ? {
           name: user.additionalHostInformation.companyName || '',

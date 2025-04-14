@@ -59,7 +59,7 @@ import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
-import { CreateSurveyRequestDto } from 'src/interfaces/survey.interface';
+import { CreateSurveyRequestDto, UpdateSurveyRequestDto } from 'src/interfaces/survey.interface';
 
 
 export class EventsController {
@@ -549,6 +549,16 @@ export class EventsController {
       const { id } = req.params;
       const response = await EventsService.getSurveyById(id);
       const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static updateSurveyById = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const payload: UpdateSurveyRequestDto = req.body;
+      const response = await EventsService.updateSurveyById(id, payload);
+      const successResponse = new UpdateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );

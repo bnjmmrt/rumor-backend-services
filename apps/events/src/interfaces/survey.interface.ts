@@ -10,6 +10,17 @@ export interface CreateSurveyRequestDto {
     surveyEndDate: Date;
     status: string;
   }
+
+  export interface UpdateSurveyRequestDto {
+    title?: string;
+    message?: string;
+    imageUrl?: string;
+    eventStartDate?: Date;
+    eventEndDate?: Date;
+    surveyStartDate?: Date;
+    surveyEndDate?: Date;
+    status?: string;
+  }
   
 
   export interface CreateSurveyResponse {

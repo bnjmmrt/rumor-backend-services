@@ -230,7 +230,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import {
-  RestrictedInvites,
+  RestrictedInvites, Survey, SurveyResponses,
   SignupFormSubmissions,
   Ticket,
 } from 'rumor-utils/shared/events/entities';
@@ -4629,7 +4629,7 @@ export class AuthService {
 
     if (!user) {
       throw new ForbiddenError(
-        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+        "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
       );
     }
 
@@ -4643,7 +4643,7 @@ export class AuthService {
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
-        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        "We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.",
       );
     }
 
@@ -4673,7 +4673,7 @@ export class AuthService {
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
       throw new ForbiddenError(
-        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        "We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.",
       );
     }
 
@@ -5551,6 +5551,7 @@ export class AuthService {
       'userSource',
       'declinedBy',
       'vouch',
+      'whosInTown'
     ];
     const focuses = await PlatformService.getFocuses();
 
@@ -5757,6 +5758,13 @@ export class AuthService {
       type: FilterTypeValues.followers,
     };
 
+    const surveysObj = {
+      id: 'whosInTown',
+      label: 'Who\'s In Town',
+      options: [serviceMesh.eventService().listSurveys()],
+      type: FilterTypeValues.whosInTown,
+    };
+
     const objectsMap = {
       baseCity: baseCityObj,
       gender: genderObj,
@@ -5775,6 +5783,7 @@ export class AuthService {
       declinedBy: declinedByObj,
       vouch: vouchObj,
       followersObj,
+      whosInTown: surveysObj,
     };
     // Arrange objects in the desired sequence
     const orderedObjects = filterOptionsSequence.map(id => objectsMap[id]).filter(node => node);
@@ -5988,6 +5997,10 @@ export class AuthService {
     const formattedLists = await this.getUserCustomLists(payload.id, user.id);
     const userRole = user.roles.find(r => ['member', 'non_member'].includes(r.role.name));
 
+    const surveys = await this.dbConnection.getRepository(SurveyResponses).find({
+      where: { user: { id: user.id } },
+    }); 
+
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
@@ -6004,13 +6017,46 @@ export class AuthService {
       undefined,
       undefined,
       eventCount,
+      surveys.map(survey => ({
+        id: survey.id,
+        response: survey.response,
+        user: {
+          ...survey.user,
+          roles: survey.user.roles.map(role => ({
+            roleId: role.role.id,
+            roleName: role.role.name,
+            status: entityToUserStatus[role.status],
+            source: role.source ? entityToUserSource[role.source] : undefined
+          }))
+        },
+        survey: {
+          ...survey.survey,
+          message: survey.survey.message || ''
+        },
+        respondedAt: survey.respondedAt.toISOString()
+      }))
     );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
-    userData.isHost = isHost;
+    userData.surveyResponses = surveys.map(survey => ({
+      id: survey.id,
+      response: survey.response,
+      user: {
+        ...survey.user,
+        roles: survey.user.roles.map(role => ({
+          roleId: role.role.id,
+          roleName: role.role.name,
+          status: entityToUserStatus[role.status],
+          source: role.source ? entityToUserSource[role.source] : undefined
+        }))
+      },
+      survey: survey.survey,
+      respondedAt: survey.respondedAt.toISOString()
+    }));
+
     return userData;
   }
 
