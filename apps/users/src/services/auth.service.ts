@@ -3311,8 +3311,7 @@ export class AuthService {
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
-    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()) || []
-    console.log("🚀 ~ AuthService ~ getAllusers ~ pastEventsIds:", pastEventsIds)
+    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()).filter(node=> node) || []
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
         const allListNames = customListName.split(',').map(name => name.trim());
@@ -3323,7 +3322,6 @@ export class AuthService {
         followed = separatedLists.includes('myFollowers-systemDefault');
       }
     }
-    console.log("🚀 ~ AuthService ~ getAllusers ~ customListNames:", customListNames)
 
     const idsResult = await this.dbConnection.getRepository(HostUserMapping).find({
       where: { host: { id: hostId } },
@@ -3374,7 +3372,6 @@ export class AuthService {
       //     }),
       //   );
       // }
-      console.log('pastEventsIds -----------', pastEventsIds)
       // if (pastEventsIds.length > 0) {
       //   const confirmedStatus = GuestStatus.CONFIRMED;
       
@@ -4012,7 +4009,6 @@ export class AuthService {
           host: { id: host.id },
         },
       });
-      console.log("🚀 ~ AuthService ~ hostFollowing ~ hostFollowing:", hostFollowing)
       
 
       if (hostFollowing) isMemberFollowingHost = true;
@@ -4670,23 +4666,16 @@ export class AuthService {
       // isPublished: true,
     };
     const queryString = prepareQueryString(queryParams);
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ queryString:", queryString)
     try{
     const listEvents: any =  await serviceMesh.eventService().listHostEvents(queryString)
-     console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ listEvents:", listEvents)
       mappedEvents = listEvents?.data?.result.map(event => ({
       name: event.name,
       id: event.id,
     }));
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ listEvents:", listEvents)
-
     }
     catch(e) {
-console.log('e', e)
     }
     
-   
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ mappedEvents:", mappedEvents)
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',

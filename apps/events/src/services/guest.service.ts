@@ -983,8 +983,7 @@ export class GuestService {
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
-    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()) || []
-    console.log("🚀 ~ AuthService ~ getAllusers ~ pastEventsIds:", pastEventsIds)
+    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()).filter(node=> node) || []
    
     let favorite = false;
     let followed = false;
@@ -1205,7 +1204,6 @@ export class GuestService {
         }),
       );
     }
-    console.log('pastEventsIds', pastEventsIds)
     if (pastEventsIds.length) {
       const confirmedStatus = GuestStatus.CONFIRMED;
       queryBuilder.andWhere(qb => {
@@ -1215,9 +1213,9 @@ export class GuestService {
           .from(Guest, 'g')
           .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
           .andWhere('g.status = :confirmedStatus', { confirmedStatus })
-           .andWhere('g.check_in = true')
+          .andWhere('g.check_in = true')
           .getQuery();
-        return 'user.id IN ' + subQuery;
+        return 'user.id IN (' + subQuery + ')';
       });
     }
 
@@ -2008,7 +2006,6 @@ export class GuestService {
       return null;
     };
 
-    console.log('parsedQuery.locations', parsedQuery.locations)
    // Handle multiple locations in parsedQuery.locations
     if (Array.isArray(parsedQuery.locations) && parsedQuery.locations.length > 0) {
       // First, parse the stringified locations
@@ -2020,7 +2017,6 @@ export class GuestService {
       //   console.error('Invalid locations array:', err);
       //   return responses.data([]);
       // }
-      console.log('parsedQuery.locations two', locations)
       const locationConditions = [];
 
       for (const loc of locations) {
