@@ -1,10 +1,41 @@
-import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { Event } from 'rumor-utils/shared/entities';
-import { convertToEpoch } from '../utils/event.utils';
+import { EventStatusEnum } from '../../../../packages/rumor-utils/shared/events/interfaces/event.interface';
+import { Event } from '../../../../packages/rumor-utils/shared/entities';
+import { convertToEpoch } from '../../../../packages/rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
-import { EventsService } from './events.service';
+import { NotFoundError, BadRequestError, ValidationError } from '../../../../packages/rumor-utils/errors';
+import { SchedulerJobType } from '../../../../packages/rumor-utils/shared/schedulars/interfaces/schedular.interface';
+import serviceMesh from 'src/server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
+
+  public static async triggerJob(payload: any): Promise<any> {
+    const { type, data } = payload;
+    console.log('inside scheduler payload', payload)
+    if (!type || !data) {
+      throw new BadRequestError(
+        'Type and data are required.',
+      );
+    }
+    switch (type) {
+      case SchedulerJobType.PUBLISH_EVENT:
+        await this.scheduleEventPublishDate(data);
+        break;
+      case SchedulerJobType.REMINDER_EVENT:
+        await this.prepareEventReminderDataAndSchedule(data);
+        break;
+      case SchedulerJobType.PAST_OR_CANCEL_EVENT:
+        await this.scheduleEventPastAndCancelledDate(data);
+        break;
+      default:
+        throw new BadRequestError(
+          `Invalid scheduler type: ${type}`
+        );
+    }
+    throw new BadRequestError(
+      `${type} job scheduled successfully.`
+    );
+  }
+
   public static async scheduleEventOnServerRestart() {
     try {
       const events: Event[] = await Event.find();
@@ -79,7 +110,7 @@ export class SchedulerService {
     }
   }
 
-  public static async scheduleUserHardDelete() {}
+  public static async scheduleUserHardDelete() { }
 
   /**
    * Schedules an event reminder 24 hours before the event's start time.
@@ -102,17 +133,25 @@ export class SchedulerService {
       if (reminderTime <= currentTime) {
         return;
       }
+      console.log('inside scheduler rminde')
       schedule.scheduleJob(reminderTime, async () => {
+
         const savedEvent = await Event.findOne({
           where: { id: e.id },
           relations: { location: true },
         });
+        console.log('savedEvent', savedEvent.name, savedEvent.status)
         if (!savedEvent) {
           return; // Stop execution if the event is deleted
         }
         if (savedEvent.status === EventStatusEnum.APPROVED_STATUS) {
           console.log(`Executing event reminder for event: ${savedEvent?.name}`);
-          await EventsService.sendEventRemindersToAllGuests(savedEvent);
+          try {
+            serviceMesh.eventService().sendEventRemindersToAllGuests(savedEvent)
+          }
+          catch (err) {
+            console.log(`Error in sending event reminder ::`, err);
+          }
         }
       });
     } catch (err) {
