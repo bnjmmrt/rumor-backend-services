@@ -2068,11 +2068,10 @@ export class GuestService {
     });
 
     const response = {
-      upcoming: [] as Array<SimpleGuestEventData>,
-      invited: [] as Array<SimpleGuestEventData>,
-      past: [] as Array<SimpleGuestEventData>,
-      requested: [] as Array<SimpleGuestEventData>,
-      totalEvents: events.length,
+      upcoming: [] as SimpleGuestEventData[],
+      invited: [] as SimpleGuestEventData[],
+      past: [] as SimpleGuestEventData[],
+      requested: [] as SimpleGuestEventData[],
     };
 
     const dateNow = new Date();
@@ -2103,7 +2102,9 @@ export class GuestService {
       }
     });
 
-    return response;
+    const totalEvents = Object.values(response).reduce((acc, curr) => acc + curr.length, 0);
+
+    return {...response, totalEvents};
   }
 
   public static async listEventGuests(
