@@ -4625,15 +4625,10 @@ export class AuthService {
       ],
       type: FilterTypeValues.type,
     };
-    const now = new Date();
     let mappedEvents: any = [];
-    //TODO: check if this logic affects on date format changes
-    // const formattedDate = formatDateToMMDDYYYYHHmm(now);
     const queryParams = {
       ownerId: userId,
       status: 'PAST_STATUS',
-      // maxEndDate: formattedDate,
-      // isPublished: true,
     };
     const queryString = prepareQueryString(queryParams);
     try {
