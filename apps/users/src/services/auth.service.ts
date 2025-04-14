@@ -2065,7 +2065,7 @@ export class AuthService {
 
     const [memberRole, nonMemberRole] = await Promise.all([
       this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } }),
-      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } })
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } }),
     ]);
 
     if (!memberRole || !nonMemberRole) {
@@ -2087,16 +2087,20 @@ export class AuthService {
     const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
 
     for (const user of users) {
-      const rolesForUser = userRoles.filter((ur) => ur.user.id === user.id);
-      const memberUserRole = rolesForUser.find((ur) => ur.role.name === "member");
-      const nonMemberUserRole = rolesForUser.find((ur) => ur.role.name === "non_member");
+      const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
+      const memberUserRole = rolesForUser.find(ur => ur.role.name === 'member');
+      const nonMemberUserRole = rolesForUser.find(ur => ur.role.name === 'non_member');
 
       if (!memberUserRole && !nonMemberUserRole) continue; // Skip if no relevant role
 
       switch (payload.status) {
         case UserStatus.ACTIVE:
           if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.ACTIVE, newRole: memberRole });
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              newRole: memberRole,
+            });
           } else if (memberUserRole) {
             usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE });
           }
@@ -2110,7 +2114,11 @@ export class AuthService {
 
         case UserStatus.WAITLISTED:
           if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.WAITLISTED, newRole: nonMemberRole });
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              newRole: nonMemberRole,
+            });
           } else if (nonMemberUserRole) {
             usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED });
           }
@@ -3311,7 +3319,11 @@ export class AuthService {
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
-    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()).filter(node=> node) || []
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
         const allListNames = customListName.split(',').map(name => name.trim());
@@ -3355,62 +3367,60 @@ export class AuthService {
       .skip(skip)
       .take(take);
 
-      /**past event filter */
-      // if (pastEventsIds.length > 0) {
-      //   usersQuery.andWhere(
-      //     new Brackets(qb => {
-      //       qb.where(
-      //         `EXISTS (
-      //           SELECT 1 FROM guest
-      //           WHERE guest.user_id = user.id
-      //           AND guest.event_id IN (:...pastEventsIds)
-      //           AND guest.status = 'CONFIRMED'
-      //           AND guest.checked_in = true
-      //         )`,
-      //         { pastEventsIds },
-      //       );
-      //     }),
-      //   );
-      // }
-      // if (pastEventsIds.length > 0) {
-      //   const confirmedStatus = GuestStatus.CONFIRMED;
-      
-      //   usersQuery.andWhere(
-      //     new Brackets(qb => {
-      //       const subQuery = usersQuery.connection
-      //         .createQueryBuilder()
-      //         .select('1')
-      //         .from('guest', 'g')
-      //         .where('"g"."user_id" = "user"."id"')
-      //         // .andWhere('"g"."event_id" IN (:...pastEventsIds)', { pastEventsIds })
-      //         // .andWhere('"g"."status" = :confirmedStatus', { confirmedStatus })
-      //         .andWhere('"g"."check_in" = true')
-      //         .getQuery();
-      
-      //       qb.where(`EXISTS (${subQuery})`);
-      //     }),
-      //   );
-      // }
-      
-      
-      if (pastEventsIds.length) {
-        const confirmedStatus = GuestStatus.CONFIRMED;
-      
-        usersQuery.andWhere(qb => {
-          const subQuery = qb
-            .subQuery()
-            .select('g.user_id')
-            .from(Guest, 'g')
-            .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
-            .andWhere('g.status = :confirmedStatus', { confirmedStatus })
-             .andWhere('g.check_in = true')
-            .getQuery();
-          return 'user.id IN ' + subQuery;
-        });
-      }
-      
-      
-      /**ends here */
+    /**past event filter */
+    // if (pastEventsIds.length > 0) {
+    //   usersQuery.andWhere(
+    //     new Brackets(qb => {
+    //       qb.where(
+    //         `EXISTS (
+    //           SELECT 1 FROM guest
+    //           WHERE guest.user_id = user.id
+    //           AND guest.event_id IN (:...pastEventsIds)
+    //           AND guest.status = 'CONFIRMED'
+    //           AND guest.checked_in = true
+    //         )`,
+    //         { pastEventsIds },
+    //       );
+    //     }),
+    //   );
+    // }
+    // if (pastEventsIds.length > 0) {
+    //   const confirmedStatus = GuestStatus.CONFIRMED;
+
+    //   usersQuery.andWhere(
+    //     new Brackets(qb => {
+    //       const subQuery = usersQuery.connection
+    //         .createQueryBuilder()
+    //         .select('1')
+    //         .from('guest', 'g')
+    //         .where('"g"."user_id" = "user"."id"')
+    //         // .andWhere('"g"."event_id" IN (:...pastEventsIds)', { pastEventsIds })
+    //         // .andWhere('"g"."status" = :confirmedStatus', { confirmedStatus })
+    //         .andWhere('"g"."check_in" = true')
+    //         .getQuery();
+
+    //       qb.where(`EXISTS (${subQuery})`);
+    //     }),
+    //   );
+    // }
+
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+
+      usersQuery.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN ' + subQuery;
+      });
+    }
+
+    /**ends here */
 
     if (eventId) {
       usersQuery.andWhere(
@@ -3533,8 +3543,6 @@ export class AuthService {
         });
       }
     }
-
-    
 
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
       const ageFrom =
@@ -4009,7 +4017,6 @@ export class AuthService {
           host: { id: host.id },
         },
       });
-      
 
       if (hostFollowing) isMemberFollowingHost = true;
 
@@ -4656,9 +4663,9 @@ export class AuthService {
       type: FilterTypeValues.type,
     };
     const now = new Date();
-    let mappedEvents : any = [];
+    let mappedEvents: any = [];
     //TODO: check if this logic affects on date format changes
-   // const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    // const formattedDate = formatDateToMMDDYYYYHHmm(now);
     const queryParams = {
       ownerId: userId,
       status: 'PAST_STATUS',
@@ -4666,16 +4673,14 @@ export class AuthService {
       // isPublished: true,
     };
     const queryString = prepareQueryString(queryParams);
-    try{
-    const listEvents: any =  await serviceMesh.eventService().listHostEvents(queryString)
+    try {
+      const listEvents: any = await serviceMesh.eventService().listHostEvents(queryString);
       mappedEvents = listEvents?.data?.result.map(event => ({
-      name: event.name,
-      id: event.id,
-    }));
-    }
-    catch(e) {
-    }
-    
+        name: event.name,
+        id: event.id,
+      }));
+    } catch (e) {}
+
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',

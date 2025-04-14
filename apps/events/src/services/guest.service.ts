@@ -983,8 +983,12 @@ export class GuestService {
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
-    let pastEventsIds : string[] = (parsedQuery.pastEvents as string)?.split(',').map(id => id.trim()).filter(node=> node) || []
-   
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
+
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
@@ -1053,7 +1057,6 @@ export class GuestService {
 
     queryBuilder.take(take).skip(skip);
 
-
     if (guestStatus) {
       if (guestStatus === 'DECLINED') {
         queryBuilder.andWhere('guest.status IN (:...statuses)', {
@@ -1096,7 +1099,7 @@ export class GuestService {
       customListNames,
       userSource,
       checkedInStatus,
-      pastEventsIds
+      pastEventsIds,
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -1189,7 +1192,7 @@ export class GuestService {
     customListNames,
     userSource,
     checkedInStatus,
-    pastEventsIds
+    pastEventsIds,
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -2006,12 +2009,12 @@ export class GuestService {
       return null;
     };
 
-   // Handle multiple locations in parsedQuery.locations
+    // Handle multiple locations in parsedQuery.locations
     if (Array.isArray(parsedQuery.locations) && parsedQuery.locations.length > 0) {
       // First, parse the stringified locations
       let locations: { latitude: number; longitude: number }[] = [];
       if (typeof parsedQuery.locations === 'string') {
-        locations = JSON.parse(parsedQuery.locations)
+        locations = JSON.parse(parsedQuery.locations);
       }
       //catch (err) {
       //   console.error('Invalid locations array:', err);
