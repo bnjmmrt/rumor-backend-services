@@ -231,6 +231,7 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { PlatformService } from './platform.service';
 import {
   RestrictedInvites, Survey, SurveyResponses,
+  RestrictedInvites, Survey, SurveyResponses,
   SignupFormSubmissions,
   Ticket,
 } from 'rumor-utils/shared/events/entities';
@@ -5563,7 +5564,7 @@ export class AuthService {
       'userSource',
       'declinedBy',
       'vouch',
-      'whosInTown',
+      'whosInTown'
     ];
     const focuses = await PlatformService.getFocuses();
 
@@ -5772,7 +5773,7 @@ export class AuthService {
 
     const surveysObj = {
       id: 'whosInTown',
-      label: "Who's In Town",
+      label: 'Who\'s In Town',
       options: [serviceMesh.eventService().listSurveys()],
       type: FilterTypeValues.whosInTown,
     };
@@ -6011,7 +6012,7 @@ export class AuthService {
 
     const surveys = await this.dbConnection.getRepository(SurveyResponses).find({
       where: { user: { id: user.id } },
-    });
+    }); 
 
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
@@ -6040,12 +6041,6 @@ export class AuthService {
       undefined, // instagramUsername
       '', // referralCode
       eventCount,
-      mappedGuestEvents.filter(e => e.startDate > new Date().toISOString()), // upcomingEvents
-      mappedGuestEvents.filter(e => e.endDate < new Date().toISOString()), // pastEvents
-      [], // invitedEvents
-      [], // requestedEvents
-      undefined, // referredBy
-      undefined, // references
       surveys.map(survey => ({
         id: survey.id,
         response: survey.response,
@@ -6055,14 +6050,14 @@ export class AuthService {
             roleId: role.role.id,
             roleName: role.role.name,
             status: entityToUserStatus[role.status],
-            source: role.source ? entityToUserSource[role.source] : undefined,
-          })),
+            source: role.source ? entityToUserSource[role.source] : undefined
+          }))
         },
         survey: {
           ...survey.survey,
-          message: survey.survey.message || '',
+          message: survey.survey.message || ''
         },
-        respondedAt: survey.respondedAt.toISOString(),
+        respondedAt: survey.respondedAt.toISOString()
       }))
     );
     userData.isFavourite = isFavorite;
@@ -6079,11 +6074,11 @@ export class AuthService {
           roleId: role.role.id,
           roleName: role.role.name,
           status: entityToUserStatus[role.status],
-          source: role.source ? entityToUserSource[role.source] : undefined,
-        })),
+          source: role.source ? entityToUserSource[role.source] : undefined
+        }))
       },
       survey: survey.survey,
-      respondedAt: survey.respondedAt.toISOString(),
+      respondedAt: survey.respondedAt.toISOString()
     }));
 
     return userData;

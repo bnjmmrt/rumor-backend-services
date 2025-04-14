@@ -1,6 +1,6 @@
-import { IsNotEmpty } from 'class-validator';
+import { IsNotEmpty } from "class-validator";
 
-import { IsString } from 'class-validator';
+import { IsString } from "class-validator";
 
 export class SurveyResponseDto {
   @IsString()

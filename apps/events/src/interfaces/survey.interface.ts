@@ -1,26 +1,27 @@
 import { Survey } from 'packages/rumor-utils/shared/events/entities/survey.entity';
 
 export interface CreateSurveyRequestDto {
-  title: string;
-  message: string;
-  imageUrl: string;
-  eventStartDate: Date;
-  eventEndDate: Date;
-  surveyStartDate: Date;
-  surveyEndDate: Date;
-  status: string;
-}
+    title: string;
+    message: string;
+    imageUrl: string;
+    eventStartDate: Date;
+    eventEndDate: Date;
+    surveyStartDate: Date;
+    surveyEndDate: Date;
+    status: string;
+  }
 
-export interface UpdateSurveyRequestDto {
-  title?: string;
-  message?: string;
-  imageUrl?: string;
-  eventStartDate?: Date;
-  eventEndDate?: Date;
-  surveyStartDate?: Date;
-  surveyEndDate?: Date;
-  status?: string;
-}
+  export interface UpdateSurveyRequestDto {
+    title?: string;
+    message?: string;
+    imageUrl?: string;
+    eventStartDate?: Date;
+    eventEndDate?: Date;
+    surveyStartDate?: Date;
+    surveyEndDate?: Date;
+    status?: string;
+  }
+  
 
 export interface CreateSurveyResponse {
   id: string;

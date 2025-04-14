@@ -1,9 +1,10 @@
 version: '3.8'
-
 services:
   users:
     container_name: rumour-users-service
     build:
+      context: .
+      dockerfile: apps/users/Dockerfile
       context: .
       dockerfile: apps/users/Dockerfile
     env_file:
@@ -14,10 +15,10 @@ services:
     ports:
       - "8000:8000"
     command: npm run dev
+    command: npm run dev
     depends_on:
       rumor-db:
         condition: service_healthy
-
   events:
     container_name: rumour-events-service
     build:
@@ -34,7 +35,6 @@ services:
     depends_on:
       rumor-db:
         condition: service_healthy
-
   notifications:
     container_name: rumour-notifications-service
     build:
@@ -51,24 +51,6 @@ services:
     depends_on:
       rumor-db:
         condition: service_healthy
-
-  scheduler:
-    container_name: rumour-scheduler-service
-    build:
-      context: .
-      dockerfile: apps/scheduler/Dockerfile
-    env_file:
-      - env/api.env
-    volumes:
-      - ./apps/scheduler/src:/app/src
-      - ./packages/rumor-utils:/app/packages/rumor-utils
-    ports:
-      - "8003:8003"
-    command: npm run dev
-    depends_on:
-      rumor-db:
-        condition: service_healthy
-
   rumor-db:
     image: postgres:latest
     container_name: rumor-backend-db
@@ -85,7 +67,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  
   nginx:
     container_name: load-balancer
     image: nginx:latest
@@ -96,6 +77,5 @@ services:
     depends_on:
       - users
       - events
-
 volumes:
   postgres_data:

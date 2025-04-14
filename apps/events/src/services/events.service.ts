@@ -68,11 +68,7 @@ import {
   UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { Survey } from '../../packages/rumor-utils/shared/events/entities';
-import {
-  CreateSurveyResponse,
-  SurveyListResponse,
-  UpdateSurveyRequestDto,
-} from '../interfaces/survey.interface';
+import { CreateSurveyResponse, SurveyListResponse, UpdateSurveyRequestDto } from '../interfaces/survey.interface';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import {

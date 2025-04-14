@@ -6,7 +6,7 @@ import { Survey } from './survey.entity';
 @Entity('survey_responses')
 export class SurveyResponses extends RumorBaseEntity {
   @Column({ type: 'jsonb', name: 'response' })
-  response: Record<string, any>;
+  response: string;
 
   @Column({ type: 'timestamptz', name: 'responded_at' })
   respondedAt: Date;
