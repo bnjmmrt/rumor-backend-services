@@ -310,6 +310,7 @@ export class GuestService {
             // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
+
               if (
                 guestStatus === GuestStatus.DECLINED &&
                 (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED)
