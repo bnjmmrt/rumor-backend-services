@@ -2009,31 +2009,12 @@ export class GuestService {
       return null;
     };
 
-    // Handle multiple locations in parsedQuery.locations
-    if (Array.isArray(parsedQuery.locations) && parsedQuery.locations.length > 0) {
-      // First, parse the stringified locations
-      let locations: { latitude: number; longitude: number }[] = [];
-      if (typeof parsedQuery.locations === 'string') {
-        locations = JSON.parse(parsedQuery.locations);
-      }
-      //catch (err) {
-      //   console.error('Invalid locations array:', err);
-      //   return responses.data([]);
-      // }
-      const locationConditions = [];
+    const locationCondition = await addLocationCondition(
+      Number(parsedQuery.longitude),
+      Number(parsedQuery.latitude),
+    );
+    addCondition(locationCondition, 'AND');
 
-      for (const loc of locations) {
-        const condition = await addLocationCondition(Number(loc.longitude), Number(loc.latitude));
-        if (condition) {
-          locationConditions.push(condition);
-        }
-      }
-
-      if (locationConditions.length > 0) {
-        // Combine all OR-ed location conditions into an AND clause
-        addCondition({ where: locationConditions }, 'AND');
-      }
-    }
     let status: EventStatusEnum[];
     if (parsedQuery.statusName) {
       status = String(parsedQuery.statusName)

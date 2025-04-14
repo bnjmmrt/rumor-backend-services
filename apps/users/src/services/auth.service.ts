@@ -3368,42 +3368,6 @@ export class AuthService {
       .take(take);
 
     /**past event filter */
-    // if (pastEventsIds.length > 0) {
-    //   usersQuery.andWhere(
-    //     new Brackets(qb => {
-    //       qb.where(
-    //         `EXISTS (
-    //           SELECT 1 FROM guest
-    //           WHERE guest.user_id = user.id
-    //           AND guest.event_id IN (:...pastEventsIds)
-    //           AND guest.status = 'CONFIRMED'
-    //           AND guest.checked_in = true
-    //         )`,
-    //         { pastEventsIds },
-    //       );
-    //     }),
-    //   );
-    // }
-    // if (pastEventsIds.length > 0) {
-    //   const confirmedStatus = GuestStatus.CONFIRMED;
-
-    //   usersQuery.andWhere(
-    //     new Brackets(qb => {
-    //       const subQuery = usersQuery.connection
-    //         .createQueryBuilder()
-    //         .select('1')
-    //         .from('guest', 'g')
-    //         .where('"g"."user_id" = "user"."id"')
-    //         // .andWhere('"g"."event_id" IN (:...pastEventsIds)', { pastEventsIds })
-    //         // .andWhere('"g"."status" = :confirmedStatus', { confirmedStatus })
-    //         .andWhere('"g"."check_in" = true')
-    //         .getQuery();
-
-    //       qb.where(`EXISTS (${subQuery})`);
-    //     }),
-    //   );
-    // }
-
     if (pastEventsIds.length) {
       const confirmedStatus = GuestStatus.CONFIRMED;
 
@@ -3419,7 +3383,6 @@ export class AuthService {
         return 'user.id IN ' + subQuery;
       });
     }
-
     /**ends here */
 
     if (eventId) {
