@@ -2559,13 +2559,13 @@ export class EventsService {
       ) {
         try {
           const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
-          // await this.notifyGuestsOnDateOrLocationChange({
-          //   eventPayload: payload,
-          //   eventId,
-          //   guestStatuses,
-          //   event,
-          //   existingLocation,
-          // });
+          await this.notifyGuestsOnDateOrLocationChange({
+            eventPayload: payload,
+            eventId,
+            guestStatuses,
+            event,
+            existingLocation,
+          });
         } catch (emailError) {
           // this.logger.warn(`Failed to send update email: ${emailError.message}`);
           // Email failure does NOT rollback the DB update
