@@ -51,7 +51,7 @@ import {
   GenerateTicketForGuestData,
   ToggleGuestCheckStatusData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
+import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
@@ -145,6 +145,8 @@ export class EventsController {
   public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     req.body.id = id;
+    const userId = (req as any).user;
+    req.body.ownerId = userId;
     const payload: UpdateEventRequestDto = req.body;
     const event: EventData = await EventsService.updateEvent(payload);
     const successResponse = new UpdateResponse(event);
@@ -401,8 +403,8 @@ export class EventsController {
 
   public static addEventToFeaturedSection = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const { id } = req.params;
-      const payload: AddEventToFeaturedSectionDto = { id, ...req.body };
+      const { eventId } = req.params;
+      const payload: AddEventToFeaturedSectionDto = { eventId, ...req.body };
       const eventResponse: string = await EventsService.addEventToFeaturedSection(payload);
       const successResponse = new CreateResponse(eventResponse);
       res.status(successResponse.statusCode).json(successResponse);
@@ -476,11 +478,33 @@ export class EventsController {
     },
   );
 
+  public static getGuestCountsByStatus = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const id = (req as any).user;
+      const payload: UserAndIdRequestDto = {
+        userId: id,
+        id: req.params.eventId,
+      };
+      const response: GuestCountByStatuses = await EventsService.getGuestCountsByStatus(payload);
+      const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
   public static deleteHostEvents = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const payload = { id: req.params.id };
       const response = await EventsService.deleteHostEvents(payload);
       const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static sendEventRemindersToAllGuests = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { eventId } = req.body;
+      const response = await EventsService.sendEventRemindersToAllGuests(eventId);
+      const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );

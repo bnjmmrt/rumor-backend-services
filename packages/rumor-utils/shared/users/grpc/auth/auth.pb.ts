@@ -474,6 +474,7 @@ export interface Member {
   categories: string[];
   types: string[];
   status: any;
+  source?: any;
   profilePicture?: string | undefined;
   email: string;
   instagramUsername?: string | undefined;
@@ -482,6 +483,7 @@ export interface Member {
   role?: string | undefined;
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
+  sources?: string[] | undefined;
 }
 
 export interface GetMembersResponse {
@@ -573,6 +575,7 @@ export interface MemberProfile {
   roleId?: string | undefined;
   placeId?: string | undefined;
   eventCount: number;
+  sources?: string[] | undefined;
 }
 
 export interface FocusProto {
@@ -794,6 +797,7 @@ export interface AdditionalHostInformation {
   bio?: string | undefined;
   companyLogo?: string | undefined;
   id?: string | undefined;
+  socialMedia?: SocialMedia | undefined;
 }
 
 export interface BioProfileResponse {
@@ -953,6 +957,7 @@ export interface UserWithRoles {
   phoneNumber?: string | undefined;
   profilePicture?: string | undefined;
   instagramUserName?: string | undefined;
+  isGuest?: boolean | undefined;
 }
 
 export interface GetUserWithRolesByEmailResponse {
@@ -971,6 +976,7 @@ export interface UserResponseData {
   message: string;
   hasEmail: boolean;
   hasPhone: boolean;
+  isExist?: boolean;
   user?: SimpleUser | undefined;
 }
 

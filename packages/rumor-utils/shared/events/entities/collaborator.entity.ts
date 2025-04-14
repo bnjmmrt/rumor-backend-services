@@ -65,7 +65,7 @@ export class Collaborator extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => Role, role => role.collaborators, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'role_id' })
@@ -73,7 +73,7 @@ export class Collaborator extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => User, user => user.collaborators, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
@@ -81,7 +81,7 @@ export class Collaborator extends RumorBaseEntity {
 
   @Index()
   @ManyToOne(() => TicketType, ticketType => ticketType.collaborators, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'ticket_type_id' })

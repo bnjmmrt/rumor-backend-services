@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, QueryRunner } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
 import database from '../database';
 import config from '../config';
 
@@ -92,6 +92,7 @@ import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-cus
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
 import { TemporaryPasswordToken } from 'rumor-utils/shared/users/entities/temporary-password-token.entity';
+import { ReferredUser } from 'rumor-utils/shared/users/entities/referred-user.entity';
 
 import {
   LoginRequest,
@@ -185,6 +186,7 @@ import {
   entityToUserSource,
   entityToUserStatus,
   newUserStatusTosUserStatus,
+  userSourceToEntity,
 } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -200,7 +202,13 @@ import * as tz from 'dayjs/plugin/timezone';
 import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  AuthorizationError,
+} from 'rumor-utils/errors';
 import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
 
@@ -209,12 +217,14 @@ import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.en
 import { Report } from 'rumor-utils/shared/users/entities/report.entity';
 import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
-import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -390,13 +400,33 @@ export class AuthService {
     // Always use `newMember` for user creation
     let newUser = newMember(payload, address);
 
-    // Retain ID if user exists
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // Si el usuario existe, actualizamos sus campos manteniendo la información existente
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recuperamos el usuario actualizado con sus relaciones
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // Si es un usuario nuevo, creamos uno nuevo con la información proporcionada
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
 
     if (payload.instagramAccessToken) {
@@ -444,11 +474,34 @@ export class AuthService {
         );
       }
       newUser.id = fusionAuthUser.response?.user?.id;
-      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
+      fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    // Only assign if not exits
+    if (!existingUser) {
+      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
+    } else {
+      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          user: existingUser,
+        },
+        relations: {
+          role: true,
+        },
+      });
+      for (let item of actualRoles) {
+        if (
+          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
+            item.source as UserSource,
+          )
+        ) {
+          await this.dbConnection
+            .getRepository(UserRole)
+            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
+        }
+      }
+    }
+
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
       focusIds: payload.focusIds,
@@ -466,11 +519,11 @@ export class AuthService {
         [
           {
             key: 'applicants_name',
-            value: `${newUser.firstName} ${newUser.lastName}`,
+            value: `${newUser.firstName}`,
           },
         ],
         'Application Submitted',
-        [newUser.email.trim()], // Send email to the member
+        [newUser.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -535,13 +588,17 @@ export class AuthService {
         roleName: role.role.name,
         roleId: role.role.id,
       })),
-      token: fusionAuthToken, // Now token is set correctly
+      token: fusionAuthToken,
     };
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
     payload.email = payload.email.toLowerCase();
-    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: UserRole | null;
+    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
+    let userHasOtherRoles: boolean = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
+
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -553,22 +610,35 @@ export class AuthService {
     });
 
     if (user) {
-      userRoleAsMemberOrNonMember = user.roles.find(item => {
-        if (item.role.name == 'non_member' || item.role.name == 'member') return item;
-      });
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
+      userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
-      userRoleExistsAsHost = user.roles.find(item => {
-        if (item.role.name == 'host') return item;
-      });
+      phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
+      emailInUse = user.email === payload.email;
 
       if (userRoleExistsAsHost) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError('Phone number is already in use.');
+        if (phoneNumberInUse && emailInUse) {
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
+        } else if (phoneNumberInUse) {
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
+        } else if (emailInUse) {
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
+      }
 
-        if (user.email === payload.email) {
-          throw new BadRequestError('Email is already in use.');
-        }
+      if (userHasOtherRoles) {
+        throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
     }
 
@@ -595,7 +665,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -648,11 +718,19 @@ export class AuthService {
   }
 
   public static async logout(payload: TokenRequestDto): Promise<string> {
-    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    let response;
+    try {
+      response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    } catch (error) {}
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError('Invalid session token.');
     }
+
+    await this.dbConnection.getRepository(PushNotificationToken).delete({
+      notificationToken: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
     return '';
   }
 
@@ -811,14 +889,21 @@ export class AuthService {
       email: payload.email,
       sendForgotPasswordEmail: false,
     };
-    const forgotPasswordResponse = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .forgotPassword(passwordResetRequest);
-    const token = forgotPasswordResponse.response?.changePasswordId;
-    if (!token) {
-      throw new BadRequestError('Unable to call forgot password, please try again later.');
-    }
     const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
     if (isAdmin) {
       const redirectPath = `new-password?token=${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -829,7 +914,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
         // this.logger,
       );
@@ -850,7 +935,7 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email.trim()],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       if (!mailServiceResponse) {
@@ -937,6 +1022,7 @@ export class AuthService {
     if (user) {
       throw new ConflictError('This email is already taken');
     }
+    await this.sendVerificationCodeByEmail({ email: payload.email });
     return { isValid: true };
   }
 
@@ -1044,10 +1130,13 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
-    if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
+    if (payload?.phoneNumber) {
+      let message =
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
+        (payload.referralCode
+          ? `Enter code ${payload.referralCode} to expedite your application review.`
+          : ``) +
+        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
 
       //Micro-service call
       try {
@@ -1055,12 +1144,6 @@ export class AuthService {
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
         }
       } catch (err) {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
@@ -1071,7 +1154,11 @@ export class AuthService {
       const params = [
         {
           key: 'invitee_first_name',
-          value: payload.name,
+          value: payload.name?.split(' ')[0] || 'User',
+        },
+        {
+          key: 'link_to_application',
+          value: config.get('USERS_SERVICE_BASE_URL') + '/redirect', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -1084,14 +1171,14 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh
+        await serviceMesh
           .notificationService()
-          .sendEmailFromTemplate(params, 'Invite New Member', [payload.email.trim()], null);
-        if (!success) {
-          throw new BadRequestError(
-            'An error occured while sending SMS invitation, please try again.',
+          .sendEmailFromTemplate(
+            params,
+            'Invite New Member',
+            [payload.email.trim().toLowerCase()],
+            null,
           );
-        }
       } catch (error) {}
     }
 
@@ -1142,14 +1229,14 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh
+      await serviceMesh
         .notificationService()
-        .sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email.trim()], null);
-      if (!success) {
-        throw new BadRequestError(
-          'An error occured while sending Email invitation, please try again.',
+        .sendEmailFromTemplate(
+          params,
+          'Host Invited by Rumor Admin',
+          [payload.email.trim().toLowerCase()],
+          null,
         );
-      }
     } catch (error) {}
 
     return '';
@@ -1303,7 +1390,13 @@ export class AuthService {
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    try {
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
+      throw new BadRequestError(JSON.stringify(error));
+    }
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -1323,31 +1416,20 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
-        if (
-          config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber ||
-          !config.get('BYPASS_VERIFICATION_CODE')
-        ) {
-          const message = 'Your Rumor verification code: ' + code.response.code;
-          try {
-            const validateNumber = isValidPhoneNumber(payload.phoneNumber);
-            if (validateNumber) {
-              const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
-              await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-            } else {
-              // Log the issue and exit early (no throw)
-              console.log(
-                `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-              );
-              return; // or just skip sending, depending on your function structure
-            }
-          } catch (err) {
-            console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        const message = 'Your Rumor verification code: ' + code.response.code;
+        try {
+          const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
     } catch (error) {}
@@ -1379,25 +1461,37 @@ export class AuthService {
       });
     }
 
+    if (user && user.roles.length) {
+      const isUnapprovedHost =
+        user.roles.length === 1 &&
+        user.roles.filter(
+          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
+        ).length > 0;
+
+      if (isUnapprovedHost) {
+        throw new AuthorizationError(
+          'Your host application is still under review. Please check back later.',
+        );
+      }
+    }
+
     if (payload.isDeactivated && user.isDeactivated) {
       this.reactivateUserAccount({ email: user.email });
     }
 
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
-      try {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
-      } catch (error) {}
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1427,19 +1521,17 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-      try {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
-      } catch (error) {}
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1469,20 +1561,52 @@ export class AuthService {
     }
 
     // Handle bypass verification logic for testing or review environment
-    if (
-      config.get('APP_REVIEW_LOGIN') === loginIdentifier ||
-      config.get('BYPASS_VERIFICATION_CODE')
-    ) {
-      const temporaryCode = await this.dbConnection
-        .getRepository(TemporaryLoginCode)
-        .findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+    if (config.get('BYPASS_VERIFICATION_CODE')) {
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          code: payload.code,
+        },
+      });
+
+      if (!temporaryCode) {
+        if (!isEmailLogin) {
+          const verificationResult = await serviceMesh
+            .notificationService()
+            .verifyCode(payload.phoneNumber, payload.code);
+          const isVerified = verificationResult?.data?.verified === true;
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: user.roles.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } else {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
+      }
+
+      // Setting up Payload.code to bypass verification for below email and phone number
+      if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
+        payload.code = temporaryCode.code;
+      } else if (payload.code !== temporaryCode.code) {
+        throw new BadRequestError('Invalid or expired verification code, please try again.');
+      }
 
       let completedLogin;
       try {
         completedLogin = await fusionAuthClientHandler
           .fusionAuthClient()
-          .passwordlessLogin({ code: temporaryCode.code });
+          .passwordlessLogin({ code: payload.code });
       } catch (error) {
         try {
           const verificationResult = isEmailLogin
@@ -1602,10 +1726,14 @@ export class AuthService {
     try {
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
     } catch (e) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     if (!authenticatedUser) {
-      throw new BadRequestError('Invalid email or password');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
     }
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
@@ -1616,6 +1744,7 @@ export class AuthService {
       hostDetails: {
         companyLogo: additionalHostInformation?.companyLogo || '',
         companyName: additionalHostInformation?.companyName || '',
+        socialMedia: additionalHostInformation?.socialMedia || {},
         id: user.id,
       },
     };
@@ -2013,22 +2142,43 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+            value: config.get('USERS_SERVICE_BASE_URL') + '/redirect',
+          },
+          {
+            key: 'first_name',
+            value: `${user.firstName}`,
           },
         ],
         'Member Approved into Rumor',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
 
     try {
       // Send Notification
-      serviceMesh
+
+      await serviceMesh
         .notificationService()
         .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
     } catch (error) {
       console.log('🚀 ~ AuthService ~ approveMember ~ error:', error);
+    }
+
+    //send text notification
+    let userPhoneNumber = user?.phoneNumber;
+    if (userPhoneNumber) {
+      try {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+        const validateNumber = isValidPhoneNumber(userPhoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+      }
     }
 
     return responses.ok;
@@ -2182,20 +2332,45 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
+          console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
                 {
                   key: 'link_to_application',
-                  value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+                  value: link,
+                },
+                {
+                  key: 'first_name',
+                  value: `${user.firstName}`,
                 },
               ],
               'Member Approved into Rumor',
-              [user.email.trim()], // Send email to the approved member
+              [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
+
+            // Send Notification
+            await serviceMesh
+              .notificationService()
+              .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+            //send text message
+            let userPhoneNumber = user?.phoneNumber;
+            if (userPhoneNumber) {
+              try {
+                let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+                const validateNumber = isValidPhoneNumber(userPhoneNumber);
+                if (validateNumber) {
+                  const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+                  await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                }
+              } catch (err) {
+                console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+              }
+            }
           }
         }
       } catch (error) {}
@@ -3000,6 +3175,10 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: user.id } },
+    });
+
     const data = {
       name: user.firstName + ' ' + user.lastName,
       email: user.email,
@@ -3017,6 +3196,7 @@ export class AuthService {
           id: item.role.id,
         };
       }),
+      isGuest: !!guest,
     };
 
     return data;
@@ -3091,7 +3271,9 @@ export class AuthService {
       newUser.phoneNumber = payload.phoneNumber ?? '';
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;
@@ -3135,6 +3317,7 @@ export class AuthService {
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
+          isExist: true,
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
@@ -3155,6 +3338,7 @@ export class AuthService {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
+        isExist: false,
         user: toCreateUser(existingUser),
       };
     }
@@ -3179,6 +3363,7 @@ export class AuthService {
 
     return {
       message: 'User created successfully.',
+      isExist: false,
       hasEmail,
       hasPhone,
       user: toCreateUser(user),
@@ -3232,7 +3417,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -3244,7 +3429,7 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email.trim()],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       }
@@ -3274,6 +3459,8 @@ export class AuthService {
 
     if (isValid) {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    } else {
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     return { verified: isValid };
@@ -3350,6 +3537,7 @@ export class AuthService {
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
       .where('user.deletedAt IS NULL')
+      .andWhere('user.id != :hostId', { hostId })
       .andWhere(
         new Brackets(qb => {
           qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
@@ -3629,8 +3817,8 @@ export class AuthService {
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
+      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      .where('user.deletedAt IS NULL')
       .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
@@ -3679,7 +3867,27 @@ export class AuthService {
       );
     }
 
-    const users = await usersQuery.getMany();
+    let users = await usersQuery.getMany();
+    users = users.filter(item => {
+      const rolesList = item?.roles?.map(item => item.role.name);
+      if (
+        rolesList.includes(RoleType.Admin) ||
+        rolesList.includes(RoleType.RumorSuperAdmin) ||
+        rolesList.includes(RoleType.RumorManager) ||
+        rolesList.includes(RoleType.Host) ||
+        rolesList.includes(RoleType.MainHost) ||
+        rolesList.includes(RoleType.CoHost) ||
+        rolesList.includes(RoleType.Promotor) ||
+        rolesList.includes(RoleType.Contributor) ||
+        rolesList.includes(RoleType.CheckIn)
+      ) {
+        return false;
+      } else if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
+        //filter users with desired roles
+        return item;
+      }
+    });
+
     const members = await Promise.all(
       users.map(async user => {
         // Micro-service call
@@ -3697,14 +3905,19 @@ export class AuthService {
             },
           });
 
-        return toMember(
+        const sources = user?.roles.map(item => item.source as string);
+
+        const member = toMember(
           user,
           focuses,
           interests,
           user.roles[0],
           socialNetworkObject,
           socialProvider?.username,
+          sources,
         );
+
+        return member;
       }),
     );
     return responses.data(members);
@@ -3717,29 +3930,48 @@ export class AuthService {
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const allEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
-      GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const upcomingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.start_date > now()
+            GROUP BY e.owner_id
+        `;
     const pastEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.end_date < now()
+            GROUP BY e.owner_id
+        `;
     const declinedEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DECLINED_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const draftEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DRAFT_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const pendingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'PENDING_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
 
     const queryBuilder = this.dbConnection
       .getRepository(User)
@@ -3827,7 +4059,7 @@ export class AuthService {
     });
 
     const isAllowed = userRoles.find(
-      role => role.role.name === 'admin' || role.role.parentRole.name === 'admin',
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
@@ -3871,6 +4103,7 @@ export class AuthService {
         throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
+      console.log(e);
       if (e.statusCode != 404) {
         throw new ConflictError('Than error happens when trying register an user.');
       }
@@ -3935,6 +4168,7 @@ export class AuthService {
     const newUser = await fusionAuthClientHandler
       .fusionAuthClient()
       .register(user.id, registrationRequest);
+
     if (newUser.statusCode !== 200) {
       throw new ConflictError('There wass an issue creating an admin');
     }
@@ -3992,6 +4226,23 @@ export class AuthService {
 
       if (isBlocked) isMemberBlockedHost = true;
     }
+    // Add this above the return statement
+    const confirmedGuestEvents = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        user: { id: memberId },
+        status: GuestStatus.CONFIRMED,
+        event: {
+          owner: { id: host.id },
+          endDate: LessThanOrEqual(new Date()),
+          status: EventStatusEnum.PAST_STATUS,
+        },
+      },
+      relations: {
+        event: {
+          location: true,
+        },
+      },
+    });
 
     return toHostProfile(
       host,
@@ -4001,6 +4252,7 @@ export class AuthService {
       isMemberBlockedHost,
       roleId,
       roleName,
+      confirmedGuestEvents,
     );
   }
 
@@ -4165,7 +4417,7 @@ export class AuthService {
 
       const skippedUsers: string[] = [];
       const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-
+      const smsToSend: { phoneNumber: string; message: string }[] = [];
       for (const user of users) {
         const hostRole = hostRoles.find(
           role =>
@@ -4212,6 +4464,16 @@ export class AuthService {
                 },
               ],
             });
+            if (user?.phoneNumber) {
+              //Micro-service call
+              try {
+                let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+                smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+              } catch (err) {
+                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
+              }
+            }
           }
         } else if (
           newUserStatusTosUserStatus[payload.status] ===
@@ -4258,10 +4520,30 @@ export class AuthService {
           emailsToSend.map(email =>
             serviceMesh
               .notificationService()
-              .sendEmailFromTemplate(email.data, email.subject, [email.email.trim()], null),
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim().toLowerCase()],
+                null,
+              ),
           ),
         );
-      } catch (error) {}
+      } catch (error) {
+        console.log(`Host Status Updates failed at function updateHostStatus:: ${error}`);
+      }
+      try {
+        await Promise.all(
+          smsToSend.map(user => {
+            const validateNumber = isValidPhoneNumber(user.phoneNumber);
+            if (validateNumber) {
+              const cleanedNumber = user.phoneNumber.replace(/[\s\-()]/g, '');
+              serviceMesh.notificationService().sendTextMessage(cleanedNumber, user.message);
+            }
+          }),
+        );
+      } catch (err) {
+        console.error(`❌ Error while processing SMS:`, err);
+      }
       // if (skippedUsers.length > 0) {
       //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
       // }
@@ -4398,6 +4680,10 @@ export class AuthService {
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
 
+    const referredUser = await this.dbConnection
+      .getRepository(ReferredUser)
+      .findOneBy({ userId: user.id });
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4407,6 +4693,7 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         eventCount,
+        referredUser?.referralCode,
       ),
     );
   }
@@ -4837,7 +5124,7 @@ export class AuthService {
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError('listType');
+          throw new NotFoundError('users or list');
         }
         break;
       }
@@ -5319,7 +5606,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email.trim()],
+        [user.email.trim().toLowerCase()],
         null,
       );
     } catch (error) {}
@@ -5615,9 +5902,10 @@ export class AuthService {
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager
-        .getRepository(User)
-        .findOne({ where: { id: payload.id }, relations: { roles: { role: true } } });
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
       if (!user) throw new NotFoundError('User');
       const isHost = user.roles?.some(role => role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
@@ -5625,6 +5913,27 @@ export class AuthService {
       try {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
       } catch (error) {}
+      // Step 2: Remove user from all notifications (join table cleanup)
+      if (user.notifications?.length) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .relation(User, 'notifications')
+          .of(user)
+          .remove(user.notifications);
+      }
+
+      // Step 3: Optionally delete orphaned notifications (no recipients)
+      const orphanedNotifications = await queryRunner.manager
+        .getRepository(Notification)
+        .createQueryBuilder('n')
+        .leftJoinAndSelect('n.recipients', 'r')
+        .getMany();
+
+      for (const n of orphanedNotifications) {
+        if (n.recipients.length === 0) {
+          await queryRunner.manager.remove(n);
+        }
+      }
 
       await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
       await this.clearAdditionalHostInfo(user.id, queryRunner);
@@ -5672,6 +5981,41 @@ export class AuthService {
         }
 
         if (!hasLoggedIn) {
+          const fullUser = await queryRunner.manager.getRepository(User).findOne({
+            where: { id: user.id },
+            relations: ['notifications'],
+          });
+
+          // Step 1: Remove user from notification_recipients
+          if (fullUser?.notifications?.length) {
+            await queryRunner.manager
+              .createQueryBuilder()
+              .relation(User, 'notifications')
+              .of(user)
+              .remove(fullUser.notifications);
+          }
+
+          // Step 2: Nullify linkedUser in notifications
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Notification)
+            .set({ linkedUser: null })
+            .where('linked_user_id = :id', { id: user.id })
+            .execute();
+
+          // Step 3: Delete orphaned notifications (no recipients)
+          const orphanedNotifications = await queryRunner.manager
+            .getRepository(Notification)
+            .createQueryBuilder('n')
+            .leftJoinAndSelect('n.recipients', 'r')
+            .getMany();
+
+          for (const n of orphanedNotifications) {
+            if (n.recipients.length === 0) {
+              await queryRunner.manager.remove(n);
+            }
+          }
+
           await queryRunner.manager.getRepository(User).delete({ id: user.id });
         }
       }

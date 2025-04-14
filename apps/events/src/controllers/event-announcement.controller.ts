@@ -49,6 +49,8 @@ export class EventAnnouncementController {
   public static getAnnouncements = asyncWrapper(async (req: Request, res: Response) => {
     const payload: any = {
       eventId: req.params.eventId,
+      userId: (req as any).user || req.query.id,
+      role: req.query.role,
     };
     const announcements = await EventAnnouncementService.getAnnouncements(payload);
 
@@ -59,6 +61,8 @@ export class EventAnnouncementController {
   public static getAnnouncement = asyncWrapper(async (req: Request, res: Response) => {
     const payload: any = {
       eventId: req.params.eventId,
+      userId: (req as any).user,
+      role: req.query.role,
       id: req.params.announcementId,
     };
     const announcement = await EventAnnouncementService.getAnnouncement(payload);

@@ -9,6 +9,7 @@
     "events": "nodemon apps/events/src/index.ts",
     "users": "nodemon apps/users/src/index.ts",
     "notifications": "nodemon apps/notifications/src/index.ts",
+    "scheduler": "nodemon apps/schedular/src/index.ts",
     "format": "prettier --write \"./apps/**/*.ts\" \"./packages/**/*.ts\"",
     "prepare": "husky install"
   },
@@ -32,8 +33,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "yargs": "^17.7.2"
-  },
-  "dependencies": {
-    "node-schedule": "^2.1.1"
   }
 }

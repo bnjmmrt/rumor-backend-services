@@ -1,4 +1,8 @@
-import { EventGuestRequest, SignupFormsResponse, UserSource } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  EventGuestRequest,
+  SignupFormsResponse,
+  UserSource,
+} from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { buildSignupFormsResponse } from 'rumor-utils/shared/events/mappers/signup-forms.mapper';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/events/entities/signup-form-static-questions.entity';
 import {
@@ -11,7 +15,12 @@ import {
   Role,
   Guest,
 } from 'rumor-utils/shared/entities';
-import { BadRequestError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from 'rumor-utils/errors';
 import database from '../database';
 import {
   CreateSignupFormDto,
@@ -26,6 +35,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
+import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -70,14 +80,17 @@ export class SignupFormsServices {
     return data;
   }
 
-  public static async getByEventId(eventId: string): Promise<SignupFormsResponse[]> {
+  public static async getByEventId(
+    eventId: string,
+    hostId: string,
+  ): Promise<SignupFormsResponse[]> {
     try {
       const event: Event | undefined = await Event.findOne({
-        where: { id: eventId },
+        where: { id: eventId, owner: { id: hostId } },
         relations: { owner: true },
       });
       if (!event) {
-        throw new NotFoundError('Event not found');
+        throw new NotFoundError('Event');
       }
       const signupForms = await EventSignupForms.find({
         where: { event: { id: eventId } },
@@ -96,6 +109,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Get By urlcode
+   * @param code
+   * @returns
+   */
   public static async getByUrl(code: string) {
     try {
       const eventSignupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
@@ -120,13 +138,15 @@ export class SignupFormsServices {
       if (!eventSignupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
+      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
+      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
+      if (eventSignupForm.event.status === EventStatusEnum.PAST_STATUS) {
+        return data;
+      }
       if (eventSignupForm.event.status != EventStatusEnum.APPROVED_STATUS) {
         throw new NotFoundError('Event does not exists');
       }
-      const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
-
-      const data = buildSignupFormsResponse(eventSignupForm.event, eventSignupForm, baseUrl);
 
       return data;
     } catch (err: any) {
@@ -318,7 +338,7 @@ export class SignupFormsServices {
             userPayload.lastName = ans.answers;
             break;
           case 'email':
-            userPayload.email = ans.answers;
+            userPayload.email = ans.answers.trim().toLowerCase();
             if (!isValidEmail(userPayload.email)) {
               throw new BadRequestError('Invalid Email format');
             }
@@ -347,6 +367,7 @@ export class SignupFormsServices {
 
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
       user: { id: payload.id },
     });
 
@@ -358,51 +379,52 @@ export class SignupFormsServices {
     userPayload: User,
   ): Promise<[User, Guest]> {
     let user = null;
+    if (!userPayload.email && !userPayload.phoneNumber) {
+      throw new BadRequestError('User information missing to apply for an event.');
+    }
     if (userPayload.email) {
       user = await User.findOne({
         where: { email: userPayload.email },
       });
-    } else if (userPayload.phoneNumber) {
+    }
+    if (userPayload.phoneNumber && !user) {
       user = await User.findOne({
-        where: { email: userPayload.phoneNumber },
+        where: { phoneNumber: userPayload.phoneNumber },
       });
-    } else {
-      throw new BadRequestError('User information missing to apply for an event.');
     }
     if (!user) {
       return [userPayload, new Guest()];
     }
-
     if (user.id) {
       const guest = await Guest.findOne({
-        where: { user: { id: userPayload.id }, event: { id: eventId } },
+        where: { user: { id: user.id }, event: { id: eventId } },
       });
-      if (guest && guest.status !== GuestStatus.DRAFT) {
-        throw new ForbiddenError(
-          'You are already part of this event. Please log into application and check your event status.',
-        );
+      if (guest) {
+        if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'You are already part of this event. Please log into application and check your event status.',
+          );
+        }
+        return [user, guest];
       }
-      return [user, guest];
     }
     return [user, new Guest()];
   }
 
-  public static async validateGuestExistence(
-    userPayload: EventGuestRequest
-  ): Promise<string> {
-    let userFoundWithEmail = null
-    let userFoundWithPhone = null
+  public static async validateGuestExistence(userPayload: EventGuestRequest): Promise<string> {
+    let userFoundWithEmail = null;
+    let userFoundWithPhone = null;
     if (userPayload?.email) {
       userFoundWithEmail = await User.findOne({
         where: { email: userPayload.email.trim().toLowerCase() },
       });
-    } 
-     if (userPayload?.phoneNumber) {
+    }
+    if (userPayload?.phoneNumber) {
       userFoundWithPhone = await User.findOne({
         where: { phoneNumber: userPayload.phoneNumber },
       });
-    } 
-    if(!userPayload || (!userPayload.email && !userPayload.phoneNumber)) {
+    }
+    if (!userPayload || (!userPayload.email && !userPayload.phoneNumber)) {
       throw new BadRequestError('User information (email or phone) is required.');
     }
     if (userFoundWithEmail?.id) {
@@ -425,7 +447,7 @@ export class SignupFormsServices {
         );
       }
     }
-    return "";
+    return '';
   }
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
@@ -453,6 +475,9 @@ export class SignupFormsServices {
       this.extractUserPayloadAndAnswers(payload, answerList, userPayload, requestedGuests);
       let inviteGuestPayload = null;
       [userPayload, inviteGuestPayload] = await this.validateUserAsGuest(eventId, userPayload);
+      if (signupForm.event.owner.id === userPayload?.id) {
+        throw new ValidationError('Host cannot apply to their own event.');
+      }
       const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
@@ -485,10 +510,18 @@ export class SignupFormsServices {
       await queryRunner.manager.save(submissions);
 
       /**-- Create Host User Mapping */
-      const hostUserMapping = new HostUserMapping();
-      hostUserMapping.user = { id: userPayload.id } as User;
-      hostUserMapping.host = { id: signupForm.event.owner.id } as User;
-      await queryRunner.manager.save(hostUserMapping);
+      const existingMapping = await HostUserMapping.findOne({
+        where: {
+          user: { id: userPayload.id },
+          host: { id: signupForm.event.owner.id },
+        },
+      });
+      if (!existingMapping) {
+        const hostUserMapping = new HostUserMapping();
+        hostUserMapping.user = { id: userPayload.id } as User;
+        hostUserMapping.host = { id: signupForm.event.owner.id } as User;
+        await queryRunner.manager.save(hostUserMapping);
+      }
 
       await queryRunner.commitTransaction();
 
@@ -505,6 +538,18 @@ export class SignupFormsServices {
       } catch (error) {
         console.log('🚀 ~ SignupFormsServices ~ error:', error);
       }
+      if (userPayload?.phoneNumber) {
+        try {
+          const validateNumber = isValidPhoneNumber(userPayload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = userPayload.phoneNumber.replace(/[\s\-()]/g, '').trim();
+            const link = `${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+            let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {}
+      }
+
       return submissions;
     } catch (err) {
       throw err;
@@ -515,7 +560,15 @@ export class SignupFormsServices {
    * 1. When an event is cancelled, need to deactivate Signup Forms.
    * @param id
    */
-  public static async deactivate(id: string) {
+  public static async deactivate(id: string, hostId: string) {
+    const signupForm = await EventSignupForms.findOne({
+      where: { id: id, createdBy: { id: hostId } },
+    });
+
+    if (!signupForm) {
+      throw new ForbiddenError('SignupForm does not exists');
+    }
+
     const data: UpdateResult = await EventSignupForms.update(id, {
       isPublished: false,
       isActive: false,
@@ -589,8 +642,16 @@ export class SignupFormsServices {
     }
   }
 
-  public static async listSubmissions(id: string, payload: any) {
+  public static async listSubmissions(id: string, hostId: string, payload: any) {
     try {
+      const signupForm = await EventSignupForms.findOne({
+        where: { id: id, createdBy: { id: hostId } },
+      });
+
+      if (!signupForm) {
+        throw new ForbiddenError('SignupForm does not exists');
+      }
+
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
 

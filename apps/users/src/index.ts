@@ -9,7 +9,10 @@ const start = async () => {
   try {
     await config.load();
     await database.initializeDbConnection();
-    await Seeders.seedRoles();
+    // await Seeders.seedRoles();
+    // await Seeders.seedInterests();
+    // await Seeders.seedFocuses();
+    // await Seeders.seedDefaultRoleSettings();
 
     await server.start();
     console.info('[APP] - Application started. 🚀');

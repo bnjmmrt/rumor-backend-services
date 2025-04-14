@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { SignupFormsServices } from '../services/signup-forms.service';
 import { SignupFormStaticQuestions } from 'rumor-utils/shared/entities';
-import { EventGuestRequest, SignupFormsResponse } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  EventGuestRequest,
+  SignupFormsResponse,
+} from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { GetResponse } from 'rumor-utils/success';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import {
@@ -27,8 +30,9 @@ export class SignupFormsController {
   });
 
   public static getByEventId = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const hostId = (req as any).user;
     const eventId = req.params.id;
-    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId);
+    const data: SignupFormsResponse[] = await SignupFormsServices.getByEventId(eventId, hostId);
     res.json(new GetResponse(data));
   });
 
@@ -67,30 +71,33 @@ export class SignupFormsController {
     res.json(new GetResponse({}));
   });
 
-  public static checkIfGuestExists = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const payload = req.body as EventGuestRequest;
-    if( !payload.email && !payload.phoneNumber) {
-      throw new BadRequestError('User information (email or phone) is required.');
-    }
-
-    if (payload.email) {
-      if (!isValidEmail(payload.email.trim())) {
-        throw new BadRequestError("Email is not valid");
+  public static checkIfGuestExists = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const payload = req.body as EventGuestRequest;
+      if (!payload.email && !payload.phoneNumber) {
+        throw new BadRequestError('User information (email or phone) is required.');
       }
-    }
 
-    if (payload.phoneNumber) {
-      if (!isValidPhoneNumber(payload.phoneNumber)) {
-        throw new BadRequestError("Phone number is not valid");
+      if (payload.email) {
+        if (!isValidEmail(payload.email.trim())) {
+          throw new BadRequestError('Email is not valid');
+        }
       }
-    }
-    await SignupFormsServices.validateGuestExistence(payload);
-    res.json(new GetResponse({}));
-  });
+
+      if (payload.phoneNumber) {
+        if (!isValidPhoneNumber(payload.phoneNumber)) {
+          throw new BadRequestError('Phone number is not valid');
+        }
+      }
+      await SignupFormsServices.validateGuestExistence(payload);
+      res.json(new GetResponse({}));
+    },
+  );
 
   public static deactivate = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id;
-    const data: UpdateResult = await SignupFormsServices.deactivate(id);
+    const hostId = (req as any).user;
+    const data: UpdateResult = await SignupFormsServices.deactivate(id, hostId);
     const successResponse = new GetResponse(data.affected);
     res.status(successResponse.statusCode).json(successResponse);
   });
@@ -99,7 +106,8 @@ export class SignupFormsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload = req.query;
       const id = req.params.id;
-      const submissions = await SignupFormsServices.listSubmissions(id, payload);
+      const hostId = (req as any).user;
+      const submissions = await SignupFormsServices.listSubmissions(id, hostId, payload);
       res.json(new GetResponse(submissions));
     },
   );

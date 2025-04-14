@@ -21,4 +21,5 @@ export const deleteHostEvents = (id: string) =>
 export const listHostEvents = (query: string) =>  
  apiService.getApi().get(`/hosts/events?${query}`);
 
-
+export const sendEventRemindersToAllGuests = (eventId: string) =>
+  apiService.getApi().post(`event/reminders/send`, { eventId });

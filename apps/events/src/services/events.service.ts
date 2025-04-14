@@ -33,7 +33,6 @@ import {
   EventTypesData,
   GetFeaturedEventsResponse,
   GuestCountByStatuses,
-  HostEventsCountByStatusResponse,
   ListEventsFeedResponse,
   ListEventUsedTicketsResponse,
   PaginatedEventsResponse,
@@ -66,6 +65,7 @@ import {
   TicketType,
   Collaborator,
   QuizQuestion,
+  UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
@@ -119,12 +119,11 @@ import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
-import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import {
   sendEventCancellation,
   sendEventUpdation,
-  sendEventInviteNonMember,
   sendEventRejection,
   sendEventPublishedApproval,
   sendEventPrePublishApproval,
@@ -136,8 +135,16 @@ import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
-import { SchedulerService } from './scheduler-service';
-import { CsvUploadRecords } from '../../packages/rumor-utils/shared/events/entities';
+import {
+  CsvUploadRecords,
+  FeaturedEventSection,
+} from '../../packages/rumor-utils/shared/events/entities';
+import { sendSmsNotification } from '../utils/sms.utils';
+import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -335,10 +342,18 @@ export class EventsService {
 
       //schedule event for cancelled status if not approved
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: event.id,
-          endDate: event.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
+        }
       }
       //ends here
 
@@ -516,6 +531,15 @@ export class EventsService {
     eventLocationPayload: EventLocationDto,
     queryRunner: QueryRunner,
   ): Promise<EventLocation> {
+    if (
+      !eventLocationPayload.location ||
+      !eventLocationPayload.placeId ||
+      !eventLocationPayload.city ||
+      !eventLocationPayload.latitude ||
+      !eventLocationPayload.longitude
+    ) {
+      throw new Error('Invalid location data');
+    }
     // Create a new EventLocation entity from the payload
     const eventLocation = this.dbConnection.getRepository(EventLocation).create({
       location: eventLocationPayload.location,
@@ -1191,19 +1215,21 @@ export class EventsService {
         }
       : { createdAt: 'DESC' };
 
-    let relations = includeRelations
-      ? [
-          'owner',
-          'admissionType',
-          'location',
-          'eventType',
-          'talents',
-          'ticketTypes',
-          'collaborators',
-          'quizQuestions',
-          'ageLimit',
-        ]
-      : ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'ageLimit'];
+    const baseRelations = [
+      'owner',
+      'admissionType',
+      'location',
+      'eventType',
+      'talents',
+      'ticketTypes',
+      'collaborators',
+      'collaborators.user',
+      'collaborators.role',
+      'collaborators.ticketType',
+      'ageLimit',
+    ];
+
+    let relations = includeRelations ? [...baseRelations, 'quizQuestions'] : baseRelations;
 
     if (includeFeaturedEventSection) {
       relations = [...relations, 'featuredEventSection'];
@@ -1278,7 +1304,9 @@ export class EventsService {
       }
       return responses.data(paginatedEvents);
     } else {
-      return responses.data(events.map(item => toEvent(item, null)));
+      const mappedEvents = events.map(item => toEvent(item, null));
+
+      return responses.data(mappedEvents);
     }
   }
 
@@ -1286,8 +1314,15 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
-    const [totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: payload.userId } },
+      relations: { role: true },
+    });
+    const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+    if (!isAdmin && event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.');
+    }
+    const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
       this.dbConnection.getRepository(Guest).count({
         where: {
@@ -1304,8 +1339,15 @@ export class EventsService {
           status: GuestStatus.CONFIRMED,
         },
       }),
+
+      // Count total guests who wats to be in event
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: payload.id },
+        },
+      }),
     ]);
-    return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+    return toEvent(event, totalCheckedInGuests, allGuests, undefined, totalConfirmedGuests);
   }
 
   public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
@@ -1327,6 +1369,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     } else {
@@ -1345,6 +1388,7 @@ export class EventsService {
           'signupForms',
           'notifications',
           'quizQuestions.answers',
+          'eventAnnouncements',
         ],
       });
     }
@@ -1365,10 +1409,11 @@ export class EventsService {
     const userRepo = this.dbConnection.getRepository(User);
     for (const csvUpload of csvUploads) {
       if (csvUpload.uploadedUsers.length > 0) {
-        await userRepo.createQueryBuilder()
+        await userRepo
+          .createQueryBuilder()
           .update(User)
           .set({ uploadedViaCsv: null })
-          .where("uploadedViaCsv.id = :csvUploadId", { csvUploadId: csvUpload.id })
+          .where('uploadedViaCsv.id = :csvUploadId', { csvUploadId: csvUpload.id })
           .execute();
       }
     }
@@ -2279,7 +2324,16 @@ export class EventsService {
           'quizQuestions',
         ],
       });
+      if (!event) throw new NotFoundError('Item of Event not found');
+      const userRoles = await UserRole.find({
+        where: { user: { id: payload.ownerId } },
+        relations: { role: true },
+      });
 
+      const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+      if (!isAdmin && event.owner?.id !== payload.ownerId) {
+        throw new ForbiddenError('You are not authorized to update this event');
+      }
       const eventCopy = JSON.parse(JSON.stringify(event));
       /**date validations */
       if (!payload.startDate) {
@@ -2299,7 +2353,6 @@ export class EventsService {
       }
       /**date validations ends here */
 
-      if (!event) throw new NotFoundError('Item of Event not found');
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -2444,17 +2497,34 @@ export class EventsService {
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
         if (!eventFromDb.isPublished && eventFromDb.publishDate) {
-          SchedulerService.scheduleEventPublishDate({
-            id: eventFromDb.id,
-            publishDate: eventFromDb.publishDate,
-          } as Event);
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.PUBLISH_EVENT,
+              data: {
+                id: eventFromDb.id,
+                publishDate: eventFromDb.publishDate,
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
+          }
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {
-          SchedulerService.prepareEventReminderDataAndSchedule({
-            id: eventFromDb.id,
-            startDate: eventFromDb.startDate,
-          } as Event);
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.REMINDER_EVENT,
+              data: {
+                id: eventFromDb.id,
+                startDate: eventFromDb.startDate,
+                name: eventFromDb.name,
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
+          }
         }
       }
       if (
@@ -2462,10 +2532,18 @@ export class EventsService {
         (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
           eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
       ) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: eventFromDb.id,
-          endDate: eventFromDb.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: eventFromDb.id,
+              endDate: eventFromDb.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
+        }
       }
       //ends here
       //ends here
@@ -2480,13 +2558,7 @@ export class EventsService {
         eventCurrentStatus === EventStatusEnum.APPROVED_STATUS
       ) {
         try {
-          const guestStatuses: GuestStatus[] = [
-            GuestStatus.APPLIED,
-            GuestStatus.CONFIRMED,
-            GuestStatus.REVIEW,
-            GuestStatus.DECLINED,
-            GuestStatus.INVITED,
-          ];
+          const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
           await this.notifyGuestsOnDateOrLocationChange({
             eventPayload: payload,
             eventId,
@@ -2571,7 +2643,11 @@ export class EventsService {
    * @param {Event} event - The event for which reminders need to be sent.
    * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
    */
-  public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
+  public static async sendEventRemindersToAllGuests(eventId: string): Promise<void> {
+    const event: Event = await Event.findOne({
+      where: { id: eventId },
+      relations: { location: true },
+    });
     const guestStatuses: GuestStatus[] = [
       GuestStatus.INVITED,
       GuestStatus.CONFIRMED,
@@ -2581,23 +2657,57 @@ export class EventsService {
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
       .where('guest.event = :eventId', { eventId: event.id })
       .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
       .getMany();
     if (!guests.length) return;
-    const emailPromises = guests.map(guest => {
-      if (!guest?.user?.email) return;
-      const mailPayload = {
-        eventName: event.name || 'Event',
-        imageFlyer: event.imageFlyer,
-        eventDate: event.startDate,
-        location: event.location?.location,
-        city: event.location?.city,
-      };
-      // return
-      sendEventReminder(mailPayload, guest.user.email, guest.user.id, event.id, event.timeZone);
-    });
+    const emailPromises = guests
+      .map(guest => {
+        if (guest?.user?.email) {
+          const mailPayload = {
+            eventName: event.name || 'Event',
+            imageFlyer: event.imageFlyer,
+            eventDate: event.startDate,
+            location: event.location?.location,
+            city: event.location?.city,
+          };
+          return sendEventReminder(
+            mailPayload,
+            guest.user.email,
+            guest.user.id,
+            event.id,
+            event.timeZone,
+          );
+        }
+        return null;
+      })
+      .filter(Boolean);
+
     await Promise.allSettled(emailPromises);
+    const smsPromises = guests
+      .map(guest => {
+        if (guest?.user?.phoneNumber) {
+          const { hour, minutes, period }: any = extractDate(event?.startDate, event.timeZone);
+          let textMessage = '';
+          const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.Member);
+          if (role?.role?.name === RoleType.Member) {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow at ${hour}:${minutes} ${period}.`;
+          } else {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow.`;
+          }
+          return sendSmsNotification({
+            phoneNumber: guest.user.phoneNumber,
+            textMessage,
+          });
+        }
+        // If no phone number, return undefined
+        return undefined;
+      })
+      .filter(Boolean);
+
+    await Promise.allSettled(smsPromises);
   }
 
   /**
@@ -2663,15 +2773,9 @@ export class EventsService {
           if (validateNumber) {
             const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
           }
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
       }
     });
@@ -3122,22 +3226,47 @@ export class EventsService {
       if (!event.publishDate) {
         event.isPublished = true;
       } else {
-        SchedulerService.scheduleEventPublishDate({
-          id: event.id,
-          publishDate: event.publishDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PUBLISH_EVENT,
+            data: {
+              id: event.id,
+              publishDate: event.publishDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
       }
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: event.id,
-          endDate: event.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
       }
       if (event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({
-          id: event.id,
-          startDate: event.startDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.REMINDER_EVENT,
+            data: {
+              id: event.id,
+              startDate: event.startDate,
+              name: event.name,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Reminder scheduler failed for ${event.name}`, e);
+        }
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3163,6 +3292,22 @@ export class EventsService {
       where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
     });
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
+      //send text notification
+      if (updatedEvent?.owner?.phoneNumber) {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
+        //Micro-service call
+        let number = updatedEvent?.owner?.phoneNumber;
+        try {
+          const validateNumber = isValidPhoneNumber(number);
+          if (validateNumber) {
+            const cleanedNumber = number.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${number}:`, err);
+        }
+      }
       if (updatedEvent.isPublished) {
         const createPayload = {
           eventDate: updatedEvent.startDate,
@@ -3222,7 +3367,11 @@ export class EventsService {
         updatedEvent.status,
       )
     ) {
-      sendEventRejection(updatedEvent.name, host.firstName, updatedEvent.owner.email);
+      sendEventRejection(
+        updatedEvent.name,
+        host?.additionalHostInformation?.companyName || host?.firstName,
+        updatedEvent.owner.email,
+      );
     }
     return responses.data(toEvent(updatedEvent, null));
   }
@@ -3311,11 +3460,11 @@ export class EventsService {
         guestId: guest.id,
         ticketStatus: hasTicket.status ?? undefined,
         ticketTypeId: guest.ticketType.id ?? undefined,
+        ticketDescription: guest.ticketType.description ?? undefined,
         ticketType: guest.ticketType.name ?? undefined,
         guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
-        ticketDescription: guest.ticketType.description ?? undefined,
       };
     }
 
@@ -3324,10 +3473,10 @@ export class EventsService {
       ticketStatus: hasTicket.status ?? undefined,
       ticketTypeId: guest.ticketType.id ?? undefined,
       ticketType: guest.ticketType.name ?? undefined,
+      ticketDescription: guest.ticketType.description ?? undefined,
       guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
-      ticketDescription: guest.ticketType.description ?? undefined,
     };
   }
 
@@ -3447,27 +3596,21 @@ export class EventsService {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.eventId },
-        relations: {
-          featuredEventSection: true,
-        },
       });
 
       if (!event) throw new NotFoundError('Event was not found');
 
       if (!payload.featuredSectionId) {
         event.featuredEventSection = null;
-        await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-          //if (!featuredEventSection) throw new NotFoundError('Featured event section was not found');
-
-          //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
-          await this.dbConnection.getRepository(Event).save(event);
+        event.featuredEventSection = { id: payload.featuredSectionId } as FeaturedEventSection;
       }
 
-      return;
+      await this.dbConnection.getRepository(Event).save(event);
+
+      return 'Featured event saved successfully';
     } catch (err) {
-      throw new BadRequestError('Error at publish event by id');
+      throw new BadRequestError('Error saving featured event');
     }
   }
 
@@ -3505,10 +3648,12 @@ export class EventsService {
       if (!event) {
         throw new NotFoundError('Event not found');
       }
-      if (event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new Error('It is not approved event.');
-      }
 
+      const validStatuses = [EventStatusEnum.APPROVED_STATUS, EventStatusEnum.UPCOMING_STATUS];
+
+      if (!validStatuses.includes(event.status)) {
+        throw new Error('Event is not approved.');
+      }
       // Permitir cancelar si es admin o propietario
       if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
@@ -3540,11 +3685,13 @@ export class EventsService {
         GuestStatus.APPLIED,
       ];
       //using query to find guests
-      const guests = await this.dbConnection
+      const guests: any = await this.dbConnection
         .getRepository(Guest)
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('guest.event', 'event')
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
         .select([
           'guest.id',
           'user.id',
@@ -3555,6 +3702,9 @@ export class EventsService {
           'event.startDate',
           'event.endDate',
           'event.location',
+          'roles.id',
+          'role.id',
+          'role.name',
         ])
         .where({ event: { id: eventId } })
         .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
@@ -3577,18 +3727,20 @@ export class EventsService {
       const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`;
+        // ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
             const createPayload = {
-              eventDate: event.startDate,
+              eventDate: event.startDate || new Date(),
               eventName,
-              imageFlyer: event.imageFlyer,
-              location: event.location.location,
-              city: event.location.city,
-              hostName: event.owner?.additionalHostInformation?.companyName,
+              imageFlyer: event.imageFlyer || ' ',
+              location: event.location.location || ' ',
+              city: event.location.city || ' ',
+              hostName:
+                event.owner?.additionalHostInformation?.companyName || event.owner.email || '',
             };
             let mailServiceResponse = sendEventCancellation(
               createPayload,
@@ -3597,30 +3749,28 @@ export class EventsService {
               message,
               event.timeZone,
             );
+
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } else if (guest.user?.phoneNumber) {
+          }
+          if (guest.user?.phoneNumber) {
             // Send SMS notification
             try {
-              const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
-              if (validateNumber) {
-                const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
-                const success = await serviceMesh
-                  .notificationService()
-                  .sendTextMessage(cleanedNumber, `${mobileNotificationMessage} \n${message}`);
-                if (success) {
-                  notificationSuccess = true;
-                }
-              } else {
-                // Log the issue and exit early (no throw)
-                console.log(
-                  `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-                );
-                return; // or just skip sending, depending on your function structure
+              const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
+              if (role?.role?.name === RoleType.NonMember) {
+                mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
+              }
+              //send text message
+              const success = sendSmsNotification({
+                phoneNumber: guest.user?.phoneNumber,
+                textMessage: mobileNotificationMessage,
+              }); /** status: Tested and working fine */
+              if (success) {
+                notificationSuccess = true;
               }
             } catch (err) {
-              console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
             }
           }
         } catch (error) {
@@ -3775,16 +3925,20 @@ export class EventsService {
         );
       },
     );
-    console.log('🚀 ~ getHostEventCountByStatus ~ payload:', payload);
     return {
       result: formattedEvents,
       totalCount,
     };
   }
 
-  public static async getHostEventCountByStatus(
-    payload: RequestByIdDto,
-  ): Promise<HostEventsCountByStatusResponse> {
+  public static async getHostEventCountByStatus(payload: RequestByIdDto): Promise<{
+    approvedStatus: number;
+    draftStatus: number;
+    pendingStatus: number;
+    cancelledStatus: number;
+    pastStatus: number;
+    rejectedStatus: number;
+  }> {
     const { id: userId } = payload;
     const queryResult = await this.dbConnection
       .getRepository(Event)
@@ -3880,6 +4034,7 @@ export class EventsService {
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({
@@ -4082,49 +4237,95 @@ export class EventsService {
     };
   }
 
-  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
-    const listHostEventsPayload: ListHostEventsDto = {
-      userId: payload.id,
-      query: '{}',
+  //Get guests count by sum of party size
+  public static async getGuestCountsByStatus(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
+      ])
+      .setParameters({
+        eventId,
+        userId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
+
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
     };
+  }
 
-    const eventsResponse = await this.listHostEvents(listHostEventsPayload);
-
-    if (!eventsResponse || !eventsResponse.result) {
-      throw new NotFoundError('Events');
-    }
-
-    const events = eventsResponse.result;
-    // Step 2: Cancel all APPROVED events
-    const eventsToCancel = events.filter(event =>
-      [
-        EventStatusEnum.APPROVED_STATUS,
-        EventStatusEnum.SCHEDULED_STATUS,
-        EventStatusEnum.UPCOMING_STATUS,
-      ].includes(event.status),
-    );
-
-    for (const event of eventsToCancel) {
-      const cancelPayload: CancelEventAndNotifyRequestDto = {
-        ownerId: payload.id,
-        eventId: event.id,
-        customMessage: 'This event has been canceled as the host is no longer available.',
+  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
+    try {
+      const listHostEventsPayload: ListHostEventsDto = {
+        userId: payload.id,
+        query: '{}',
       };
-      await this.cancelEventAndNotify(cancelPayload);
+
+      const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+      if (!eventsResponse || !eventsResponse.result) {
+        throw new NotFoundError('Events');
+      }
+
+      const events = eventsResponse.result;
+      // Step 2: Cancel all APPROVED events
+      const eventsToCancel = events.filter(event =>
+        [
+          EventStatusEnum.APPROVED_STATUS,
+          EventStatusEnum.SCHEDULED_STATUS,
+          EventStatusEnum.UPCOMING_STATUS,
+        ].includes(event.status),
+      );
+
+      for (const event of eventsToCancel) {
+        const cancelPayload: CancelEventAndNotifyRequestDto = {
+          ownerId: payload.id,
+          eventId: event.id,
+          customMessage: 'This event has been canceled as the host is no longer available.',
+        };
+        await this.cancelEventAndNotify(cancelPayload);
+      }
+
+      // Step 3: Delete all events (regardless of status)
+      // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+      // for (const event of events) {
+      //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      //   await this.deleteEvent(deletePayload);
+      // }
+
+      const eventIds = events.map(event => event.id);
+
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
+      console.log(error);
     }
-
-    // Step 3: Delete all events (regardless of status)
-    // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
-    // for (const event of events) {
-    //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
-    //   await this.deleteEvent(deletePayload);
-    // }
-
-    const eventIds = events.map(event => event.id);
-
-    if (eventIds.length > 0) {
-      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-    }
-    return responses.ok;
   }
 }

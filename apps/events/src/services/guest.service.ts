@@ -115,7 +115,7 @@ import {
   sendEventInvitePlusOnes,
   sendGuestEventApproval,
 } from '../utils/emails.utils';
-
+import { sendSmsNotification } from '../utils/sms.utils';
 export class GuestService {
   public static dbConnection = database;
 
@@ -150,14 +150,16 @@ export class GuestService {
     const parsedQuery = parse(payload.query);
     const eventId = parsedQuery?.eventId as string;
     // Fetch the event by its ID
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: eventId } });
-    if (!event) throw new NotFoundError('Event not found');
+    const event = await this.dbConnection
+      .getRepository(Event)
+      .findOne({ where: { id: eventId }, relations: { location: true, owner: true } });
+    if (!event) throw new NotFoundError('Event');
 
     // Validate ticket type if provided in the request
     let ticketType = await this.dbConnection
       .getRepository(TicketType)
       .findOne({ where: { id: payload.ticketTypeId } });
-    if (!ticketType) throw new NotFoundError('Ticket type not found');
+    if (!ticketType) throw new NotFoundError('Ticket type');
 
     // Fetch the host profile
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
@@ -231,8 +233,13 @@ export class GuestService {
             const createGuests = await this.addGuests(payloadCreateGuest, token);
 
             // Check if guests were successfully created
-            if (createGuests.result.length > 0)
-              return { message: `Guest created with status ${guestStatus}` };
+            if (createGuests.result.length > 0) {
+              if (createGuests.isExist) {
+                throw new BadRequestError(`The user already has a status on the guest list.`);
+              } else {
+                return { message: `Guest created with status ${guestStatus}` };
+              }
+            }
           } else {
             throw new BadRequestError('Invalid guest status for CREATE action.');
           }
@@ -265,24 +272,66 @@ export class GuestService {
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
-            // Check if guests were successfully created
+            const smsPromises: Promise<{ success: boolean }>[] = [];
+
+            const baseRedirectUrl = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+
+            for (const guest of updateGuests) {
+              const { phoneNumber, invitationSource, userId } = guest;
+
+              if (!phoneNumber) continue;
+
+              const shouldSendApproval =
+                guestStatus === GuestStatus.CONFIRMED &&
+                [GuestStatus.APPLIED, GuestStatus.DECLINED].includes(currentStatus as GuestStatus);
+
+              const shouldSendDecline =
+                guestStatus === GuestStatus.DECLINED &&
+                [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(currentStatus as GuestStatus);
+
+              let textMessage: string | null = null;
+              if (shouldSendDecline && invitationSource === UserSource.SIGN_UP_FORM) {
+                textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
+              } else if (shouldSendApproval) {
+                if (invitationSource === UserSource.SIGN_UP_FORM) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.`;
+                } else if (invitationSource === UserSource.REQUEST_IN_APP) {
+                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
+                }
+              }
+
+              if (textMessage) {
+                smsPromises.push(sendSmsNotification({ phoneNumber, textMessage }));
+              }
+            }
+
+            await Promise.all(smsPromises);
+
+            // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
-              //"action": "UPDATE",
-              if (guestStatus === GuestStatus.DECLINED)
+              const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
+
+              if (
+                guestStatus === GuestStatus.DECLINED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_DENIED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.INVITED)
+              if (
+                guestStatus === GuestStatus.CONFIRMED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
                     NotificationType.EVENT_REQUEST_APPROVED,
-                    payload.inclusiveIds,
+                    recipientIds,
                     eventId,
                     hostId,
                   );
@@ -358,9 +407,10 @@ export class GuestService {
           return userIds;
         }
         // Extract main guest IDs
-        const usersData = (await serviceMesh.userService(token).getAllusers(payload.query)).data;
+        const queryString = new URLSearchParams(payload.query).toString();
+        const usersData = (await serviceMesh.userService(token).getAllusers(queryString)).data;
         if (usersData.result.length === 0 || usersData.totalCount === 0) {
-          throw new NotFoundError('Users data not found');
+          throw new NotFoundError('Users data');
         }
         let userIds: string[] = usersData.result.map(user => user.id);
         if (exclusiveIds.length > 0) {
@@ -422,7 +472,7 @@ export class GuestService {
       if (guestData.length > 0) {
         return guestData.map(guest => guest.id);
       } else {
-        throw new NotFoundError('Guest data not found');
+        throw new NotFoundError('Guest data');
       }
     }
 
@@ -448,13 +498,16 @@ export class GuestService {
     // Fetch event details based on the provided event ID
     const event = await this.dbConnection
       .getRepository(Event)
-      .findOne({ where: { id: payload.eventId } });
+      .findOne({ where: { id: payload.eventId }, relations: { location: true, owner: true } });
     if (!event) throw new NotFoundError('Event not found');
 
     // Fetch host profile using the provided host ID
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.hostId)).data;
     if (!host) throw new NotFoundError('Host not found');
-
+    // Check if the host ID is in the users array and throw an error if present
+    if (payload.users.includes(payload.hostId)) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
     // Fetch ticket type details if a ticketTypeId is provided
     let ticketType = await this.dbConnection
       .getRepository(TicketType)
@@ -484,6 +537,7 @@ export class GuestService {
     }
 
     const emailsData = []; // Store guest emails for invitations
+    let isExist: boolean = false; // Flag to check if guest already exists
     const guests = await Promise.all(
       payload.users.map(async userId => {
         try {
@@ -494,6 +548,19 @@ export class GuestService {
           });
           // const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
+          const existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+            where: {
+              host: { id: payload.hostId },
+              user: { id: userId },
+            },
+          });
+
+          if (!existingMapping) {
+            const newMapping = new HostUserMapping();
+            newMapping.user = user;
+            newMapping.host = { id: payload.hostId } as User;
+            await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+          }
 
           // Extract user data and email
           let emailData: {
@@ -502,13 +569,16 @@ export class GuestService {
             firstName: string;
             role: string[];
             id?: string;
+            phoneNumber?: string;
           } = {
             eventId: event.id,
             email: user.email,
             firstName: user.firstName,
             id: user.id,
             role: user.roles.flatMap(role => role.role.name),
+            phoneNumber: user.phoneNumber,
           };
+          if (emailData) emailsData.push(emailData);
           // Check if the guest already exists in the event
           let guest = await this.dbConnection.getRepository(Guest).findOne({
             where: {
@@ -534,8 +604,9 @@ export class GuestService {
             }
             const data = await this.dbConnection.getRepository(Guest).save(guest);
             return data;
+          } else {
+            isExist = true;
           }
-          if (emailData) emailsData.push(emailData);
           return guest;
         } catch (err) {
           return null;
@@ -545,11 +616,8 @@ export class GuestService {
 
     // Filter out any null values from guests (failed guest additions)
     const validGuests = guests.filter(guest => guest !== null);
-
     // If guest status is "INVITED" and sendInvite is true, send invitation emails
-    // TO DO: Change email and sms template
-    if (guestStatus === GuestStatus.INVITED && payload.sendInvite) {
-      //To Do: Change email and sms template
+    if (guestStatus === GuestStatus.INVITED && payload.sendInvite && !isExist) {
       await Promise.all(
         emailsData.map(data => {
           if (data.role.includes('member')) {
@@ -583,6 +651,19 @@ export class GuestService {
             }
 
             sendEventInviteMember(createMailPayload, event.timeZone);
+            if (data.phoneNumber) {
+              const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+              // Send SMS notification
+              try {
+                const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                if (validateNumber) {
+                  const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                  serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                }
+              } catch (err) {
+                console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+              }
+            }
           } else if (data.role.includes('non_member')) {
             const createMailPayload = {
               eventDate: event.startDate,
@@ -610,6 +691,20 @@ export class GuestService {
               );
 
             sendEventInviteNonMember(createMailPayload, event.timeZone);
+
+            if (data.phoneNumber) {
+              const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+              // Send SMS notification
+              try {
+                const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                if (validateNumber) {
+                  const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                  serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                }
+              } catch (err) {
+                console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+              }
+            }
           }
         }),
       );
@@ -624,7 +719,7 @@ export class GuestService {
     );
 
     // Return the response containing guest details
-    return { result: guestsTransform, totalCount: guestsTransform.length };
+    return { result: guestsTransform, totalCount: guestsTransform.length, isExist };
   }
 
   /**
@@ -691,6 +786,7 @@ export class GuestService {
               firstName: guest.user.firstName,
               role: user.roles.flatMap(role => role.role.name),
               invitationSource: guest.invitationSource,
+              phoneNumber: guest.user.phoneNumber ?? undefined,
             };
             // Update max additional guests and private notes if provided
             guest.maxAdditionalGuests = payload.maxAdditionalGuests ?? guest.maxAdditionalGuests;
@@ -722,7 +818,7 @@ export class GuestService {
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
                   if ([GuestStatus.APPLIED].includes(guest.status)) {
                     confirmedGuestsEmails.push(emailData);
-                  } else if ([GuestStatus.DECLINED, GuestStatus.REFUSED].includes(guest.status)) {
+                  } else if ([GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
                   }
                   guest.status = GuestStatus.CONFIRMED;
@@ -790,7 +886,6 @@ export class GuestService {
           where: { id: invitedGuestsEmails[0].eventId },
           relations: { location: true, owner: true },
         });
-        // TO DO: Change email and sms template
         await Promise.all(
           invitedGuestsEmails.map(data => {
             if (data.role.includes('member')) {
@@ -819,6 +914,19 @@ export class GuestService {
                 );
 
               sendEventInviteMember(createMailPayload, event.timeZone);
+              if (data.phoneNumber) {
+                const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                // Send SMS notification
+                try {
+                  const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                  if (validateNumber) {
+                    const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                    serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                  }
+                } catch (err) {
+                  console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                }
+              }
             } else if (data.role.includes('non_member')) {
               const createMailPayload = {
                 eventDate: event.startDate,
@@ -844,6 +952,19 @@ export class GuestService {
                   data.eventId,
                   payload.hostId,
                 );
+              if (data.phoneNumber) {
+                const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                // Send SMS notification
+                try {
+                  const validateNumber = isValidPhoneNumber(data.phoneNumber);
+                  if (validateNumber) {
+                    const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '');
+                    serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                  }
+                } catch (err) {
+                  console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+                }
+              }
             }
           }),
         );
@@ -2226,17 +2347,19 @@ export class GuestService {
     if (parsedQuery.guestEventStatus && multipleGuestStatusFilter?.length === 1) {
       switch (multipleGuestStatusFilter[0]) {
         case 'UPCOMING':
-          addCondition({ endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS, endDate: MoreThan(dateNow) }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'PAST':
-          addCondition({ endDate: LessThan(dateNow) });
+          addCondition({ status: EventStatusEnum.PAST_STATUS, endDate: LessThan(dateNow) });
           guestStatusFilter = [GuestStatus.CONFIRMED];
           break;
         case 'INVITED':
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS }); //to get only upcoming events whos end date is in future
           guestStatusFilter = [GuestStatus.INVITED];
           break;
         case 'APPLIED':
+          addCondition({ status: EventStatusEnum.APPROVED_STATUS, endDate: MoreThan(dateNow) });
           guestStatusFilter = [GuestStatus.APPLIED];
           break;
         case 'DECLINED':
@@ -2251,6 +2374,7 @@ export class GuestService {
           case 'UPCOMING':
             orCondition = {
               endDate: MoreThan(dateNow),
+              status: EventStatusEnum.APPROVED_STATUS,
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
@@ -2260,6 +2384,7 @@ export class GuestService {
           case 'PAST':
             orCondition = {
               endDate: LessThan(dateNow),
+              status: EventStatusEnum.PAST_STATUS,
               guests: {
                 status: GuestStatus.CONFIRMED,
                 user: { id: payload.userId },
@@ -2268,6 +2393,7 @@ export class GuestService {
             break;
           case 'INVITED':
             orCondition = {
+              status: EventStatusEnum.APPROVED_STATUS,
               guests: {
                 status: GuestStatus.INVITED,
                 user: { id: payload.userId },
@@ -2276,6 +2402,8 @@ export class GuestService {
             break;
           case 'APPLIED':
             orCondition = {
+              status: EventStatusEnum.APPROVED_STATUS,
+              endDate: MoreThan(dateNow),
               guests: {
                 status: GuestStatus.APPLIED,
                 user: { id: payload.userId },
@@ -2493,6 +2621,9 @@ export class GuestService {
 
     if (!user) {
       throw new NotFoundError('User not found');
+    }
+    if (event.owner.id === payload.id) {
+      throw new ValidationError('The host cannot be invited in event');
     }
     const hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
@@ -2894,6 +3025,13 @@ export class GuestService {
     });
     if (!event) throw new NotFoundError('Event not found');
 
+    if (
+      payload.email?.trim().toLowerCase() === event.owner.email.trim().toLowerCase() ||
+      payload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+    ) {
+      throw new ValidationError('The host cannot be invited in event');
+    }
+
     // Step 2: Verify the lead guest's presence and CONFIRMED status
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
@@ -3006,6 +3144,7 @@ export class GuestService {
         lastName: payload.lastName,
         email: payload.email,
         phoneNumber: payload.phoneNumber,
+        source: UserSource.PLUS_1,
       };
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
@@ -3047,21 +3186,15 @@ export class GuestService {
       };
       sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     } else if (payload.phoneNumber) {
-      const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+      const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
           const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
           await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-        } else {
-          // Log the issue and exit early (no throw)
-          console.log(
-            `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-          );
-          return; // or just skip sending, depending on your function structure
         }
       } catch (err) {
-        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
 
@@ -3102,7 +3235,14 @@ export class GuestService {
         where: { id: guestPayload.eventId, deletedAt: IsNull() },
         relations: { location: true, owner: true },
       });
-      if (!event) throw new NotFoundError('Event not found');
+      if (!event) throw new NotFoundError('Event');
+
+      if (
+        guestPayload.email?.trim().toLowerCase() === event.owner.email?.trim().toLowerCase() ||
+        guestPayload.phoneNumber?.trim() === event.owner.phoneNumber?.trim()
+      ) {
+        throw new ValidationError('The host cannot be invited in event');
+      }
 
       // Step 2: Check lead guest presence and confirmation
       const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
@@ -3192,6 +3332,7 @@ export class GuestService {
           lastName: guestPayload.lastName,
           email: guestPayload.email,
           phoneNumber: guestPayload.phoneNumber,
+          source: UserSource.PLUS_1,
         };
         const newUser = (
           await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
@@ -3226,21 +3367,15 @@ export class GuestService {
           };
           sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
         } else if (guest.user.phoneNumber) {
-          const message = `Hi, ${guest.user.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+          const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
           try {
             const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
             if (validateNumber) {
               const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
               await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-            } else {
-              // Log the issue and exit early (no throw)
-              console.log(
-                `⚠️ Skipping SMS: Invalid phone number "${guest.user.phoneNumber}". Missing country code?`,
-              );
-              return; // or just skip sending, depending on your function structure
             }
           } catch (err) {
-            console.error(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+            console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
           }
         }
         return toGuestDataSimple(guest, []);
@@ -3362,9 +3497,14 @@ export class GuestService {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
-        const existingUserData = existingUsers.find(
-          user => user.email === row.email || user.phoneNumber === row.phoneNumber,
-        );
+        let existingUserData;
+        if (payload.isUploadUser) {
+          existingUserData = existingUsers.find(
+            user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+          );
+        } else {
+          existingUserData = existingUsers.find(user => user.email === row.email);
+        }
         if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
           if (mappingSet.has(existingUserData.id)) {
             const user = {
@@ -3372,7 +3512,7 @@ export class GuestService {
               lastName: row.lastName,
               email: row.email ? row.email : '',
               phoneNumber: row.phoneNumber ? row.phoneNumber : '',
-              reason: 'User already exists',
+              reason: 'User already exists in users list',
             };
             garbageData.push(user);
             if (row.email) userMap.delete(row.email);
@@ -3450,13 +3590,19 @@ export class GuestService {
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
 
-    if (newMappings.length !== 0)
+    if (newMappings.length !== 0) {
       await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      newMappings.map(async mapping => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: mapping.user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length,
+      SuccessUserCount: users.length + newMappings.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
@@ -3548,13 +3694,23 @@ export class GuestService {
     // Step 1: Check if the event exists and is not deleted
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.eventId, deletedAt: IsNull() },
-      relations: { location: true },
+      relations: { location: true, owner: true },
     });
-    if (!event) throw new NotFoundError('Event not found');
+    if (!event) throw new NotFoundError('Event');
 
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
+    if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
 
     if (!payload.email && !payload.phoneNumber) {
       throw new ValidationError('Atleast phoneNumber or email should be there');
@@ -3566,7 +3722,7 @@ export class GuestService {
       ticketType = await this.dbConnection
         .getRepository(TicketType)
         .findOne({ where: { id: payload.ticketTypeId } });
-      if (!ticketType) throw new NotFoundError('Ticket type not found');
+      if (!ticketType) throw new NotFoundError('Ticket type');
     }
 
     // Step 4: Normalize and validate guest status
@@ -3598,13 +3754,15 @@ export class GuestService {
         checkExistingUser = (
           await serviceMesh.userService().getUserWithRolesByPhone(payload.phoneNumber)
         )?.data;
+      } else if (payload.email && payload.phoneNumber) {
+        throw new BadRequestError('Please provide either email or phone number, not both');
       }
     } catch (e) {
       checkExistingUser = null;
     }
     if (checkExistingUser) {
       const checkGuest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: checkExistingUser.id } },
+        where: { user: { id: checkExistingUser.id }, event: { id: event.id } },
       });
       if (checkGuest) {
         throw new BadRequestError('Guest already exists');
@@ -3622,6 +3780,7 @@ export class GuestService {
         lastName,
         email: email || '',
         phoneNumber: phoneNumber || '',
+        source: UserSource.INVITED_BY_HOST,
       }))(payload);
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)
@@ -3641,6 +3800,7 @@ export class GuestService {
         maxAdditionalGuests: payload.maxAdditionalGuests || 0,
         user: { id: member.id } as User,
         addedBy: { id: host.id } as User,
+        inviteMessage: payload.inviteMessage,
         privateGuestNote: payload.privateGuestNote,
         invitationSource: UserSource.INVITED_BY_HOST,
         ticketType: ticketType ? ({ id: ticketType.id } as TicketType) : undefined,
@@ -3665,21 +3825,15 @@ export class GuestService {
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
-        const message = `Hi, ${payload.firstName} would like to invite you to join our upcoming event. Download the app here.`;
+        const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {
-            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '').trim();
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
-          } else {
-            // Log the issue and exit early (no throw)
-            console.log(
-              `⚠️ Skipping SMS: Invalid phone number "${payload.phoneNumber}". Missing country code?`,
-            );
-            return; // or just skip sending, depending on your function structure
           }
         } catch (err) {
-          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+          console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
     }

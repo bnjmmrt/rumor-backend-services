@@ -14,6 +14,8 @@ import { UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { entityToGender } from './auth.mapper';
 import { entityToUserSource, entityToUserStatus } from './shared.mapper';
 import { UserRole } from '../entities/roles/user-role.entity';
+import { formatDateFromDB } from '../../events/utils/event.utils';
+import { EventStatusEnum } from '../../events/interfaces/event.interface';
 
 export const toHostProfile = (
   user: User,
@@ -23,44 +25,54 @@ export const toHostProfile = (
   isMemberBlockedHost: boolean,
   roleId: string,
   roleName: string,
+  confirmedGuestEvents?: any[],
 ): HostProfile => {
+  const now = new Date();
   const upcomingEvents = user.hostedEvents
-    .filter(event => formatEventStatus(event) === EventStatus.UPCOMING_STATUS)
+    .filter(
+      event =>
+        event.status === EventStatusEnum.APPROVED_STATUS &&
+        !event.isPrivate &&
+        event.isPublished &&
+        new Date(event.endDate) >= now,
+    )
     .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
         name: event.name,
-        startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
-        endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
+        startDate: formatDateFromDB(event.startDate),
+        endDate: formatDateFromDB(event.endDate),
         imageFlyer: event.imageFlyer || '',
         eventLocation: event.location || undefined,
+        timeZone: event.timeZone || undefined,
       };
     });
-  const pastEvents = user.hostedEvents
-    .filter(event => formatEventStatus(event) === EventStatus.PAST_STATUS)
-    .map(event => {
+  const pastEvents =
+    confirmedGuestEvents?.map((guest: any) => {
       return {
-        id: event.id,
-        imageCover: event.imageCover || '',
-        name: event.name,
-        startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
-        endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
-        imageFlyer: event.imageFlyer || '',
-        eventLocation: event.location || undefined,
+        id: guest?.event?.id,
+        imageCover: guest?.event?.imageCover || '',
+        name: guest?.event?.name,
+        startDate: guest?.event?.startDate ? formatDateFromDB(guest.event.startDate) : '',
+        endDate: guest?.event?.endDate ? formatDateFromDB(guest.event.endDate) : '',
+        imageFlyer: guest?.event?.imageFlyer || '',
+        eventLocation: guest?.event?.location || undefined,
+        timeZone: guest?.event?.timeZone || undefined,
       };
-    });
+    }) || [];
   const pendingEvents = user.hostedEvents
-    .filter(event => formatEventStatus(event) === EventStatus.PENDING_STATUS)
+    .filter(event => event.status === EventStatusEnum.PENDING_STATUS)
     .map(event => {
       return {
         id: event.id,
         imageCover: event.imageCover || '',
         name: event.name,
-        startDate: dayjs(event.startDate).format('MM/DD/YYYY HH:mm') || '',
-        endDate: dayjs(event.endDate).format('MM/DD/YYYY HH:mm') || '',
+        startDate: formatDateFromDB(event.startDate),
+        endDate: formatDateFromDB(event.endDate),
         imageFlyer: event.imageFlyer || '',
         eventLocation: event.location || undefined,
+        timeZone: event.timeZone || undefined,
       };
     });
 
@@ -113,6 +125,8 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
   };
 };
 
+/*
+TODO: remove
 export const toMemberProfile = (
   user: User,
   focuses: FocusProto[],
@@ -153,4 +167,4 @@ export const toMemberProfile = (
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount,
   };
-};
+}; */

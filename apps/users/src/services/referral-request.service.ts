@@ -16,49 +16,61 @@ import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import database from '../database';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import config from '../config';
+import { BadRequestError, ConflictError } from 'rumor-utils/errors';
 
 export class ReferralRequestService {
   public static dbConnection = database;
 
-  public static async createReferralRequest(
-    payload: CreateReferralRequestDto,
-  ): Promise<GenericResponse> {
+  public static async createReferralRequest(payload: CreateReferralRequestDto): Promise<string> {
+    const existingReferralRequest = await this.dbConnection.getRepository(ReferralRequest).findOne({
+      where: {
+        user: { id: payload.userId },
+        requester: { id: payload.requesterId },
+      },
+    });
+
+    if (existingReferralRequest) throw new ConflictError('Referral request already exists');
+
+    const referralRequest = new ReferralRequest();
+    referralRequest.user = { id: payload.userId } as User;
+    referralRequest.requester = { id: payload.requesterId } as User;
+
+    await this.dbConnection.getRepository(ReferralRequest).save(referralRequest);
+
     try {
-      const existingReferralRequest = await this.dbConnection
-        .getRepository(ReferralRequest)
-        .findOne({
-          where: {
-            user: { id: payload.userId },
-            requester: { id: payload.requesterId },
-          },
-        });
-
-      if (existingReferralRequest) return responses.conflict('Referral request already exists');
-
-      const referralRequest = new ReferralRequest();
-      referralRequest.user = { id: payload.userId } as User;
-      referralRequest.requester = { id: payload.requesterId } as User;
-
-      await this.dbConnection.getRepository(ReferralRequest).save(referralRequest);
-
-      try {
-        serviceMesh
-          .notificationService()
-          .sendNotification(
-            NotificationType.PROFILE_REFERRALS,
-            payload.userId,
-            null,
-            payload.requesterId,
-          );
-      } catch (error) {
-        console.log('🚀 ~ ReferralRequestService ~ createReferralRequest ~ error:', error);
-      }
-
-      return responses.ok;
-    } catch (err) {
-      //   this.logger.error(err);
-      return responses.badRequest('Error creating a new referral request');
+      serviceMesh
+        .notificationService()
+        .sendNotification(
+          NotificationType.PROFILE_REFERRALS,
+          payload.userId,
+          null,
+          payload.requesterId,
+        );
+    } catch (error) {
+      console.log('🚀 ~ ReferralRequestService ~ createReferralRequest ~ error:', error);
     }
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId },
+    });
+    let userPhoneNumber = user?.phoneNumber;
+    //send text message to user to whom the referral request is sent
+    if (userPhoneNumber) {
+      try {
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let message = `Hey ${user?.firstName} - Someone has requested your referral to Rumor. Click to refer them now! ${link}`;
+        const validateNumber = isValidPhoneNumber(userPhoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+      }
+    }
+    return '';
   }
 
   public static async getReferralRequests(
