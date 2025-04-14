@@ -2504,6 +2504,7 @@ export class EventsService {
           //   publishDate: eventFromDb.publishDate,
           // } as Event);
           try {
+            console.log('publishing')
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.PUBLISH_EVENT,
               data: {
@@ -2512,7 +2513,9 @@ export class EventsService {
               },
             };
             serviceMesh.schedularService().triggerSchedulerJob(data);
-          } catch (e) {}
+          } catch (e) {
+            console.log('e -= - ', e)
+          }
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {

@@ -17,15 +17,15 @@ RUN find . -mindepth 1 -maxdepth 1 ! -name 'dist' -exec rm -rf {} + && \
 
 WORKDIR /app
 
-# Copy necessary files for apps/users
-COPY apps/users/package.json  ./
-COPY apps/users/tsconfig.json ./
+# Copy necessary files for apps/schedular
+COPY apps/schedular/package.json  ./
+COPY apps/schedular/tsconfig.json ./
 
 # Install dependencies
 RUN npm install --legacy-peer-deps
 
 # Copy the application source code
-COPY apps/users/src src
+COPY apps/schedular/src src
 
 # Remove previous build artifacts
 RUN rm -rf dist
@@ -33,7 +33,7 @@ RUN rm -rf dist
 # Build the application
 RUN npm run build
 
-EXPOSE 8000
+EXPOSE 8003
 
 # Start the service
 CMD ["npm", "start"]
