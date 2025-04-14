@@ -466,8 +466,6 @@ router.get('/guest/event/:id/export', AuthMiddleware.fusionAuthRequired, GuestCo
 
 router.delete('/delete-host-events/:id', EventsController.deleteHostEvents);
 
-
 router.post('/event/reminders/send', EventsController.sendEventRemindersToAllGuests);
-
 
 export default router;

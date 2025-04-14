@@ -141,7 +141,10 @@ import {
 } from '../../packages/rumor-utils/shared/events/entities';
 import { sendSmsNotification } from '../utils/sms.utils';
 import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
-import { SchedulerJobType, SchedulerTriggerPayload } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -344,17 +347,15 @@ export class EventsService {
         //   endDate: event.endDate,
         // } as Event);
         try {
-        let data: SchedulerTriggerPayload = {
-          type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
-          data: {
-            id: event.id,
-            endDate: event.endDate
-          }
-        }
-        serviceMesh.schedularService().triggerSchedulerJob(data)
-      } catch(e) {
-          
-      }
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {}
       }
       //ends here
 
@@ -2508,12 +2509,10 @@ export class EventsService {
               data: {
                 id: eventFromDb.id,
                 publishDate: eventFromDb.publishDate,
-              }
-            }
-            serviceMesh.schedularService().triggerSchedulerJob(data)
-          } catch (e) {
-
-          }
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {}
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {
@@ -2523,19 +2522,17 @@ export class EventsService {
           // } as Event);
 
           try {
-            console.log('reminder')
+            console.log('reminder');
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.REMINDER_EVENT,
               data: {
                 id: eventFromDb.id,
                 startDate: eventFromDb.startDate,
                 name: eventFromDb.name,
-              }
-            }
-            serviceMesh.schedularService().triggerSchedulerJob(data)
-          } catch (e) {
-
-          }
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {}
         }
       }
       if (
@@ -2547,18 +2544,16 @@ export class EventsService {
         //   id: eventFromDb.id,
         //   endDate: eventFromDb.endDate,
         // } as Event);
-        try{
-        let data: SchedulerTriggerPayload = {
-          type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
-          data: {
-            id: eventFromDb.id,
-            endDate: eventFromDb.endDate,
-          }
-        }
-        serviceMesh.schedularService().triggerSchedulerJob(data)
-      } catch(e) {
-          
-      }
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: eventFromDb.id,
+              endDate: eventFromDb.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {}
       }
       //ends here
       //ends here
@@ -2674,26 +2669,26 @@ export class EventsService {
       .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
       .getMany();
     if (!guests.length) return;
-    const emailPromises = guests.map(guest => {
-
-      if (guest?.user?.email)  {
-        const mailPayload = {
-          eventName: event.name || 'Event',
-          imageFlyer: event.imageFlyer,
-          eventDate: event.startDate,
-          location: event.location?.location,
-          city: event.location?.city,
-        };
-       return sendEventReminder(
-          mailPayload,
-          guest.user.email,
-          guest.user.id,
-          event.id,
-          event.timeZone
-        );
-      }
-      return null;
-    })
+    const emailPromises = guests
+      .map(guest => {
+        if (guest?.user?.email) {
+          const mailPayload = {
+            eventName: event.name || 'Event',
+            imageFlyer: event.imageFlyer,
+            eventDate: event.startDate,
+            location: event.location?.location,
+            city: event.location?.city,
+          };
+          return sendEventReminder(
+            mailPayload,
+            guest.user.email,
+            guest.user.id,
+            event.id,
+            event.timeZone,
+          );
+        }
+        return null;
+      })
       .filter(Boolean);
 
     await Promise.allSettled(emailPromises);
@@ -3242,18 +3237,15 @@ export class EventsService {
         //   publishDate: event.publishDate,
         // } as Event);
         try {
-        let data: SchedulerTriggerPayload = {
-          type: SchedulerJobType.PUBLISH_EVENT,
-          data: {
-            id: event.id,
-            publishDate: event.publishDate,
-          }
-        }
-        serviceMesh.schedularService().triggerSchedulerJob(data)
-
-      } catch(e) {
-          
-      }
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PUBLISH_EVENT,
+            data: {
+              id: event.id,
+              publishDate: event.publishDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {}
       }
       if (event.endDate) {
         // SchedulerService.scheduleEventPastAndCancelledDate({
@@ -3261,18 +3253,15 @@ export class EventsService {
         //   endDate: event.endDate,
         // } as Event);
         try {
-        let data: SchedulerTriggerPayload = {
-          type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
-          data: {
-            id: event.id,
-            endDate: event.endDate,
-          }
-        }
-        serviceMesh.schedularService().triggerSchedulerJob(data)
-      } catch(e) {
-          
-      }
-
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {}
       }
       if (event?.startDate) {
         // SchedulerService.prepareEventReminderDataAndSchedule({
@@ -3285,12 +3274,11 @@ export class EventsService {
             data: {
               id: event.id,
               startDate: event.startDate,
-              name: event.name
-            }
-          }
-          serviceMesh.schedularService().triggerSchedulerJob(data)
-        } catch (e) {
-        }
+              name: event.name,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {}
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3318,10 +3306,10 @@ export class EventsService {
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       //send text notification
       if (updatedEvent?.owner?.phoneNumber) {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect'
-        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`
+        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
         //Micro-service call
-        let number = updatedEvent?.owner?.phoneNumber
+        let number = updatedEvent?.owner?.phoneNumber;
         try {
           const validateNumber = isValidPhoneNumber(number);
           if (validateNumber) {
@@ -3652,7 +3640,7 @@ export class EventsService {
    * 8. Commit the transaction if at least one notification is successful.
    */
   public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
-    console.log("🚀 ~ cancelEventAndNotify ~ payload:", payload)
+    console.log('🚀 ~ cancelEventAndNotify ~ payload:', payload);
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3712,7 +3700,7 @@ export class EventsService {
         GuestStatus.APPLIED,
       ];
       //using query to find guests
-      const guests : any = await this.dbConnection
+      const guests: any = await this.dbConnection
         .getRepository(Guest)
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
@@ -3755,7 +3743,7 @@ export class EventsService {
         const guestName = guest.user?.firstName || 'Guest';
 
         const message = payload.customMessage;
-        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`
+        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`;
         // ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
@@ -3783,19 +3771,22 @@ export class EventsService {
           }
           if (guest.user?.phoneNumber) {
             // Send SMS notification
-             try {
-               const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
-               if (role?.role?.name === RoleType.NonMember) {
-                 mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`
-               }
-               //send text message 
-               const success = sendSmsNotification({ phoneNumber: guest.user?.phoneNumber, textMessage: mobileNotificationMessage }); /** status: Tested and working fine */
-               if (success) {
-                 notificationSuccess = true;
-               }
-             } catch (err) {
-               console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
-             }
+            try {
+              const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
+              if (role?.role?.name === RoleType.NonMember) {
+                mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
+              }
+              //send text message
+              const success = sendSmsNotification({
+                phoneNumber: guest.user?.phoneNumber,
+                textMessage: mobileNotificationMessage,
+              }); /** status: Tested and working fine */
+              if (success) {
+                notificationSuccess = true;
+              }
+            } catch (err) {
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+            }
           }
         } catch (error) {
           // this.logger.error(`Error sending notification to ${guestName || 'guest'} for event:`, error);
