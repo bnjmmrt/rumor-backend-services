@@ -350,7 +350,7 @@ export class EventsService {
               endDate: event.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          //serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
         }
@@ -2505,7 +2505,7 @@ export class EventsService {
                 publishDate: eventFromDb.publishDate,
               },
             };
-            serviceMesh.schedularService().triggerSchedulerJob(data);
+            //serviceMesh.schedularService().triggerSchedulerJob(data);
           } catch (e) {
             console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
           }
@@ -2521,7 +2521,7 @@ export class EventsService {
                 name: eventFromDb.name,
               },
             };
-            serviceMesh.schedularService().triggerSchedulerJob(data);
+            //serviceMesh.schedularService().triggerSchedulerJob(data);
           } catch (e) {
             console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
           }
@@ -2540,7 +2540,7 @@ export class EventsService {
               endDate: eventFromDb.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          //serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
         }
@@ -3234,7 +3234,7 @@ export class EventsService {
               publishDate: event.publishDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          //serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
@@ -3248,7 +3248,7 @@ export class EventsService {
               endDate: event.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          //serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
@@ -3263,7 +3263,7 @@ export class EventsService {
               name: event.name,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          //serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Reminder scheduler failed for ${event.name}`, e);
         }
