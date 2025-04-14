@@ -1462,17 +1462,10 @@ export class AuthService {
     }
 
     if (user && user.roles.length) {
-      const isUnapprovedHost =
-        user.roles.length === 1 &&
+      user.roles =
         user.roles.filter(
-          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
-        ).length > 0;
-
-      if (isUnapprovedHost) {
-        throw new AuthorizationError(
-          'Your host application is still under review. Please check back later.',
+          data => data.status !== UserStatus.NEW_APPLICANT && data?.role?.name !== 'host',
         );
-      }
     }
 
     if (payload.isDeactivated && user.isDeactivated) {
