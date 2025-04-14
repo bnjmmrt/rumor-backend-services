@@ -3845,7 +3845,19 @@ export class AuthService {
     let users = await usersQuery.getMany();
     users = users.filter(item => {
       const rolesList = item?.roles?.map(item => item.role.name);
-      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+      if (
+        rolesList.includes(RoleType.Admin) ||
+        rolesList.includes(RoleType.RumorSuperAdmin) ||
+        rolesList.includes(RoleType.RumorManager) ||
+        rolesList.includes(RoleType.Host) ||
+        rolesList.includes(RoleType.MainHost) ||
+        rolesList.includes(RoleType.CoHost) ||
+        rolesList.includes(RoleType.Promotor) ||
+        rolesList.includes(RoleType.Contributor) ||
+        rolesList.includes(RoleType.CheckIn)
+      ) {
+        return false;
+      } else if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
         //filter users with desired roles
         return item;
       }
