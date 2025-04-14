@@ -1,7 +1,7 @@
 // scheduler.controller.ts
 import { Request, Response } from 'express';
 import { SchedulerService } from '../services/scheduler-service';
-import asyncWrapper from 'src/server/helpers/asyncWrapper';
+import asyncWrapper from '../server/helpers/asyncWrapper';
 import {
   CreateResponse,
   DeleteResponse,

@@ -8,7 +8,7 @@ import {
   ValidationError,
 } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
-import serviceMesh from 'src/server/helpers/serviceMeshHandler';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
   public static async triggerJob(payload: any): Promise<any> {
