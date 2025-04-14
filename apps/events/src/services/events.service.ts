@@ -135,13 +135,16 @@ import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
 
-import { SchedulerService } from './scheduler-service';
 import {
   CsvUploadRecords,
   FeaturedEventSection,
 } from '../../packages/rumor-utils/shared/events/entities';
 import { sendSmsNotification } from '../utils/sms.utils';
 import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -339,10 +342,18 @@ export class EventsService {
 
       //schedule event for cancelled status if not approved
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: event.id,
-          endDate: event.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
+        }
       }
       //ends here
 
@@ -2486,17 +2497,34 @@ export class EventsService {
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
         if (!eventFromDb.isPublished && eventFromDb.publishDate) {
-          SchedulerService.scheduleEventPublishDate({
-            id: eventFromDb.id,
-            publishDate: eventFromDb.publishDate,
-          } as Event);
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.PUBLISH_EVENT,
+              data: {
+                id: eventFromDb.id,
+                publishDate: eventFromDb.publishDate,
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
+          }
         }
         //update schedular if event start date has been change
         if (payload?.startDate) {
-          SchedulerService.prepareEventReminderDataAndSchedule({
-            id: eventFromDb.id,
-            startDate: eventFromDb.startDate,
-          } as Event);
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.REMINDER_EVENT,
+              data: {
+                id: eventFromDb.id,
+                startDate: eventFromDb.startDate,
+                name: eventFromDb.name,
+              },
+            };
+            serviceMesh.schedularService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
+          }
         }
       }
       if (
@@ -2504,10 +2532,18 @@ export class EventsService {
         (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
           eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
       ) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: eventFromDb.id,
-          endDate: eventFromDb.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: eventFromDb.id,
+              endDate: eventFromDb.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
+        }
       }
       //ends here
       //ends here
@@ -2607,7 +2643,11 @@ export class EventsService {
    * @param {Event} event - The event for which reminders need to be sent.
    * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
    */
-  public static async sendEventRemindersToAllGuests(event: Event): Promise<void> {
+  public static async sendEventRemindersToAllGuests(eventId: string): Promise<void> {
+    const event: Event = await Event.findOne({
+      where: { id: eventId },
+      relations: { location: true },
+    });
     const guestStatuses: GuestStatus[] = [
       GuestStatus.INVITED,
       GuestStatus.CONFIRMED,
@@ -3186,22 +3226,47 @@ export class EventsService {
       if (!event.publishDate) {
         event.isPublished = true;
       } else {
-        SchedulerService.scheduleEventPublishDate({
-          id: event.id,
-          publishDate: event.publishDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PUBLISH_EVENT,
+            data: {
+              id: event.id,
+              publishDate: event.publishDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
       }
       if (event.endDate) {
-        SchedulerService.scheduleEventPastAndCancelledDate({
-          id: event.id,
-          endDate: event.endDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
       }
       if (event?.startDate) {
-        SchedulerService.prepareEventReminderDataAndSchedule({
-          id: event.id,
-          startDate: event.startDate,
-        } as Event);
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.REMINDER_EVENT,
+            data: {
+              id: event.id,
+              startDate: event.startDate,
+              name: event.name,
+            },
+          };
+          serviceMesh.schedularService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Reminder scheduler failed for ${event.name}`, e);
+        }
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -3563,7 +3628,6 @@ export class EventsService {
    * 8. Commit the transaction if at least one notification is successful.
    */
   public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
-    console.log('🚀 ~ cancelEventAndNotify ~ payload:', payload);
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -3590,8 +3654,6 @@ export class EventsService {
       if (!validStatuses.includes(event.status)) {
         throw new Error('Event is not approved.');
       }
-
-      console.log('event.owner', event.owner.id, payload.ownerId);
       // Permitir cancelar si es admin o propietario
       if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');

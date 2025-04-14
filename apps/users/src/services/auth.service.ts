@@ -400,13 +400,33 @@ export class AuthService {
     // Always use `newMember` for user creation
     let newUser = newMember(payload, address);
 
-    // Retain ID if user exists
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // Si el usuario existe, actualizamos sus campos manteniendo la información existente
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recuperamos el usuario actualizado con sus relaciones
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // Si es un usuario nuevo, creamos uno nuevo con la información proporcionada
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
 
     if (payload.instagramAccessToken) {
@@ -454,11 +474,34 @@ export class AuthService {
         );
       }
       newUser.id = fusionAuthUser.response?.user?.id;
-      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
+      fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    // Only assign if not exits
+    if (!existingUser) {
+      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
+    } else {
+      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          user: existingUser,
+        },
+        relations: {
+          role: true,
+        },
+      });
+      for (let item of actualRoles) {
+        if (
+          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
+            item.source as UserSource,
+          )
+        ) {
+          await this.dbConnection
+            .getRepository(UserRole)
+            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
+        }
+      }
+    }
+
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
       focusIds: payload.focusIds,
@@ -480,7 +523,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email.trim().toLowerCase()], // Send email to the member
+        [newUser.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -545,7 +588,7 @@ export class AuthService {
         roleName: role.role.name,
         roleId: role.role.id,
       })),
-      token: fusionAuthToken, // Now token is set correctly
+      token: fusionAuthToken,
     };
   }
 
