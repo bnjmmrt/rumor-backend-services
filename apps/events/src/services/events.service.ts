@@ -68,7 +68,11 @@ import {
   UserRole,
 } from '../../packages/rumor-utils/shared/entities';
 import { Survey } from '../../packages/rumor-utils/shared/events/entities';
-import { CreateSurveyResponse, SurveyListResponse, UpdateSurveyRequestDto } from '../interfaces/survey.interface';
+import {
+  CreateSurveyResponse,
+  SurveyListResponse,
+  UpdateSurveyRequestDto,
+} from '../interfaces/survey.interface';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import {
@@ -4459,15 +4463,19 @@ export class EventsService {
     };
   }
 
-    public static async listSurveys(): Promise<SurveyListResponse> {
+  public static async listSurveys(): Promise<SurveyListResponse> {
     const surveys = await this.dbConnection.getRepository(Survey).find();
     //Add responses count to each survey as well as whether it's upcoming, live, or past
-    const surveysWithResponses = await Promise.all(surveys.map(async (survey) => {
-      const responses = await this.dbConnection.getRepository(SurveyResponses).count({ where: { survey: { id: survey.id } } });
-      return { ...survey, responses };
-    }));
+    const surveysWithResponses = await Promise.all(
+      surveys.map(async survey => {
+        const responses = await this.dbConnection
+          .getRepository(SurveyResponses)
+          .count({ where: { survey: { id: survey.id } } });
+        return { ...survey, responses };
+      }),
+    );
     //Add whether it's upcoming, live, or past
-    const surveysWithStatus = surveysWithResponses.map((survey) => {
+    const surveysWithStatus = surveysWithResponses.map(survey => {
       const now = new Date();
       if (survey.surveyStartDate > now) {
         return { ...survey, status: 'upcoming' };
@@ -4478,9 +4486,9 @@ export class EventsService {
       return { ...survey, status: 'past' };
     });
     return {
-      past: surveysWithStatus.filter((survey) => survey.status === 'past'),
-      live: surveysWithStatus.filter((survey) => survey.status === 'live'),
-      upcoming: surveysWithStatus.filter((survey) => survey.status === 'upcoming'),
+      past: surveysWithStatus.filter(survey => survey.status === 'past'),
+      live: surveysWithStatus.filter(survey => survey.status === 'live'),
+      upcoming: surveysWithStatus.filter(survey => survey.status === 'upcoming'),
     };
   }
 
@@ -4489,7 +4497,10 @@ export class EventsService {
     return survey;
   }
 
-  public static async updateSurveyById(id: string, payload: UpdateSurveyRequestDto): Promise<Survey> {
+  public static async updateSurveyById(
+    id: string,
+    payload: UpdateSurveyRequestDto,
+  ): Promise<Survey> {
     await this.dbConnection.getRepository(Survey).update(id, payload);
     return this.getSurveyById(id);
   }

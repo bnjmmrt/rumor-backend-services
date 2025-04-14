@@ -5551,7 +5551,7 @@ export class AuthService {
       'userSource',
       'declinedBy',
       'vouch',
-      'whosInTown'
+      'whosInTown',
     ];
     const focuses = await PlatformService.getFocuses();
 
@@ -5760,7 +5760,7 @@ export class AuthService {
 
     const surveysObj = {
       id: 'whosInTown',
-      label: 'Who\'s In Town',
+      label: "Who's In Town",
       options: [serviceMesh.eventService().listSurveys()],
       type: FilterTypeValues.whosInTown,
     };
@@ -5999,7 +5999,7 @@ export class AuthService {
 
     const surveys = await this.dbConnection.getRepository(SurveyResponses).find({
       where: { user: { id: user.id } },
-    }); 
+    });
 
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
@@ -6026,15 +6026,15 @@ export class AuthService {
             roleId: role.role.id,
             roleName: role.role.name,
             status: entityToUserStatus[role.status],
-            source: role.source ? entityToUserSource[role.source] : undefined
-          }))
+            source: role.source ? entityToUserSource[role.source] : undefined,
+          })),
         },
         survey: {
           ...survey.survey,
-          message: survey.survey.message || ''
+          message: survey.survey.message || '',
         },
-        respondedAt: survey.respondedAt.toISOString()
-      }))
+        respondedAt: survey.respondedAt.toISOString(),
+      })),
     );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
@@ -6050,11 +6050,11 @@ export class AuthService {
           roleId: role.role.id,
           roleName: role.role.name,
           status: entityToUserStatus[role.status],
-          source: role.source ? entityToUserSource[role.source] : undefined
-        }))
+          source: role.source ? entityToUserSource[role.source] : undefined,
+        })),
       },
       survey: survey.survey,
-      respondedAt: survey.respondedAt.toISOString()
+      respondedAt: survey.respondedAt.toISOString(),
     }));
 
     return userData;

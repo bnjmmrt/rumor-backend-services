@@ -16,6 +16,6 @@ export class SurveyResponses extends RumorBaseEntity {
   survey: Survey;
 
   @ManyToOne(() => User, user => user.surveyResponses)
-  @JoinColumn({ name: 'user_id' })  
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }

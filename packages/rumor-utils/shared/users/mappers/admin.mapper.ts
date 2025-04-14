@@ -134,7 +134,7 @@ export const toMemberProfile = (
   role: UserRole,
   instagramUsername?: string,
   eventCount?: number,
-  surveyResponses?: SurveyResponse[]
+  surveyResponses?: SurveyResponse[],
 ): MemberProfile => {
   return {
     id: user.id,
@@ -168,23 +168,24 @@ export const toMemberProfile = (
     customLists: [],
     focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
     eventCount,
-    surveyResponses: user.surveyResponses?.map(response => ({
-      id: response.id,
-      response: response.response,
-      user: {
-        ...response.user,
-        roles: response.user.roles.map(role => ({
-          roleId: role.role.id,
-          roleName: role.role.name,
-          status: entityToUserStatus[role.status],
-          source: role.source ? entityToUserSource[role.source] : undefined
-        }))
-      },
-      survey: {
-        ...response.survey,
-        message: response.survey.message || ''
-      },
-      respondedAt: response.respondedAt.toISOString()
-    })) || [],
+    surveyResponses:
+      user.surveyResponses?.map(response => ({
+        id: response.id,
+        response: response.response,
+        user: {
+          ...response.user,
+          roles: response.user.roles.map(role => ({
+            roleId: role.role.id,
+            roleName: role.role.name,
+            status: entityToUserStatus[role.status],
+            source: role.source ? entityToUserSource[role.source] : undefined,
+          })),
+        },
+        survey: {
+          ...response.survey,
+          message: response.survey.message || '',
+        },
+        respondedAt: response.respondedAt.toISOString(),
+      })) || [],
   };
 }; */

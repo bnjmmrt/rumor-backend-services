@@ -24,7 +24,6 @@ import {
 } from './shared.pb';
 import { IReferenceCode } from 'shared/users/mappers/auth.mapper';
 
-
 export const protobufPackage = 'auth';
 
 /** Gender */
@@ -552,14 +551,14 @@ export interface InvitedUsers {
 }
 
 export interface Survey {
-    title: string;
-    message?: string;
-    imageUrl: string;
-    eventStartDate: Date;
-    eventEndDate: Date;
-    surveyStartDate: Date;
-    surveyEndDate: Date;
-    status: string;
+  title: string;
+  message?: string;
+  imageUrl: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  surveyStartDate: Date;
+  surveyEndDate: Date;
+  status: string;
 }
 
 export interface SurveyResponse {

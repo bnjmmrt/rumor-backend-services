@@ -242,7 +242,6 @@ export class User extends RumorBaseEntity {
   @OneToMany(() => Report, report => report.reportedTo)
   reportsReceived: Relation<Report[]>;
 
-
   @OneToMany(() => SurveyResponses, response => response.user)
   surveyResponses: Relation<SurveyResponses[]>;
 
