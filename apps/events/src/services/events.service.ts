@@ -352,8 +352,7 @@ export class EventsService {
           };
           serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
-          console.log(`Past or Cancel scheduler failed for ${event.name}`, e)
-         
+          console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
         }
       }
       //ends here
@@ -2508,7 +2507,7 @@ export class EventsService {
             };
             serviceMesh.schedularService().triggerSchedulerJob(data);
           } catch (e) {
-            console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e)
+            console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
           }
         }
         //update schedular if event start date has been change
@@ -2524,7 +2523,7 @@ export class EventsService {
             };
             serviceMesh.schedularService().triggerSchedulerJob(data);
           } catch (e) {
-            console.log(`remainder scheduler failed for ${eventFromDb.name}`, e)
+            console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
           }
         }
       }
@@ -2541,9 +2540,9 @@ export class EventsService {
               endDate: eventFromDb.endDate,
             },
           };
-           serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
-          console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e)
+          console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
         }
       }
       //ends here
@@ -2646,9 +2645,9 @@ export class EventsService {
    */
   public static async sendEventRemindersToAllGuests(eventId: string): Promise<void> {
     const event: Event = await Event.findOne({
-      where: { id: eventId},
+      where: { id: eventId },
       relations: { location: true },
-    });   
+    });
     const guestStatuses: GuestStatus[] = [
       GuestStatus.INVITED,
       GuestStatus.CONFIRMED,
@@ -3237,7 +3236,7 @@ export class EventsService {
           };
           serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
-          console.log(`Publish date scheduler failed for ${event.name}`, e)
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
       }
       if (event.endDate) {
@@ -3251,7 +3250,7 @@ export class EventsService {
           };
           serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
-          console.log(`Publish date scheduler failed for ${event.name}`, e)
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
       }
       if (event?.startDate) {
@@ -3266,7 +3265,7 @@ export class EventsService {
           };
           serviceMesh.schedularService().triggerSchedulerJob(data);
         } catch (e) {
-          console.log(`Reminder scheduler failed for ${event.name}`, e)
+          console.log(`Reminder scheduler failed for ${event.name}`, e);
         }
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {

@@ -2,9 +2,7 @@ import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.inte
 import { Event } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
-import {
-  BadRequestError,
-} from 'rumor-utils/errors';
+import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 
@@ -27,7 +25,7 @@ export class SchedulerService {
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
-    return ''
+    return '';
   }
 
   public static async scheduleEventOnServerRestart() {

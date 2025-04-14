@@ -2,9 +2,7 @@
 import { Request, Response } from 'express';
 import { SchedulerService } from '../services/scheduler-service';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import {
-  CreateResponse,
-} from 'rumor-utils/success';
+import { CreateResponse } from 'rumor-utils/success';
 
 export class SchedulerController {
   public static triggerSchedulerJob = asyncWrapper(

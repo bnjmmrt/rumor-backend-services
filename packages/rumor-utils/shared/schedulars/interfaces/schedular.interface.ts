@@ -19,7 +19,7 @@ export type ReminderEventData = {
 export type EndOrCancelEventData = {
   id: string;
   endDate: Date;
-} ;
+};
 
 export type SchedulerTriggerPayload =
   | { type: SchedulerJobType.PUBLISH_EVENT; data: PublishEventData }
