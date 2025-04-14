@@ -272,53 +272,44 @@ export class GuestService {
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
-            // console.log("here we go", updateGuests)
-            await Promise.all(
-              updateGuests.map(guest => {
-                const phoneNumber = guest?.phoneNumber;
-                const guestStatus = guest?.guestStatus;
-
-                if (!phoneNumber) return;
-
-                let textMessage: string | null = null;
-                //TODO
-                // if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
-                //   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences [link to event download].`;
-                // }
-
-                if (
-                  guestStatus === GuestStatus.DECLINED &&
-                  guest?.invitationSource == UserSource.SIGN_UP_FORM
-                ) {
-                  textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}. `;
+            const smsPromises: Promise<{ success: boolean }>[] = [];
+        
+            const baseRedirectUrl = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        
+            for (const guest of updateGuests) {
+              const { phoneNumber, invitationSource, userId } = guest;
+        
+              if (!phoneNumber) continue;
+        
+              const shouldSendApproval =
+                guestStatus === GuestStatus.CONFIRMED &&
+                [GuestStatus.APPLIED, GuestStatus.DECLINED].includes(currentStatus as GuestStatus);
+        
+              const shouldSendDecline =
+                guestStatus === GuestStatus.DECLINED &&
+                [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(currentStatus as GuestStatus);
+        
+              let textMessage: string | null = null;
+              if (shouldSendDecline && invitationSource === UserSource.SIGN_UP_FORM) {
+                textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
+              } else if (shouldSendApproval) {
+                if (invitationSource === UserSource.SIGN_UP_FORM) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.`;
+                } else if (invitationSource === UserSource.REQUEST_IN_APP) {
+                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
+              }
+        
+              if (textMessage) {
+                smsPromises.push(sendSmsNotification({ phoneNumber, textMessage }));
+              }
+            }
+        
+            await Promise.all(smsPromises);
 
-                if (
-                  guestStatus === GuestStatus.CONFIRMED &&
-                  guest?.invitationSource == UserSource.SIGN_UP_FORM
-                ) {
-                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details. `;
-                }
-
-                if (
-                  guestStatus === GuestStatus.CONFIRMED &&
-                  guest?.invitationSource == UserSource.REQUEST_IN_APP
-                ) {
-                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
-                }
-
-                return sendSmsNotification({
-                  phoneNumber,
-                  textMessage,
-                });
-              }),
-            );
-
-            // Check if guests were successfully created
-
+            // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
-              //"action": "UPDATE",
               if (guestStatus === GuestStatus.DECLINED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED))
                 serviceMesh
                   .notificationService()
