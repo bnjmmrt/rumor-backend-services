@@ -4678,9 +4678,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-    const eventCount = await this.dbConnection
-      .getRepository(Guest)
-      .count({ where: { user: { id: user.id } } });
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -4694,8 +4692,12 @@ export class AuthService {
         userRole,
         undefined,
         socialProvider?.username,
-        eventCount,
         referredUser?.referralCode,
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
       ),
     );
   }
@@ -5232,6 +5234,7 @@ export class AuthService {
       interests,
       userRole,
       formattedLists,
+      undefined,
       undefined,
       eventCount,
     );
