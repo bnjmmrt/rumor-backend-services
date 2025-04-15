@@ -1220,6 +1220,24 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
+    if (payload?.phoneNumber) {
+      let message =
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. `+
+        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+
+      //Micro-service call
+      try {
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
+    }
+
+
     const params = [
       {
         key: 'invitee_first_name',
@@ -4678,9 +4696,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-    const eventCount = await this.dbConnection
-      .getRepository(Guest)
-      .count({ where: { user: { id: user.id } } });
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -4694,8 +4710,12 @@ export class AuthService {
         userRole,
         undefined,
         socialProvider?.username,
-        eventCount,
         referredUser?.referralCode,
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
       ),
     );
   }
@@ -5232,6 +5252,7 @@ export class AuthService {
       interests,
       userRole,
       formattedLists,
+      undefined,
       undefined,
       eventCount,
     );
