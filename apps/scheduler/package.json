@@ -1,5 +1,5 @@
 {
-  "name": "rumor-schedular-service",
+  "name": "rumor-scheduler-service",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.ts",
