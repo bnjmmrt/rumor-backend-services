@@ -23,7 +23,7 @@ export class FeaturedEventSectionsController {
 
   public static deleteFeaturedEventSection = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
-    const response = await FeaturedEventSectionsService.deleteFeaturedEventSection(id);
+    const response = await FeaturedEventSectionsService.deleteFeaturedEventSection({id});
     const successResponse = new DeleteResponse(
       response,
       'Succesfully created feature event section',
