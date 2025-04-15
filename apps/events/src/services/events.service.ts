@@ -4437,12 +4437,11 @@ export class EventsService {
 
       const eventIds = events.map(event => event.id);
 
-    if (eventIds.length > 0) {
-      await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-    }
-    return responses.ok;
-  }
-  catch (error) {
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
       throw new BadRequestError('Error deleting host events');
     }
   }
@@ -4493,17 +4492,18 @@ export class EventsService {
   }
 
   public static async getSurveyById(id: string): Promise<Survey> {
-    const qb = this.dbConnection.getRepository(Survey)
+    const qb = this.dbConnection
+      .getRepository(Survey)
       .createQueryBuilder('survey')
       .leftJoinAndSelect('survey.responses', 'response')
       .leftJoinAndSelect('response.user', 'user') // <-- this line loads user info
       .where('survey.id = :id', { id });
-  
+
     console.log(await qb.getSql());
-  
+
     const survey = await qb.getOne();
     console.log(survey);
-  
+
     return survey;
   }
 
