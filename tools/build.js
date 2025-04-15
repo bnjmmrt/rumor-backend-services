@@ -9,10 +9,10 @@ const utils = 'rumor-utils';
 const users = 'users';
 const events = 'events';
 const notifications = 'notifications';
-const schedular = 'schedular';
+const scheduler = 'scheduler';
 
 const packageNames = [utils];
-const appNames = [users, events, notifications, schedular];
+const appNames = [users, events, notifications, scheduler];
 
 const packagesToBuild = argv.packages ? argv.packages.split(',') : packageNames;
 const appsToBuild = argv.apps ? argv.apps.split(',') : appNames;
@@ -45,9 +45,9 @@ const apps = [
         dependencies: [utils]
     },
     {
-        name: schedular,
-        appDirectory: `${root}/apps/schedular`,
-        packagesDirectory: `${root}/apps/schedular/packages`,
+        name: scheduler,
+        appDirectory: `${root}/apps/scheduler`,
+        packagesDirectory: `${root}/apps/scheduler/packages`,
         dependencies: [utils]
     }
 ];

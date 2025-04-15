@@ -144,7 +144,7 @@ import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import {
   SchedulerJobType,
   SchedulerTriggerPayload,
-} from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
+} from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 
 const responses = {
   conflict: (message: string) => ({
@@ -350,7 +350,7 @@ export class EventsService {
               endDate: event.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
         }
@@ -2380,7 +2380,7 @@ export class EventsService {
           } else {
             event.publishDate = null;
             event.isPublished = true;
-            //TODO: if removed publish date then need to remove its schedular
+            //TODO: if removed publish date then need to remove its scheduler
           }
         } else {
           event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
@@ -2505,12 +2505,12 @@ export class EventsService {
                 publishDate: eventFromDb.publishDate,
               },
             };
-            serviceMesh.schedularService().triggerSchedulerJob(data);
+            serviceMesh.schedulerService().triggerSchedulerJob(data);
           } catch (e) {
             console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
           }
         }
-        //update schedular if event start date has been change
+        //update scheduler if event start date has been change
         if (payload?.startDate) {
           try {
             let data: SchedulerTriggerPayload = {
@@ -2521,7 +2521,7 @@ export class EventsService {
                 name: eventFromDb.name,
               },
             };
-            serviceMesh.schedularService().triggerSchedulerJob(data);
+            serviceMesh.schedulerService().triggerSchedulerJob(data);
           } catch (e) {
             console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
           }
@@ -2540,7 +2540,7 @@ export class EventsService {
               endDate: eventFromDb.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
         }
@@ -3234,7 +3234,7 @@ export class EventsService {
               publishDate: event.publishDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
@@ -3248,7 +3248,7 @@ export class EventsService {
               endDate: event.endDate,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Publish date scheduler failed for ${event.name}`, e);
         }
@@ -3263,7 +3263,7 @@ export class EventsService {
               name: event.name,
             },
           };
-          serviceMesh.schedularService().triggerSchedulerJob(data);
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
         } catch (e) {
           console.log(`Reminder scheduler failed for ${event.name}`, e);
         }

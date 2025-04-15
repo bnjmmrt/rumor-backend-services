@@ -3,7 +3,7 @@ import { Event } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import { BadRequestError } from 'rumor-utils/errors';
-import { SchedulerJobType } from 'rumor-utils/shared/schedulars/interfaces/schedular.interface';
+import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class SchedulerService {

@@ -52,15 +52,15 @@ services:
       rumor-db:
         condition: service_healthy
 
-  schedular:
-    container_name: rumour-schedular-service
+  scheduler:
+    container_name: rumour-scheduler-service
     build:
       context: .  
-      dockerfile: apps/schedular/Dockerfile  
+      dockerfile: apps/scheduler/Dockerfile  
     env_file:
       - env/api.env
     volumes:
-      - ./apps/schedular/src:/app/src
+      - ./apps/scheduler/src:/app/src
       - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8003:8003"
