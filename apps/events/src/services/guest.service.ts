@@ -844,6 +844,7 @@ export class GuestService {
                   }
                   guest.status = GuestStatus.DECLINED;
                   guest.declinedBy = { id: payload.hostId } as User;
+                  guest.checkIn = false;
                   break;
 
                 case GuestStatus.DRAFT:
@@ -2753,6 +2754,7 @@ export class GuestService {
         alreadyGuest.status = GuestStatus.DECLINED;
         alreadyGuest.declinedBy = { id: event?.owner.id } as User;
         alreadyGuest.rejectedReason = 'User is marked as spam';
+        alreadyGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const declinedGuest = new Guest();
@@ -2763,6 +2765,7 @@ export class GuestService {
         declinedGuest.status = GuestStatus.DECLINED;
         declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
         declinedGuest.rejectedReason = 'User is marked as spam';
+        declinedGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(declinedGuest);
       }
     } else {
@@ -3026,6 +3029,7 @@ export class GuestService {
     guest.status = GuestStatus.DECLINED;
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
+    guest.checkIn = false;
     await this.dbConnection.getRepository(Guest).save(guest);
     return '';
   }
