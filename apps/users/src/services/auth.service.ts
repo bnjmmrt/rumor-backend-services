@@ -3845,7 +3845,8 @@ export class AuthService {
     let users = await usersQuery.getMany();
     users = users.filter(item => {
       const rolesList = item?.roles?.map(item => item.role.name);
-      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+
+      if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
         //filter users with desired roles
         return item;
       }
@@ -3869,6 +3870,12 @@ export class AuthService {
           });
 
         const sources = user?.roles.map(item => item.source as string);
+
+        user.roles = user?.roles?.filter(item => {
+          if ([RoleType.NonMember, RoleType.Member].includes(item?.role?.name as RoleType)) {
+            return item;
+          }
+        });
 
         const member = toMember(
           user,
