@@ -4493,7 +4493,17 @@ export class EventsService {
   }
 
   public static async getSurveyById(id: string): Promise<Survey> {
-    const survey = await this.dbConnection.getRepository(Survey).findOne({ where: { id } });
+    const qb = this.dbConnection.getRepository(Survey)
+      .createQueryBuilder('survey')
+      .leftJoinAndSelect('survey.responses', 'response')
+      .leftJoinAndSelect('response.user', 'user') // <-- this line loads user info
+      .where('survey.id = :id', { id });
+  
+    console.log(await qb.getSql());
+  
+    const survey = await qb.getOne();
+    console.log(survey);
+  
     return survey;
   }
 

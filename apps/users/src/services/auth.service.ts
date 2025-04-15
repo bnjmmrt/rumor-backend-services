@@ -4924,6 +4924,8 @@ export class AuthService {
       where: { id: payload.id, deletedAt: IsNull() },
     });
 
+    console.log('🚀 ~ AuthService ~ host:', host);
+
     if (!host) {
       throw new NotFoundError('host');
     }
@@ -6017,6 +6019,7 @@ export class AuthService {
       undefined,
       undefined,
       eventCount,
+      '',
       surveys.map(survey => ({
         id: survey.id,
         response: survey.response,
