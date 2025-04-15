@@ -6041,6 +6041,7 @@ export class AuthService {
       undefined, // instagramUsername
       '', // referralCode
       eventCount,
+      '',
       surveys.map(survey => ({
         id: survey.id,
         response: survey.response,
