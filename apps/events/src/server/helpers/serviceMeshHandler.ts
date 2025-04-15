@@ -1,7 +1,7 @@
 import config from '../../config';
 import * as usersServiceMesh from 'rumor-utils/service-mesh/users';
 import * as notificationsServiceMesh from 'rumor-utils/service-mesh/notifications';
-import * as schedularsServiceMesh from 'rumor-utils/service-mesh/schedulars';
+import * as schedulersServiceMesh from 'rumor-utils/service-mesh/schedulers';
 
 import apiService from 'rumor-utils/service-mesh/';
 
@@ -16,9 +16,9 @@ class start {
     return notificationsServiceMesh;
   }
 
-  schedularService() {
-    apiService.initialize(config.get('SCHEDULAR_SERVICE_BASE_URL'));
-    return schedularsServiceMesh;
+  schedulerService() {
+    apiService.initialize(config.get('SCHEDULER_SERVICE_BASE_URL'));
+    return schedulersServiceMesh;
   }
 }
 

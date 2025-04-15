@@ -21,11 +21,11 @@ app.use(
   }),
 );
 
-app.get('/schedular/v1/health', (req: Request, res: Response) => {
+app.get('/scheduler/v1/health', (req: Request, res: Response) => {
   res.json({ status: 'UP', timestamp: new Date() }).status(200);
 });
 
-app.use('/schedular/v1', router);
+app.use('/scheduler/v1', router);
 
 app.get('*', (req: Request, res: Response, next: NextFunction) =>
   next(new NotFoundError(req.path)),
