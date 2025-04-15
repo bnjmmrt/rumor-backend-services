@@ -4443,6 +4443,11 @@ export class EventsService {
       }
       return responses.ok;
     } catch (error) {
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
       throw new BadRequestError('Error deleting host events');
     }
   }
