@@ -31,10 +31,10 @@ export class RoleService {
     return responses.data([]);
   }
 
-  static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<string> {
+  static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<UserRole> {
     const user = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.userId } });
+      .findOne({ where: { id: payload.userId }});
 
     let role: Role | null;
     if (payload.roleName) {
@@ -54,8 +54,8 @@ export class RoleService {
     userRole.user = user;
     userRole.role = role;
 
-    await this.dbConnection.getRepository(UserRole).save(userRole);
-    return '';
+    const newRole = await this.dbConnection.getRepository(UserRole).save(userRole);
+    return newRole;
   }
 
   static async getUserRoleHierarchy(payload: IdRequestDto): Promise<UserRoleList[]> {

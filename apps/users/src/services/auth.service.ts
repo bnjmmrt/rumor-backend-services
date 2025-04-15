@@ -1464,14 +1464,21 @@ export class AuthService {
     if (user && user.roles.length) {
       const isUnapprovedHost =
         user.roles.length === 1 &&
-        user.roles.filter(
-          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
-        ).length > 0;
+        user.roles[0].role?.name === 'host' &&
+        user.roles[0].status === UserStatus.NEW_APPLICANT;
 
+      // Filter out 'host' roles with status 'new_applicant'
+      user.roles = user.roles.filter(
+        userRole => !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT)
+      );
+
+      // If user had only an unapproved host role, assign NonMember
       if (isUnapprovedHost) {
-        throw new AuthorizationError(
-          'Your host application is still under review. Please check back later.',
-        );
+        const nonMemberRole = await RoleService.assignRoleToUser({
+          userId: user.id,
+          roleName: RoleType.NonMember,
+        });
+        user.roles.push(nonMemberRole);
       }
     }
 
@@ -3506,6 +3513,11 @@ export class AuthService {
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
         const allListNames = customListName.split(',').map(name => name.trim());
@@ -3549,6 +3561,25 @@ export class AuthService {
       )
       .skip(skip)
       .take(take);
+
+    /**past event filter */
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+
+      usersQuery.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN ' + subQuery;
+      });
+    }
+    /**ends here */
+
     if (eventId) {
       usersQuery.andWhere(
         `NOT EXISTS (
@@ -3670,6 +3701,7 @@ export class AuthService {
         });
       }
     }
+
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
       const ageFrom =
         parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim()
@@ -4882,21 +4914,20 @@ export class AuthService {
       ],
       type: FilterTypeValues.type,
     };
-    const now = new Date();
-    //TODO: check if this logic affects on date format changes
-    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    let mappedEvents: any = [];
     const queryParams = {
       ownerId: userId,
-      statusName: 'PAST_STATUS',
-      maxEndDate: formattedDate,
-      isPublished: true,
+      status: 'PAST_STATUS',
     };
     const queryString = prepareQueryString(queryParams);
-    const listEvents = [];
-    const mappedEvents = listEvents?.map(event => ({
-      name: event.name,
-      id: event.id,
-    }));
+    try {
+      const listEvents: any = await serviceMesh.eventService().listHostEvents(queryString);
+      mappedEvents = listEvents?.data?.result.map(event => ({
+        name: event.name,
+        id: event.id,
+      }));
+    } catch (e) {}
+
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',
