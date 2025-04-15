@@ -543,7 +543,14 @@ export interface QuizAnswer {
   eventId: string;
   id?: string | undefined;
 }
-
+export interface SimpleGuestEventData {
+  id: string;
+  name: string;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  imageFlyer: string | undefined;
+  imageCover: string | undefined;
+}
 export interface GuestEventData {
   id: string;
   name: string;

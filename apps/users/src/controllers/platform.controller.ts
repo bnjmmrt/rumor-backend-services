@@ -60,13 +60,13 @@ export class PlatformController {
   public static createInterest = asyncWrapper(async (req, res): Promise<void> => {
     const payload: CreateInterestRequestDto = req.body;
     const response: InterestData = await PlatformService.createInterest(payload);
-    const createResponse = new CreateResponse(response);
+    const createResponse = new CreateResponse(response, 'Interest created succesfully');
     res.status(createResponse.statusCode).json(createResponse);
   });
 
   public static listInterests = asyncWrapper(async (req, res): Promise<void> => {
     const response: InterestData[] = await PlatformService.listInterests();
-    const getResponse = new GetResponse(response);
+    const getResponse = new GetResponse(response, 'Interest retreived succesfully');
     res.status(getResponse.statusCode).json(getResponse);
   });
 
@@ -93,14 +93,14 @@ export class PlatformController {
     const { id } = req.params;
     const payload: UpdateInterestRequestDto = { ...req.body, id };
     const response: InterestData = await PlatformService.updateInterest(payload);
-    const updateResponse = new UpdateResponse(response);
+    const updateResponse = new UpdateResponse(response, "Interest updated succesfully");
     res.status(updateResponse.statusCode).json(updateResponse);
   });
 
   public static deleteInterest = asyncWrapper(async (req, res): Promise<void> => {
     const payload: IdRequestDto = req.params;
     const response: GenericResponse = await PlatformService.deleteInterest(payload);
-    const deleteResponse = new DeleteResponse(response, 'Delete Successful');
+    const deleteResponse = new DeleteResponse(response, 'Interest deleted successfully');
     res.status(deleteResponse.statusCode).json(deleteResponse);
   });
 

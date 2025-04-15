@@ -3,5 +3,5 @@ import apiService from './apiService';
 export * from './users';
 export * from './events';
 export * from './notifications';
-export * from './schedulars';
+export * from './schedulers';
 export default apiService;

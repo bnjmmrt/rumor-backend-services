@@ -28,7 +28,7 @@ export class RoleController {
   public static assignRoleToUser = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
     const payload: RoleRequestDto = { ...req.body, userId: id };
-    const response: string = await RoleService.assignRoleToUser(payload);
+    const response = await RoleService.assignRoleToUser(payload);
     const createResponse = new CreateResponse(response, 'Role assigned to user successfully!');
     res.status(createResponse.statusCode).json(createResponse);
   });
