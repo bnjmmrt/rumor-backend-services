@@ -313,6 +313,7 @@ export class GuestService {
             // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
+
               if (
                 guestStatus === GuestStatus.DECLINED &&
                 (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED)
@@ -1106,6 +1107,12 @@ export class GuestService {
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
+
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
@@ -1216,6 +1223,7 @@ export class GuestService {
       customListNames,
       userSource,
       checkedInStatus,
+      pastEventsIds,
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -1308,6 +1316,7 @@ export class GuestService {
     customListNames,
     userSource,
     checkedInStatus,
+    pastEventsIds,
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -1321,6 +1330,20 @@ export class GuestService {
           });
         }),
       );
+    }
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+      queryBuilder.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN (' + subQuery + ')';
+      });
     }
 
     if (checkedInStatus) {

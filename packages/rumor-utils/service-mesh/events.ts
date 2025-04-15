@@ -20,3 +20,8 @@ export const deleteHostEvents = (id: string) =>
 
 export const getSimpleGuestEvents = (userId: string) =>
   apiService.getApi().get(`/events/users/${userId}/simple-events`);
+
+export const listHostEvents = (query: string) => apiService.getApi().get(`/hosts/events?${query}`);
+
+export const sendEventRemindersToAllGuests = (eventId: string) =>
+  apiService.getApi().post(`event/reminders/send`, { eventId });

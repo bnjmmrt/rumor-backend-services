@@ -52,6 +52,23 @@ services:
       rumor-db:
         condition: service_healthy
 
+  scheduler:
+    container_name: rumour-scheduler-service
+    build:
+      context: .  
+      dockerfile: apps/scheduler/Dockerfile  
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/scheduler/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+    ports:
+      - "8003:8003"
+    command: npm run dev  
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+
   rumor-db:
     image: postgres:latest
     container_name: rumor-backend-db

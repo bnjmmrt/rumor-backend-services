@@ -51,7 +51,7 @@ import {
   GenerateTicketForGuestData,
   ToggleGuestCheckStatusData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import { EventAgeLimit } from 'packages/rumor-utils/shared/entities';
+import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
@@ -69,7 +69,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: CreateEventTypeRequestDto = req.body;
       const createdEventType: EventTypeData = await EventsService.createEventType(payload);
-      const successResponse = new CreateResponse(createdEventType);
+      const successResponse = new CreateResponse(createdEventType, "Event type created succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
@@ -78,7 +78,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: QueryRequestDto = req.query;
       const eventTypeResponse: EventTypesData = await EventsService.listEventTypes(payload);
-      const successResponse = new GetResponse(eventTypeResponse);
+      const successResponse = new GetResponse(eventTypeResponse, "Event types retreived succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
@@ -87,7 +87,7 @@ export class EventsController {
     const { id } = req.params;
     const payload: RequestByIdDto = { id };
     const getEventTypeResponse: EventTypeData = await EventsService.getEventType(payload);
-    const successResponse = new GetResponse(getEventTypeResponse);
+    const successResponse = new GetResponse(getEventTypeResponse, '"Event type retreived succesfully"');
     res.status(successResponse.statusCode).json(successResponse);
   });
 
@@ -95,7 +95,7 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const payload: UpdateEventTypeRequestDto = { ...req.body, ...req.params };
       const updatedEventTypesData: EventTypeResponse = await EventsService.updateEventType(payload);
-      const successResponse = new UpdateResponse();
+      const successResponse = new UpdateResponse(updatedEventTypesData.data, "Event type updated succesfully");
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
@@ -496,6 +496,15 @@ export class EventsController {
       const payload = { id: req.params.id };
       const response = await EventsService.deleteHostEvents(payload);
       const successResponse = new GetResponse(response);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static sendEventRemindersToAllGuests = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { eventId } = req.body;
+      const response = await EventsService.sendEventRemindersToAllGuests(eventId);
+      const successResponse = new CreateResponse(response);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );

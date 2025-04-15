@@ -400,13 +400,33 @@ export class AuthService {
     // Always use `newMember` for user creation
     let newUser = newMember(payload, address);
 
-    // Retain ID if user exists
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // Si el usuario existe, actualizamos sus campos manteniendo la información existente
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recuperamos el usuario actualizado con sus relaciones
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // Si es un usuario nuevo, creamos uno nuevo con la información proporcionada
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
 
     if (payload.instagramAccessToken) {
@@ -454,11 +474,34 @@ export class AuthService {
         );
       }
       newUser.id = fusionAuthUser.response?.user?.id;
-      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
+      fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    // Only assign if not exits
+    if (!existingUser) {
+      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
+    } else {
+      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          user: existingUser,
+        },
+        relations: {
+          role: true,
+        },
+      });
+      for (let item of actualRoles) {
+        if (
+          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
+            item.source as UserSource,
+          )
+        ) {
+          await this.dbConnection
+            .getRepository(UserRole)
+            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
+        }
+      }
+    }
+
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
       focusIds: payload.focusIds,
@@ -480,7 +523,7 @@ export class AuthService {
           },
         ],
         'Application Submitted',
-        [newUser.email.trim().toLowerCase()], // Send email to the member
+        [newUser.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -545,7 +588,7 @@ export class AuthService {
         roleName: role.role.name,
         roleId: role.role.id,
       })),
-      token: fusionAuthToken, // Now token is set correctly
+      token: fusionAuthToken,
     };
   }
 
@@ -1421,14 +1464,21 @@ export class AuthService {
     if (user && user.roles.length) {
       const isUnapprovedHost =
         user.roles.length === 1 &&
-        user.roles.filter(
-          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
-        ).length > 0;
+        user.roles[0].role?.name === 'host' &&
+        user.roles[0].status === UserStatus.NEW_APPLICANT;
 
+      // Filter out 'host' roles with status 'new_applicant'
+      user.roles = user.roles.filter(
+        userRole => !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT)
+      );
+
+      // If user had only an unapproved host role, assign NonMember
       if (isUnapprovedHost) {
-        throw new AuthorizationError(
-          'Your host application is still under review. Please check back later.',
-        );
+        const nonMemberRole = await RoleService.assignRoleToUser({
+          userId: user.id,
+          roleName: RoleType.NonMember,
+        });
+        user.roles.push(nonMemberRole);
       }
     }
 
@@ -3463,6 +3513,11 @@ export class AuthService {
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
         const allListNames = customListName.split(',').map(name => name.trim());
@@ -3506,6 +3561,25 @@ export class AuthService {
       )
       .skip(skip)
       .take(take);
+
+    /**past event filter */
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+
+      usersQuery.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN ' + subQuery;
+      });
+    }
+    /**ends here */
+
     if (eventId) {
       usersQuery.andWhere(
         `NOT EXISTS (
@@ -3627,6 +3701,7 @@ export class AuthService {
         });
       }
     }
+
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
       const ageFrom =
         parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim()
@@ -3802,7 +3877,8 @@ export class AuthService {
     let users = await usersQuery.getMany();
     users = users.filter(item => {
       const rolesList = item?.roles?.map(item => item.role.name);
-      if (rolesList.includes('member') || rolesList.includes('non_member')) {
+
+      if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
         //filter users with desired roles
         return item;
       }
@@ -3826,6 +3902,12 @@ export class AuthService {
           });
 
         const sources = user?.roles.map(item => item.source as string);
+
+        user.roles = user?.roles?.filter(item => {
+          if ([RoleType.NonMember, RoleType.Member].includes(item?.role?.name as RoleType)) {
+            return item;
+          }
+        });
 
         const member = toMember(
           user,
@@ -4834,21 +4916,20 @@ export class AuthService {
       ],
       type: FilterTypeValues.type,
     };
-    const now = new Date();
-    //TODO: check if this logic affects on date format changes
-    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    let mappedEvents: any = [];
     const queryParams = {
       ownerId: userId,
-      statusName: 'PAST_STATUS',
-      maxEndDate: formattedDate,
-      isPublished: true,
+      status: 'PAST_STATUS',
     };
     const queryString = prepareQueryString(queryParams);
-    const listEvents = [];
-    const mappedEvents = listEvents?.map(event => ({
-      name: event.name,
-      id: event.id,
-    }));
+    try {
+      const listEvents: any = await serviceMesh.eventService().listHostEvents(queryString);
+      mappedEvents = listEvents?.data?.result.map(event => ({
+        name: event.name,
+        id: event.id,
+      }));
+    } catch (e) {}
+
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',
