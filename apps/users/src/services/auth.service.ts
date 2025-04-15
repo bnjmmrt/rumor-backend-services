@@ -1464,14 +1464,21 @@ export class AuthService {
     if (user && user.roles.length) {
       const isUnapprovedHost =
         user.roles.length === 1 &&
-        user.roles.filter(
-          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
-        ).length > 0;
+        user.roles[0].role?.name === 'host' &&
+        user.roles[0].status === UserStatus.NEW_APPLICANT;
 
+      // Filter out 'host' roles with status 'new_applicant'
+      user.roles = user.roles.filter(
+        userRole => !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT)
+      );
+
+      // If user had only an unapproved host role, assign NonMember
       if (isUnapprovedHost) {
-        throw new AuthorizationError(
-          'Your host application is still under review. Please check back later.',
-        );
+        const nonMemberRole = await RoleService.assignRoleToUser({
+          userId: user.id,
+          roleName: RoleType.NonMember,
+        });
+        user.roles.push(nonMemberRole);
       }
     }
 
