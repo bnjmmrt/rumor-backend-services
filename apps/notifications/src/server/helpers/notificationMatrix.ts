@@ -31,7 +31,7 @@ let notificationMatrix = {
   },
   eventCancelled: {
     pushMessage: 'Hi [Recipient Name], [Event Name] has been canceled.',
-    appMessage: '[Linked User Name] canceled [Event Name] ',
+    appMessage: '[Linked Company Name] canceled [Event Name] ',
     pushNotification: true,
     appNotification: true,
     body: { eventId: '' },
@@ -127,8 +127,8 @@ let notificationMatrix = {
   },
   eventAnnouncement: {
     pushMessage:
-      '[Linked User Name] just posted a new event announcement for [Event Name]. Tap to view.',
-    appMessage: '[Linked User Name] posted a new announcement for [Event Name]',
+      '[Linked Company Name] just posted a new event announcement for [Event Name]. Tap to view.',
+    appMessage: '[Linked Company Name] posted a new announcement for [Event Name]',
     appNotification: true,
     pushNotification: true,
     body: { eventId: '' },
@@ -212,21 +212,22 @@ let notificationMatrix = {
     action: 'Event Edited',
     role: 'admin',
   },
-  hostReport: {
+  userReport: {
     pushMessage: '',
-    appMessage: '[Linked User Name] submitted a report against [Member Name]',
+    appMessage: '[Linked Company Name] submitted a report against [Linked User Name]',
     appNotification: true,
     pushNotification: false,
     body: { eventId: '' },
     notificationModule: 'host',
     linkedUser: '',
     linkedEvent: '',
+    linkedHost:'',
     action: 'Host Reported a User',
     role: 'admin',
   },
   hostFeedback: {
     pushMessage: '',
-    appMessage: '[Linked User Name] submitted feedback',
+    appMessage: '[Linked Company Name] submitted feedback',
     appNotification: true,
     pushNotification: false,
     body: { eventId: '' },
@@ -236,15 +237,16 @@ let notificationMatrix = {
     action: 'Host Feedback',
     role: 'admin',
   },
-  userReport: {
+  hostReport: {
     pushMessage: '',
-    appMessage: '[Linked User Name] submitted a report against [Host Name]',
+    appMessage: '[Linked User Name] submitted a report against [Linked Company Name]',
     appNotification: true,
     pushNotification: false,
     body: { eventId: '' },
     notificationModule: 'user',
     linkedUser: '',
     linkedEvent: '',
+    linkedHost:'',
     action: 'User Reported a Host',
     role: 'admin',
   },
@@ -282,7 +284,7 @@ let notificationMatrix = {
     body: { eventId: '' },
     notificationModule: 'event',
     action: 'New Guest Request',
-    image: 'linkedUser.profilePicture',
+    image: 'linkedEvent.imageFlyer',
     role: 'host',
   },
   rsvpSignupFormRequest: {
@@ -295,7 +297,7 @@ let notificationMatrix = {
     body: { eventId: '', signupFormId: '' },
     notificationModule: 'event',
     action: 'New RSVP Sign up Form Request',
-    image: '',
+    image: 'linkedEvent.imageFlyer',
     role: 'host',
   },
   eventSubmissionApproved: {

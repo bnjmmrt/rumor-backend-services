@@ -548,8 +548,9 @@ export class AuthController {
   public static getUserFiltersOptions = asyncWrapper(async (req, res): Promise<void> => {
     const userId = (req as any).user;
     const query = req.query;
+    const token = (req as any).token;
     const payload: FilterRequestDto = { userId, query };
-    const response: Filter[] = await AuthService.getUserFiltersOptions(payload);
+    const response: Filter[] = await AuthService.getUserFiltersOptions(payload, token);
     const successResponse = new GetResponse(response, 'Users filters retrieved successfully');
     res.status(successResponse.statusCode).json(successResponse);
   });

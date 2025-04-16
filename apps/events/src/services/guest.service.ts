@@ -308,7 +308,7 @@ export class GuestService {
               }
             }
 
-            await Promise.all(smsPromises);
+            await Promise.allSettled(smsPromises);
 
             // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
@@ -1325,9 +1325,23 @@ export class GuestService {
       queryBuilder.andWhere(
         new Brackets(qb => {
           searchWords.forEach(word => {
-            qb.orWhere('user.firstName ILIKE :word', {
-              word: `%${word}%`,
-            }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` })
+              .orWhere('user.lastName ILIKE :word', { word: `%${word}%` })
+              .orWhere(
+                new Brackets(subQb => {
+                  subQb.where(() => {
+                    const subQuery = this.dbConnection
+                      .getRepository(Guest)
+                      .createQueryBuilder('ag')
+                      .leftJoin('ag.user', 'agu')
+                      .where('ag.addedBy = guest.user')
+                      .andWhere('agu.firstName ILIKE :word', { word: `%${word}%` })
+                      .orWhere('agu.lastName ILIKE :word', { word: `%${word}%` })
+                      .select('1');
+                    return `EXISTS (${subQuery.getQuery()})`;
+                  });
+                }),
+              );
           });
         }),
       );
@@ -2125,7 +2139,7 @@ export class GuestService {
 
     const totalEvents = Object.values(response).reduce((acc, curr) => acc + curr.length, 0);
 
-    return {...response, totalEvents};
+    return { ...response, totalEvents };
   }
 
   public static async listEventGuests(

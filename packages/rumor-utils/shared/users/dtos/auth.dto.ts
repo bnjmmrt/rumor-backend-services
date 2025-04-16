@@ -685,6 +685,10 @@ export class HostFeedbackRequestDto implements HostFeedbackRequest {
   @IsString()
   @IsNotEmpty()
   tag: Tag;
+
+  @IsString()
+  @IsOptional()
+  role: string;
 }
 
 export class SendVerificationCodeByEmailRequestDto implements SendVerificationCodeByEmailRequest {

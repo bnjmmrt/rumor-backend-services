@@ -93,7 +93,7 @@ export class PlatformController {
     const { id } = req.params;
     const payload: UpdateInterestRequestDto = { ...req.body, id };
     const response: InterestData = await PlatformService.updateInterest(payload);
-    const updateResponse = new UpdateResponse(response, "Interest updated succesfully");
+    const updateResponse = new UpdateResponse(response, 'Interest updated succesfully');
     res.status(updateResponse.statusCode).json(updateResponse);
   });
 
