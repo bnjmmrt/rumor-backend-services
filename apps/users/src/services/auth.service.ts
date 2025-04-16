@@ -1449,15 +1449,6 @@ export class AuthService {
         userRole =>
           !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT),
       );
-
-      // If user had only an unapproved host role, assign NonMember
-      if (isUnapprovedHost) {
-        const nonMemberRole = await RoleService.assignRoleToUser({
-          userId: user.id,
-          roleName: RoleType.NonMember,
-        });
-        user.roles.push(nonMemberRole);
-      }
     }
 
     if (user.isDeactivated) {
@@ -1565,10 +1556,28 @@ export class AuthService {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
 
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.NEW_APPLICANT,
+                } as UserRole,
+              ];
+            }
+          }
+
           return {
             id: user.id,
             token: '',
-            roles: user.roles.map(item => ({
+            roles: rolesToReturn.map(item => ({
               roleName: item.role.name,
               roleId: item.role.id,
             })),
@@ -1606,10 +1615,29 @@ export class AuthService {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
 
+
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.ACTIVE,
+                } as UserRole,
+              ];
+            }
+          }
+
           return {
             id: user.id,
             token: '',
-            roles: user.roles.map(item => ({
+            roles: rolesToReturn.map(item => ({
               roleName: item.role.name,
               roleId: item.role.id,
             })),
