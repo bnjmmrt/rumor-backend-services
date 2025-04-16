@@ -10,10 +10,7 @@ class AuthMiddleware {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      console.log('insidre fusionAuthRequired');
       const authorization = req.header('Authorization');
-      console.log("🚀 ~ AuthMiddleware ~ authorization:", authorization)
-      
       if (!authorization) {
         res.status(401).send('Unauthorized');
         return;

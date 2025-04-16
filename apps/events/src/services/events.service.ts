@@ -3832,7 +3832,6 @@ export class EventsService {
   public static async listHostEvents(payload: ListHostEventsDto): Promise<PaginatedEventsResponse> {
     const { userId } = payload;
     const parsedQuery = JSON.parse(payload.query);
-    console.log("🚀 ~ listHostEvents ~ parsedQuery:", parsedQuery)
     const currentTime = new Date().toISOString();
 
     // Check and set pagination if available
@@ -3909,7 +3908,6 @@ export class EventsService {
 
     const totalCount = await query.getCount();
     const events = await query.getMany();
-    console.log("🚀 ~ //.where ~ events:", events)
     type EventWithGuestCounts = Event & {
       checkedInGuestCount: string;
       confirmedGuestCount: string;

@@ -4810,8 +4810,10 @@ export class AuthService {
     return queryBuilder;
   }
 
-  public static async getUserFiltersOptions(payload: FilterRequestDto, token: string): Promise<Filter[]> {
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ token:", token)
+  public static async getUserFiltersOptions(
+    payload: FilterRequestDto,
+    token: string,
+  ): Promise<Filter[]> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query) as ParsedQs;
     const eventId = parsedQuery?.eventId as string;
@@ -4860,7 +4862,6 @@ export class AuthService {
       name: list.listName,
       id: list.listName,
     }));
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ customLists:", customLists)
     const hostDefaultList = [
       { id: 'myFavourites-systemDefault', name: 'My Favorites' },
       { id: 'myFollowers-systemDefault', name: 'My Followers' },
@@ -4919,17 +4920,14 @@ export class AuthService {
       ownerId: userId,
       status: 'PAST_STATUS',
     };
-    const queryString =  prepareQueryString(queryParams);
-    console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ queryString:", queryString)
+    const queryString = prepareQueryString(queryParams);
     try {
       const listEvents: any = await serviceMesh.eventService(token).listHostEvents(queryString);
-      console.log("🚀 ~ AuthService ~ getUserFiltersOptions ~ listEvents:", listEvents)
       mappedEvents = listEvents?.data?.result.map(event => ({
         name: event.name,
         id: event.id,
       }));
     } catch (e) {
-      console.log('e', e)
     }
 
     const pastEventsObj = {
