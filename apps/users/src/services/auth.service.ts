@@ -1222,7 +1222,7 @@ export class AuthService {
 
     if (payload?.phoneNumber) {
       let message =
-        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. `+
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
         `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
 
       //Micro-service call
@@ -1236,7 +1236,6 @@ export class AuthService {
         console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
       }
     }
-
 
     const params = [
       {
@@ -1487,7 +1486,8 @@ export class AuthService {
 
       // Filter out 'host' roles with status 'new_applicant'
       user.roles = user.roles.filter(
-        userRole => !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT)
+        userRole =>
+          !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT),
       );
 
       // If user had only an unapproved host role, assign NonMember
@@ -3663,12 +3663,17 @@ export class AuthService {
     }
     // Apply AND conditions for other filters
     if (searchValue) {
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       usersQuery.andWhere(
-        new Brackets(qb => {
-          qb.where('user.firstName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
-          }).orWhere('user.lastName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+              }),
+            );
           });
         }),
       );

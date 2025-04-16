@@ -34,7 +34,7 @@ export class RoleService {
   static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<UserRole> {
     const user = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.userId }});
+      .findOne({ where: { id: payload.userId } });
 
     let role: Role | null;
     if (payload.roleName) {
