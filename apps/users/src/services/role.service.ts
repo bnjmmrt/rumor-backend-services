@@ -45,7 +45,6 @@ export class RoleService {
       role = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.roleId } });
     }
 
-    console.log(role, 'requested role')
     if (!user || !role) {
       throw new NotFoundError('User or role');
     }
