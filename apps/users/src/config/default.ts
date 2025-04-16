@@ -7,7 +7,6 @@ const config = {
   ],
   values: {
     PORT: 8000,
-    FILE_SIZE_IN_BYTES: '5000000',
     POSTGRES_USERNAME: process.env.POSTGRES_USERNAME,
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
@@ -20,3 +19,4 @@ const config = {
 };
 
 export default config;
+

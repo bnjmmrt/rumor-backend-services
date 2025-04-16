@@ -6,6 +6,7 @@ import {
   Attendees,
   Guests,
   FetchBulkGuestsData,
+  SimpleGuestEventsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { VouchRequestService } from './vouch-request.service';
 import { responses } from '../common/responses';
@@ -94,6 +95,7 @@ import {
   BulkUserData,
   UserEventInviteesData,
   QuizData,
+  SimpleGuestEventData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
@@ -116,6 +118,7 @@ import {
   sendGuestEventApproval,
 } from '../utils/emails.utils';
 import { sendSmsNotification } from '../utils/sms.utils';
+import * as dayjs from 'dayjs';
 export class GuestService {
   public static dbConnection = database;
 
@@ -841,6 +844,7 @@ export class GuestService {
                   }
                   guest.status = GuestStatus.DECLINED;
                   guest.declinedBy = { id: payload.hostId } as User;
+                  guest.checkIn = false;
                   break;
 
                 case GuestStatus.DRAFT:
@@ -2070,6 +2074,60 @@ export class GuestService {
     );
   }
 
+  public static async listSimpleGuestEvents(userId: string): Promise<SimpleGuestEventsResponse> {
+    const events = await this.dbConnection.getRepository(Event).find({
+      where: {
+        guests: {
+          user: {
+            id: userId,
+          },
+          status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
+        },
+        status: EventStatusEnum.APPROVED_STATUS,
+      },
+      relations: ['guests'],
+    });
+
+    const response = {
+      upcoming: [] as SimpleGuestEventData[],
+      invited: [] as SimpleGuestEventData[],
+      past: [] as SimpleGuestEventData[],
+      requested: [] as SimpleGuestEventData[],
+    };
+
+    const dateNow = new Date();
+
+    events.forEach(event => {
+      const simpleEvent: SimpleGuestEventData = {
+        id: event.id,
+        name: event.name,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        imageCover: event.imageCover,
+        imageFlyer: event.imageFlyer,
+      };
+
+      const guest = event.guests[0];
+
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.upcoming.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.APPLIED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.requested.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.INVITED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.invited.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isBefore(dateNow)) {
+        response.past.push(simpleEvent);
+      }
+    });
+
+    const totalEvents = Object.values(response).reduce((acc, curr) => acc + curr.length, 0);
+
+    return {...response, totalEvents};
+  }
+
   public static async listEventGuests(
     payload: ListEventGuestsDto,
   ): Promise<PaginatedGuestEventsResponse> {
@@ -2696,6 +2754,7 @@ export class GuestService {
         alreadyGuest.status = GuestStatus.DECLINED;
         alreadyGuest.declinedBy = { id: event?.owner.id } as User;
         alreadyGuest.rejectedReason = 'User is marked as spam';
+        alreadyGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const declinedGuest = new Guest();
@@ -2706,6 +2765,7 @@ export class GuestService {
         declinedGuest.status = GuestStatus.DECLINED;
         declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
         declinedGuest.rejectedReason = 'User is marked as spam';
+        declinedGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(declinedGuest);
       }
     } else {
@@ -2969,6 +3029,7 @@ export class GuestService {
     guest.status = GuestStatus.DECLINED;
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
+    guest.checkIn = false;
     await this.dbConnection.getRepository(Guest).save(guest);
     return '';
   }

@@ -1220,6 +1220,24 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
+    if (payload?.phoneNumber) {
+      let message =
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. `+
+        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+
+      //Micro-service call
+      try {
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
+    }
+
+
     const params = [
       {
         key: 'invitee_first_name',
@@ -1464,14 +1482,21 @@ export class AuthService {
     if (user && user.roles.length) {
       const isUnapprovedHost =
         user.roles.length === 1 &&
-        user.roles.filter(
-          data => data.status === UserStatus.NEW_APPLICANT && data?.role?.name === 'host',
-        ).length > 0;
+        user.roles[0].role?.name === 'host' &&
+        user.roles[0].status === UserStatus.NEW_APPLICANT;
 
+      // Filter out 'host' roles with status 'new_applicant'
+      user.roles = user.roles.filter(
+        userRole => !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT)
+      );
+
+      // If user had only an unapproved host role, assign NonMember
       if (isUnapprovedHost) {
-        throw new AuthorizationError(
-          'Your host application is still under review. Please check back later.',
-        );
+        const nonMemberRole = await RoleService.assignRoleToUser({
+          userId: user.id,
+          roleName: RoleType.NonMember,
+        });
+        user.roles.push(nonMemberRole);
       }
     }
 
@@ -3870,19 +3895,8 @@ export class AuthService {
     let users = await usersQuery.getMany();
     users = users.filter(item => {
       const rolesList = item?.roles?.map(item => item.role.name);
-      if (
-        rolesList.includes(RoleType.Admin) ||
-        rolesList.includes(RoleType.RumorSuperAdmin) ||
-        rolesList.includes(RoleType.RumorManager) ||
-        rolesList.includes(RoleType.Host) ||
-        rolesList.includes(RoleType.MainHost) ||
-        rolesList.includes(RoleType.CoHost) ||
-        rolesList.includes(RoleType.Promotor) ||
-        rolesList.includes(RoleType.Contributor) ||
-        rolesList.includes(RoleType.CheckIn)
-      ) {
-        return false;
-      } else if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
+
+      if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
         //filter users with desired roles
         return item;
       }
@@ -3906,6 +3920,12 @@ export class AuthService {
           });
 
         const sources = user?.roles.map(item => item.source as string);
+
+        user.roles = user?.roles?.filter(item => {
+          if ([RoleType.NonMember, RoleType.Member].includes(item?.role?.name as RoleType)) {
+            return item;
+          }
+        });
 
         const member = toMember(
           user,
@@ -4676,9 +4696,7 @@ export class AuthService {
         relations: ['user'],
       });
 
-    const eventCount = await this.dbConnection
-      .getRepository(Guest)
-      .count({ where: { user: { id: user.id } } });
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -4692,8 +4710,12 @@ export class AuthService {
         userRole,
         undefined,
         socialProvider?.username,
-        eventCount,
         referredUser?.referralCode,
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
       ),
     );
   }
@@ -5233,6 +5255,7 @@ export class AuthService {
       interests,
       userRole,
       formattedLists,
+      undefined,
       undefined,
       eventCount,
     );

@@ -34,6 +34,7 @@ import {
   QuizQuestion,
   ReassignTo,
   RoleCollaboratorEnum,
+  SimpleGuestEventData,
   SimpleUser,
   Talent,
   TicketStatus,
@@ -602,7 +603,13 @@ export interface ListEventGuestsResponse {
   error?: Error | undefined;
   data: PaginatedGuestEventsResponse | undefined;
 }
-
+export interface SimpleGuestEventsResponse {
+  upcoming: SimpleGuestEventData[];
+  past: SimpleGuestEventData[];
+  invited: SimpleGuestEventData[];
+  requested: SimpleGuestEventData[];
+  totalEvents: number;
+}
 export interface PaginatedGuestEventsResponse {
   result: GuestEventData[];
   totalCount: number;
