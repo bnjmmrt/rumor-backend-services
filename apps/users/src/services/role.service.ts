@@ -34,7 +34,7 @@ export class RoleService {
   static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<UserRole> {
     const user = await this.dbConnection
       .getRepository(User)
-      .findOne({ where: { id: payload.userId } });
+      .findOne({ where: { id: payload.userId }, relations: { roles: { role: true } } });
 
     let role: Role | null;
     if (payload.roleName) {
@@ -48,6 +48,13 @@ export class RoleService {
     if (!user || !role) {
       throw new NotFoundError('User or role');
     }
+
+    const hasRoleAlready = user?.roles?.some(userRole => userRole.role?.id === role!.id);
+    if (hasRoleAlready) {
+      console.log(`User already has the role: ${role.name}`);
+      return user.roles.find(userRole => userRole.role?.id === role!.id)!;
+    }
+
 
     const userRole = new UserRole();
     userRole.source = source;

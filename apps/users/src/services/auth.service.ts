@@ -364,15 +364,18 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        const code = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .startPasswordlessLogin(request);
-        const authenticatedUser = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .passwordlessLogin({ code: code.response.code });
-        fusionAuthToken = authenticatedUser.response.token;
-
-        requiresFusionAuthRegistration = false;
+        try {
+          const code = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .startPasswordlessLogin(request);
+          const authenticatedUser = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .passwordlessLogin({ code: code.response.code });
+          fusionAuthToken = authenticatedUser.response.token;
+          requiresFusionAuthRegistration = false;
+        } catch (error) {
+          requiresFusionAuthRegistration = true;
+        }
       } else if (isNonMember) {
         try {
           const fusionAuthResponse = await fusionAuthClientHandler
@@ -401,32 +404,11 @@ export class AuthService {
     let newUser = newMember(payload, address);
 
     if (existingUser) {
-      // Si el usuario existe, actualizamos sus campos manteniendo la información existente
-      const updateData = {
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        dateOfBirth: payload.dateOfBirth,
-        phoneNumber: payload.phoneNumber,
-        address: address,
-        additionalMemberInformation: {
-          ...existingUser.additionalMemberInformation,
-          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
-        },
-      };
+      newUser.id = existingUser.id;
+    }
 
-      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
-
-      // Recuperamos el usuario actualizado con sus relaciones
-      newUser = await this.dbConnection.getRepository(User).findOne({
-        where: { id: existingUser.id },
-        relations: { roles: { role: true } },
-      });
-    } else {
-      // Si es un usuario nuevo, creamos uno nuevo con la información proporcionada
-      if (payload.socialUrl) {
-        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
-      }
-      newUser = await this.dbConnection.getRepository(User).save(newUser);
+    if (payload.socialUrl) {
+      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
     }
 
     if (payload.instagramAccessToken) {
@@ -477,30 +459,8 @@ export class AuthService {
       fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    // Only assign if not exits
-    if (!existingUser) {
-      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
-    } else {
-      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
-        where: {
-          user: existingUser,
-        },
-        relations: {
-          role: true,
-        },
-      });
-      for (let item of actualRoles) {
-        if (
-          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
-            item.source as UserSource,
-          )
-        ) {
-          await this.dbConnection
-            .getRepository(UserRole)
-            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
-        }
-      }
-    }
+    newUser = await this.dbConnection.getRepository(User).save(newUser);
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
 
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
@@ -1489,15 +1449,6 @@ export class AuthService {
         userRole =>
           !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT),
       );
-
-      // If user had only an unapproved host role, assign NonMember
-      if (isUnapprovedHost) {
-        const nonMemberRole = await RoleService.assignRoleToUser({
-          userId: user.id,
-          roleName: RoleType.NonMember,
-        });
-        user.roles.push(nonMemberRole);
-      }
     }
 
     if (user.isDeactivated) {
@@ -1605,10 +1556,28 @@ export class AuthService {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
 
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.NEW_APPLICANT,
+                } as UserRole,
+              ];
+            }
+          }
+
           return {
             id: user.id,
             token: '',
-            roles: user.roles.map(item => ({
+            roles: rolesToReturn.map(item => ({
               roleName: item.role.name,
               roleId: item.role.id,
             })),
@@ -1646,10 +1615,29 @@ export class AuthService {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
 
+
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.ACTIVE,
+                } as UserRole,
+              ];
+            }
+          }
+
           return {
             id: user.id,
             token: '',
-            roles: user.roles.map(item => ({
+            roles: rolesToReturn.map(item => ({
               roleName: item.role.name,
               roleId: item.role.id,
             })),
@@ -5095,7 +5083,7 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
-    const { description, tag } = payload;
+    const { description, tag, role } = payload;
 
     const feedback = this.dbConnection.getRepository(HostFeedback).create({
       description,
@@ -5104,6 +5092,41 @@ export class AuthService {
     });
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
+
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0){
+        if(['member', 'non_member'].includes(role)){
+          await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
+        }
+        if(role === 'host'){
+          await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
+        }
+      }
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
 
     return {
       description: savedFeedback.description,
@@ -5495,6 +5518,33 @@ export class AuthService {
       reportedToRoleId: reportedToRole.id,
     };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.USER_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
+
     return data;
   }
 
@@ -5621,6 +5671,32 @@ export class AuthService {
       reportMessage,
     };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.HOST_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
     return data;
   }
 
