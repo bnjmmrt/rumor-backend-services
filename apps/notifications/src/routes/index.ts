@@ -54,12 +54,12 @@ router.post('/notification/push', NotificationController.sendPushNotification);
 router.get('/notifications', AuthMiddleware.fusionAuth, NotificationController.getAllNotifications);
 router.get(
   '/notification/:notificationId',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   NotificationController.getNotificationDetail,
 );
 router.delete(
   '/notification/:notificationId',
-  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.fusionAuth,
   NotificationController.deleteNotificationById,
 );
 
