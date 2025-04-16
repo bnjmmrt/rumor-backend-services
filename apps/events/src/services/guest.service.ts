@@ -1325,9 +1325,23 @@ export class GuestService {
       queryBuilder.andWhere(
         new Brackets(qb => {
           searchWords.forEach(word => {
-            qb.orWhere('user.firstName ILIKE :word', {
-              word: `%${word}%`,
-            }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` })
+              .orWhere('user.lastName ILIKE :word', { word: `%${word}%` })
+              .orWhere(
+                new Brackets(subQb => {
+                  subQb.where(() => {
+                    const subQuery = this.dbConnection
+                      .getRepository(Guest)
+                      .createQueryBuilder('ag')
+                      .leftJoin('ag.user', 'agu')
+                      .where('ag.addedBy = guest.user')
+                      .andWhere('agu.firstName ILIKE :word', { word: `%${word}%` })
+                      .orWhere('agu.lastName ILIKE :word', { word: `%${word}%` })
+                      .select('1');
+                    return `EXISTS (${subQuery.getQuery()})`;
+                  });
+                }),
+              );
           });
         }),
       );

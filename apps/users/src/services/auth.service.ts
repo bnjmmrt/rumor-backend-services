@@ -3662,12 +3662,17 @@ export class AuthService {
     }
     // Apply AND conditions for other filters
     if (searchValue) {
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       usersQuery.andWhere(
-        new Brackets(qb => {
-          qb.where('user.firstName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
-          }).orWhere('user.lastName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+              }),
+            );
           });
         }),
       );
