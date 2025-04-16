@@ -20,6 +20,7 @@ class NotificationService {
     recipients: string | string[],
     linkedUserId?: string,
     linkedEventId?: string,
+    linkedHostId?: string,
   ) {
     try {
       const recipientList = Array.isArray(recipients) ? recipients : [recipients];
@@ -38,6 +39,10 @@ class NotificationService {
       const linkedEvent: Event = linkedEventId
         ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
         : null;
+      
+      const linkedHost: User = linkedHostId
+        ? await User.getRepository().findOne({ where: { id: linkedHostId } })
+        : null;
 
       if (notificationTemplate.hasOwnProperty('linkedUser') && !linkedUser) {
         throw new NotFoundError('Linked user not found');
@@ -45,7 +50,11 @@ class NotificationService {
       if (notificationTemplate.hasOwnProperty('linkedEvent') && !linkedEvent) {
         throw new NotFoundError('Linked event not found');
       }
+      if (notificationTemplate.hasOwnProperty('linkedHost') && !linkedHost) {
+        throw new NotFoundError('Linked host not found');
+      }
 
+    
       const notificationsToSave: Notification[] = [];
       const pushNotifications: {
         tokens: string[];
@@ -76,10 +85,8 @@ class NotificationService {
             }
           : {};
         const notificationImage = eval(notificationTemplate.image);
-        let linkedUserName = linkedUser
-          ? linkedUser?.additionalHostInformation?.companyName
-            ? linkedUser?.additionalHostInformation?.companyName
-            : `${linkedUser.firstName} ${linkedUser.lastName}`
+
+        let linkedUserName = linkedUser ? `${linkedUser.firstName} ${linkedUser.lastName}`
           : '';
         let recipientName = recipientUser.firstName
           ? `${recipientUser.firstName} ${recipientUser.lastName}`
@@ -88,16 +95,26 @@ class NotificationService {
           recipientName = recipientUser?.firstName ? recipientUser.firstName : '';
         }
 
+        let companyName = () => {
+          if(linkedHost && linkedHost?.additionalHostInformation?.companyName){
+            return linkedHost?.additionalHostInformation?.companyName 
+          }
+          else {
+            return linkedUser?.additionalHostInformation?.companyName
+              ? linkedUser?.additionalHostInformation?.companyName
+              : `${linkedUser.firstName} ${linkedUser.lastName}`
+          }
+        }
+
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
           message
             .replace('[Event Start Time]', (linkedEvent?.startDate || '').toString())
             .replace('[Recipient Name]', recipientName)
             .replace('[Linked User Name]', linkedUserName)
+            .replace('[Linked Company Name]', companyName())
             .replace('[Event Name]', linkedEvent?.name || '')
             .replace('[Event City Name]', linkedEvent?.location?.city || '')
-            .replace('[Member Name]', body?.name || '')
-            .replace('[Host Name]', body?.name || '');
 
         const appMessage = replaceTemplateValues(notificationTemplate.appMessage || '');
         const pushMessage = replaceTemplateValues(notificationTemplate.pushMessage || '');
