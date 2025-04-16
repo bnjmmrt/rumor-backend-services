@@ -5890,6 +5890,20 @@ export class AuthService {
       deactivatedAt: new Date(),
     });
 
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur =>
+      ['member', 'non_member'].includes(ur.role.name),
+    );
+
+    if (targetRole) {
+      targetRole.status = UserStatus.DEACTIVATED;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
     return '';
   }
 
