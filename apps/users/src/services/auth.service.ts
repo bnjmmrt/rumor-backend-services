@@ -1616,7 +1616,6 @@ export class AuthService {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
 
-
           let rolesToReturn = user.roles;
 
           // If no roles exist, assign non_member temporarily
@@ -4701,9 +4700,12 @@ export class AuthService {
       .getRepository(ReferralRequest)
       .createQueryBuilder('referral')
       .innerJoin('referral.user', 'user')
-      .select('user.id, user.first_name "firstName", user.last_name "lastName", user.profile_picture "profilePicture"')
+      .select(
+        'user.id, user.first_name "firstName", user.last_name "lastName", user.profile_picture "profilePicture"',
+      )
       .where('referral.requester = :requester', { requester: user.id })
-      .andWhere('referral.isApproved = true').getRawMany();
+      .andWhere('referral.isApproved = true')
+      .getRawMany();
 
     return responses.data(
       toMemberProfile(
@@ -5122,16 +5124,16 @@ export class AuthService {
 
       const adminUserIds = adminUsers.map(user => user.id);
 
-      if (adminUserIds.length > 0){
-        if(['member', 'non_member'].includes(role)){
+      if (adminUserIds.length > 0) {
+        if (['member', 'non_member'].includes(role)) {
           await serviceMesh
-          .notificationService()
-          .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
+            .notificationService()
+            .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
         }
-        if(role === 'host'){
+        if (role === 'host') {
           await serviceMesh
-          .notificationService()
-          .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
+            .notificationService()
+            .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
         }
       }
     } catch (error) {
@@ -5550,7 +5552,13 @@ export class AuthService {
       if (adminUserIds.length > 0)
         await serviceMesh
           .notificationService()
-          .sendNotification(NotificationType.USER_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+          .sendNotification(
+            NotificationType.USER_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
     } catch (error) {
       console.log('🚀 ~ AuthService ~ error:', error);
     }
@@ -5703,7 +5711,13 @@ export class AuthService {
       if (adminUserIds.length > 0)
         await serviceMesh
           .notificationService()
-          .sendNotification(NotificationType.HOST_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+          .sendNotification(
+            NotificationType.HOST_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
     } catch (error) {
       console.log('🚀 ~ AuthService ~ error:', error);
     }
