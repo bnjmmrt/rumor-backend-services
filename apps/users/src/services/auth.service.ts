@@ -5904,6 +5904,20 @@ export class AuthService {
         .update(user.id, { isDeactivated: false, deactivatedAt: null });
     }
 
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+    
+    const targetRole = userRoles.find(ur =>
+      ['member', 'non_member'].includes(ur.role.name),
+    );
+
+    if (targetRole) {
+      targetRole.status = UserStatus.ACTIVE;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
     return '';
   }
 
