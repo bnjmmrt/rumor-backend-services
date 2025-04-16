@@ -4832,7 +4832,10 @@ export class AuthService {
     return queryBuilder;
   }
 
-  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<Filter[]> {
+  public static async getUserFiltersOptions(
+    payload: FilterRequestDto,
+    token: string,
+  ): Promise<Filter[]> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query) as ParsedQs;
     const eventId = parsedQuery?.eventId as string;
@@ -4941,7 +4944,7 @@ export class AuthService {
     };
     const queryString = prepareQueryString(queryParams);
     try {
-      const listEvents: any = await serviceMesh.eventService().listHostEvents(queryString);
+      const listEvents: any = await serviceMesh.eventService(token).listHostEvents(queryString);
       mappedEvents = listEvents?.data?.result.map(event => ({
         name: event.name,
         id: event.id,

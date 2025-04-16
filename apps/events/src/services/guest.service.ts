@@ -308,7 +308,7 @@ export class GuestService {
               }
             }
 
-            await Promise.all(smsPromises);
+            await Promise.allSettled(smsPromises);
 
             // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
