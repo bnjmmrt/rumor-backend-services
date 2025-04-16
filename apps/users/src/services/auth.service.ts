@@ -5083,7 +5083,7 @@ export class AuthService {
       throw new NotFoundError('User');
     }
 
-    const { description, tag } = payload;
+    const { description, tag, role } = payload;
 
     const feedback = this.dbConnection.getRepository(HostFeedback).create({
       description,
@@ -5092,6 +5092,41 @@ export class AuthService {
     });
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
+
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0){
+        if(['member', 'non_member'].includes(role)){
+          await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
+        }
+        if(role === 'host'){
+          await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
+        }
+      }
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
 
     return {
       description: savedFeedback.description,
@@ -5483,6 +5518,33 @@ export class AuthService {
       reportedToRoleId: reportedToRole.id,
     };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.USER_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
+
     return data;
   }
 
@@ -5609,6 +5671,32 @@ export class AuthService {
       reportMessage,
     };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.HOST_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
     return data;
   }
 
