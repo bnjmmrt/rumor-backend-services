@@ -364,15 +364,18 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        const code = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .startPasswordlessLogin(request);
-        const authenticatedUser = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .passwordlessLogin({ code: code.response.code });
-        fusionAuthToken = authenticatedUser.response.token;
-
-        requiresFusionAuthRegistration = false;
+        try {
+          const code = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .startPasswordlessLogin(request);
+          const authenticatedUser = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .passwordlessLogin({ code: code.response.code });
+          fusionAuthToken = authenticatedUser.response.token;
+          requiresFusionAuthRegistration = false;
+        } catch (error) {
+          requiresFusionAuthRegistration = true;
+        }
       } else if (isNonMember) {
         try {
           const fusionAuthResponse = await fusionAuthClientHandler
