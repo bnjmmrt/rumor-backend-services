@@ -4927,8 +4927,7 @@ export class AuthService {
         name: event.name,
         id: event.id,
       }));
-    } catch (e) {
-    }
+    } catch (e) {}
 
     const pastEventsObj = {
       id: 'pastEvents',
