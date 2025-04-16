@@ -1451,7 +1451,7 @@ export class AuthService {
       );
     }
 
-    if (user.isDeactivated) {
+    if (user?.isDeactivated) {
       this.reactivateUserAccount({ email: user.email });
     }
 
