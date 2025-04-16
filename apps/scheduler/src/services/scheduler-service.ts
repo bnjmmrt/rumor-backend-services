@@ -1,10 +1,33 @@
 import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { Event } from 'rumor-utils/shared/entities';
-import { convertToEpoch } from '../utils/event.utils';
+import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
-import { EventsService } from './events.service';
+import { BadRequestError } from 'rumor-utils/errors';
+import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
+  public static async triggerJob(payload: any): Promise<string> {
+    const { type, data } = payload;
+    if (!type || !data) {
+      throw new BadRequestError('Type and data are required.');
+    }
+    switch (type) {
+      case SchedulerJobType.PUBLISH_EVENT:
+        await this.scheduleEventPublishDate(data);
+        break;
+      case SchedulerJobType.REMINDER_EVENT:
+        await this.prepareEventReminderDataAndSchedule(data);
+        break;
+      case SchedulerJobType.PAST_OR_CANCEL_EVENT:
+        await this.scheduleEventPastAndCancelledDate(data);
+        break;
+      default:
+        throw new BadRequestError(`Invalid scheduler type: ${type}`);
+    }
+    return '';
+  }
+
   public static async scheduleEventOnServerRestart() {
     try {
       const events: Event[] = await Event.find();
@@ -103,7 +126,7 @@ export class SchedulerService {
         return;
       }
       schedule.scheduleJob(reminderTime, async () => {
-        const savedEvent = await Event.findOne({
+        const savedEvent: Event = await Event.findOne({
           where: { id: e.id },
           relations: { location: true },
         });
@@ -112,7 +135,11 @@ export class SchedulerService {
         }
         if (savedEvent.status === EventStatusEnum.APPROVED_STATUS) {
           console.log(`Executing event reminder for event: ${savedEvent?.name}`);
-          await EventsService.sendEventRemindersToAllGuests(savedEvent);
+          try {
+            serviceMesh.eventService().sendEventRemindersToAllGuests(savedEvent.id);
+          } catch (err) {
+            console.log(`Error in sending event reminder ::`, err);
+          }
         }
       });
     } catch (err) {

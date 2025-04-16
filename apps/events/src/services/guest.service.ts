@@ -6,6 +6,7 @@ import {
   Attendees,
   Guests,
   FetchBulkGuestsData,
+  SimpleGuestEventsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { VouchRequestService } from './vouch-request.service';
 import { responses } from '../common/responses';
@@ -94,6 +95,7 @@ import {
   BulkUserData,
   UserEventInviteesData,
   QuizData,
+  SimpleGuestEventData,
 } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import database from '../database';
 import config from '../config';
@@ -116,6 +118,7 @@ import {
   sendGuestEventApproval,
 } from '../utils/emails.utils';
 import { sendSmsNotification } from '../utils/sms.utils';
+import * as dayjs from 'dayjs';
 export class GuestService {
   public static dbConnection = database;
 
@@ -272,54 +275,49 @@ export class GuestService {
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
-            // console.log("here we go", updateGuests)
-            await Promise.all(
-              updateGuests.map(guest => {
-                const phoneNumber = guest?.phoneNumber;
-                const guestStatus = guest?.guestStatus;
+            const smsPromises: Promise<{ success: boolean }>[] = [];
 
-                if (!phoneNumber) return;
+            const baseRedirectUrl = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
 
-                let textMessage: string | null = null;
-                //TODO
-                // if (guestStatus === GuestStatus.DECLINED && guest?.invitationSource == UserSource.REQUEST_IN_APP) {
-                //   textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences [link to event download].`;
-                // }
+            for (const guest of updateGuests) {
+              const { phoneNumber, invitationSource, userId } = guest;
 
-                if (
-                  guestStatus === GuestStatus.DECLINED &&
-                  guest?.invitationSource == UserSource.SIGN_UP_FORM
-                ) {
-                  textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}. `;
+              if (!phoneNumber) continue;
+
+              const shouldSendApproval =
+                guestStatus === GuestStatus.CONFIRMED &&
+                [GuestStatus.APPLIED, GuestStatus.DECLINED].includes(currentStatus as GuestStatus);
+
+              const shouldSendDecline =
+                guestStatus === GuestStatus.DECLINED &&
+                [GuestStatus.APPLIED, GuestStatus.CONFIRMED].includes(currentStatus as GuestStatus);
+
+              let textMessage: string | null = null;
+              if (shouldSendDecline && invitationSource === UserSource.SIGN_UP_FORM) {
+                textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
+              } else if (shouldSendApproval) {
+                if (invitationSource === UserSource.SIGN_UP_FORM) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.`;
+                } else if (invitationSource === UserSource.REQUEST_IN_APP) {
+                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
+              }
 
-                if (
-                  guestStatus === GuestStatus.CONFIRMED &&
-                  guest?.invitationSource == UserSource.SIGN_UP_FORM
-                ) {
-                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details. `;
-                }
+              if (textMessage) {
+                smsPromises.push(sendSmsNotification({ phoneNumber, textMessage }));
+              }
+            }
 
-                if (
-                  guestStatus === GuestStatus.CONFIRMED &&
-                  guest?.invitationSource == UserSource.REQUEST_IN_APP
-                ) {
-                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
-                }
+            await Promise.all(smsPromises);
 
-                return sendSmsNotification({
-                  phoneNumber,
-                  textMessage,
-                });
-              }),
-            );
-
-            // Check if guests were successfully created
-
+            // Check if guests notifications were successfully sent
             if (updateGuests.length > 0) {
               const recipientIds = updateGuests.map(data => data.userId).filter(Boolean);
-              //"action": "UPDATE",
-              if (guestStatus === GuestStatus.DECLINED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED))
+
+              if (
+                guestStatus === GuestStatus.DECLINED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.CONFIRMED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -328,7 +326,10 @@ export class GuestService {
                     eventId,
                     hostId,
                   );
-              if (guestStatus === GuestStatus.CONFIRMED && (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED))
+              if (
+                guestStatus === GuestStatus.CONFIRMED &&
+                (currentStatus === GuestStatus.APPLIED || currentStatus === GuestStatus.DECLINED)
+              )
                 serviceMesh
                   .notificationService()
                   .sendNotification(
@@ -843,6 +844,7 @@ export class GuestService {
                   }
                   guest.status = GuestStatus.DECLINED;
                   guest.declinedBy = { id: payload.hostId } as User;
+                  guest.checkIn = false;
                   break;
 
                 case GuestStatus.DRAFT:
@@ -1106,6 +1108,12 @@ export class GuestService {
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
+
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
@@ -1216,6 +1224,7 @@ export class GuestService {
       customListNames,
       userSource,
       checkedInStatus,
+      pastEventsIds,
     );
     const [guests, totalCount] = await queryBuilder.getManyAndCount();
     const buildGuests = await Promise.all(
@@ -1308,6 +1317,7 @@ export class GuestService {
     customListNames,
     userSource,
     checkedInStatus,
+    pastEventsIds,
   ) {
     // Apply search value filter
     if (searchValue) {
@@ -1321,6 +1331,20 @@ export class GuestService {
           });
         }),
       );
+    }
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+      queryBuilder.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN (' + subQuery + ')';
+      });
     }
 
     if (checkedInStatus) {
@@ -2050,6 +2074,60 @@ export class GuestService {
     );
   }
 
+  public static async listSimpleGuestEvents(userId: string): Promise<SimpleGuestEventsResponse> {
+    const events = await this.dbConnection.getRepository(Event).find({
+      where: {
+        guests: {
+          user: {
+            id: userId,
+          },
+          status: In([GuestStatus.INVITED, GuestStatus.APPLIED, GuestStatus.CONFIRMED]),
+        },
+        status: EventStatusEnum.APPROVED_STATUS,
+      },
+      relations: ['guests'],
+    });
+
+    const response = {
+      upcoming: [] as SimpleGuestEventData[],
+      invited: [] as SimpleGuestEventData[],
+      past: [] as SimpleGuestEventData[],
+      requested: [] as SimpleGuestEventData[],
+    };
+
+    const dateNow = new Date();
+
+    events.forEach(event => {
+      const simpleEvent: SimpleGuestEventData = {
+        id: event.id,
+        name: event.name,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        imageCover: event.imageCover,
+        imageFlyer: event.imageFlyer,
+      };
+
+      const guest = event.guests[0];
+
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.upcoming.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.APPLIED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.requested.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.INVITED && dayjs(event.endDate).isAfter(dateNow)) {
+        response.invited.push(simpleEvent);
+      }
+      if (guest.status === GuestStatus.CONFIRMED && dayjs(event.endDate).isBefore(dateNow)) {
+        response.past.push(simpleEvent);
+      }
+    });
+
+    const totalEvents = Object.values(response).reduce((acc, curr) => acc + curr.length, 0);
+
+    return {...response, totalEvents};
+  }
+
   public static async listEventGuests(
     payload: ListEventGuestsDto,
   ): Promise<PaginatedGuestEventsResponse> {
@@ -2676,6 +2754,7 @@ export class GuestService {
         alreadyGuest.status = GuestStatus.DECLINED;
         alreadyGuest.declinedBy = { id: event?.owner.id } as User;
         alreadyGuest.rejectedReason = 'User is marked as spam';
+        alreadyGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(alreadyGuest);
       } else {
         const declinedGuest = new Guest();
@@ -2686,6 +2765,7 @@ export class GuestService {
         declinedGuest.status = GuestStatus.DECLINED;
         declinedGuest.invitationSource = UserSource.REQUEST_IN_APP;
         declinedGuest.rejectedReason = 'User is marked as spam';
+        declinedGuest.checkIn = false;
         await this.dbConnection.getRepository(Guest).save(declinedGuest);
       }
     } else {
@@ -2949,6 +3029,7 @@ export class GuestService {
     guest.status = GuestStatus.DECLINED;
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
+    guest.checkIn = false;
     await this.dbConnection.getRepository(Guest).save(guest);
     return '';
   }

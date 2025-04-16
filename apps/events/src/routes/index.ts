@@ -398,6 +398,7 @@ router.get(
 );
 
 router.get('/events/users/:id/events', GuestController.listGuestEvents); /**TestStatus: TODO: */
+router.get('/events/users/:id/simple-events', GuestController.listSimpleGuestEvents);
 router.post(
   '/events/request/bulk/guest',
   AuthMiddleware.fusionAuthRequired,
@@ -465,4 +466,7 @@ router.delete(
 router.get('/guest/event/:id/export', AuthMiddleware.fusionAuthRequired, GuestController.exportCsv);
 
 router.delete('/delete-host-events/:id', EventsController.deleteHostEvents);
+
+router.post('/event/reminders/send', EventsController.sendEventRemindersToAllGuests);
+
 export default router;
