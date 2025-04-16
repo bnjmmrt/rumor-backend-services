@@ -2139,7 +2139,7 @@ export class GuestService {
 
     const totalEvents = Object.values(response).reduce((acc, curr) => acc + curr.length, 0);
 
-    return {...response, totalEvents};
+    return { ...response, totalEvents };
   }
 
   public static async listEventGuests(
