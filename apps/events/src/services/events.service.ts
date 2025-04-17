@@ -2595,7 +2595,7 @@ export class EventsService {
             await serviceMesh
               .notificationService()
               .sendNotification(
-                NotificationType.USER_APPLICATION,
+                NotificationType.EVENT_EDITED,
                 adminUserIds,
                 event.id,
                 event.owner.id,
