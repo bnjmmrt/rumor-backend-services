@@ -1324,24 +1324,28 @@ export class GuestService {
       const searchWords = searchValue.trim().split(/\s+/);
       queryBuilder.andWhere(
         new Brackets(qb => {
-          searchWords.forEach(word => {
-            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` })
-              .orWhere('user.lastName ILIKE :word', { word: `%${word}%` })
-              .orWhere(
-                new Brackets(subQb => {
-                  subQb.where(() => {
-                    const subQuery = this.dbConnection
-                      .getRepository(Guest)
-                      .createQueryBuilder('ag')
-                      .leftJoin('ag.user', 'agu')
-                      .where('ag.addedBy = guest.user')
-                      .andWhere('agu.firstName ILIKE :word', { word: `%${word}%` })
-                      .orWhere('agu.lastName ILIKE :word', { word: `%${word}%` })
-                      .select('1');
-                    return `EXISTS (${subQuery.getQuery()})`;
-                  });
-                }),
-              );
+          searchWords.forEach((word, index) => {
+            const param = `%${word}%`;
+
+            // Match the main guest's name
+            qb.orWhere(
+              `(user.first_name ILIKE :word${index} OR user.last_name ILIKE :word${index})`,
+              { [`word${index}`]: param },
+            );
+            // Match additional guest's name
+            qb.orWhere(
+              `EXISTS (
+                SELECT 1 FROM guest ag
+                INNER JOIN "user" au ON au.id = ag.user_id
+                WHERE ag.added_by_id = "user".id
+                  AND ag.event_id = :eventId
+                  AND (au.first_name ILIKE :aword${index} OR au.last_name ILIKE :aword${index})
+              )`,
+              {
+                [`aword${index}`]: param,
+                eventId: event.id,
+              },
+            );
           });
         }),
       );
