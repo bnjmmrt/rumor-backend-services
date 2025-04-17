@@ -4,6 +4,8 @@ import FusionAuthClient from '@fusionauth/typescript-client';
 import { ValidateRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { ForbiddenError, AuthorizationError } from 'rumor-utils/errors';
 import { RoleService } from '../../services/role.service';
+import { User } from 'rumor-utils/shared/entities';
+import { UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
 
 class AuthMiddleware {
   fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -33,7 +35,7 @@ class AuthMiddleware {
 
       next();
     } catch (error) {
-      const errMsg = new AuthorizationError(`Session has expired, Please login again `);
+      const errMsg = new AuthorizationError(`Session has expired, Please login again`);
       res.status(401).send(errMsg);
     }
   };
@@ -81,6 +83,21 @@ class AuthMiddleware {
 
       if (!findUser?.response?.user?.active) {
         throw new ForbiddenError('User is not active');
+      }
+
+      const userDetails = await User.findOne({
+        where: { email: findUser.response.user.email },
+        relations: { roles: { role: true } },
+      });
+
+      const hasRestricted = userDetails?.roles?.filter(
+        ur =>
+          ['member', 'non_member'].includes(ur?.role?.name) &&
+          ur.status === UserStatus.DEACTIVATED
+      );
+
+      if (hasRestricted) {
+        throw new AuthorizationError('User role is deactivated');
       }
 
       return {
