@@ -87,12 +87,12 @@ class AuthMiddleware {
 
       const userDetails = await User.findOne({
         where: { email: findUser.response.user.email },
-        relations: {roles: {role: true }},
+        relations: { roles: { role: true } },
       });
 
       const hasRestricted = userDetails?.roles?.filter(
         ur =>
-          ['member', 'non_member'].includes(ur.role.name) &&
+          ['member', 'non_member'].includes(ur?.role?.name) &&
           ur.status === UserStatus.DEACTIVATED
       );
 
