@@ -1451,7 +1451,7 @@ export class AuthService {
       );
     }
 
-    if (user.isDeactivated) {
+    if (user?.isDeactivated) {
       this.reactivateUserAccount({ email: user.email });
     }
 
@@ -5890,6 +5890,20 @@ export class AuthService {
       deactivatedAt: new Date(),
     });
 
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur =>
+      ['member', 'non_member'].includes(ur.role.name),
+    );
+
+    if (targetRole) {
+      targetRole.status = UserStatus.DEACTIVATED;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
     return '';
   }
 
@@ -5902,6 +5916,20 @@ export class AuthService {
       await this.dbConnection
         .getRepository(User)
         .update(user.id, { isDeactivated: false, deactivatedAt: null });
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+    
+    const targetRole = userRoles.find(ur =>
+      ['member', 'non_member'].includes(ur.role.name),
+    );
+
+    if (targetRole) {
+      targetRole.status = UserStatus.ACTIVE;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
     return '';
