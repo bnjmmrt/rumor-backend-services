@@ -2575,7 +2575,7 @@ export class EventsService {
       }
 
       try {
-        if (eventDateOrLocationComparisionResponse.changed && eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
+        if (eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
           const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
             where: {
               deletedAt: IsNull(),
