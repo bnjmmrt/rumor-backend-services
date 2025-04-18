@@ -5,13 +5,14 @@ import firebaseNotificationsService from '../utils/firebase-notifications/fireba
 
 export class NotificationController {
   public static sendNotification = asyncWrapper(async (req, res): Promise<void> => {
-    const { notificationType, recipients, linkedUserId, linkedEventId } = req.body;
+    const { notificationType, recipients, linkedUserId, linkedEventId, linkedHostId } = req.body;
 
     await notificationService.sendNotification(
       notificationType,
       recipients,
       linkedUserId,
       linkedEventId,
+      linkedHostId
     );
 
     const successResponse = new CreateResponse({}, 'Notification sent successfully');
