@@ -554,7 +554,7 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    payload.email = payload.email.toLowerCase();
+    payload.email = payload.email.trim().toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
     let phoneNumberInUse = false,
@@ -831,9 +831,19 @@ export class AuthService {
     return '';
   }
 
+  /**
+   * Handles the forgot password flow for Admin and Host roles.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
   public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: null },
+      where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
       relations: {
         roles: {
           role: true,
@@ -847,10 +857,22 @@ export class AuthService {
     }
     const passwordResetRequest: ForgotPasswordRequest = {
       applicationId: config.get('FUSIONAUTH_APP_ID'),
-      email: payload.email,
+      email: payload.email.trim().toLowerCase(),
       sendForgotPasswordEmail: false,
     };
-    const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    console.log('isHost', isHost)
+    console.log('user?.roles', user?.roles)
+    if (!isHost && !isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
+    }
     let token = null;
     try {
       const forgotPasswordResponse = await fusionAuthClientHandler
@@ -882,7 +904,7 @@ export class AuthService {
       if (!mailServiceResponse) {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
-    } else {
+    } else if (isHost) {
       const redirectPath = `auth/reset-password/${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
         [
@@ -902,10 +924,23 @@ export class AuthService {
       if (!mailServiceResponse) {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
+    } else {
+      throw new BadRequestError(
+        "Can't send reset link, Please check your role and account status and try again.",
+      );
     }
     return '';
   }
 
+  /**
+   * Reset a password for a user using the token received from the forgot password flow.
+   * Verifies token validity, resets the password via FusionAuth,
+   * and returns authentication tokens for Admin or Host roles upon success.
+   *
+   * @param payload - SetHostPasswordRequestDto containing the new password, repeated password, and reset token.
+   * @returns Promise<TokenResponseAndRoles> - Authentication tokens and roles if password reset succeeds.
+   * @throws BadRequestError - If passwords don't match, token is invalid, or if resetting the password fails.
+   */
   public static async setPassword(
     payload: SetHostPasswordRequestDto,
   ): Promise<TokenResponseAndRoles> {
@@ -923,23 +958,32 @@ export class AuthService {
         'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
       );
     }
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { email: email }, relations: { roles: { role: true } } });
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    if (!isHost && !isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
+    }
     const changePasswordFusionAuthResponse = await fusionAuthClientHandler
       .fusionAuthClient()
       .changePassword(token, changePasswordRequest);
     if (changePasswordFusionAuthResponse?.statusCode !== 200) {
       throw new BadRequestError('Unable to reset password, please try again later.');
     }
-    const user = await this.dbConnection
-      .getRepository(User)
-      .findOne({ where: { email: email }, relations: { roles: { role: true } } });
-    const isAdmin = user.roles.some(role => role.role.name === 'admin');
-    const isHost = user.roles.some(role => role.role.name === 'host');
-
     if (isAdmin) {
       return await this.adminLogin({ email, password });
     } else if (isHost) {
       return await this.hostLogin({ email, password });
     }
+    throw new BadRequestError('You dont have permission, please try again later.');
   }
 
   public static async loginSSO(): Promise<LoginSSOResponse> {
@@ -1452,7 +1496,7 @@ export class AuthService {
       );
     }
 
-    if (user.isDeactivated) {
+    if (user?.isDeactivated) {
       this.reactivateUserAccount({ email: user.email });
     }
 
@@ -5914,6 +5958,18 @@ export class AuthService {
       deactivatedAt: new Date(),
     });
 
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
+
+    if (targetRole) {
+      targetRole.status = UserStatus.DEACTIVATED;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
     return '';
   }
 
@@ -5926,6 +5982,18 @@ export class AuthService {
       await this.dbConnection
         .getRepository(User)
         .update(user.id, { isDeactivated: false, deactivatedAt: null });
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
+
+    if (targetRole) {
+      targetRole.status = UserStatus.ACTIVE;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
     return '';
