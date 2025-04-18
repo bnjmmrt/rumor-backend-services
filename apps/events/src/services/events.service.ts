@@ -4535,7 +4535,7 @@ export class EventsService {
   public static async getMostRecentSurvey(userId: string): Promise<Survey | null> {
     // Get current date
     const now = new Date();
-    
+
     // Query to find the most recent live survey that the user hasn't responded to
     const survey = await this.dbConnection
       .getRepository(Survey)
@@ -4557,49 +4557,49 @@ export class EventsService {
       .orderBy('survey.createdAt', 'DESC')
       // We only need one result
       .getOne();
-      console.log("CHOI")
-      console.log(survey);
-      
+    console.log('CHOI');
+    console.log(survey);
+
     return survey;
   }
 
   public static async respondToSurvey(id: string, payload: SurveyResponseDto): Promise<Survey> {
     // First, fetch the Survey entity using the id
     const survey = await this.dbConnection.getRepository(Survey).findOne({
-      where: { id: id }
+      where: { id: id },
     });
-    
+
     if (!survey) {
       throw new Error(`Survey with id ${id} not found`);
     }
-    
+
     // Then, fetch the User entity using the userId from payload
     const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.userId }
+      where: { id: payload.userId },
     });
-    
+
     if (!user) {
       throw new Error(`User with id ${payload.userId} not found`);
     }
-    
+
     // Now create the SurveyResponses entity with the correct relations
     const surveyResponse = this.dbConnection.getRepository(SurveyResponses).create({
       response: payload.response,
       respondedAt: new Date(payload.respondedAt),
       survey: survey,
-      user: user
+      user: user,
     });
-    
+
     const resp = await this.dbConnection.getRepository(SurveyResponses).save(surveyResponse);
-    console.log("resp", resp);
-    
+    console.log('resp', resp);
+
     return this.getSurveyById(id);
   }
 
   public static async getSurveyPage(userId: string): Promise<any[]> {
     // Get current date for checking live surveys
     const now = new Date();
-    
+
     // Fetch live surveys with pagination
     const surveys = await this.dbConnection
       .getRepository(Survey)
@@ -4608,10 +4608,10 @@ export class EventsService {
       .andWhere('survey.surveyEndDate >= :now', { now })
       .orderBy('survey.createdAt', 'DESC')
       .getMany();
-    
+
     // Fetch this user's responses for these surveys
     const surveyIds = surveys.map(survey => survey.id);
-    
+
     // Get all responses for these surveys by this user
     const responses = await this.dbConnection
       .getRepository(SurveyResponses)
@@ -4620,63 +4620,65 @@ export class EventsService {
       .where('survey.id IN (:...surveyIds)', { surveyIds })
       .andWhere('response.user.id = :userId', { userId })
       .getMany();
-    
+
     // Create a map of survey ID to response for quick lookup
     const responseMap = new Map();
     responses.forEach(response => {
       responseMap.set(response.survey.id, response);
     });
-    
+
     // Combine surveys with their responses
     const surveysWithResponses = surveys.map(survey => {
       const userResponse = responseMap.get(survey.id) || null;
       return {
         ...survey,
         userResponse: userResponse,
-        hasResponded: !!userResponse
+        hasResponded: !!userResponse,
       };
     });
-    
+
     return surveysWithResponses;
   }
 
-  public static async updateSurveyResponse(id: string, payload: SurveyResponseDto): Promise<Survey> {
+  public static async updateSurveyResponse(
+    id: string,
+    payload: SurveyResponseDto,
+  ): Promise<Survey> {
     // First, fetch the existing SurveyResponse entity
     const existingResponse = await this.dbConnection.getRepository(SurveyResponses).findOne({
-      where: { id }
+      where: { id },
     });
-    
+
     if (!existingResponse) {
       throw new Error(`Survey response with id ${id} not found`);
     }
-    
+
     // Fetch the Survey entity using surveyId from payload
     const survey = await this.dbConnection.getRepository(Survey).findOne({
-      where: { id: payload.surveyId }
+      where: { id: payload.surveyId },
     });
-    
+
     if (!survey) {
       throw new Error(`Survey with id ${payload.surveyId} not found`);
     }
-    
+
     // Fetch the User entity using userId from payload
     const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: payload.userId }
+      where: { id: payload.userId },
     });
-    
+
     if (!user) {
       throw new Error(`User with id ${payload.userId} not found`);
     }
-    
+
     // Update the SurveyResponses entity with relations
     await this.dbConnection.getRepository(SurveyResponses).update(id, {
       response: payload.response,
       respondedAt: new Date(), // Use current date for update
       survey: survey,
-      user: user
+      user: user,
     });
-    
+
     return this.getSurveyById(payload.surveyId);
   }
-   
 }

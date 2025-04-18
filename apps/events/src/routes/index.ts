@@ -199,10 +199,26 @@ router.get('/surveys/:id', AuthMiddleware.fusionAuthRequired, EventsController.g
 
 router.put('/surveys/:id', AuthMiddleware.fusionAuthRequired, EventsController.updateSurveyById);
 
-router.get('/surveys/:id/responders', AuthMiddleware.fusionAuthRequired, EventsController.getSurveyResponders);
-router.get('/surveys/mostRecent/:userId', AuthMiddleware.fusionAuthRequired, EventsController.getMostRecentSurvey);
-router.post('/surveys/:id/respond', AuthMiddleware.fusionAuthRequired, EventsController.respondToSurvey);
-router.put('/surveys/:id/updateResponse', AuthMiddleware.fusionAuthRequired, EventsController.updateSurveyResponse);
+router.get(
+  '/surveys/:id/responders',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getSurveyResponders,
+);
+router.get(
+  '/surveys/mostRecent/:userId',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.getMostRecentSurvey,
+);
+router.post(
+  '/surveys/:id/respond',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.respondToSurvey,
+);
+router.put(
+  '/surveys/:id/updateResponse',
+  AuthMiddleware.fusionAuthRequired,
+  EventsController.updateSurveyResponse,
+);
 
 // Collaborators
 router.get(
@@ -229,7 +245,7 @@ router.delete('/event-location/:id', EventsController.deleteEventLocation);
 //events routes
 router.post(
   '/event',
-  AuthMiddleware.fusionAuthRequired, 
+  AuthMiddleware.fusionAuthRequired,
   EventsController.createEvent,
 ); /**TestStatus: working */
 router.delete(
