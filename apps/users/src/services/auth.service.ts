@@ -3479,7 +3479,7 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, userSourceToEntity['INVITED_BY_HOST']);
 
     return {
       message: 'User created successfully.',
