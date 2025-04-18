@@ -93,9 +93,16 @@ import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rum
 
 export class AuthController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'ForgotPassword')
-  public static forgotPassword = asyncWrapper(async (req, res): Promise<void> => {
+  public static forgotAdminPassword = asyncWrapper(async (req, res): Promise<void> => {
     const payload: ForgotPasswordRequestDto = req.body;
-    const response: string = await AuthService.forgot(payload);
+    const response: string = await AuthService.forgotAdminPassword(payload);
+    const createResponse = new CreateResponse(response, 'Password reset email sent successfully.');
+    res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static forgotHostPassword = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: ForgotPasswordRequestDto = req.body;
+    const response: string = await AuthService.forgotHostPassword(payload);
     const createResponse = new CreateResponse(response, 'Password reset email sent successfully.');
     res.status(createResponse.statusCode).json(createResponse);
   });
