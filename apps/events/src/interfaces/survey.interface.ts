@@ -51,3 +51,9 @@ export interface SurveyResponse {
   status: string;
   responses: number;
 }
+
+
+export interface GetSurveyPageRequestDto {
+  page: number;
+  userId: string;
+}
