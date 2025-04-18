@@ -68,6 +68,7 @@ export interface SurveyResponse {
   responses: number;
 }
 
+
 export interface GetSurveyPageRequestDto {
   page: number;
   userId: string;
