@@ -96,7 +96,8 @@ class AuthMiddleware {
           ur.status === UserStatus.DEACTIVATED
       );
 
-      if (hasRestricted) {
+
+      if (hasRestricted?.length > 0) {
         throw new AuthorizationError('User role is deactivated');
       }
 
