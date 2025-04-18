@@ -23,6 +23,8 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
+      console.log(token)
+
       const response = await this.validate({ token });
 
       if (!response || !response.userId) {
@@ -96,8 +98,7 @@ class AuthMiddleware {
           ur.status === UserStatus.DEACTIVATED
       );
 
-
-      if (hasRestricted?.length > 0) {
+      if (hasRestricted.length > 0) {
         throw new AuthorizationError('User role is deactivated');
       }
 
