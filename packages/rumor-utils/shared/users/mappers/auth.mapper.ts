@@ -15,6 +15,7 @@ import {
   MemberProfile,
   customListData,
   MemberEvent,
+  ReferrerMembers,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -305,6 +306,7 @@ export const toMemberProfile = (
   pastEvents?: MemberEvent[],
   invitedEvents?: MemberEvent[],
   requestedEvents?: MemberEvent[],
+  referredBy?: ReferrerMembers[],
 ): MemberProfile => {
   return {
     id: user.id,
@@ -321,7 +323,7 @@ export const toMemberProfile = (
     socialStats: {
       instagramFollowersCount: user.socialStats?.instagramFollowersCount || 0,
     },
-    referredBy: [],
+    referredBy,
     upcomingEvents,
     pastEvents,
     invitedEvents,

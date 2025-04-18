@@ -100,7 +100,7 @@ class NotificationService {
             return linkedHost?.additionalHostInformation?.companyName 
           }
           else {
-            return linkedUser?.additionalHostInformation?.companyName
+            return linkedUser?.additionalHostInformation
               ? linkedUser?.additionalHostInformation?.companyName
               : `${linkedUser.firstName} ${linkedUser.lastName}`
           }
@@ -139,16 +139,6 @@ class NotificationService {
         const userPushPreference = recipientUser.userSettings
           ? recipientUser.userSettings.enableAppNotifications
           : true;
-
-        console.log(
-          '🚀 ~ NotificationService ~ recipientUser?.pushNotificationToken?.length:',
-          recipientUser?.pushNotificationToken?.length,
-        );
-        console.log('🚀 ~ NotificationService ~ userPushPreference:', userPushPreference);
-        console.log(
-          '🚀 ~ NotificationService ~ notificationTemplate.pushNotification:',
-          notificationTemplate.pushNotification,
-        );
 
         // Handle push notification if enabled and user has tokens
         if (
@@ -299,53 +289,76 @@ class NotificationService {
     notificationsByModule: Record<string, number>;
     notificationsByType: Record<string, number>;
   }> {
-    const queryBuilder = this.dbConnection
-      .getRepository(Notification)
+    const repo = this.dbConnection.getRepository(Notification);
+  
+    const possibleModules = ['user', 'host', 'event'];
+    const possibleTypes = [
+      'userApplication',
+      'hostApplication',
+      'eventSubmitted',
+      'eventEdited',
+      'userReport',
+      'hostReport',
+      'userFeedback',
+      'hostFeedback',
+    ];
+  
+    // Base query for unread notifications
+    const unreadQuery = repo
       .createQueryBuilder('notification')
-      .where('notification.isSeen = false')
       .innerJoin('notification.recipients', 'recipient', 'recipient.id = :recipientId', {
         recipientId,
-      });
-
+      })
+      .where('notification.isSeen = false');
+  
     if (role) {
-      role = role === 'non_member' ? 'member' : role;
-      queryBuilder.andWhere('notification.role = :role', { role });
+      const normalizedRole = role === 'non_member' ? 'member' : role;
+      unreadQuery.andWhere('notification.role = :role', { role: normalizedRole });
     }
-
-    // Get total notifications count
-    const totalNotifications = await queryBuilder.getCount();
-
-    // Get count grouped by notificationModule
-    const notificationsByModule = await queryBuilder
-      .select('notification.notificationModule, COUNT(*) AS count')
+  
+    // Total unread
+    const totalNotifications = await unreadQuery.clone().getCount();
+  
+    // Count unread by module
+    const unreadByModuleRaw = await unreadQuery
+      .clone()
+      .select('notification.notificationModule', 'notificationModule')
+      .addSelect('COUNT(*)', 'count')
       .groupBy('notification.notificationModule')
       .getRawMany();
-
-    // Get count grouped by notificationType
-    const notificationsByType = await queryBuilder
-      .select('notification.notificationType, COUNT(*) AS count')
+  
+    // Count unread by type
+    const unreadByTypeRaw = await unreadQuery
+      .clone()
+      .select('notification.notificationType', 'notificationType')
+      .addSelect('COUNT(*)', 'count')
       .groupBy('notification.notificationType')
       .getRawMany();
-
-    // Format response
+  
+    // Fill in missing modules/types with 0
+    const notificationsByModule = Object.fromEntries(
+      possibleModules.map(module => [
+        module,
+        Number(
+          unreadByModuleRaw.find(row => row.notificationModule === module)?.count || 0,
+        ),
+      ]),
+    );
+  
+    const notificationsByType = Object.fromEntries(
+      possibleTypes.map(type => [
+        type,
+        Number(unreadByTypeRaw.find(row => row.notificationType === type)?.count || 0),
+      ]),
+    );
+  
     return {
       totalNotifications,
-      notificationsByModule: notificationsByModule.reduce(
-        (acc, row) => {
-          acc[row.notificationModule] = Number(row.count);
-          return acc;
-        },
-        {} as Record<string, number>,
-      ),
-      notificationsByType: notificationsByType.reduce(
-        (acc, row) => {
-          acc[row.notificationType] = Number(row.count);
-          return acc;
-        },
-        {} as Record<string, number>,
-      ),
+      notificationsByModule,
+      notificationsByType,
     };
   }
+  
 
   async deleteMultipleNotifications(
     recipientId: string,
