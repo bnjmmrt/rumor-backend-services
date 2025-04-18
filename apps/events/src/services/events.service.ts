@@ -380,10 +380,7 @@ export class EventsService {
         },
       });
 
-      console.log("🚀 ~ constadminUsers:User[]=awaitthis.dbConnection.getRepository ~ adminUsers:", adminUsers)
-
       const adminUserIds = adminUsers.map(user => user.id);
-      console.log("🚀 ~ createEvent ~ adminUserIds:", adminUserIds)
 
       if (adminUserIds.length > 0)
         await serviceMesh
