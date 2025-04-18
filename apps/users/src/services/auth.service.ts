@@ -831,7 +831,7 @@ export class AuthService {
   }
 
   /**
-   * Handles the forgot password flow for Admin and Host roles.
+   * Handles the forgot password flow for Admin  role.
    * Validates the user by email, generates a password reset token using FusionAuth,
    * and sends a reset link via email based on the user's role.
    *
@@ -840,7 +840,7 @@ export class AuthService {
    * @throws NotFoundError - If the email does not match any user.
    * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
    */
-  public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
+  public static async forgotAdminPassword(payload: ForgotPasswordRequestDto): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
       relations: {
@@ -862,14 +862,10 @@ export class AuthService {
     const isAdmin: boolean = user?.roles?.some(
       (role: UserRole) => role.role.name === RoleType.Admin,
     );
-    const isHost: boolean = user?.roles?.some(
-      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
-    );
-    console.log('isHost', isHost)
-    console.log('user?.roles', user?.roles)
-    if (!isHost && !isAdmin) {
+
+    if (!isAdmin) {
       throw new BadRequestError(
-        'You dont have permission for this action, please check your role and account status and try again later.',
+        'You dont have permission for this action, please check your role and try again later.',
       );
     }
     let token = null;
@@ -880,7 +876,7 @@ export class AuthService {
       token = forgotPasswordResponse.response?.changePasswordId;
     } catch (e) {
       throw new BadRequestError(
-        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+        `Unable to send reset link, please try again later or check if email is correct.`,
       );
     }
     if (!token) {
@@ -903,33 +899,95 @@ export class AuthService {
       if (!mailServiceResponse) {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
-    } else if (isHost) {
-      const redirectPath = `auth/reset-password/${token}`;
-      const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
-        [
-          {
-            key: 'user_name',
-            value: user?.additionalHostInformation?.companyName || 'Host',
-          },
-          {
-            key: 'reset_url',
-            value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
-          },
-        ],
-        'Reset Password',
-        [payload.email.trim().toLowerCase()],
-        null,
-      );
-      if (!mailServiceResponse) {
-        throw new BadRequestError('Unable to send mail, please try again later.');
-      }
-    } else {
+    }  else {
       throw new BadRequestError(
         "Can't send reset link, Please check your role and account status and try again.",
       );
     }
     return '';
   }
+
+
+
+    /**
+   * Handles the forgot password flow for Host role.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
+    public static async forgotHostPassword(payload: ForgotPasswordRequestDto): Promise<string> {
+      const user: User = await this.dbConnection.getRepository(User).findOne({
+        where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+      if (!user) {
+        throw new NotFoundError(
+          "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
+        );
+      }
+      const passwordResetRequest: ForgotPasswordRequest = {
+        applicationId: config.get('FUSIONAUTH_APP_ID'),
+        email: payload.email.trim().toLowerCase(),
+        sendForgotPasswordEmail: false,
+      };
+    
+      const isHost: boolean = user?.roles?.some(
+        (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+      );
+      if (!isHost) {
+        throw new BadRequestError(
+          'You dont have permission for this action, please check your role and account status and try again later.',
+        );
+      }
+      let token = null;
+      try {
+        const forgotPasswordResponse = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .forgotPassword(passwordResetRequest);
+        token = forgotPasswordResponse.response?.changePasswordId;
+      } catch (e) {
+        throw new BadRequestError(
+          `Unable to send reset link, please try again later or check if your profile setup successfully completed for the host role.`,
+        );
+      }
+      if (!token) {
+        throw new BadRequestError('Unable to get token, please try again later.');
+      }
+     if (isHost) {
+        const redirectPath = `auth/reset-password/${token}`;
+        const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
+          [
+            {
+              key: 'user_name',
+              value: user?.additionalHostInformation?.companyName || 'Host',
+            },
+            {
+              key: 'reset_url',
+              value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+            },
+          ],
+          'Reset Password',
+          [payload.email.trim().toLowerCase()],
+          null,
+        );
+        if (!mailServiceResponse) {
+          throw new BadRequestError('Unable to send mail, please try again later.');
+        }
+      } else {
+        throw new BadRequestError(
+          "Can't send reset link, Please check your role and account status and try again.",
+        );
+      }
+      return '';
+    }
 
   /**
    * Reset a password for a user using the token received from the forgot password flow.
@@ -971,12 +1029,17 @@ export class AuthService {
         'You dont have permission for this action, please check your role and account status and try again later.',
       );
     }
+    try {
     const changePasswordFusionAuthResponse = await fusionAuthClientHandler
       .fusionAuthClient()
       .changePassword(token, changePasswordRequest);
-    if (changePasswordFusionAuthResponse?.statusCode !== 200) {
-      throw new BadRequestError('Unable to reset password, please try again later.');
+      if (changePasswordFusionAuthResponse?.statusCode !== 200) {
+        throw new BadRequestError('Unable to reset password, please try again later.');
+      }
+    } catch(e) {
+      throw new BadRequestError('Unable to reset password. The reset link may have expired. Please try again later.');
     }
+   
     if (isAdmin) {
       return await this.adminLogin({ email, password });
     } else if (isHost) {
