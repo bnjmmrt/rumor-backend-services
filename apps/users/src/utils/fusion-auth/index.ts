@@ -23,8 +23,6 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
-      console.log(token)
-
       const response = await this.validate({ token });
 
       if (!response || !response.userId) {
