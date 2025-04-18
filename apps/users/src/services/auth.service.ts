@@ -225,6 +225,7 @@ import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notifica
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
+import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -4739,6 +4740,17 @@ export class AuthService {
       .getRepository(ReferredUser)
       .findOneBy({ userId: user.id });
 
+    const referredByMembers = await this.dbConnection
+      .getRepository(ReferralRequest)
+      .createQueryBuilder('referral')
+      .innerJoin('referral.user', 'user')
+      .select(
+        'user.id, user.first_name "firstName", user.last_name "lastName", user.profile_picture "profilePicture"',
+      )
+      .where('referral.requester = :requester', { requester: user.id })
+      .andWhere('referral.isApproved = true')
+      .getRawMany();
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4753,6 +4765,7 @@ export class AuthService {
         guestEvents?.past,
         guestEvents?.invited,
         guestEvents?.requested,
+        referredByMembers,
       ),
     );
   }
