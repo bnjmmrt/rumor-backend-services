@@ -293,7 +293,7 @@ export class GuestController {
   });
 
   public static inviteNewUser = asyncWrapper(async (req, res): Promise<void> => {
-    console.log('🚀 ~ GuestController ~ inviteNewUser ~ req:', req);
+    console.log("🚀 ~ GuestController ~ inviteNewUser ~ req:", req)
     const payload: InviteNewUserRequestDto = {
       eventId: req.params.id,
       userId: (req as any).user,

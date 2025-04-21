@@ -758,4 +758,21 @@ export interface TicketBreakdownResponse {
   ticketBreakdown: TicketBreakdown[];
 }
 
+export interface TicketBreakdown {
+  ticketType: string;
+  price: number;
+  quantity: number;
+  confirmed: number;
+  pending: number;
+  collaborator: Collaborator;
+}
+
+export interface TicketBreakdownResponse {
+  ticketBreakdown: TicketBreakdown[];
+}
+
+
+
+
+
 export const EVENTS_PACKAGE_NAME = 'events';
