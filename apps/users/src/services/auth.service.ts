@@ -569,13 +569,13 @@ export class AuthService {
         roles: { role: true },
       },
     });
-   
-    if( user?.email && user.email !== payload.email) {
+
+    if (user?.email && user.email !== payload.email) {
       throw new ConflictError(
-            'This email and phone number do not belong to the same account. Please check your details.',
+        'This email and phone number do not belong to the same account. Please check your details.',
       );
     }
-    if( user?.phoneNumber && user.phoneNumber !==  payload.phoneNumber.trim()) {
+    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
       throw new ConflictError(
         'This email and phone number do not belong to the same account. Please check your details.',
       );
@@ -773,8 +773,8 @@ export class AuthService {
 
     try {
       await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
-    } catch(e) {
-      throw new BadRequestError('Not able to set host password, try agian later')
+    } catch (e) {
+      throw new BadRequestError('Not able to set host password, try agian later');
     }
     // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
     // Nullify relationships
@@ -3493,7 +3493,10 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, UserSource.INVITED_BY_HOST);
+    await RoleService.assignRoleToUser(
+      { userId: user.id, roleName: RoleType.NonMember },
+      UserSource.INVITED_BY_HOST,
+    );
 
     return {
       message: 'User created successfully.',
@@ -4581,35 +4584,35 @@ export class AuthService {
           const users = await fusionAuthClientHandler
             .fusionAuthClient()
             .searchUsersByIds([user.id]);
-          let isUserPresentInFusionAuth = false
-          if(users.response?.total) {
-            isUserPresentInFusionAuth = true
+          let isUserPresentInFusionAuth = false;
+          if (users.response?.total) {
+            isUserPresentInFusionAuth = true;
           }
-            const token = await this.generateToken(user);
-            await this.approveHost(user, isUserPresentInFusionAuth);
-            emailsToSend.push({
-              email: user.email,
-              subject: 'Host Application Approved',
-              data: [
-                { key: 'first_name', value: user.firstName },
-                {
-                  key: 'company_name',
-                  value: user.additionalHostInformation?.companyName ?? user.firstName,
-                },
-                {
-                  key: 'password_token',
-                  value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}`,
-                },
-              ],
-            });
-            if (user?.phoneNumber) {
-              //Micro-service call
-              try {
-                let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
-                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
-                smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
-              } catch (err) {
-                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
+          const token = await this.generateToken(user);
+          await this.approveHost(user, isUserPresentInFusionAuth);
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Host Application Approved',
+            data: [
+              { key: 'first_name', value: user.firstName },
+              {
+                key: 'company_name',
+                value: user.additionalHostInformation?.companyName ?? user.firstName,
+              },
+              {
+                key: 'password_token',
+                value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}`,
+              },
+            ],
+          });
+          if (user?.phoneNumber) {
+            //Micro-service call
+            try {
+              let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+              let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+              smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+            } catch (err) {
+              console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
             }
           }
         } else if (
@@ -4702,13 +4705,13 @@ export class AuthService {
     }
   }
 
-  public static async approveHost(user: User, isUserPresentInFusionAuth:boolean): Promise<void> {
+  public static async approveHost(user: User, isUserPresentInFusionAuth: boolean): Promise<void> {
     const password = generateRandomPassword(12);
     const temporaryPassword = new TemporaryPassword();
     temporaryPassword.password = password;
     user.temporaryPassword = temporaryPassword;
     user = await this.dbConnection.getRepository(User).save(user);
-    if(!isUserPresentInFusionAuth) {
+    if (!isUserPresentInFusionAuth) {
       const registrationRequest: RegistrationRequest = {
         registration: {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
@@ -4728,8 +4731,7 @@ export class AuthService {
         },
       };
       await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-    }
-    else {
+    } else {
       //setting the password for the user for the first time
       const request: ChangePasswordRequest = {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
@@ -4737,9 +4739,9 @@ export class AuthService {
         password: password,
       };
       try {
-      await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
-      } catch(e) {
-        throw new BadRequestError("Cannot approve this host")
+        await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+      } catch (e) {
+        throw new BadRequestError('Cannot approve this host');
       }
     }
   }
