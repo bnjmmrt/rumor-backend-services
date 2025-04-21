@@ -774,7 +774,6 @@ export class AuthService {
     try {
       await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
     } catch(e) {
-      console.log('e------', e.exception, e.exception?.fieldErrors)
       throw new BadRequestError('Not able to set host password, try agian later')
     }
     // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
