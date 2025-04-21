@@ -100,7 +100,7 @@ class NotificationService {
             return linkedHost?.additionalHostInformation?.companyName 
           }
           else {
-            return linkedUser?.additionalHostInformation?.companyName
+            return linkedUser?.additionalHostInformation
               ? linkedUser?.additionalHostInformation?.companyName
               : `${linkedUser.firstName} ${linkedUser.lastName}`
           }

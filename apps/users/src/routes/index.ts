@@ -67,7 +67,8 @@ router.get(
 router.get('/users/export', AuthMiddleware.fusionAuthRequired, AdminController.exportUsersCsv);
 
 // Auth routes
-router.post('/auth/forgot-password', AuthController.forgotPassword);
+router.post('/auth/admin/forgot-password', AuthController.forgotAdminPassword);
+router.post('/auth/host/forgot-password', AuthController.forgotHostPassword);
 router.post('/auth/set-password', AuthController.setPassword);
 router.post('/auth/login', AuthController.login);
 

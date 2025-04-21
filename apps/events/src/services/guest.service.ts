@@ -3624,6 +3624,7 @@ export class GuestService {
             ...row,
             eventId: payload.eventId,
             userId: payload.hostId,
+            source: UserSource.INVITED_BY_HOST,
           });
           return response.data; // Ensure it returns a valid user
         }

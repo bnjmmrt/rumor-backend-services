@@ -225,6 +225,7 @@ import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notifica
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
+import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -840,9 +841,19 @@ export class AuthService {
     return '';
   }
 
-  public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
+  /**
+   * Handles the forgot password flow for Admin  role.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
+  public static async forgotAdminPassword(payload: ForgotPasswordRequestDto): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: null },
+      where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
       relations: {
         roles: {
           role: true,
@@ -856,10 +867,18 @@ export class AuthService {
     }
     const passwordResetRequest: ForgotPasswordRequest = {
       applicationId: config.get('FUSIONAUTH_APP_ID'),
-      email: payload.email,
+      email: payload.email.trim().toLowerCase(),
       sendForgotPasswordEmail: false,
     };
-    const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+
+    if (!isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and try again later.',
+      );
+    }
     let token = null;
     try {
       const forgotPasswordResponse = await fusionAuthClientHandler
@@ -868,7 +887,7 @@ export class AuthService {
       token = forgotPasswordResponse.response?.changePasswordId;
     } catch (e) {
       throw new BadRequestError(
-        `Unable to send reset link, please try again later or check ${!isAdmin ? 'if your profile setup successfully completed for the host role.' : 'if email is correct.'}`,
+        `Unable to send reset link, please try again later or check if email is correct.`,
       );
     }
     if (!token) {
@@ -892,6 +911,66 @@ export class AuthService {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
     } else {
+      throw new BadRequestError(
+        "Can't send reset link, Please check your role and account status and try again.",
+      );
+    }
+    return '';
+  }
+
+  /**
+   * Handles the forgot password flow for Host role.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
+  public static async forgotHostPassword(payload: ForgotPasswordRequestDto): Promise<string> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+    if (!user) {
+      throw new NotFoundError(
+        "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
+      );
+    }
+    const passwordResetRequest: ForgotPasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      email: payload.email.trim().toLowerCase(),
+      sendForgotPasswordEmail: false,
+    };
+
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    if (!isHost) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
+    }
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check if your profile setup successfully completed for the host role.`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
+    if (isHost) {
       const redirectPath = `auth/reset-password/${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
         [
@@ -911,10 +990,23 @@ export class AuthService {
       if (!mailServiceResponse) {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
+    } else {
+      throw new BadRequestError(
+        "Can't send reset link, Please check your role and account status and try again.",
+      );
     }
     return '';
   }
 
+  /**
+   * Reset a password for a user using the token received from the forgot password flow.
+   * Verifies token validity, resets the password via FusionAuth,
+   * and returns authentication tokens for Admin or Host roles upon success.
+   *
+   * @param payload - SetHostPasswordRequestDto containing the new password, repeated password, and reset token.
+   * @returns Promise<TokenResponseAndRoles> - Authentication tokens and roles if password reset succeeds.
+   * @throws BadRequestError - If passwords don't match, token is invalid, or if resetting the password fails.
+   */
   public static async setPassword(
     payload: SetHostPasswordRequestDto,
   ): Promise<TokenResponseAndRoles> {
@@ -932,23 +1024,39 @@ export class AuthService {
         'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
       );
     }
-    const changePasswordFusionAuthResponse = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .changePassword(token, changePasswordRequest);
-    if (changePasswordFusionAuthResponse?.statusCode !== 200) {
-      throw new BadRequestError('Unable to reset password, please try again later.');
-    }
     const user = await this.dbConnection
       .getRepository(User)
       .findOne({ where: { email: email }, relations: { roles: { role: true } } });
-    const isAdmin = user.roles.some(role => role.role.name === 'admin');
-    const isHost = user.roles.some(role => role.role.name === 'host');
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    if (!isHost && !isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
+    }
+    try {
+      const changePasswordFusionAuthResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .changePassword(token, changePasswordRequest);
+      if (changePasswordFusionAuthResponse?.statusCode !== 200) {
+        throw new BadRequestError('Unable to reset password, please try again later.');
+      }
+    } catch (e) {
+      throw new BadRequestError(
+        'Unable to reset password. The reset link may have expired. Please try again later.',
+      );
+    }
 
     if (isAdmin) {
       return await this.adminLogin({ email, password });
     } else if (isHost) {
       return await this.hostLogin({ email, password });
     }
+    throw new BadRequestError('You dont have permission, please try again later.');
   }
 
   public static async loginSSO(): Promise<LoginSSOResponse> {
@@ -1624,7 +1732,6 @@ export class AuthService {
           if (!isVerified) {
             throw new NotFoundError('Invalid or expired verification code, please try again.');
           }
-
 
           let rolesToReturn = user.roles;
 
@@ -3382,7 +3489,7 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, UserSource.INVITED_BY_HOST);
 
     return {
       message: 'User created successfully.',
@@ -4709,6 +4816,17 @@ export class AuthService {
       .getRepository(ReferredUser)
       .findOneBy({ userId: user.id });
 
+    const referredByMembers = await this.dbConnection
+      .getRepository(ReferralRequest)
+      .createQueryBuilder('referral')
+      .innerJoin('referral.user', 'user')
+      .select(
+        'user.id, user.first_name "firstName", user.last_name "lastName", user.profile_picture "profilePicture"',
+      )
+      .where('referral.requester = :requester', { requester: user.id })
+      .andWhere('referral.isApproved = true')
+      .getRawMany();
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4723,6 +4841,7 @@ export class AuthService {
         guestEvents?.past,
         guestEvents?.invited,
         guestEvents?.requested,
+        referredByMembers,
       ),
     );
   }
@@ -5125,16 +5244,16 @@ export class AuthService {
 
       const adminUserIds = adminUsers.map(user => user.id);
 
-      if (adminUserIds.length > 0){
-        if(['member', 'non_member'].includes(role)){
+      if (adminUserIds.length > 0) {
+        if (['member', 'non_member'].includes(role)) {
           await serviceMesh
-          .notificationService()
-          .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
+            .notificationService()
+            .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
         }
-        if(role === 'host'){
+        if (role === 'host') {
           await serviceMesh
-          .notificationService()
-          .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
+            .notificationService()
+            .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
         }
       }
     } catch (error) {
@@ -5553,7 +5672,13 @@ export class AuthService {
       if (adminUserIds.length > 0)
         await serviceMesh
           .notificationService()
-          .sendNotification(NotificationType.USER_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+          .sendNotification(
+            NotificationType.USER_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
     } catch (error) {
       console.log('🚀 ~ AuthService ~ error:', error);
     }
@@ -5706,7 +5831,13 @@ export class AuthService {
       if (adminUserIds.length > 0)
         await serviceMesh
           .notificationService()
-          .sendNotification(NotificationType.HOST_REPORT, adminUserIds, null, reportedBy.id, reportedTo.id);
+          .sendNotification(
+            NotificationType.HOST_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
     } catch (error) {
       console.log('🚀 ~ AuthService ~ error:', error);
     }
@@ -5908,9 +6039,7 @@ export class AuthService {
       relations: ['role'],
     });
 
-    const targetRole = userRoles.find(ur =>
-      ['member', 'non_member'].includes(ur.role.name),
-    );
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
 
     if (targetRole) {
       targetRole.status = UserStatus.DEACTIVATED;
@@ -5935,10 +6064,8 @@ export class AuthService {
       where: { user: { id: user.id } },
       relations: ['role'],
     });
-    
-    const targetRole = userRoles.find(ur =>
-      ['member', 'non_member'].includes(ur.role.name),
-    );
+
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
 
     if (targetRole) {
       targetRole.status = UserStatus.ACTIVE;
