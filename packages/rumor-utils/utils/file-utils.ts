@@ -131,7 +131,7 @@ export const processCsvFile = async (
         record.firstName = record.firstName?.toString().trim();
         record.lastName = record.lastName?.toString().trim();
         record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
-        record.email = rawEmail.trim();
+        record.email = rawEmail.trim().toLowerCase();
         validData.push(record);
       }
     }
