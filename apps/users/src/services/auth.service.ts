@@ -780,7 +780,6 @@ export class AuthService {
     // Nullify relationships
     user.temporaryPassword = null;
     user.temporaryPasswordToken = null;
-    // throw new Error("intentionalyy")
     await this.dbConnection.getRepository(User).save(user);
 
     // Delete entities successfully
