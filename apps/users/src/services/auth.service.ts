@@ -553,7 +553,7 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    payload.email = payload.email.toLowerCase();
+    payload.email = payload.email.trim()?.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
     let phoneNumberInUse = false,
@@ -568,7 +568,17 @@ export class AuthService {
         roles: { role: true },
       },
     });
-
+   
+    if( user.email && user.email !== payload.email) {
+      throw new ConflictError(
+            'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
+    if( user.phoneNumber && user.phoneNumber !==  payload.phoneNumber.trim()) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find(
         item => item.role.name === 'non_member' || item.role.name === 'member',
@@ -4460,9 +4470,12 @@ export class AuthService {
           const users = await fusionAuthClientHandler
             .fusionAuthClient()
             .searchUsersByIds([user.id]);
-          if (users.response.total === 0) {
-            await this.approveHost(user);
+          let isUserPresentInFusionAuth = false
+          if(users.response?.total) {
+            isUserPresentInFusionAuth = true
+          }
             const token = await this.generateToken(user);
+            await this.approveHost(user, isUserPresentInFusionAuth);
             emailsToSend.push({
               email: user.email,
               subject: 'Host Application Approved',
@@ -4478,15 +4491,14 @@ export class AuthService {
                 },
               ],
             });
-            if (user?.phoneNumber) {
-              //Micro-service call
-              try {
-                let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
-                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
-                smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
-              } catch (err) {
-                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
-              }
+          if (user?.phoneNumber) {
+            //Micro-service call
+            try {
+              let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+              let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+              smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+            } catch (err) {
+              console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
             }
           }
         } else if (
@@ -4579,32 +4591,33 @@ export class AuthService {
     }
   }
 
-  public static async approveHost(user: User): Promise<void> {
+  public static async approveHost(user: User, isUserPresentInFusionAuth:boolean): Promise<void> {
     const password = generateRandomPassword(12);
     const temporaryPassword = new TemporaryPassword();
     temporaryPassword.password = password;
     user.temporaryPassword = temporaryPassword;
     user = await this.dbConnection.getRepository(User).save(user);
-
-    const registrationRequest: RegistrationRequest = {
-      registration: {
-        applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email,
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: user.email,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobilePhone: user.phoneNumber,
-        password,
-        verified: true,
-        active: true,
-      },
-    };
-    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    if(!isUserPresentInFusionAuth) {
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: user.email,
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: user.email,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobilePhone: user.phoneNumber,
+          password,
+          verified: true,
+          active: true,
+        },
+      };
+      await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    }
   }
 
   public static async generateToken(user: User): Promise<string> {
