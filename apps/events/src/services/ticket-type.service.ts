@@ -10,9 +10,11 @@ import {
 import { TicketType } from 'rumor-utils/shared/events/entities/ticket-type.entity';
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses';
-import { Event } from 'rumor-utils/shared/events/entities';
+import { normalizeCatalogName } from '../common/helpers';
+import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
+import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class TicketTypeService {
   public static dbConnection = database;
@@ -139,5 +141,45 @@ export class TicketTypeService {
     } catch (err) {
       return responses.badRequest('Error updating ticket type');
     }
+  }
+
+  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<String> {
+    //For a given event, get the ticket types and the number of guests that have RSVPed for each ticket type
+    //Get the ticket types
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: {
+        id: payload.id,
+      },
+    });
+    if (!event) return responses.badRequest('Event not found');
+
+    //Get the ticket types
+    const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
+      where: {
+        event: {
+          id: event.id,
+        },
+      },
+    });
+
+
+    //Get the number of guests that have RSVPed for each ticket type
+    const guests = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        event: {
+          id: event.id,
+        },
+      },
+    });
+
+    //Get the number of guests that have RSVPed for each ticket type
+    const guestsByTicketType = guests.filter((guest) => 
+      ticketTypes.some(ticketType => guest.ticketType.id === ticketType.id)
+    );
+
+    console.log(guestsByTicketType)
+
+    return "Hello World"
+
   }
 }

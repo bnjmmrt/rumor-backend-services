@@ -70,4 +70,12 @@ export class TicketTypeController {
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
+
+  public static getTicketBreakdown = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const payload: RequestByIdDto = { id };
+      const ticketTypeResponse: TicketTypeResponse = await TicketTypeService.getTicketBreakdown(payload);
+    },
+  );
 }

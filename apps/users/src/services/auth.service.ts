@@ -5697,6 +5697,8 @@ export class AuthService {
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
 
+    console.log("WHATS UP");
+
     try {
       const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
         where: {
@@ -5715,6 +5717,8 @@ export class AuthService {
       });
 
       const adminUserIds = adminUsers.map(user => user.id);
+
+      console.log("🚀 ~ AuthService ~ adminUserIds:", adminUserIds)
 
       if (adminUserIds.length > 0) {
         if (['member', 'non_member'].includes(role)) {
