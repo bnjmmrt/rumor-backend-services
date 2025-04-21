@@ -1214,7 +1214,7 @@ export class AuthService {
         (payload.referralCode
           ? `Enter code ${payload.referralCode} to expedite your application review.`
           : ``) +
-        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
 
       //Micro-service call
       try {
@@ -1236,7 +1236,7 @@ export class AuthService {
         },
         {
           key: 'link_to_application',
-          value: config.get('USERS_SERVICE_BASE_URL') + '/redirect', //config.get('RUMOR_WEBSITE'),
+          value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -1301,7 +1301,7 @@ export class AuthService {
     if (payload?.phoneNumber) {
       let message =
         `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
-        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
 
       //Micro-service call
       try {
@@ -2272,7 +2272,7 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('USERS_SERVICE_BASE_URL') + '/redirect',
+            value: config.get('RUMOR_WEBSITE_HOST') + 'redirect',
           },
           {
             key: 'first_name',
@@ -2299,7 +2299,7 @@ export class AuthService {
     let userPhoneNumber = user?.phoneNumber;
     if (userPhoneNumber) {
       try {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
         let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
         const validateNumber = isValidPhoneNumber(userPhoneNumber);
         if (validateNumber) {
@@ -2462,7 +2462,7 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
           console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
@@ -4598,16 +4598,15 @@ export class AuthService {
                 },
               ],
             });
-          if (user?.phoneNumber) {
-            //Micro-service call
-            try {
-              let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
-              let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
-              smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
-            } catch (err) {
-              console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
+            if (user?.phoneNumber) {
+              //Micro-service call
+              try {
+                let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+                smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+              } catch (err) {
+                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
             }
-          }
         } else if (
           newUserStatusTosUserStatus[payload.status] ===
           newUserStatusTosUserStatus[NewUserStatus.WAITLIST]
