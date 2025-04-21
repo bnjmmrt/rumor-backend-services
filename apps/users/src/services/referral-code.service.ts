@@ -64,14 +64,10 @@ export class ReferralCodeService {
     const queryBuilder = this.dbConnection.getRepository(ReferralCode).createQueryBuilder('code');
 
     if (deactivatedCodes) {
-      queryBuilder.where('code.isManuallyDeactivated = true').andWhere(
-        new Brackets(qb => {
-          qb.where('code.expirationDate >= CURRENT_DATE')
-            .orWhere('code.expirationDate IS NULL')
-            .orWhere('code.usageCount = code.usageLimit')
-            .orWhere('code.usageLimit = -1');
-        }),
-      );
+      queryBuilder
+        .where('code.isManuallyDeactivated = true')
+        .orWhere('code.expirationDate < CURRENT_DATE')
+        .orWhere('code.usageCount = code.usageLimit');
     } else {
       queryBuilder
         .where('code.isManuallyDeactivated = false')
