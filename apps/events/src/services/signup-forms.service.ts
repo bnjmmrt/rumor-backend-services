@@ -524,7 +524,6 @@ export class SignupFormsServices {
       }
 
       await queryRunner.commitTransaction();
-      await queryRunner.release();
 
       try {
         // Send Notification
@@ -555,7 +554,6 @@ export class SignupFormsServices {
 
       return submissions;
     } catch (err) {
-      console.log('🚀 ~ SignupFormsServices ~ answers ~ error:', err);
       throw err;
     }
   }
