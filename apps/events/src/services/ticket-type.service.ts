@@ -14,7 +14,7 @@ import { normalizeCatalogName } from '../common/helpers';
 import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
-import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { TicketBreakdown, TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class TicketTypeService {
   public static dbConnection = database;
@@ -143,7 +143,7 @@ export class TicketTypeService {
     }
   }
 
-  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<String> {
+  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<TicketType[]> {
     //For a given event, get the ticket types and the number of guests that have RSVPed for each ticket type
     //Get the ticket types
     const event = await this.dbConnection.getRepository(Event).findOne({
@@ -151,7 +151,7 @@ export class TicketTypeService {
         id: payload.id,
       },
     });
-    if (!event) return responses.badRequest('Event not found');
+
 
     //Get the ticket types
     const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
@@ -160,26 +160,9 @@ export class TicketTypeService {
           id: event.id,
         },
       },
-    });
+    }); 
 
-
-    //Get the number of guests that have RSVPed for each ticket type
-    const guests = await this.dbConnection.getRepository(Guest).find({
-      where: {
-        event: {
-          id: event.id,
-        },
-      },
-    });
-
-    //Get the number of guests that have RSVPed for each ticket type
-    const guestsByTicketType = guests.filter((guest) => 
-      ticketTypes.some(ticketType => guest.ticketType.id === ticketType.id)
-    );
-
-    console.log(guestsByTicketType)
-
-    return "Hello World"
+    return ticketTypes;
 
   }
 }

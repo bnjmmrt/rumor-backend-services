@@ -17,6 +17,7 @@ import {
 } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express';
 import { TicketType } from 'packages/rumor-utils/shared/entities';
+import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 export class TicketTypeController {
   constructor(private readonly ticketTypeService: TicketTypeService) {}
@@ -75,7 +76,9 @@ export class TicketTypeController {
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
       const payload: RequestByIdDto = { id };
-      const ticketTypeResponse: TicketTypeResponse = await TicketTypeService.getTicketBreakdown(payload);
+      const ticketTypeResponse: TicketType[] = await TicketTypeService.getTicketBreakdown(payload);
+      const successResponse = new GetResponse(ticketTypeResponse);
+      res.status(successResponse.statusCode).json(successResponse);
     },
   );
 }
