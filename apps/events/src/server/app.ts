@@ -27,7 +27,6 @@ app.get('/events/v1/health', (req: Request, res: Response) => {
 
 app.get('/events/v1/db-health',async (req: Request, res: Response) => {
   const dbRepository = await ConnectionManager.getRepository('events').query('SELECT 1');
-  console.log("🚀 ~ app.get ~ dbRepository:", dbRepository)
   res.json({ status: dbRepository ? 'UP' : 'DOWN', timestamp: new Date() }).status(200);
 })
 
