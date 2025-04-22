@@ -451,6 +451,7 @@ export class SignupFormsServices {
   }
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
     try {
       const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
         where: { id: id, event: { id: eventId } },
@@ -478,7 +479,6 @@ export class SignupFormsServices {
       if (signupForm.event.owner.id === userPayload?.id) {
         throw new ValidationError('Host cannot apply to their own event.');
       }
-      const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
@@ -552,9 +552,12 @@ export class SignupFormsServices {
         }
       }
 
-      return submissions;
+      return;
     } catch (err) {
+      console.log('🚀 ~ SignupFormsServices ~ answers ~ error:', err);
       throw err;
+    } finally {
+      await queryRunner.release();
     }
   }
 

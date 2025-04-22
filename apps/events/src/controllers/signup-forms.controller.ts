@@ -70,7 +70,7 @@ export class SignupFormsController {
     // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ payload: ${new Date()}`, payload)
     // const answers = 
     await SignupFormsServices.answers(id, eventId, payload);
-    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ answers: ${new Date()}`, answers)
+    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ answers: ${new Date()}`)
     res.json(new GetResponse({}));
   });
 
