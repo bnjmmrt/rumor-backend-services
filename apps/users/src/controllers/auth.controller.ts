@@ -162,7 +162,7 @@ export class AuthController {
   public static setHostPassword = asyncWrapper(async (req, res): Promise<void> => {
     const payload: SetHostPasswordRequestDto = req.body;
     const response: string = await AuthService.setHostPassword(payload);
-    const createResponse = new CreateResponse(response, 'Password has been successfully reset.');
+    const createResponse = new CreateResponse(response, 'Password has been successfully set.');
     res.status(createResponse.statusCode).json(createResponse);
   });
 
