@@ -547,7 +547,9 @@ export class SignupFormsServices {
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }
-        } catch (err) {}
+        } catch (err) {
+          console.error('Error sending SMS:', err);
+        }
       }
 
       return submissions;
