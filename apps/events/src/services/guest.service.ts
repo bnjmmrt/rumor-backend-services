@@ -277,7 +277,7 @@ export class GuestService {
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             const smsPromises: Promise<{ success: boolean }>[] = [];
 
-            const baseRedirectUrl = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+            const baseRedirectUrl = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
 
             for (const guest of updateGuests) {
               const { phoneNumber, invitationSource, userId } = guest;
@@ -655,7 +655,7 @@ export class GuestService {
 
             sendEventInviteMember(createMailPayload, event.timeZone);
             if (data.phoneNumber) {
-              const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+              const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
               // Send SMS notification
               try {
                 const validateNumber = isValidPhoneNumber(data.phoneNumber);
@@ -696,7 +696,7 @@ export class GuestService {
             sendEventInviteNonMember(createMailPayload, event.timeZone);
 
             if (data.phoneNumber) {
-              const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+              const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
               // Send SMS notification
               try {
                 const validateNumber = isValidPhoneNumber(data.phoneNumber);
@@ -919,7 +919,7 @@ export class GuestService {
 
               sendEventInviteMember(createMailPayload, event.timeZone);
               if (data.phoneNumber) {
-                const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                const message = `You've received an invite to attend ${event.name}! Click the link to see more details and RSVP. ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
                 // Send SMS notification
                 try {
                   const validateNumber = isValidPhoneNumber(data.phoneNumber);
@@ -957,7 +957,7 @@ export class GuestService {
                   payload.hostId,
                 );
               if (data.phoneNumber) {
-                const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+                const message = `Hi ${data.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
                 // Send SMS notification
                 try {
                   const validateNumber = isValidPhoneNumber(data.phoneNumber);
@@ -3265,7 +3265,7 @@ export class GuestService {
       };
       sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     } else if (payload.phoneNumber) {
-      const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+      const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
         if (validateNumber) {
@@ -3446,7 +3446,7 @@ export class GuestService {
           };
           sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
         } else if (guest.user.phoneNumber) {
-          const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+          const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
           try {
             const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
             if (validateNumber) {
@@ -3905,7 +3905,7 @@ export class GuestService {
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
       } else if (payload.phoneNumber) {
-        const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {

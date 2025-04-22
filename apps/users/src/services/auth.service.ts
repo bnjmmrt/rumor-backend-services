@@ -554,7 +554,7 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    payload.email = payload.email.trim().toLowerCase();
+    payload.email = payload.email.trim()?.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
     let phoneNumberInUse = false,
@@ -570,6 +570,16 @@ export class AuthService {
       },
     });
 
+    if (user?.email && user.email !== payload.email) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
+    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find(
         item => item.role.name === 'non_member' || item.role.name === 'member',
@@ -761,8 +771,11 @@ export class AuthService {
       password: payload.password,
     };
 
-    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
-
+    try {
+      await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+    } catch (e) {
+      throw new BadRequestError('Not able to set host password, try agian later');
+    }
     // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
     // Nullify relationships
     user.temporaryPassword = null;
@@ -1204,7 +1217,7 @@ export class AuthService {
         (payload.referralCode
           ? `Enter code ${payload.referralCode} to expedite your application review.`
           : ``) +
-        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
 
       //Micro-service call
       try {
@@ -1226,7 +1239,7 @@ export class AuthService {
         },
         {
           key: 'link_to_application',
-          value: config.get('USERS_SERVICE_BASE_URL') + '/redirect', //config.get('RUMOR_WEBSITE'),
+          value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -1291,7 +1304,7 @@ export class AuthService {
     if (payload?.phoneNumber) {
       let message =
         `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
-        `\n ${config.get('USERS_SERVICE_BASE_URL') + '/redirect'}`;
+        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
 
       //Micro-service call
       try {
@@ -2262,7 +2275,7 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('USERS_SERVICE_BASE_URL') + '/redirect',
+            value: config.get('RUMOR_WEBSITE_HOST') + 'redirect',
           },
           {
             key: 'first_name',
@@ -2289,7 +2302,7 @@ export class AuthService {
     let userPhoneNumber = user?.phoneNumber;
     if (userPhoneNumber) {
       try {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
         let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
         const validateNumber = isValidPhoneNumber(userPhoneNumber);
         if (validateNumber) {
@@ -2452,7 +2465,7 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
           console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
@@ -3479,7 +3492,10 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, UserSource.INVITED_BY_HOST);
+    await RoleService.assignRoleToUser(
+      { userId: user.id, roleName: RoleType.NonMember },
+      UserSource.INVITED_BY_HOST,
+    );
 
     return {
       message: 'User created successfully.',
@@ -4567,33 +4583,35 @@ export class AuthService {
           const users = await fusionAuthClientHandler
             .fusionAuthClient()
             .searchUsersByIds([user.id]);
-          if (users.response.total === 0) {
-            await this.approveHost(user);
-            const token = await this.generateToken(user);
-            emailsToSend.push({
-              email: user.email,
-              subject: 'Host Application Approved',
-              data: [
-                { key: 'first_name', value: user.firstName },
-                {
-                  key: 'company_name',
-                  value: user.additionalHostInformation?.companyName ?? user.firstName,
-                },
-                {
-                  key: 'password_token',
-                  value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}`,
-                },
-              ],
-            });
-            if (user?.phoneNumber) {
-              //Micro-service call
-              try {
-                let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
-                let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
-                smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
-              } catch (err) {
-                console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
-              }
+          let isUserPresentInFusionAuth = false;
+          if (users.response?.total) {
+            isUserPresentInFusionAuth = true;
+          }
+          const token = await this.generateToken(user);
+          await this.approveHost(user, isUserPresentInFusionAuth);
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Host Application Approved',
+            data: [
+              { key: 'first_name', value: user.firstName },
+              {
+                key: 'company_name',
+                value: user.additionalHostInformation?.companyName ?? user.firstName,
+              },
+              {
+                key: 'password_token',
+                value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}`,
+              },
+            ],
+          });
+          if (user?.phoneNumber) {
+            //Micro-service call
+            try {
+              let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+              let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+              smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+            } catch (err) {
+              console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
             }
           }
         } else if (
@@ -4686,32 +4704,45 @@ export class AuthService {
     }
   }
 
-  public static async approveHost(user: User): Promise<void> {
+  public static async approveHost(user: User, isUserPresentInFusionAuth: boolean): Promise<void> {
     const password = generateRandomPassword(12);
     const temporaryPassword = new TemporaryPassword();
     temporaryPassword.password = password;
     user.temporaryPassword = temporaryPassword;
     user = await this.dbConnection.getRepository(User).save(user);
-
-    const registrationRequest: RegistrationRequest = {
-      registration: {
+    if (!isUserPresentInFusionAuth) {
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: user.email,
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: user.email,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobilePhone: user.phoneNumber,
+          password,
+          verified: true,
+          active: true,
+        },
+      };
+      await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    } else {
+      //setting the password for the user for the first time
+      const request: ChangePasswordRequest = {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email,
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: user.email,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobilePhone: user.phoneNumber,
-        password,
-        verified: true,
-        active: true,
-      },
-    };
-    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+        loginId: user.email,
+        password: password,
+      };
+      try {
+        await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+      } catch (e) {
+        throw new BadRequestError('Cannot approve this host');
+      }
+    }
   }
 
   public static async generateToken(user: User): Promise<string> {
