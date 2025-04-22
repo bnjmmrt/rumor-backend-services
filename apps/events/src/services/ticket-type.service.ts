@@ -180,7 +180,7 @@ export class TicketTypeService {
           id: event.id,
         },
       },
-    });
+    }); 
 
     // Get attendee count for each ticket type
     const ticketTypesWithCounts = await Promise.all(
