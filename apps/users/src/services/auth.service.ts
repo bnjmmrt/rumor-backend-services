@@ -1662,7 +1662,7 @@ export class AuthService {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
         where: {
           [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
-          code: payload.code,
+          // code: payload.code,
         },
       });
 
