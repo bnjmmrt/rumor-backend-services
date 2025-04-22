@@ -3293,7 +3293,7 @@ export class EventsService {
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       //send text notification
       if (updatedEvent?.owner?.phoneNumber) {
-        let link = config.get('USERS_SERVICE_BASE_URL') + '/redirect';
+        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
         let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
         //Micro-service call
         let number = updatedEvent?.owner?.phoneNumber;
