@@ -801,6 +801,7 @@ export class GuestService {
       // Arrays to store guest emails for notifications
       const invitedGuestsEmails = [];
       const confirmedGuestsEmails = [];
+      const confirmedGuestsEmailsWithoutRequest = [];
       const declinedGuestsEmails = [];
 
       // Process each guest update asynchronously
@@ -858,9 +859,14 @@ export class GuestService {
                 case GuestStatus.CONFIRMED:
                   // Only allow confirmation if the current status is INVITED, DRAFT, or APPLIED
                   if ([GuestStatus.APPLIED].includes(guest.status)) {
+                    //if  old status is applied and new status confirmed
                     confirmedGuestsEmails.push(emailData);
                   } else if ([GuestStatus.REFUSED].includes(guest.status)) {
                     throw new Error(`Cannot set status to CONFIRMED from ${guest.status}`);
+                  }
+                  let oldStatuses = [GuestStatus.INVITED, GuestStatus.DRAFT];
+                  if (oldStatuses.includes(guest.status)) {
+                    confirmedGuestsEmailsWithoutRequest.push(emailData);
                   }
                   guest.status = GuestStatus.CONFIRMED;
                   break;
@@ -1011,7 +1017,7 @@ export class GuestService {
           }),
         );
       }
-
+      console.log('confirmedGuestsEmailsWithoutRequest');
       if (updatedGuests.length > 0 && confirmedGuestsEmails.length > 0 && payload.sendInvite) {
         const event = await this.dbConnection.getRepository(Event).findOne({
           where: { id: confirmedGuestsEmails[0].eventId },
@@ -1036,6 +1042,48 @@ export class GuestService {
               },
             };
             sendGuestEventApproval(createMailPayload, event.timeZone);
+          }
+        });
+      }
+
+      if (
+        updatedGuests.length > 0 &&
+        confirmedGuestsEmailsWithoutRequest.length > 0 &&
+        payload.sendInvite
+      ) {
+        const event = await this.dbConnection.getRepository(Event).findOne({
+          where: { id: confirmedGuestsEmailsWithoutRequest[0].eventId },
+          relations: { location: true, owner: true },
+        });
+        confirmedGuestsEmailsWithoutRequest.map(data => {
+          const createMailPayload = {
+            eventDate: event.startDate,
+            eventName: event.name,
+            imageFlyer: event.imageFlyer,
+            location: event.location.location,
+            city: event.location.city,
+            hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+            emailsData: {
+              eventId: data.eventId,
+              id: data.id,
+              firstName: data.firstName,
+              email: data.email,
+            },
+          };
+          sendEventInviteToConfirmedGuest(createMailPayload, event.timeZone);
+          if (data.phoneNumber) {
+            let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+
+            const message = ` Hi ${data?.firstName ? data.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
+            try {
+              const validateNumber = isValidPhoneNumber(data.phoneNumber);
+              if (validateNumber) {
+                const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '').trim();
+                serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+              }
+            } catch (err) {
+              console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
+            }
           }
         });
       }
