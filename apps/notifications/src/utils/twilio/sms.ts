@@ -143,7 +143,7 @@ class TwilioService {
     }
 
     try {
-      // Enviar el mensaje principal
+      // Send primary message
       const response = await client.messages.create({
         to: payload.phoneNumber,
         from: messagingServiceSid,
@@ -154,18 +154,18 @@ class TwilioService {
         throw new BadRequestError('Failed to send text message');
       }
 
-      // Verificar si necesitamos enviar el mensaje de cumplimiento
+      // Verify if need to send compliant message
       const needsComplianceMessage = await this.checkAndUpdateRecipient(payload.phoneNumber);
 
       if (needsComplianceMessage) {
-        // Enviar el mensaje de cumplimiento
+        // Send complaint message
         await client.messages.create({
           to: payload.phoneNumber,
           from: messagingServiceSid,
           body: this.COMPLIANCE_MESSAGE,
         });
 
-        // Marcar que el mensaje de cumplimiento fue enviado
+        // Mark complain message sent
         await this.markComplianceMessageSent(payload.phoneNumber);
       }
     } catch (error) {
@@ -184,25 +184,25 @@ class TwilioService {
     try {
       await Promise.all(
         payload.phoneNumbers.map(async phoneNumber => {
-          // Enviar el mensaje de invitación
+          // Send invite message
           await client.messages.create({
             to: phoneNumber,
             from: messagingServiceSid,
             body: `Hi, I want to invite you to join Rumor - a new app that connects a private community of people and experience organizers that shape culture. Check it out and download here: [link]`,
           });
 
-          // Verificar si necesitamos enviar el mensaje de cumplimiento
+          // Validate  need compliance message
           const needsComplianceMessage = await this.checkAndUpdateRecipient(phoneNumber);
 
           if (needsComplianceMessage) {
-            // Enviar el mensaje de cumplimiento
+            // Sned compliant message
             await client.messages.create({
               to: phoneNumber,
               from: messagingServiceSid,
               body: this.COMPLIANCE_MESSAGE,
             });
 
-            // Marcar que el mensaje de cumplimiento fue enviado
+            // M-ark as sent
             await this.markComplianceMessageSent(phoneNumber);
           }
         }),
