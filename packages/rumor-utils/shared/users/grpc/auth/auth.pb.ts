@@ -156,6 +156,7 @@ export interface MemberSignUpRequest {
   facebookAccessToken?: string | undefined;
   linkedInAccessToken?: string | undefined;
   instagramUserName?: string | undefined;
+  instagramValidated?: boolean | undefined;
   interestsIds: string[];
   profilePicture?: string | undefined;
   fcmToken?: string;
@@ -742,6 +743,7 @@ export interface UpdateUserProfileRequest {
   address?: MemberAddressUpdate | undefined;
   focusIds: string[];
   id: string;
+  instagramValidated?: boolean | undefined;
 }
 
 export interface UserProfile {

@@ -218,6 +218,9 @@ export class MemberSignUpRequestDto implements MemberSignUpRequest {
   @IsString()
   @IsOptional()
   instagramUserName?: string;
+  @IsBoolean()
+  @IsOptional()
+  instagramValidated?: boolean;
   @IsString()
   @IsOptional()
   profilePicture?: string;
@@ -413,6 +416,9 @@ export class UpdateUserProfileRequestDto implements UpdateUserProfileRequest {
   @IsUUID('4', { each: true })
   @IsNotEmpty()
   focusIds: string[];
+  @IsBoolean()
+  @IsOptional()
+  instagramValidated?: boolean;
 }
 
 export class BioProfileRequestDto implements BioProfileRequest {

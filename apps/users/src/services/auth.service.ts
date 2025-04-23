@@ -365,18 +365,15 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        try {
-          const code = await fusionAuthClientHandler
-            .fusionAuthClient()
-            .startPasswordlessLogin(request);
-          const authenticatedUser = await fusionAuthClientHandler
-            .fusionAuthClient()
-            .passwordlessLogin({ code: code.response.code });
-          fusionAuthToken = authenticatedUser.response.token;
-          requiresFusionAuthRegistration = false;
-        } catch (error) {
-          requiresFusionAuthRegistration = true;
-        }
+        const code = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: code.response.code });
+        fusionAuthToken = authenticatedUser.response.token;
+
+        requiresFusionAuthRegistration = false;
       } else if (isNonMember) {
         try {
           const fusionAuthResponse = await fusionAuthClientHandler
@@ -405,11 +402,32 @@ export class AuthService {
     let newUser = newMember(payload, address);
 
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // if user exits maintain data and update new data if register
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recovering user with actual information
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // if is new user create a new one
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
 
     if (payload.instagramAccessToken) {
@@ -460,8 +478,30 @@ export class AuthService {
       fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    // Only assign if not exits
+    if (!existingUser) {
+      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
+    } else {
+      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          user: existingUser,
+        },
+        relations: {
+          role: true,
+        },
+      });
+      for (let item of actualRoles) {
+        if (
+          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
+            item.source as UserSource,
+          )
+        ) {
+          await this.dbConnection
+            .getRepository(UserRole)
+            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
+        }
+      }
+    }
 
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
@@ -554,7 +594,7 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    payload.email = payload.email.trim()?.toLowerCase();
+    payload.email = payload.email.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
     let phoneNumberInUse = false,
@@ -570,16 +610,6 @@ export class AuthService {
       },
     });
 
-    if (user?.email && user.email !== payload.email) {
-      throw new ConflictError(
-        'This email and phone number do not belong to the same account. Please check your details.',
-      );
-    }
-    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
-      throw new ConflictError(
-        'This email and phone number do not belong to the same account. Please check your details.',
-      );
-    }
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find(
         item => item.role.name === 'non_member' || item.role.name === 'member',
@@ -6186,6 +6216,42 @@ export class AuthService {
         ...(hasHostRole ? {} : { additionalHostInformation: null }),
       });
     }
+
+    return '';
+  }
+
+  public static async getInstagramValidated(
+    payload: IdRequestDto,
+  ): Promise<{ instagramValidated: boolean; instagramUserName: string }> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Usuario no encontrado');
+    }
+
+    return {
+      instagramValidated: user.instagramValidated || false,
+      instagramUserName: user.instagramUserName || '',
+    };
+  }
+
+  public static async setInstagramValidated(
+    payload: IdRequestDto,
+    value: boolean,
+  ): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Usuario no encontrado');
+    }
+
+    await this.dbConnection
+      .getRepository(User)
+      .update({ id: payload.id }, { instagramValidated: value });
 
     return '';
   }

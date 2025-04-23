@@ -12,7 +12,7 @@ export class NotificationController {
       recipients,
       linkedUserId,
       linkedEventId,
-      linkedHostId
+      linkedHostId,
     );
 
     const successResponse = new CreateResponse({}, 'Notification sent successfully');

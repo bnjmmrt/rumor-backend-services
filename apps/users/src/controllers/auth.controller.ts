@@ -761,4 +761,27 @@ export class AuthController {
     const deleteResponse = new DeleteResponse(response, 'Host account permanantly deleted');
     res.status(deleteResponse.statusCode).json(deleteResponse);
   });
+
+  public static getInstagramValidated = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const payload: IdRequestDto = { id };
+    const response = await AuthService.getInstagramValidated(payload);
+    const successResponse = new GetResponse(
+      response,
+      'Instagram validation status retrieved successfully',
+    );
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static setInstagramValidated = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const { value } = req.body;
+    const payload: IdRequestDto = { id };
+    const response = await AuthService.setInstagramValidated(payload, value);
+    const updateResponse = new UpdateResponse(
+      response,
+      'Instagram validation status updated successfully',
+    );
+    res.status(updateResponse.statusCode).json(updateResponse);
+  });
 }
