@@ -63,13 +63,6 @@ export class RoleService {
       return existingUserRole;
     }
 
-    // const hasRoleAlready = user?.roles?.some(userRole => userRole.role?.id === role!.id);
-    // if (hasRoleAlready) {
-    //   console.log(`User already has the role: ${role.name}`);
-    //   return user.roles.find(userRole => userRole.role?.id === role!.id)!;
-    // }
-
-
     const userRole = new UserRole();
     userRole.source = source;
     userRole.user = user;
