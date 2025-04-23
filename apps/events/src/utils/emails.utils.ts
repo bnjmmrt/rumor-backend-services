@@ -154,6 +154,77 @@ export const sendEventInviteNonMember = async (
   }
 };
 
+export const sendEventInviteToConfirmedGuest = async (
+  mailComponents: MailComponent,
+  timeZone: string,
+): Promise<AxiosResponse<any, any>> => {
+  try {
+    const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
+    const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
+    const params = [
+      {
+        key: 'event_name',
+        value: eventName,
+      },
+      {
+        key: 'image_url',
+        value: imageFlyer,
+      },
+      {
+        key: 'month',
+        value: month,
+      },
+      {
+        key: 'day',
+        value: day,
+      },
+      {
+        key: 'day_of_week',
+        value: dayOfWeek,
+      },
+      {
+        key: 'hour',
+        value: hour,
+      },
+      {
+        key: 'minutes',
+        value: `${minutes} ${period}`,
+      },
+      {
+        key: 'email',
+        value: emailsData.email.trim(),
+      },
+      {
+        key: 'address',
+        value: city,
+      },
+      { key: 'host_name', value: hostName },
+    ];
+    const data = emailsData;
+    const redirectPath = `users/${data.id}/events/${data.eventId}`;
+    params.push(
+      { key: 'first_name', value: data.firstName },
+      {
+        key: 'view_ticket',
+        value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      },
+    );
+    const emailData = await serviceMesh
+      .notificationService()
+      .sendEmailFromTemplate(
+        params,
+        'Member + Non-Member:  Added to Confirmed',
+        [data.email.trim().toLowerCase()],
+        null,
+      );
+    return emailData;
+  } catch (error) {
+    console.log(
+      `Invite User as confirmed guest failed at function sendEventInviteToConfirmedGuest:: ${error}`,
+    );
+  }
+};
+
 export const sendEventCancellation = async (
   mailComponents: MailComponent,
   email: string,
