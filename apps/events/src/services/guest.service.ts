@@ -115,6 +115,7 @@ import {
   sendEventInviteMember,
   sendEventInviteNonMember,
   sendEventInvitePlusOnes,
+  sendEventInviteToConfirmedGuest,
   sendGuestEventApproval,
 } from '../utils/emails.utils';
 import { sendSmsNotification } from '../utils/sms.utils';
@@ -630,7 +631,7 @@ export class GuestService {
               imageFlyer: event.imageFlyer,
               location: event.location.location,
               city: event.location.city,
-              hostName: host.firstName,
+              hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
@@ -707,6 +708,43 @@ export class GuestService {
               } catch (err) {
                 console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
               }
+            }
+          }
+        }),
+      );
+    }
+
+    // If guest status is "INVITED" and sendInvite is true, send invitation emails
+    if (guestStatus === GuestStatus.CONFIRMED && payload.sendInvite && !isExist) {
+      await Promise.all(
+        emailsData.map(data => {
+          const createMailPayload = {
+            eventDate: event.startDate,
+            eventName: event.name,
+            imageFlyer: event.imageFlyer,
+            location: event.location.location,
+            city: event.location.city,
+            hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+            emailsData: {
+              eventId: data.eventId,
+              id: data.id,
+              firstName: data.firstName,
+              email: data.email,
+            },
+          };
+          sendEventInviteToConfirmedGuest(createMailPayload, event.timeZone);
+          if (data.phoneNumber) {
+            let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`
+
+            const message = ` Hi ${(data?.firstName) ? data.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
+            try {
+              const validateNumber = isValidPhoneNumber(data.phoneNumber);
+              if (validateNumber) {
+                const cleanedNumber = data.phoneNumber.replace(/[\s\-()]/g, '').trim();
+                serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+              }
+            } catch (err) {
+              console.log(`❌ Error while processing SMS for ${data.phoneNumber}:`, err);
             }
           }
         }),
@@ -3900,11 +3938,12 @@ export class GuestService {
           imageFlyer: event.imageFlyer,
           location: event.location.location,
           city: event.location.city,
-          hostName: host.firstName,
+          hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
           emailsData: emailData,
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
-      } else if (payload.phoneNumber) {
+      } 
+       if (payload.phoneNumber) {
         const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -3917,7 +3956,32 @@ export class GuestService {
         }
       }
     }
-
+    if (GuestStatus[guestStatus] === GuestStatus.CONFIRMED) {
+      if (payload.email) {
+        const createPayload = {
+          eventDate: event.startDate,
+          eventName: event.name,
+          imageFlyer: event.imageFlyer,
+          location: event.location.location,
+          city: event.location.city,
+          hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+          emailsData: emailData,
+        };
+        sendEventInviteToConfirmedGuest(createPayload, event.timeZone);
+      }  if (payload.phoneNumber) {
+        let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`
+        const message = ` Hi ${(emailData?.firstName)? emailData.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${payload.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
+        try {
+          const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '').trim();
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.log(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+        }
+      }
+    }
     // Step 10: Fetch user and transform guest data
     const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
 
