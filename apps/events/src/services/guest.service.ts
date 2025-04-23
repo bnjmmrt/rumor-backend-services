@@ -298,7 +298,7 @@ export class GuestService {
                 textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
               } else if (shouldSendApproval) {
                 if (invitationSource === UserSource.SIGN_UP_FORM) {
-                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.`;
+                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.\n${baseRedirectUrl}`;
                 } else if (invitationSource === UserSource.REQUEST_IN_APP) {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
@@ -1017,7 +1017,6 @@ export class GuestService {
           }),
         );
       }
-      console.log('confirmedGuestsEmailsWithoutRequest');
       if (updatedGuests.length > 0 && confirmedGuestsEmails.length > 0 && payload.sendInvite) {
         const event = await this.dbConnection.getRepository(Event).findOne({
           where: { id: confirmedGuestsEmails[0].eventId },
