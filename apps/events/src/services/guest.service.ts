@@ -734,9 +734,9 @@ export class GuestService {
           };
           sendEventInviteToConfirmedGuest(createMailPayload, event.timeZone);
           if (data.phoneNumber) {
-            let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`
+            let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
 
-            const message = ` Hi ${(data?.firstName) ? data.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
+            const message = ` Hi ${data?.firstName ? data.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
             try {
               const validateNumber = isValidPhoneNumber(data.phoneNumber);
               if (validateNumber) {
@@ -3942,8 +3942,8 @@ export class GuestService {
           emailsData: emailData,
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
-      } 
-       if (payload.phoneNumber) {
+      }
+      if (payload.phoneNumber) {
         const message = `Hi ${emailData.firstName}, ${event.owner?.additionalHostInformation.companyName ?? 'Host'} has invited you to ${event.name ?? 'an Event'}! \n Download the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -3968,9 +3968,10 @@ export class GuestService {
           emailsData: emailData,
         };
         sendEventInviteToConfirmedGuest(createPayload, event.timeZone);
-      }  if (payload.phoneNumber) {
-        let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`
-        const message = ` Hi ${(emailData?.firstName)? emailData.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${payload.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
+      }
+      if (payload.phoneNumber) {
+        let link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+        const message = ` Hi ${emailData?.firstName ? emailData.firstName : 'Guest'},\n\n${event.owner?.additionalHostInformation.companyName ?? 'Host'} has added you to the guest list for ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${payload.phoneNumber} to view your confirmation.\n\nNeed help? Contact us at support@therumor.com.\n\n${link}`;
         try {
           const validateNumber = isValidPhoneNumber(payload.phoneNumber);
           if (validateNumber) {
