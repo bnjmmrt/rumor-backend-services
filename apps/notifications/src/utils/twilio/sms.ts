@@ -1,9 +1,33 @@
 import { BadRequestError, InternalServerError, ValidationError } from 'rumor-utils/errors';
 import config from '../../config';
 import { Twilio } from 'twilio';
+import { SmsRecipient } from 'rumor-utils/shared/notifications/entities/sms-recipient.entity';
+import database from '../../database';
+
+export interface SendVerificationCodePayload {
+  phoneNumber: string;
+}
+
+export interface VerifyCodePayload {
+  phoneNumber: string;
+  code: string;
+}
+
+export interface SendTextMessagePayload {
+  phoneNumber: string;
+  message: string;
+}
+
+export interface SendInvitationMessagesPayload {
+  phoneNumbers: string[];
+  senderName: string;
+}
 
 class TwilioService {
   private twilioClient: Twilio | null = null;
+  private readonly COMPLIANCE_MESSAGE = "Msg & data rates may apply. Reply STOP to opt out.";
+
+  constructor() {}
 
   private getClient(): Twilio {
     if (!this.twilioClient) {
@@ -20,7 +44,7 @@ class TwilioService {
     return this.twilioClient;
   }
 
-  async sendVerificationCode(payload: { phoneNumber: string }) {
+  async sendVerificationCode(payload: SendVerificationCodePayload) {
     const client = this.getClient();
     const sid = config.get('TWILIO_VERIFY_SID');
 
@@ -44,7 +68,7 @@ class TwilioService {
     }
   }
 
-  async verifyCode(payload: { phoneNumber: string; code: string }) {
+  async verifyCode(payload: VerifyCodePayload) {
     const client = this.getClient();
     const sid = config.get('TWILIO_VERIFY_SID');
 
@@ -74,7 +98,43 @@ class TwilioService {
     }
   }
 
-  async sendTextMessage(payload: { phoneNumber: string; message: string }) {
+  private async checkAndUpdateRecipient(phoneNumber: string): Promise<boolean> {
+    try {
+      let recipient = await database.getRepository(SmsRecipient).findOne({
+        where: { phoneNumber }
+      });
+      
+      if (!recipient) {
+        recipient = database.getRepository(SmsRecipient).create({
+          phoneNumber,
+          hasReceivedComplianceMessage: false
+        });
+        await database.getRepository(SmsRecipient).save(recipient);
+        return true;
+      }
+      
+      return !recipient.hasReceivedComplianceMessage;
+    } catch (error) {
+      console.error('Error checking recipient:', error);
+      return false;
+    }
+  }
+
+  private async markComplianceMessageSent(phoneNumber: string): Promise<void> {
+    try {
+      await database.getRepository(SmsRecipient).update(
+        { phoneNumber },
+        { 
+          hasReceivedComplianceMessage: true,
+          lastMessageSentAt: new Date()
+        }
+      );
+    } catch (error) {
+      console.error('Error updating recipient status:', error);
+    }
+  }
+
+  async sendTextMessage(payload: SendTextMessagePayload) {
     const client = this.getClient();
     const messagingServiceSid = config.get('TWILIO_MESSAGING_SERVICE_SID');
 
@@ -83,6 +143,7 @@ class TwilioService {
     }
 
     try {
+      // Enviar el mensaje principal
       const response = await client.messages.create({
         to: payload.phoneNumber,
         from: messagingServiceSid,
@@ -92,12 +153,27 @@ class TwilioService {
       if (!response || !response.sid) {
         throw new BadRequestError('Failed to send text message');
       }
+
+      // Verificar si necesitamos enviar el mensaje de cumplimiento
+      const needsComplianceMessage = await this.checkAndUpdateRecipient(payload.phoneNumber);
+      
+      if (needsComplianceMessage) {
+        // Enviar el mensaje de cumplimiento
+        await client.messages.create({
+          to: payload.phoneNumber,
+          from: messagingServiceSid,
+          body: this.COMPLIANCE_MESSAGE,
+        });
+
+        // Marcar que el mensaje de cumplimiento fue enviado
+        await this.markComplianceMessageSent(payload.phoneNumber);
+      }
     } catch (error) {
       throw new InternalServerError(error);
     }
   }
 
-  async sendInvitationMessages(payload: { phoneNumbers: string[] }) {
+  async sendInvitationMessages(payload: SendInvitationMessagesPayload) {
     const client = this.getClient();
     const messagingServiceSid = config.get('TWILIO_MESSAGING_SERVICE_SID');
 
@@ -108,11 +184,27 @@ class TwilioService {
     try {
       await Promise.all(
         payload.phoneNumbers.map(async phoneNumber => {
-          return await client.messages.create({
+          // Enviar el mensaje de invitación
+          await client.messages.create({
             to: phoneNumber,
             from: messagingServiceSid,
             body: `Hi, I want to invite you to join Rumor - a new app that connects a private community of people and experience organizers that shape culture. Check it out and download here: [link]`,
           });
+
+          // Verificar si necesitamos enviar el mensaje de cumplimiento
+          const needsComplianceMessage = await this.checkAndUpdateRecipient(phoneNumber);
+          
+          if (needsComplianceMessage) {
+            // Enviar el mensaje de cumplimiento
+            await client.messages.create({
+              to: phoneNumber,
+              from: messagingServiceSid,
+              body: this.COMPLIANCE_MESSAGE,
+            });
+
+            // Marcar que el mensaje de cumplimiento fue enviado
+            await this.markComplianceMessageSent(phoneNumber);
+          }
         }),
       );
     } catch (error) {
