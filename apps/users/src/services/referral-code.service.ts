@@ -81,6 +81,7 @@ export class ReferralCodeService {
 
   public static async updateReferralCode(
     payload: UpdateReferralCodeRequestDto,
+    reactivate: boolean = false,
   ): Promise<ReferralCodeData> {
     const existingReferralCode = await this.dbConnection.getRepository(ReferralCode).findOne({
       where: {
@@ -114,6 +115,7 @@ export class ReferralCodeService {
     const updatedReferralCode = this.dbConnection
       .getRepository(ReferralCode)
       .merge(referralCode, payload);
+    updatedReferralCode.isManuallyDeactivated = reactivate ? false : true;
 
     await this.dbConnection.getRepository(ReferralCode).save(updatedReferralCode);
 
