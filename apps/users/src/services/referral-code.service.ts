@@ -115,7 +115,10 @@ export class ReferralCodeService {
     const updatedReferralCode = this.dbConnection
       .getRepository(ReferralCode)
       .merge(referralCode, payload);
-    updatedReferralCode.isManuallyDeactivated = reactivate ? false : true;
+
+    if (reactivate === true) {
+      updatedReferralCode.isManuallyDeactivated = false;
+    }
 
     await this.dbConnection.getRepository(ReferralCode).save(updatedReferralCode);
 
