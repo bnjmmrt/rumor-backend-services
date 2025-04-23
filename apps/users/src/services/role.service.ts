@@ -55,7 +55,6 @@ export class RoleService {
       return user.roles.find(userRole => userRole.role?.id === role!.id)!;
     }
 
-
     const userRole = new UserRole();
     userRole.source = source;
     userRole.user = user;

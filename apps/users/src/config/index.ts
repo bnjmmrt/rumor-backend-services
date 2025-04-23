@@ -90,8 +90,6 @@ class Config {
         // throw new ProgrammerError(`No config for environment '${environment}'`);
       }
 
-
-
       console.info(`[CONFIG] Successfully loaded config.`);
 
       // Validate config values after loading

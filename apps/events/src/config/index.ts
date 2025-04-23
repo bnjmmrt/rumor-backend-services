@@ -88,7 +88,6 @@ class Config {
         default:
       }
 
-
       /*TODO remove this*/
 
       console.info(`[CONFIG] Successfully loaded config.`);

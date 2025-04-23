@@ -33,4 +33,10 @@ export const sendNotification = (
 ) =>
   apiService
     .getApi()
-    .post(`/notification`, { notificationType, recipients, linkedEventId, linkedUserId ,linkedHostId});
+    .post(`/notification`, {
+      notificationType,
+      recipients,
+      linkedEventId,
+      linkedUserId,
+      linkedHostId,
+    });

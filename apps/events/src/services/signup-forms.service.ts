@@ -733,7 +733,7 @@ export class SignupFormsServices {
   }
 
   public static async getSignupFormQuestions(id: string) {
-    //get all questions for a signup form 
+    //get all questions for a signup form
     const signupForm = await SignupFormQuestions.find({
       where: { signupForms: { id: id } },
     });

@@ -117,7 +117,7 @@ export class SignupFormsController {
       const id = req.params.id;
       const submission = await SignupFormsServices.getSignupFormQuestions(id);
       res.json(new GetResponse(submission));
-      console.log("submission", submission)
+      console.log('submission', submission);
     },
   );
 

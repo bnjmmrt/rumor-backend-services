@@ -30,7 +30,7 @@ export class CommunicationController {
       try {
         await TwilioService.sendVerificationCode(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController sendVerificationCode ~ e: ", e)
+        console.log('🚀 ~ CommunicationController sendVerificationCode ~ e: ', e);
       }
       const successResponse = new CreateResponse({}, 'Code Sent Successfully');
       res.status(successResponse.statusCode).json(successResponse);
@@ -50,7 +50,7 @@ export class CommunicationController {
       try {
         await TwilioService.sendInvitationMessages(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController sendInvitationMessages ~ e: ", e)
+        console.log('🚀 ~ CommunicationController sendInvitationMessages ~ e: ', e);
       }
       const successResponse = new GetResponse({}, 'ok');
       res.status(successResponse.statusCode).json(successResponse);
@@ -63,7 +63,7 @@ export class CommunicationController {
       try {
         await TwilioService.sendTextMessage(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController sendTextMessage~ e: ", e)
+        console.log('🚀 ~ CommunicationController sendTextMessage~ e: ', e);
       }
       const successResponse = new GetResponse({}, 'ok');
       res.status(successResponse.statusCode).json(successResponse);
@@ -82,11 +82,11 @@ export class CommunicationController {
   public static createEmailTemplate = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const payload: EmailTemplateDto = req.body;
-      let response = null
+      let response = null;
       try {
         response = await CommunicationService.createEmailTemplate(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController createEmailTemplate ~ e: ", e)
+        console.log('🚀 ~ CommunicationController createEmailTemplate ~ e: ', e);
       }
       const successResponse = new CreateResponse(response, 'Template created successfully');
       res.status(successResponse.statusCode).json(successResponse);
@@ -95,11 +95,11 @@ export class CommunicationController {
 
   public static listEmailTemplates = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      let response = null
+      let response = null;
       try {
         response = await CommunicationService.listEmailTemplates();
       } catch (e) {
-        console.log("🚀 ~ CommunicationController listEmailTemplates ~ e: ", e)
+        console.log('🚀 ~ CommunicationController listEmailTemplates ~ e: ', e);
       }
       const successResponse = new GetResponse(response, 'Ok');
       res.status(successResponse.statusCode).json(successResponse);
@@ -112,7 +112,7 @@ export class CommunicationController {
       try {
         await CommunicationService.deleteEmailTemplate(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController listEmailTemplates ~ e: ", e)
+        console.log('🚀 ~ CommunicationController listEmailTemplates ~ e: ', e);
       }
       const deleteResponse = new DeleteResponse({}, 'Template Deleted Successfully');
       res.status(deleteResponse.statusCode).json(deleteResponse);
@@ -122,11 +122,11 @@ export class CommunicationController {
   public static getEmailTemplate = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const payload: RequestByIdDto = req.body;
-      let response = null
+      let response = null;
       try {
         response = await CommunicationService.getEmailTemplate(payload);
       } catch (e) {
-        console.log("🚀 ~ CommunicationController listEmailTemplates ~ e: ", e)
+        console.log('🚀 ~ CommunicationController listEmailTemplates ~ e: ', e);
       }
       const successResponse = new GetResponse(response, 'Ok');
       res.status(successResponse.statusCode).json(successResponse);
