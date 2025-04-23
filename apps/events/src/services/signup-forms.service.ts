@@ -732,6 +732,14 @@ export class SignupFormsServices {
     }
   }
 
+  public static async getSignupFormQuestions(id: string) {
+    //get all questions for a signup form 
+    const signupForm = await SignupFormQuestions.find({
+      where: { signupForms: { id: id } },
+    });
+    return signupForm;
+  }
+
   // public static async setName(id: string, name: string) {
   //   try {
   //     const signupForm: EventSignupForms = await EventSignupForms.findOne({
