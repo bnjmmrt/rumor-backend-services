@@ -25,7 +25,7 @@ export interface SendInvitationMessagesPayload {
 
 class TwilioService {
   private twilioClient: Twilio | null = null;
-  private readonly COMPLIANCE_MESSAGE = "Msg & data rates may apply. Reply STOP to opt out.";
+  private readonly COMPLIANCE_MESSAGE = 'Msg & data rates may apply. Reply STOP to opt out.';
 
   constructor() {}
 
@@ -101,18 +101,18 @@ class TwilioService {
   private async checkAndUpdateRecipient(phoneNumber: string): Promise<boolean> {
     try {
       let recipient = await database.getRepository(SmsRecipient).findOne({
-        where: { phoneNumber }
+        where: { phoneNumber },
       });
-      
+
       if (!recipient) {
         recipient = database.getRepository(SmsRecipient).create({
           phoneNumber,
-          hasReceivedComplianceMessage: false
+          hasReceivedComplianceMessage: false,
         });
         await database.getRepository(SmsRecipient).save(recipient);
         return true;
       }
-      
+
       return !recipient.hasReceivedComplianceMessage;
     } catch (error) {
       console.error('Error checking recipient:', error);
@@ -124,10 +124,10 @@ class TwilioService {
     try {
       await database.getRepository(SmsRecipient).update(
         { phoneNumber },
-        { 
+        {
           hasReceivedComplianceMessage: true,
-          lastMessageSentAt: new Date()
-        }
+          lastMessageSentAt: new Date(),
+        },
       );
     } catch (error) {
       console.error('Error updating recipient status:', error);
@@ -156,7 +156,7 @@ class TwilioService {
 
       // Verificar si necesitamos enviar el mensaje de cumplimiento
       const needsComplianceMessage = await this.checkAndUpdateRecipient(payload.phoneNumber);
-      
+
       if (needsComplianceMessage) {
         // Enviar el mensaje de cumplimiento
         await client.messages.create({
@@ -193,7 +193,7 @@ class TwilioService {
 
           // Verificar si necesitamos enviar el mensaje de cumplimiento
           const needsComplianceMessage = await this.checkAndUpdateRecipient(phoneNumber);
-          
+
           if (needsComplianceMessage) {
             // Enviar el mensaje de cumplimiento
             await client.messages.create({
