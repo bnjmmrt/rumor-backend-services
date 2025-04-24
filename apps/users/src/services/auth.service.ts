@@ -2518,12 +2518,12 @@ export class AuthService {
   public static async createNonMemberUser(
     payload: CreateNonMemberUserRequestDto,
   ): Promise<UserIdData> {
-    const exists = await this.dbConnection
-      .getRepository(User)
-      .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-    if (exists) {
-      throw new BadRequestError('user exists');
-    }
+    // const exists = await this.dbConnection
+    //   .getRepository(User)
+    //   .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+    // if (exists) {
+    //   throw new BadRequestError('user exists');
+    // }
     if (payload.email || payload.phoneNumber) {
       const exists = await this.dbConnection
         .getRepository(User)
