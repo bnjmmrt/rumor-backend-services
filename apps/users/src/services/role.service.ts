@@ -49,10 +49,18 @@ export class RoleService {
       throw new NotFoundError('User or role');
     }
 
-    const hasRoleAlready = user?.roles?.some(userRole => userRole.role?.id === role!.id);
-    if (hasRoleAlready) {
-      console.log(`User already has the role: ${role.name}`);
-      return user.roles.find(userRole => userRole.role?.id === role!.id)!;
+    const existingUserRole = user?.roles.find(userRole => userRole.role?.id === role!.id);
+
+    if (existingUserRole) {
+      // Update source if it's different
+      if (source && existingUserRole.source !== source) {
+        existingUserRole.source = source;
+        await this.dbConnection.getRepository(UserRole).save(existingUserRole);
+        console.log(`Updated role source for user: ${role.name}`);
+      } else {
+        console.log(`User already has the role: ${role.name} with same source`);
+      }
+      return existingUserRole;
     }
 
     const userRole = new UserRole();

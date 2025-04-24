@@ -478,30 +478,11 @@ export class AuthService {
       fusionAuthToken = fusionAuthUser.response.token;
     }
 
-    // Only assign if not exits
-    if (!existingUser) {
-      await RoleService.assignRoleToUser({ userId: newUser.id, roleName: RoleType.NonMember });
-    } else {
-      let actualRoles = await await this.dbConnection.getRepository(UserRole).find({
-        where: {
-          user: existingUser,
-        },
-        relations: {
-          role: true,
-        },
-      });
-      for (let item of actualRoles) {
-        if (
-          [UserSource.SIGN_UP_FORM, UserSource.PLUS_1, UserSource.INVITED_BY_HOST].includes(
-            item.source as UserSource,
-          )
-        ) {
-          await this.dbConnection
-            .getRepository(UserRole)
-            .update({ id: item.id }, { source: UserSource.REQUEST_IN_APP });
-        }
-      }
-    }
+    newUser = await this.dbConnection.getRepository(User).save(newUser);
+    await RoleService.assignRoleToUser(
+      { userId: newUser.id, roleName: 'non_member' },
+      UserSource.REQUEST_IN_APP,
+    );
 
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
@@ -2545,11 +2526,19 @@ export class AuthService {
   public static async createNonMemberUser(
     payload: CreateNonMemberUserRequestDto,
   ): Promise<UserIdData> {
-    const exists = await this.dbConnection
-      .getRepository(User)
-      .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-    if (exists) {
-      throw new BadRequestError('user exists');
+    // const exists = await this.dbConnection
+    //   .getRepository(User)
+    //   .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+    // if (exists) {
+    //   throw new BadRequestError('user exists');
+    // }
+    if (payload.email || payload.phoneNumber) {
+      const exists = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+      if (exists) {
+        throw new BadRequestError('user exists');
+      }
     }
     let user = new User();
     user.email = payload.email;
