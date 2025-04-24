@@ -3866,9 +3866,83 @@ export class GuestService {
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
     if (!host) throw new NotFoundError('Host not found');
+
+    if (!payload.email && !payload.phoneNumber) {
+      let guest = new Guest();
+      try {
+        // Extract relevant fields for non-member registration
+        const memberPayload = (({ firstName, lastName, phoneNumber }) => ({
+          firstName,
+          lastName,
+          email: '',
+          phoneNumber: phoneNumber || '',
+          eventId: event.id,
+        }))(payload);
+
+        if (event.status !== EventStatusEnum.APPROVED_STATUS) {
+          throw new BadRequestError(
+            'You cannot send invites until the event has been approved by the Rumor admin',
+          );
+        }
+
+        const user = await serviceMesh.userService().createNonMemberUser(memberPayload);
+
+        guest = this.dbConnection.getRepository(Guest).create({
+          id: uuidv4(),
+          status: GuestStatus.CONFIRMED,
+          event,
+          maxAdditionalGuests: payload.maxAdditionalGuests || 0,
+          user: { id: user.data.userId } as User,
+          addedBy: { id: host.id } as User,
+          inviteMessage: payload.inviteMessage,
+          privateGuestNote: payload.privateGuestNote,
+          invitationSource: UserSource.INVITED_BY_HOST,
+          ticketType: payload.ticketTypeId
+            ? ({ id: payload.ticketTypeId } as TicketType)
+            : undefined,
+        });
+
+        guest = await this.dbConnection.getRepository(Guest).save(guest);
+
+        // Fetch and return guest data without sending notifications
+        const queryBuilder = this.dbConnection.getRepository(Guest).createQueryBuilder('guest');
+
+        queryBuilder
+          .leftJoinAndSelect('guest.user', 'user')
+          .leftJoinAndSelect('user.roles', 'roles')
+          .leftJoinAndSelect('user.address', 'address')
+          .leftJoinAndSelect('roles.role', 'role')
+          .leftJoinAndSelect('guest.addedBy', 'addedBy')
+          .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
+          .leftJoinAndSelect('guest.ticketType', 'ticketType')
+          .where({ event: { id: event.id } })
+          .andWhere({
+            status: In([
+              GuestStatus.DRAFT,
+              GuestStatus.INVITED,
+              GuestStatus.CONFIRMED,
+              GuestStatus.NO_STATUS,
+            ]),
+          })
+          .andWhere({ user: { id: guest.user.id } })
+          .limit(1);
+
+        const checkGuest = await queryBuilder.getOne();
+        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+        const guestData = toGuestDataSimple(checkGuest, focuses);
+
+        return guestData;
+      } catch (err) {
+        return null;
+      }
+    }
+
+
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
       throw new ValidationError('You cannot add yourself to an event');
     }
+
+
 
     if (
       payload.phoneNumber &&
