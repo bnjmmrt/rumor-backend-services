@@ -461,7 +461,7 @@ export class AuthService {
     }
 
     newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' }, UserSource.REQUEST_IN_APP);
 
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
@@ -1662,7 +1662,7 @@ export class AuthService {
       const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
         where: {
           [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
-          code: payload.code,
+          // code: payload.code,
         },
       });
 
