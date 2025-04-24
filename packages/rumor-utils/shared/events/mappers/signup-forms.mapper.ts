@@ -61,6 +61,6 @@ const buildQuestion = (q: SignupFormQuestions) => {
     ordering: q.ordering,
     value: q.value,
     hasToggle: q.hasToggle,
-    isToggled: q.isToggled
+    isToggled: q.isToggled,
   };
 };

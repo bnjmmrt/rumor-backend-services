@@ -51,7 +51,7 @@ export class SignupFormsServices {
         type: true,
         isRequired: true,
         isToggled: true,
-        hasToggle: true
+        hasToggle: true,
       },
     });
     return staticQuestions;
@@ -216,11 +216,11 @@ export class SignupFormsServices {
     }
   }
 
- /**
- * Updates a signup form and its questions.
- * - Handles form metadata update
- * - Creates, updates, or deletes questions
- */
+  /**
+   * Updates a signup form and its questions.
+   * - Handles form metadata update
+   * - Creates, updates, or deletes questions
+   */
   public static async update(
     id: string,
     eventId: string,

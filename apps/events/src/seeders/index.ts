@@ -104,7 +104,7 @@ export class Seeders {
         isRequired: true,
         key: 'firstName',
         hasToggle: false,
-        isToggled: false
+        isToggled: false,
       },
       {
         name: 'Last Name',
@@ -114,7 +114,7 @@ export class Seeders {
         isRequired: true,
         key: 'lastName',
         hasToggle: false,
-        isToggled: false
+        isToggled: false,
       },
       {
         name: 'Email',
@@ -124,7 +124,7 @@ export class Seeders {
         isRequired: true,
         key: 'email',
         hasToggle: false,
-        isToggled: false
+        isToggled: false,
       },
       {
         name: 'Phone',
@@ -134,7 +134,7 @@ export class Seeders {
         isRequired: true,
         key: 'phone',
         hasToggle: false,
-        isToggled: false
+        isToggled: false,
       },
       {
         name: 'Request Access for Additional Guests',
@@ -144,7 +144,7 @@ export class Seeders {
         isRequired: true,
         key: 'requestAdditionalGuests',
         hasToggle: true,
-        isToggled: true
+        isToggled: true,
       },
       {
         name: 'Instagram',
@@ -154,7 +154,7 @@ export class Seeders {
         isRequired: true,
         key: 'instagram',
         hasToggle: true,
-        isToggled: true
+        isToggled: true,
       },
     ];
 
