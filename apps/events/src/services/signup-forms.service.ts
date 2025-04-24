@@ -50,6 +50,8 @@ export class SignupFormsServices {
         name: true,
         type: true,
         isRequired: true,
+        isToggled: true,
+        hasToggle: true
       },
     });
     return staticQuestions;
@@ -195,6 +197,8 @@ export class SignupFormsServices {
         question.isDefault = q.id ? true : false;
         question.value = q.value;
         question.isRequired = q.isRequired;
+        question.hasToggle = q.hasToggle || false;
+        question.isToggled = q.isToggled || false;
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
 
@@ -291,20 +295,13 @@ export class SignupFormsServices {
             break;
         }
       }
-      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
-      if (!body.hasAccessForAdditionalGuests) {
-        if (q.name === 'Request Access for Additional Guests') {
-          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
-          const deleteQuestions = SignupFormQuestions.delete(q.id);
-          questionPromises.push(deleteQuestions);
-        } else {
-          ids.push(q.id);
-          question.ordering = index;
-          question.value = q.value;
-          const updatesQuestion = SignupFormQuestions.update(q.id, question);
-          questionPromises.push(updatesQuestion);
-        }
-      }
+      ids.push(q.id);
+      question.ordering = index;
+      question.value = q.value;
+      question.hasToggle = q.hasToggle || false;
+      question.isToggled = q.isToggled || false;
+      const updatesQuestion = SignupFormQuestions.update(q.id, question);
+      questionPromises.push(updatesQuestion);
     }
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
@@ -351,6 +348,10 @@ export class SignupFormsServices {
             break;
           case 'request access for additional guests':
             requestedGuests.additional = Number(ans.answers);
+            break;
+
+          case 'instagram':
+            userPayload.instagramUserName = ans.answers.trim();
             break;
         }
       }
@@ -681,6 +682,7 @@ export class SignupFormsServices {
         .innerJoin('sfs.guest', 'gst')
         .select([])
         .addSelect('sfs.id', 'id')
+        .addSelect('sfs.answers', 'answers')
         .addSelect('atd.firstName', 'firstName')
         .addSelect('atd.profilePicture', 'profilePicture')
         .addSelect('atd.lastName', 'lastName')

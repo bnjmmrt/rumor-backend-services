@@ -28,4 +28,10 @@ export class SignupFormQuestions extends RumorBaseEntity {
   })
   @JoinColumn({ name: 'sign_up_form_id' })
   signupForms: EventSignupForms;
+
+  @Column({ type: 'boolean', default: false, name: 'has_toggle' })
+  hasToggle: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'is_toggled' })
+  isToggled: boolean;
 }

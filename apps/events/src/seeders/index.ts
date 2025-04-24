@@ -99,42 +99,62 @@ export class Seeders {
       {
         name: 'First Name',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: true,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
         key: 'firstName',
+        hasToggle: false,
+        isToggled: false
       },
       {
         name: 'Last Name',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: true,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
         key: 'lastName',
+        hasToggle: false,
+        isToggled: false
       },
       {
         name: 'Email',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: true,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
         key: 'email',
+        hasToggle: false,
+        isToggled: false
       },
       {
         name: 'Phone',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: true,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
         key: 'phone',
+        hasToggle: false,
+        isToggled: false
       },
       {
         name: 'Request Access for Additional Guests',
         type: QuestionValueType.NUMBER,
-        is_default: true,
-        is_active: true,
-        is_required: true,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
         key: 'requestAdditionalGuests',
+        hasToggle: true,
+        isToggled: true
+      },
+      {
+        name: 'Instagram',
+        type: QuestionValueType.STRING,
+        isDefault: true,
+        isActive: true,
+        isRequired: true,
+        key: 'instagram',
+        hasToggle: true,
+        isToggled: true
       },
     ];
 
