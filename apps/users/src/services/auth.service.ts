@@ -461,7 +461,10 @@ export class AuthService {
     }
 
     newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' }, UserSource.REQUEST_IN_APP);
+    await RoleService.assignRoleToUser(
+      { userId: newUser.id, roleName: 'non_member' },
+      UserSource.REQUEST_IN_APP,
+    );
 
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,

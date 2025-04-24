@@ -39,7 +39,7 @@ class NotificationService {
       const linkedEvent: Event = linkedEventId
         ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
         : null;
-      
+
       const linkedHost: User = linkedHostId
         ? await User.getRepository().findOne({ where: { id: linkedHostId } })
         : null;
@@ -54,7 +54,6 @@ class NotificationService {
         throw new NotFoundError('Linked host not found');
       }
 
-    
       const notificationsToSave: Notification[] = [];
       const pushNotifications: {
         tokens: string[];
@@ -86,8 +85,7 @@ class NotificationService {
           : {};
         const notificationImage = eval(notificationTemplate.image);
 
-        let linkedUserName = linkedUser ? `${linkedUser.firstName} ${linkedUser.lastName}`
-          : '';
+        let linkedUserName = linkedUser ? `${linkedUser.firstName} ${linkedUser.lastName}` : '';
         let recipientName = recipientUser.firstName
           ? `${recipientUser.firstName} ${recipientUser.lastName}`
           : '';
@@ -96,15 +94,14 @@ class NotificationService {
         }
 
         let companyName = () => {
-          if(linkedHost && linkedHost?.additionalHostInformation?.companyName){
-            return linkedHost?.additionalHostInformation?.companyName 
-          }
-          else {
+          if (linkedHost && linkedHost?.additionalHostInformation?.companyName) {
+            return linkedHost?.additionalHostInformation?.companyName;
+          } else {
             return linkedUser?.additionalHostInformation
               ? linkedUser?.additionalHostInformation?.companyName
-              : `${linkedUser.firstName} ${linkedUser.lastName}`
+              : `${linkedUser.firstName} ${linkedUser.lastName}`;
           }
-        }
+        };
 
         // Generate personalized messages
         const replaceTemplateValues = (message: string) =>
@@ -114,7 +111,7 @@ class NotificationService {
             .replace('[Linked User Name]', linkedUserName)
             .replace('[Linked Company Name]', companyName())
             .replace('[Event Name]', linkedEvent?.name || '')
-            .replace('[Event City Name]', linkedEvent?.location?.city || '')
+            .replace('[Event City Name]', linkedEvent?.location?.city || '');
 
         const appMessage = replaceTemplateValues(notificationTemplate.appMessage || '');
         const pushMessage = replaceTemplateValues(notificationTemplate.pushMessage || '');
@@ -290,7 +287,7 @@ class NotificationService {
     notificationsByType: Record<string, number>;
   }> {
     const repo = this.dbConnection.getRepository(Notification);
-  
+
     const possibleModules = ['user', 'host', 'event'];
     const possibleTypes = [
       'userApplication',
@@ -302,7 +299,7 @@ class NotificationService {
       'userFeedback',
       'hostFeedback',
     ];
-  
+
     // Base query for unread notifications
     const unreadQuery = repo
       .createQueryBuilder('notification')
@@ -310,15 +307,15 @@ class NotificationService {
         recipientId,
       })
       .where('notification.isSeen = false');
-  
+
     if (role) {
       const normalizedRole = role === 'non_member' ? 'member' : role;
       unreadQuery.andWhere('notification.role = :role', { role: normalizedRole });
     }
-  
+
     // Total unread
     const totalNotifications = await unreadQuery.clone().getCount();
-  
+
     // Count unread by module
     const unreadByModuleRaw = await unreadQuery
       .clone()
@@ -326,7 +323,7 @@ class NotificationService {
       .addSelect('COUNT(*)', 'count')
       .groupBy('notification.notificationModule')
       .getRawMany();
-  
+
     // Count unread by type
     const unreadByTypeRaw = await unreadQuery
       .clone()
@@ -334,31 +331,28 @@ class NotificationService {
       .addSelect('COUNT(*)', 'count')
       .groupBy('notification.notificationType')
       .getRawMany();
-  
+
     // Fill in missing modules/types with 0
     const notificationsByModule = Object.fromEntries(
       possibleModules.map(module => [
         module,
-        Number(
-          unreadByModuleRaw.find(row => row.notificationModule === module)?.count || 0,
-        ),
+        Number(unreadByModuleRaw.find(row => row.notificationModule === module)?.count || 0),
       ]),
     );
-  
+
     const notificationsByType = Object.fromEntries(
       possibleTypes.map(type => [
         type,
         Number(unreadByTypeRaw.find(row => row.notificationType === type)?.count || 0),
       ]),
     );
-  
+
     return {
       totalNotifications,
       notificationsByModule,
       notificationsByType,
     };
   }
-  
 
   async deleteMultipleNotifications(
     recipientId: string,

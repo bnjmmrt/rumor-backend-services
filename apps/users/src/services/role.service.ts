@@ -55,7 +55,7 @@ export class RoleService {
       // Update source if it's different
       if (source && existingUserRole.source !== source) {
         existingUserRole.source = source;
-        await this.dbConnection.getRepository(UserRole).save(existingUserRole); 
+        await this.dbConnection.getRepository(UserRole).save(existingUserRole);
         console.log(`Updated role source for user: ${role.name}`);
       } else {
         console.log(`User already has the role: ${role.name} with same source`);
