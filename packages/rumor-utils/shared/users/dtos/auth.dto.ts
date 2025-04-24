@@ -443,6 +443,9 @@ export class CreateNonMemberUserRequestDto implements CreateNonMemberUserRequest
   @IsString()
   @IsOptional()
   lastName?: string;
+  @IsString()
+  @IsOptional()
+  eventId?: string;
 }
 
 export class CreateHostCollaboratorRequestDto implements CreateHostCollaboratorRequest {
