@@ -136,6 +136,23 @@ export class Seeders {
         is_required: true,
         key: 'requestAdditionalGuests',
       },
+      {
+        name: 'What is your Instagram handle?',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: false,
+        key: 'instagram',
+      },  
+      {
+        name: 'Gender',
+        type: QuestionValueType.STRING,
+        is_default: true,
+        is_active: true,
+        is_required: false,
+        key: 'gender',
+      },
+
     ];
 
     for (const questionData of questionsData) {

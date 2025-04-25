@@ -653,7 +653,7 @@ export class SignupFormsServices {
       if (!signupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
-      
+
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -661,18 +661,18 @@ export class SignupFormsServices {
         parsedQuery.findByName && typeof parsedQuery.findByName === 'string'
           ? parsedQuery.findByName.toLowerCase()
           : '';
-          
+
       // Parse filter values - following the getAllUsers approach
       let userTypes = [];
       if (parsedQuery.type && typeof parsedQuery.type === 'string') {
         userTypes = parsedQuery.type.split(',').map(name => name.trim());
       }
-      
+
       let customListNames: string[] = [];
       const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
       let favorite = false;
       let followed = false;
-      
+
       if (parsedQuery.list && parsedQuery.list.length) {
         if (parsedQuery.list && typeof parsedQuery.list === 'string') {
           const allListNames = parsedQuery.list.split(',').map(name => name.trim());
@@ -683,13 +683,13 @@ export class SignupFormsServices {
           followed = separatedLists.includes('myFollowers-systemDefault');
         }
       }
-      
+
       let pastEventsIds: string[] =
         (parsedQuery.pastEvents as string)
           ?.split(',')
           .map(id => id.trim())
           .filter(node => node) || [];
-      
+
       // Create base queries
       const getCountQuery = database
         .getRepository(SignupFormSubmissions)
@@ -697,7 +697,7 @@ export class SignupFormsServices {
         .innerJoin('sfs.attendees', 'atd')
         .innerJoin('sfs.guest', 'gst')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
-      
+
       const submissionsQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder('sfs')
@@ -716,7 +716,7 @@ export class SignupFormsServices {
         .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
         .addSelect('sfs.answers', 'answers')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
-      
+
       // Apply search conditions
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
@@ -733,7 +733,7 @@ export class SignupFormsServices {
             });
           }),
         );
-        
+
         submissionsQuery.andWhere(
           new Brackets(qbOuter => {
             searchWords.forEach((word, index) => {
@@ -748,7 +748,7 @@ export class SignupFormsServices {
           }),
         );
       }
-      
+
       // Apply type filter - similar to getAllUsers
       if (userTypes.length) {
         getCountQuery.andWhere(qb => {
@@ -761,7 +761,7 @@ export class SignupFormsServices {
             .getQuery();
           return `atd.id IN ${subQuery}`;
         });
-        
+
         submissionsQuery.andWhere(qb => {
           const subQuery = qb
             .subQuery()
@@ -773,7 +773,7 @@ export class SignupFormsServices {
           return `atd.id IN ${subQuery}`;
         });
       }
-      
+
       // Apply list filters (favorites, followed, custom lists) - similar to getAllUsers
       if (favorite || followed || customListNames.length > 0) {
         getCountQuery.andWhere(
@@ -815,7 +815,7 @@ export class SignupFormsServices {
             }
           }),
         );
-        
+
         submissionsQuery.andWhere(
           new Brackets(qb => {
             if (favorite) {
@@ -856,11 +856,11 @@ export class SignupFormsServices {
           }),
         );
       }
-      
+
       // Apply past events filter - similar to getAllUsers
       if (pastEventsIds.length) {
         const confirmedStatus = GuestStatus.CONFIRMED;
-        
+
         getCountQuery.andWhere(qb => {
           const subQuery = qb
             .subQuery()
@@ -872,7 +872,7 @@ export class SignupFormsServices {
             .getQuery();
           return 'atd.id IN ' + subQuery;
         });
-        
+
         submissionsQuery.andWhere(qb => {
           const subQuery = qb
             .subQuery()
@@ -885,7 +885,7 @@ export class SignupFormsServices {
           return 'atd.id IN ' + subQuery;
         });
       }
-      
+
       // Apply sorting
       if (parsedQuery.sortBy === 'name') {
         const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
@@ -897,14 +897,14 @@ export class SignupFormsServices {
       } else {
         submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
       }
-      
+
       // Execute queries
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
-      
-      console.log("Filter params received:", parsedQuery); // Debug log
-      console.log("Total count after filtering:", count); // Debug log
-      
+
+      console.log('Filter params received:', parsedQuery); // Debug log
+      console.log('Total count after filtering:', count); // Debug log
+
       const result = { count, result: submissionList };
       return result;
     } catch (err) {
