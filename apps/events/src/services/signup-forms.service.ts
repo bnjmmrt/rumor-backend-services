@@ -50,6 +50,8 @@ export class SignupFormsServices {
         name: true,
         type: true,
         isRequired: true,
+        isToggled: true,
+        hasToggle: true,
       },
     });
     return staticQuestions;
@@ -166,9 +168,6 @@ export class SignupFormsServices {
       if (!event) {
         throw new NotFoundError('Event');
       }
-      if (event.isPrivate) {
-        throw new ForbiddenError('You cannot create signup forms for private events.');
-      }
       let random = Math.floor(100000 + Math.random() * 900000).toString();
 
       const companyName = (event.owner?.additionalHostInformation?.companyName || '')
@@ -195,6 +194,8 @@ export class SignupFormsServices {
         question.isDefault = q.id ? true : false;
         question.value = q.value;
         question.isRequired = q.isRequired;
+        question.hasToggle = q.hasToggle || false;
+        question.isToggled = q.isToggled || false;
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
 
@@ -212,6 +213,11 @@ export class SignupFormsServices {
     }
   }
 
+  /**
+   * Updates a signup form and its questions.
+   * - Handles form metadata update
+   * - Creates, updates, or deletes questions
+   */
   public static async update(
     id: string,
     eventId: string,
@@ -225,6 +231,7 @@ export class SignupFormsServices {
       throw new ForbiddenError('Signup Forms does not exists.');
     }
 
+    // Step 1: Collect old question IDs from the incoming body
     const oldQuestionIds: string[] = [];
     body.questions.forEach(q => q.id && oldQuestionIds.push(q.id));
     // const oldQuestions: FindOperator<string> = In(oldQuestionIds);
@@ -232,6 +239,7 @@ export class SignupFormsServices {
     //   where: { id: oldQuestions },
     // });
 
+    // Step 2: Fetch existing questions to check if any are default/static
     const existingQuestions = await SignupFormQuestions.getRepository()
       .createQueryBuilder()
       .where('id IN (:...ids)', { ids: oldQuestionIds })
@@ -240,6 +248,7 @@ export class SignupFormsServices {
     const questionsMap = new Map<string, boolean>();
     existingQuestions.forEach(q => questionsMap.set(q.id.toString(), q.isDefault));
 
+    // Step 3: Update signup form meta
     signupForm.hasAccessForAdditionalGuests = body.hasAccessForAdditionalGuests;
     signupForm.description = body.description;
     signupForm.styling = body.styling;
@@ -247,7 +256,7 @@ export class SignupFormsServices {
     signupForm.isActive = true;
     signupForm.name = body.name;
 
-    const ids = [];
+    const ids = new Set<string>(); // To hold unique question IDs
     const questionPromises: any[] = [];
 
     /**---------TO DO:: HACKY FIX --------------------- */
@@ -280,7 +289,7 @@ export class SignupFormsServices {
             questionList.push(question);
             break;
           case 'update':
-            ids.push(q.id);
+            ids.add(q.id!);
             question.ordering = index;
             const updatesQuestion = SignupFormQuestions.update(q.id, question);
             questionPromises.push(updatesQuestion);
@@ -290,27 +299,25 @@ export class SignupFormsServices {
             questionPromises.push(deleteQuestions);
             break;
         }
-      }
-      /**---- This is Hacky fix for NOW and should be removed in Phase 2 */
-      if (!body.hasAccessForAdditionalGuests) {
-        if (q.name === 'Request Access for Additional Guests') {
-          /**-----------THIS CODE IS NEVER EXECUTED -----------*/
-          const deleteQuestions = SignupFormQuestions.delete(q.id);
-          questionPromises.push(deleteQuestions);
-        } else {
-          ids.push(q.id);
-          question.ordering = index;
-          question.value = q.value;
-          const updatesQuestion = SignupFormQuestions.update(q.id, question);
-          questionPromises.push(updatesQuestion);
-        }
+      } else {
+        ids.add(q.id!);
+        question.ordering = index;
+        question.value = q.value;
+        question.hasToggle = q.hasToggle || false;
+        question.isToggled = q.isToggled || false;
+        const updatesQuestion = SignupFormQuestions.update(q.id, question);
+        questionPromises.push(updatesQuestion);
       }
     }
+
+    // Step 4: Insert new questions
     await Promise.all(questionPromises);
     const newQuestions = SignupFormQuestions.create(questionList);
     await SignupFormQuestions.insert(newQuestions);
-    ids.push(...newQuestions.map(q => q.id));
-    signupForm.questionIds = ids;
+    newQuestions.forEach(q => ids.add(q.id!));
+    signupForm.questionIds = Array.from(ids);
+
+    // Step 5: Save form and return response
     const baseUrl: string = config.get('SIGNUP_FORM_BASE_URL') || '';
     await signupForm.save();
     const response = buildSignupFormsResponse(signupForm.event, signupForm, baseUrl, 0);
@@ -351,6 +358,10 @@ export class SignupFormsServices {
             break;
           case 'request access for additional guests':
             requestedGuests.additional = Number(ans.answers);
+            break;
+
+          case 'instagram':
+            userPayload.instagramUserName = ans.answers.trim();
             break;
         }
       }
@@ -681,6 +692,7 @@ export class SignupFormsServices {
         .innerJoin('sfs.guest', 'gst')
         .select([])
         .addSelect('sfs.id', 'id')
+        .addSelect('sfs.answers', 'answers')
         .addSelect('atd.firstName', 'firstName')
         .addSelect('atd.profilePicture', 'profilePicture')
         .addSelect('atd.lastName', 'lastName')

@@ -739,6 +739,8 @@ export interface ISignupFormQuestionsRequest {
   answers?: string;
   ordering?: number;
   value?: string;
+  hasToggle?: boolean;
+  isToggled?: boolean;
 }
 
 export const EVENTS_PACKAGE_NAME = 'events';
