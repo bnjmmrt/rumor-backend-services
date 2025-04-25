@@ -3329,7 +3329,7 @@ export class GuestService {
       await this.dbConnection.getRepository(Guest).create(guest);
       guest = await this.dbConnection.getRepository(Guest).save(guest);
     }
-    let guestFirstName= guest.user?.firstName || checkUser?.name?.split(' ')[0]|| 'Guest'
+    let guestFirstName = guest.user?.firstName || checkUser?.name?.split(' ')[0] || 'Guest';
     // Step 10: Send invitation via email or SMS
     // TO DO: Change email and sms template
     if (payload.email) {
@@ -3511,7 +3511,7 @@ export class GuestService {
         });
       }
       guest = await this.dbConnection.getRepository(Guest).save(guest);
-      let guestFirstName= guest.user?.firstName || checkUser?.name?.split(' ')[0]|| 'Guest'
+      let guestFirstName = guest.user?.firstName || checkUser?.name?.split(' ')[0] || 'Guest';
       if (guest) {
         if (guest.user?.email) {
           const createMailPayload = {
@@ -3531,7 +3531,7 @@ export class GuestService {
           };
           sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
         }
-        // let userName = 
+        // let userName =
         if (guest.user?.phoneNumber) {
           const message = `Hi ${guestFirstName}, ${leadGuest.user.firstName} ${leadGuest.user.lastName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
           try {
