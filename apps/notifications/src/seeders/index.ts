@@ -721,6 +721,56 @@ export class SeedDatabase {
           },
         ],
       },
+      {
+        templateName: 'Member + Non-Member:  Added to Confirmed',
+        templateSendgridId: 'd-edbebf00cfab486d9ca0fa2e86ba9c03',
+        params: [
+          {
+            key: 'first_name',
+            mandatory: true,
+          },
+          {
+            key: 'event_name',
+            mandatory: true,
+          },
+          {
+            key: 'host_name',
+            mandatory: true,
+          },
+          {
+            key: 'image_url',
+            mandatory: true,
+          },
+          {
+            key: 'month',
+            mandatory: true,
+          },
+          {
+            key: 'day',
+            mandatory: true,
+          },
+          {
+            key: 'day_of_week',
+            mandatory: true,
+          },
+          {
+            key: 'hour',
+            mandatory: true,
+          },
+          {
+            key: 'minutes',
+            mandatory: true,
+          },
+          {
+            key: 'address',
+            mandatory: true,
+          },
+          {
+            key: 'view_ticket',
+            mandatory: true,
+          },
+        ],
+      },
     ];
     const existingTemplatesMap = new Map(
       (await this.dbConnection.getRepository(EmailTemplate).find()).map(et => [

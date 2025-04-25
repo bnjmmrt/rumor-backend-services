@@ -20,13 +20,18 @@ import {
   DeleteEmailTemplateRequestDto,
   RequestByIdDto,
 } from 'rumor-utils/shared/notifications/dtos/communication.dto';
-import { TwilioService } from '../utils/twilio';
+import TwilioService, {
+  SendVerificationCodePayload,
+  VerifyCodePayload,
+  SendTextMessagePayload,
+  SendInvitationMessagesPayload,
+} from '../utils/twilio/sms';
 import { CreateResponse, DeleteResponse, GetResponse } from 'rumor-utils/success';
 
 export class CommunicationController {
   public static sendVerificationCode = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const payload: SendVerificationCodeRequestDto = req.body;
+      const payload = req.body as SendVerificationCodePayload;
       try {
         await TwilioService.sendVerificationCode(payload);
       } catch (e) {
@@ -38,7 +43,7 @@ export class CommunicationController {
   );
 
   public static verifyCode = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
-    const payload: VerifyCodeRequestDto = req.body;
+    const payload = req.body as VerifyCodePayload;
     const result = await TwilioService.verifyCode(payload);
     const successResponse = new GetResponse({ ...result }, 'Code verified');
     res.status(successResponse.statusCode).json(successResponse);
@@ -46,7 +51,7 @@ export class CommunicationController {
 
   public static sendInvitationMessages = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const payload: SendInvitationMessagesRequestDto = req.body;
+      const payload = req.body as SendInvitationMessagesPayload;
       try {
         await TwilioService.sendInvitationMessages(payload);
       } catch (e) {
@@ -59,7 +64,7 @@ export class CommunicationController {
 
   public static sendTextMessage = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const payload: SendTextMessageRequestDto = req.body;
+      const payload = req.body as SendTextMessagePayload;
       try {
         await TwilioService.sendTextMessage(payload);
       } catch (e) {
