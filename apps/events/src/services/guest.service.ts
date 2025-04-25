@@ -3350,7 +3350,7 @@ export class GuestService {
       };
       sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     }
-     if (payload.phoneNumber) {
+    if (payload.phoneNumber) {
       const message = `Hi ${guest.user.firstName}, ${leadGuest.user?.firstName} ${leadGuest.user?.lastName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest?.user?.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -3512,7 +3512,7 @@ export class GuestService {
       }
 
       guest = await this.dbConnection.getRepository(Guest).save(guest);
-   
+
       if (guest) {
         if (guest.user?.email) {
           const createMailPayload = {
@@ -3531,8 +3531,8 @@ export class GuestService {
             leadGuestName: `${leadGuest.user.firstName} ${leadGuest.user.lastName}`,
           };
           sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
-        } 
-         if (guest.user?.phoneNumber) {
+        }
+        if (guest.user?.phoneNumber) {
           const message = `Hi ${guest.user.firstName}, ${event.owner.additionalHostInformation.companyName} has invited you to ${event.name}! \n Download the Rumor app and log in with this phone number: ${guest.user.phoneNumber} to RSVP and confirm your spot. \n Need help? Contact us at support@therumor.com. \n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
           try {
             const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
@@ -3939,12 +3939,9 @@ export class GuestService {
       }
     }
 
-
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
       throw new ValidationError('You cannot add yourself to an event');
     }
-
-
 
     if (
       payload.phoneNumber &&
