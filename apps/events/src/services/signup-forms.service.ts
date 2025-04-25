@@ -168,9 +168,6 @@ export class SignupFormsServices {
       if (!event) {
         throw new NotFoundError('Event');
       }
-      if (event.isPrivate) {
-        throw new ForbiddenError('You cannot create signup forms for private events.');
-      }
       let random = Math.floor(100000 + Math.random() * 900000).toString();
 
       const companyName = (event.owner?.additionalHostInformation?.companyName || '')
