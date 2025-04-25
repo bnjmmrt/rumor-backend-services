@@ -143,7 +143,7 @@ export class Seeders {
         is_active: true,
         is_required: false,
         key: 'instagram',
-      },  
+      },
       {
         name: 'Gender',
         type: QuestionValueType.STRING,
@@ -152,7 +152,6 @@ export class Seeders {
         is_required: false,
         key: 'gender',
       },
-
     ];
 
     for (const questionData of questionsData) {
