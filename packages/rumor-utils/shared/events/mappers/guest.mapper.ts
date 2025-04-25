@@ -230,7 +230,7 @@ export const toGuestDataSimple = (
 ): GuestDataSimple => {
   const user = guest.user;
   const roleInfo = user.roles?.find(
-    item => item.role.name === 'member' || item.role.name === 'non_member',
+    item => item.role?.name === 'member' || item.role?.name === 'non_member',
   );
   const addedBy = guest.addedBy
     ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`
