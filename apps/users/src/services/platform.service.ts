@@ -151,6 +151,7 @@ export class PlatformService {
   public static async saveInterestsForUser(
     payload: SaveInterestsForUserRequestDto,
   ): Promise<GenericResponse> {
+    /* TODO: remove
     const interests = await this.dbConnection.getRepository(Interest).find({
       where: {
         users: { id: payload.userId },
@@ -186,6 +187,35 @@ export class PlatformService {
         }
       }),
     );
+    */
+
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: payload.userId,
+        deletedAt: IsNull(),
+      },
+      relations: ['interests'],
+    });
+
+    if (!user) return;
+
+    user.interests = [];
+    await this.dbConnection.getRepository(User).save(user);
+
+    const interests = await Promise.all(
+      payload.interestsIds.map(async interestId => {
+        let interest = await this.dbConnection.getRepository(Interest).findOne({
+          where: {
+            id: interestId,
+            deletedAt: IsNull(),
+          },
+        });
+        if (interest) return interest;
+      }),
+    );
+
+    user.interests = interests;
+    await this.dbConnection.getRepository(User).save(user);
 
     return;
   }
