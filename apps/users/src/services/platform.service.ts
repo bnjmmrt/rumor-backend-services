@@ -73,6 +73,7 @@ export class PlatformService {
   public static async saveFocusesForUser(
     payload: SaveFocusesForUserRequestoDto,
   ): Promise<GenericResponse> {
+    /* TODO: remove after testing 
     const focuses = await this.dbConnection.getRepository(Focus).find({
       where: {
         users: { id: payload.userId },
@@ -109,6 +110,34 @@ export class PlatformService {
         }
       }),
     );
+    */
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: payload.userId,
+        deletedAt: IsNull(),
+      },
+      relations: ['focuses'],
+    });
+
+    if (!user) return;
+
+    user.focuses = [];
+    await this.dbConnection.getRepository(User).save(user);
+
+    const focuses = await Promise.all(
+      payload.focusIds.map(async focusId => {
+        return await this.dbConnection.getRepository(Focus).findOne({
+          where: {
+            id: focusId,
+            deletedAt: IsNull(),
+          },
+        });
+      }),
+    );
+
+    user.focuses = focuses?.length > 0 ? focuses : [];
+    await this.dbConnection.getRepository(User).save(user);
+
     return;
   }
 
@@ -151,7 +180,7 @@ export class PlatformService {
   public static async saveInterestsForUser(
     payload: SaveInterestsForUserRequestDto,
   ): Promise<GenericResponse> {
-    /* TODO: remove
+    /* TODO: remove after testing
     const interests = await this.dbConnection.getRepository(Interest).find({
       where: {
         users: { id: payload.userId },
@@ -204,17 +233,16 @@ export class PlatformService {
 
     const interests = await Promise.all(
       payload.interestsIds.map(async interestId => {
-        let interest = await this.dbConnection.getRepository(Interest).findOne({
+        return await this.dbConnection.getRepository(Interest).findOne({
           where: {
             id: interestId,
             deletedAt: IsNull(),
           },
         });
-        if (interest) return interest;
       }),
     );
 
-    user.interests = interests;
+    user.interests = interests?.length > 0 ? interests : [];
     await this.dbConnection.getRepository(User).save(user);
 
     return;

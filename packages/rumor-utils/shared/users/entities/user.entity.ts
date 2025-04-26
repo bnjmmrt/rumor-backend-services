@@ -125,7 +125,7 @@ export class User extends RumorBaseEntity {
   interests: Interest[];
 
   @ManyToMany(() => Focus, { cascade: false })
-  @JoinTable()
+  @JoinTable({ name: 'focus_users_user' })
   focuses: Focus[];
 
   @OneToMany(() => RestrictedInvites, ri => ri.restrictedBy, { onDelete: 'CASCADE' })
