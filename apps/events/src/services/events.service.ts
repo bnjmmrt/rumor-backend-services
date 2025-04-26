@@ -2648,9 +2648,9 @@ export class EventsService {
       relations: { location: true },
     });
     const guestStatuses: GuestStatus[] = [
-      GuestStatus.INVITED,
+     // GuestStatus.INVITED,
       GuestStatus.CONFIRMED,
-      GuestStatus.APPLIED,
+     // GuestStatus.APPLIED,
     ];
     const guests = await this.dbConnection
       .getRepository(Guest)
