@@ -1862,10 +1862,12 @@ export class AuthService {
     try {
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
     } catch (e) {
+      console.log("🚀 ~ AuthService ~ hostLogin ~ e:", e)
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );
     }
+    console.log("🚀 ~ AuthService ~ hostLogin ~ authenticatedUser:", authenticatedUser)
     if (!authenticatedUser) {
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
