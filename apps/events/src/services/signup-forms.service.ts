@@ -386,7 +386,6 @@ export class SignupFormsServices {
   }
 
   private static async assignRoleToUser(payload: User, queryRunner: QueryRunner) {
-
     const nonMemberRole: Role[] = await this.dbConnection
       .getRepository(Role)
       .find({ where: { name: 'non_member' } });

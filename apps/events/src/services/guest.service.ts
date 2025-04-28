@@ -3716,7 +3716,7 @@ export class GuestService {
           const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
             ['member', 'non_member'].includes(userRole.role.name),
           );
-          
+
           if (!hasMemberOrNonMember) {
             this.assignRoleToUser(existingUserData);
           }
