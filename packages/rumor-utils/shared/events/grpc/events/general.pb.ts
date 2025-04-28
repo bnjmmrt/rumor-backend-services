@@ -758,8 +758,4 @@ export interface TicketBreakdownResponse {
   ticketBreakdown: TicketBreakdown[];
 }
 
-
-
-
-
 export const EVENTS_PACKAGE_NAME = 'events';

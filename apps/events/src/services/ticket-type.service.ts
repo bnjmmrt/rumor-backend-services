@@ -14,7 +14,10 @@ import { normalizeCatalogName } from '../common/helpers';
 import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
-import { TicketBreakdown, TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  TicketBreakdown,
+  TicketBreakdownResponse,
+} from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 import { TicketBreakdown as ProtoTicketBreakdown } from 'rumor-utils/shared/events/grpc/events/general.pb';
 
 interface ExtendedTicketBreakdown extends ProtoTicketBreakdown {
@@ -181,7 +184,7 @@ export class TicketTypeService {
 
     // Get attendee count for each ticket type
     const ticketTypesWithCounts = await Promise.all(
-      ticketTypes.map(async (ticketType) => {
+      ticketTypes.map(async ticketType => {
         const attendeeCount = await this.dbConnection.getRepository(Guest).count({
           where: {
             event: { id: event.id },
@@ -189,7 +192,7 @@ export class TicketTypeService {
             deletedAt: IsNull(),
           },
         });
-        
+
         return {
           id: ticketType.id,
           name: ticketType.name,
@@ -198,7 +201,7 @@ export class TicketTypeService {
           enabled: ticketType.enabled,
           attendeeCount,
         };
-      })
+      }),
     );
 
     return ticketTypesWithCounts;

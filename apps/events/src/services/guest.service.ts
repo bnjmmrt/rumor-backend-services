@@ -4168,7 +4168,7 @@ export class GuestService {
       const checkGuest = await queryBuilder.getOne();
       const focuses = (await serviceMesh.userService().getUserFocuses(savedGuest.user.id)).data;
       const guestData = toGuestDataSimple(checkGuest, focuses);
-      
+
       return guestData;
     }
 
