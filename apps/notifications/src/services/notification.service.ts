@@ -40,6 +40,7 @@ class NotificationService {
         ? await Event.getRepository().findOne({ where: { id: linkedEventId } })
         : null;
 
+
       const linkedHost: User = linkedHostId
         ? await User.getRepository().findOne({ where: { id: linkedHostId } })
         : null;
@@ -113,6 +114,7 @@ class NotificationService {
             .replace('[Linked User Name]', linkedUserName)
             .replace('[Linked Company Name]', companyName())
             .replace('[Event Name]', linkedEvent?.name || '')
+            .replace('[Event City Name]', linkedEvent?.location?.city || '');
             .replace('[Event City Name]', linkedEvent?.location?.city || '');
 
         const appMessage = replaceTemplateValues(notificationTemplate.appMessage || '');
