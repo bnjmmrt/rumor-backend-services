@@ -150,7 +150,7 @@ export class Seeders {
         name: 'Instagram',
         type: QuestionValueType.STRING,
         isDefault: true,
-        isActive: true,
+        isActive: false,
         isRequired: true,
         key: 'instagram',
         hasToggle: true,
