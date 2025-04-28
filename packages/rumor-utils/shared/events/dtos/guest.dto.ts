@@ -286,6 +286,10 @@ export class AcceptEventInvitationRequestDto {
   @IsUUID()
   @IsNotEmpty()
   userId: string;
+  
+  @IsNumber()
+  @IsNotEmpty()
+  limitOnePlus: number;
 }
 export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsUUID()
