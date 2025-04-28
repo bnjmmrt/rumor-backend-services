@@ -1323,12 +1323,7 @@ export class EventsService {
     }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
-      this.dbConnection.getRepository(Guest).count({
-        where: {
-          event: { id: payload.id },
-          status: GuestStatus.CONFIRMED,
-        },
-      }),
+      this.getTotalConfirmedGuests(payload.id, event.owner?.id),
 
       // Count total guests who have checked in.
       this.dbConnection.getRepository(Guest).count({
@@ -4028,7 +4023,7 @@ export class EventsService {
     // Step 1: Fetch guest details along with associated event.
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
-      relations: ['user', 'event'], // Load related user and event details.
+      relations: ['user', 'event', 'event.owner'], // Load related user and event details.
     });
 
     // If guest does not exist, return an error response.
@@ -4095,12 +4090,7 @@ export class EventsService {
           .findOne({ where: { id: ticket.id }, select: ['status'] }),
 
         // Count total confirmed guests for the event.
-        this.dbConnection.getRepository(Guest).count({
-          where: {
-            event: { id: guest.event.id },
-            status: GuestStatus.CONFIRMED,
-          },
-        }),
+        this.getTotalConfirmedGuests(guest.event.id, guest.event?.owner?.id),
 
         // Count total guests who have checked in.
         this.dbConnection.getRepository(Guest).count({
@@ -4120,6 +4110,19 @@ export class EventsService {
       totalConfirmedGuests,
       totalCheckedInGuests,
     };
+  }
+
+  private static async getTotalConfirmedGuests(eventId: string, userId: string): Promise<number> {
+    const { confirmed_count } = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select('SUM(COALESCE(guest.max_additional_guests, 0) + 1)', 'confirmed_count')
+      .where('guest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED })
+      .andWhere('guest.event_id = :eventId', { eventId })
+      .andWhere('guest.added_by_id = :userId', { userId })
+      .getRawOne();
+  
+    return Number(confirmed_count || 0);
   }
 
   /**
