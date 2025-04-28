@@ -3550,6 +3550,28 @@ export class GuestService {
 
     // Execute all guest invites concurrently
     const invitedGuestsResults = await Promise.all(invites);
+    const eventId = guests[0].eventId;
+    const userId = guests[0].userId;
+
+    const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
+      where: {
+        event: { id: eventId },
+        user: { id: userId },
+        status: GuestStatus.CONFIRMED,
+        deletedAt: IsNull(),
+      },
+      relations: {
+        user: true,
+        ticketType: true,
+      },
+    });
+    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
+      relations: ['user', 'ticketType', 'declinedBy', 'user.address'],
+      where: { addedBy: { id: leadGuest.user.id }, event: { id: eventId } },
+    });
+
+    leadGuest.maxAdditionalGuests = additionalGuests.length;
+    await this.dbConnection.getRepository(Guest).save(leadGuest);
     const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(
       Boolean,
     ) as GuestDataSimple[];

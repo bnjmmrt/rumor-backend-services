@@ -27,4 +27,10 @@ export class SignupFormStaticQuestions extends RumorBaseEntity {
 
   @Column({ type: 'varchar', name: 'key' })
   key: string;
+
+  @Column({ type: 'boolean', default: false, name: 'has_toggle' })
+  hasToggle: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'is_toggled' })
+  isToggled: boolean;
 }
