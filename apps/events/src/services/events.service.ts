@@ -2406,7 +2406,7 @@ export class EventsService {
       if (payload.imageCover) {
         event.imageCover = payload.imageCover;
       }
-      if (payload.furtherInstructions) {
+      if (payload.furtherInstructions !== undefined) {
         event.furtherInstructions = payload.furtherInstructions;
       }
       if (payload.showLocation !== undefined) {
