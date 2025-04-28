@@ -3550,7 +3550,7 @@ export class GuestService {
     const invitedGuestsResults = await Promise.all(invites);
     const eventId = guests[0].eventId;
     const userId = guests[0].userId;
-  
+
     const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
       where: {
         event: { id: eventId },
@@ -3959,12 +3959,9 @@ export class GuestService {
       }
     }
 
-
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
       throw new ValidationError('You cannot add yourself to an event');
     }
-
-
 
     if (
       payload.phoneNumber &&
