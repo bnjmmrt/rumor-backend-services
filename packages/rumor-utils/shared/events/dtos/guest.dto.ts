@@ -286,7 +286,7 @@ export class AcceptEventInvitationRequestDto {
   @IsUUID()
   @IsNotEmpty()
   userId: string;
-  
+
   @IsNumber()
   @IsNotEmpty()
   limitOnePlus: number;
