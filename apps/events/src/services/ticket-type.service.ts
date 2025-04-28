@@ -15,6 +15,20 @@ import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 import { TicketBreakdown, TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
+import { TicketBreakdown as ProtoTicketBreakdown } from 'rumor-utils/shared/events/grpc/events/general.pb';
+
+interface ExtendedTicketBreakdown extends ProtoTicketBreakdown {
+  attendeeCount: number;
+}
+
+interface TicketTypeBreakdown {
+  id: string;
+  name: string;
+  description: string;
+  capacity: number;
+  enabled: boolean;
+  attendeeCount: number;
+}
 
 export class TicketTypeService {
   public static dbConnection = database;
@@ -143,7 +157,7 @@ export class TicketTypeService {
     }
   }
 
-  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<TicketType[]> {
+  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<TicketTypeBreakdown[]> {
     //For a given event, get the ticket types and the number of guests that have RSVPed for each ticket type
     //Get the ticket types
     const event = await this.dbConnection.getRepository(Event).findOne({
@@ -152,6 +166,9 @@ export class TicketTypeService {
       },
     });
 
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
 
     //Get the ticket types
     const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
@@ -160,9 +177,30 @@ export class TicketTypeService {
           id: event.id,
         },
       },
-    }); 
+    });
 
-    return ticketTypes;
+    // Get attendee count for each ticket type
+    const ticketTypesWithCounts = await Promise.all(
+      ticketTypes.map(async (ticketType) => {
+        const attendeeCount = await this.dbConnection.getRepository(Guest).count({
+          where: {
+            event: { id: event.id },
+            ticketType: { id: ticketType.id },
+            deletedAt: IsNull(),
+          },
+        });
+        
+        return {
+          id: ticketType.id,
+          name: ticketType.name,
+          description: ticketType.description,
+          capacity: ticketType.capacity,
+          enabled: ticketType.enabled,
+          attendeeCount,
+        };
+      })
+    );
 
+    return ticketTypesWithCounts;
   }
 }

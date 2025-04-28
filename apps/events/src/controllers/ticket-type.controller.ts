@@ -76,7 +76,7 @@ export class TicketTypeController {
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
       const payload: RequestByIdDto = { id };
-      const ticketTypeResponse: TicketType[] = await TicketTypeService.getTicketBreakdown(payload);
+      const ticketTypeResponse: TicketBreakdownResponse[] = await TicketTypeService.getTicketBreakdown(payload);
       const successResponse = new GetResponse(ticketTypeResponse);
       res.status(successResponse.statusCode).json(successResponse);
     },
