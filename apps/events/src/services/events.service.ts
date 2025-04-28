@@ -4121,7 +4121,7 @@ export class EventsService {
       .andWhere('guest.event_id = :eventId', { eventId })
       .andWhere('guest.added_by_id = :userId', { userId })
       .getRawOne();
-  
+
     return Number(confirmed_count || 0);
   }
 

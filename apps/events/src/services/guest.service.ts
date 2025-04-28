@@ -3568,7 +3568,7 @@ export class GuestService {
       where: { addedBy: { id: leadGuest.user.id }, event: { id: eventId } },
     });
 
-    leadGuest.maxAdditionalGuests = additionalGuests.length
+    leadGuest.maxAdditionalGuests = additionalGuests.length;
     await this.dbConnection.getRepository(Guest).save(leadGuest);
     const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(
       Boolean,
