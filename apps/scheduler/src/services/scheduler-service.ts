@@ -7,6 +7,35 @@ import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/sched
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 
 export class SchedulerService {
+  private static scheduledJobs: { [key: string]: schedule.Job } = {};
+
+  /**
+   * Cancel a previously scheduled job if exists.
+   */
+  private static cancelScheduledJob(jobKey: string): void {
+    if (SchedulerService.scheduledJobs[jobKey]) {
+      SchedulerService.scheduledJobs[jobKey].cancel();
+      delete SchedulerService.scheduledJobs[jobKey]; // Cleanup after cancel
+    }
+  }
+
+  /**
+    * Store a job reference for later cancellation if needed.
+    */
+  private static storeScheduledJob(jobKey: string, job: schedule.Job): void {
+    SchedulerService.scheduledJobs[jobKey] = job;
+  }
+
+  /**
+   * Remove a completed or cancelled job from the scheduledJobs map.
+   */
+  private static removeScheduledJob(jobKey: string): void {
+    delete SchedulerService.scheduledJobs[jobKey];
+  }
+
+  /**
+    * Trigger the job based on the payload type and data.
+    */
   public static async triggerJob(payload: any): Promise<string> {
     const { type, data } = payload;
     if (!type || !data) {
@@ -28,6 +57,10 @@ export class SchedulerService {
     return '';
   }
 
+  /**
+  * Schedule jobs for events after server restart.
+  * It checks events and schedules jobs accordingly.
+  */
   public static async scheduleEventOnServerRestart() {
     try {
       const events: Event[] = await Event.find();
@@ -55,10 +88,17 @@ export class SchedulerService {
     }
   }
 
+  /**
+    * Schedule the event's publish date.
+    * Cancels previous job if it's already scheduled and reschedules.
+    */
   public static async scheduleEventPublishDate(e: Event) {
     try {
+      const jobKey = `${SchedulerJobType.PUBLISH_EVENT}_${e.id}`; // Using the existing enum for job key
+      // Cancel any previously scheduled job
+      this.cancelScheduledJob(jobKey);
       if (e.publishDate) {
-        schedule.scheduleJob(e.publishDate, async () => {
+        const job = schedule.scheduleJob(e.publishDate, async () => {
           if (e.id) {
             const savedEvent = await Event.findOne({ where: { id: e.id } });
             if (!savedEvent) {
@@ -68,17 +108,26 @@ export class SchedulerService {
             savedEvent.isPublished = true;
             await savedEvent.save();
           }
+          this.removeScheduledJob(jobKey);
         });
+        this.storeScheduledJob(jobKey, job);
       }
     } catch (err) {
       console.log(`Error in publishing events ::`, err);
     }
   }
 
+  /**
+  * Schedule event status change to Past or Cancelled.
+  * Cancels previous job if it's already scheduled and reschedules.
+  */
   public static async scheduleEventPastAndCancelledDate(e: Event) {
     try {
+      const jobKey = `${SchedulerJobType.PAST_OR_CANCEL_EVENT}_${e.id}`; // Using the existing enum for job key
+      // Cancel any previously scheduled job
+      this.cancelScheduledJob(jobKey);
       if (e.endDate) {
-        schedule.scheduleJob(e.endDate, async () => {
+        const job = schedule.scheduleJob(e.endDate, async () => {
           const savedEvent = await Event.findOne({ where: { id: e.id } });
           if (!savedEvent) {
             return; // Stop execution if the event is deleted
@@ -95,14 +144,16 @@ export class SchedulerService {
             savedEvent.status = st;
             await savedEvent.save();
           }
+          this.removeScheduledJob(jobKey);
         });
+        this.storeScheduledJob(jobKey, job);
       }
     } catch (err) {
       console.log(`Error in setting status to cancel or past event ::`, err);
     }
   }
 
-  public static async scheduleUserHardDelete() {}
+  public static async scheduleUserHardDelete() { }
 
   /**
    * Schedules an event reminder 24 hours before the event's start time.
@@ -125,10 +176,12 @@ export class SchedulerService {
       if (reminderTime <= currentTime) {
         return;
       }
-      schedule.scheduleJob(reminderTime, async () => {
+      const jobKey = `${SchedulerJobType.REMINDER_EVENT}_${e.id}`; // Using the existing enum for job key
+      // Cancel any previously scheduled reminder job
+      this.cancelScheduledJob(jobKey);
+      const job = schedule.scheduleJob(reminderTime, async () => {
         const savedEvent: Event = await Event.findOne({
           where: { id: e.id },
-          relations: { location: true },
         });
         if (!savedEvent) {
           return; // Stop execution if the event is deleted
@@ -141,7 +194,9 @@ export class SchedulerService {
             console.log(`Error in sending event reminder ::`, err);
           }
         }
+        this.removeScheduledJob(jobKey);
       });
+      this.storeScheduledJob(jobKey, job);
     } catch (err) {
       console.log(`Error in sending event reminder ::`, err);
     }
