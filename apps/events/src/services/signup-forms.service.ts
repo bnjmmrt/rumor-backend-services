@@ -511,7 +511,7 @@ export class SignupFormsServices {
         await this.registerUserAsNonMember(userPayload, queryRunner);
       }
 
-      const isMemberOrNonMember = userPayload.roles.some(userRole =>
+      const isMemberOrNonMember = userPayload?.roles?.some(userRole =>
         ['member', 'non_member'].includes(userRole.role.name),
       );
       if (!isMemberOrNonMember) {
