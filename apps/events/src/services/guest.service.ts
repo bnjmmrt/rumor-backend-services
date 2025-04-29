@@ -552,6 +552,14 @@ export class GuestService {
             where: [{ id: userId }],
             relations: { roles: { role: true } },
           });
+
+          const hasMemberOrNonMember = user?.roles?.some(userRole =>
+            ['member', 'non_member'].includes(userRole.role.name),
+          );
+
+          if (!hasMemberOrNonMember) {
+            this.assignRoleToUser(user);
+          }
           // const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
           const existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
