@@ -385,6 +385,20 @@ export class SignupFormsServices {
     await queryRunner.manager.save(userRole);
   }
 
+  private static async assignRoleToUser(payload: User, queryRunner: QueryRunner) {
+    const nonMemberRole: Role[] = await this.dbConnection
+      .getRepository(Role)
+      .find({ where: { name: 'non_member' } });
+
+    const userRole = UserRole.create({
+      role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
+      user: { id: payload.id },
+    });
+
+    await queryRunner.manager.save(userRole);
+  }
+
   private static async validateUserAsGuest(
     eventId: string,
     userPayload: User,
@@ -495,6 +509,13 @@ export class SignupFormsServices {
 
       if (!userPayload.id) {
         await this.registerUserAsNonMember(userPayload, queryRunner);
+      }
+
+      const isMemberOrNonMember = userPayload?.roles?.some(userRole =>
+        ['member', 'non_member'].includes(userRole.role.name),
+      );
+      if (!isMemberOrNonMember) {
+        await this.assignRoleToUser(userPayload, queryRunner);
       }
 
       /**--Create Submissions */
