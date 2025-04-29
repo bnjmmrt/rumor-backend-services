@@ -74,6 +74,11 @@ router.get(
   SignupFormsController.getStaticQuestions,
 );
 router.get(
+  '/signup-forms/:id/questions',
+  AuthMiddleware.fusionAuthRequired,
+  SignupFormsController.getSignupFormQuestions,
+);
+router.get(
   '/events/:id/signup-forms',
   AuthMiddleware.fusionAuthRequired,
   SignupFormsController.getByEventId,
