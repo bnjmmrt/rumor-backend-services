@@ -94,7 +94,7 @@ export class SchedulerService {
    */
   public static async scheduleEventPublishDate(e: Event) {
     try {
-      const jobKey = `${SchedulerJobType.PUBLISH_EVENT}_${e.id}`; // Using the existing enum for job key
+      const jobKey = `${SchedulerJobType.PUBLISH_EVENT}_${e.id}`; 
       // Cancel any previously scheduled job
       this.cancelScheduledJob(jobKey);
       if (e.publishDate) {
@@ -123,7 +123,7 @@ export class SchedulerService {
    */
   public static async scheduleEventPastAndCancelledDate(e: Event) {
     try {
-      const jobKey = `${SchedulerJobType.PAST_OR_CANCEL_EVENT}_${e.id}`; // Using the existing enum for job key
+      const jobKey = `${SchedulerJobType.PAST_OR_CANCEL_EVENT}_${e.id}`; 
       // Cancel any previously scheduled job
       this.cancelScheduledJob(jobKey);
       if (e.endDate) {
@@ -176,7 +176,7 @@ export class SchedulerService {
       if (reminderTime <= currentTime) {
         return;
       }
-      const jobKey = `${SchedulerJobType.REMINDER_EVENT}_${e.id}`; // Using the existing enum for job key
+      const jobKey = `${SchedulerJobType.REMINDER_EVENT}_${e.id}`; 
       // Cancel any previously scheduled reminder job
       this.cancelScheduledJob(jobKey);
       const job = schedule.scheduleJob(reminderTime, async () => {
