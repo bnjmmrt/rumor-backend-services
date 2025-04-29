@@ -20,8 +20,8 @@ export class SchedulerService {
   }
 
   /**
-    * Store a job reference for later cancellation if needed.
-    */
+   * Store a job reference for later cancellation if needed.
+   */
   private static storeScheduledJob(jobKey: string, job: schedule.Job): void {
     SchedulerService.scheduledJobs[jobKey] = job;
   }
@@ -34,8 +34,8 @@ export class SchedulerService {
   }
 
   /**
-    * Trigger the job based on the payload type and data.
-    */
+   * Trigger the job based on the payload type and data.
+   */
   public static async triggerJob(payload: any): Promise<string> {
     const { type, data } = payload;
     if (!type || !data) {
@@ -58,9 +58,9 @@ export class SchedulerService {
   }
 
   /**
-  * Schedule jobs for events after server restart.
-  * It checks events and schedules jobs accordingly.
-  */
+   * Schedule jobs for events after server restart.
+   * It checks events and schedules jobs accordingly.
+   */
   public static async scheduleEventOnServerRestart() {
     try {
       const events: Event[] = await Event.find();
@@ -89,9 +89,9 @@ export class SchedulerService {
   }
 
   /**
-    * Schedule the event's publish date.
-    * Cancels previous job if it's already scheduled and reschedules.
-    */
+   * Schedule the event's publish date.
+   * Cancels previous job if it's already scheduled and reschedules.
+   */
   public static async scheduleEventPublishDate(e: Event) {
     try {
       const jobKey = `${SchedulerJobType.PUBLISH_EVENT}_${e.id}`; // Using the existing enum for job key
@@ -118,9 +118,9 @@ export class SchedulerService {
   }
 
   /**
-  * Schedule event status change to Past or Cancelled.
-  * Cancels previous job if it's already scheduled and reschedules.
-  */
+   * Schedule event status change to Past or Cancelled.
+   * Cancels previous job if it's already scheduled and reschedules.
+   */
   public static async scheduleEventPastAndCancelledDate(e: Event) {
     try {
       const jobKey = `${SchedulerJobType.PAST_OR_CANCEL_EVENT}_${e.id}`; // Using the existing enum for job key
@@ -153,7 +153,7 @@ export class SchedulerService {
     }
   }
 
-  public static async scheduleUserHardDelete() { }
+  public static async scheduleUserHardDelete() {}
 
   /**
    * Schedules an event reminder 24 hours before the event's start time.
