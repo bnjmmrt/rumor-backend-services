@@ -3158,6 +3158,8 @@ export class GuestService {
     if (guest.status === GuestStatus.CONFIRMED)
       throw new BadRequestError('Guest is already confirmed');
     guest.status = GuestStatus.CONFIRMED;
+    guest.maxAdditionalGuests = payload.limitOnePlus;
+    guest.additionalRequestedGuests = payload.limitOnePlus;
     await this.dbConnection.getRepository(Guest).save(guest);
     return '';
   }
