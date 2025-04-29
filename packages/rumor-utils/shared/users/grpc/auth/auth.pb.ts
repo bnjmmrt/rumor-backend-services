@@ -484,6 +484,7 @@ export interface Member {
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
   sources?: string[] | undefined;
+  isRoleDeactivated?: boolean | undefined;
 }
 
 export interface GetMembersResponse {
