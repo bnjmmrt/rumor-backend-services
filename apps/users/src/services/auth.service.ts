@@ -3467,6 +3467,23 @@ export class AuthService {
         where: { host: { id: payload.id }, user: { id: existingUser.id } },
       });
 
+      const userWithRoles = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: ['roles', 'roles.role'],
+      });
+
+      const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
+        ['member', 'non_member'].includes(userRole.role.name),
+      );
+
+      // Assign non_member if user is only a host
+      if (!hasMemberOrNonMember) {
+        await RoleService.assignRoleToUser(
+          { userId: existingUser.id, roleName: RoleType.NonMember },
+          UserSource.INVITED_BY_HOST,
+        );
+      }
+
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
