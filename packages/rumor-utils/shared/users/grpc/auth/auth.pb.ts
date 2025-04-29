@@ -22,6 +22,7 @@ import {
   UserSource,
   UserStatus,
 } from './shared.pb';
+import {IReferenceCode} from "../../mappers/auth.mapper";
 
 export const protobufPackage = 'auth';
 
@@ -484,6 +485,7 @@ export interface Member {
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
   sources?: string[] | undefined;
+  references?: IReferenceCode
 }
 
 export interface GetMembersResponse {
