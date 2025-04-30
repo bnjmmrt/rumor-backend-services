@@ -573,16 +573,6 @@ export class AuthService {
       },
     });
 
-    if (user?.email && user.email !== payload.email) {
-      throw new ConflictError(
-        'This email and phone number do not belong to the same account. Please check your details.',
-      );
-    }
-    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
-      throw new ConflictError(
-        'This email and phone number do not belong to the same account. Please check your details.',
-      );
-    }
     if (user) {
       userRoleAsMemberOrNonMember = user.roles.find(
         item => item.role.name === 'non_member' || item.role.name === 'member',
@@ -614,6 +604,16 @@ export class AuthService {
       if (userHasOtherRoles) {
         throw new BadRequestError('Users with existing roles cannot sign up as a host.');
       }
+    }
+    if (user?.email && user.email !== payload.email) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
+    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
     }
 
     let newUser = newHost(payload);
