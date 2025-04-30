@@ -660,28 +660,28 @@ export class SignupFormsServices {
   public static async getOrFetchInstagramProfile(username: string): Promise<InstagramProfile> {
     const repo = database.getRepository(InstagramProfile);
     const lowerUsername = username.toLowerCase();
-  
+
     let profile = await repo.findOne({ where: { username: lowerUsername } });
-  
+
     if (profile && profile.followerCount) {
       return profile;
     }
-  
+
     // Fetch from API
     const response = await fetch(
-      `https://data.hoobe.pro/instagram/info?username_or_id_or_url=${encodeURIComponent(username)}`
+      `https://data.hoobe.pro/instagram/info?username_or_id_or_url=${encodeURIComponent(username)}`,
     );
-  
+
     if (!response.ok) throw new Error('Failed to fetch IG profile');
     const json = await response.json();
-  
+
     const followerCount = json?.data?.follower_count ?? 0;
-  
+
     profile = repo.create({
       username: lowerUsername,
       followerCount,
-      });
-  
+    });
+
     await repo.save(profile);
     return profile;
   }
@@ -932,7 +932,7 @@ export class SignupFormsServices {
       if (parsedQuery.sortBy) {
         const sortField = parsedQuery.sortBy;
         const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-      
+
         // Whitelist valid sortable fields
         const validSortFields = {
           firstName: 'atd.firstName',
@@ -943,9 +943,12 @@ export class SignupFormsServices {
           partySize: 'gst.maxAdditionalGuests', // or 'partySize' depending on what you want
           createdAt: 'sfs.created_at',
         };
-      
+
         if (validSortFields[sortField as keyof typeof validSortFields]) {
-          submissionsQuery.addOrderBy(validSortFields[sortField as keyof typeof validSortFields], sortDirection);
+          submissionsQuery.addOrderBy(
+            validSortFields[sortField as keyof typeof validSortFields],
+            sortDirection,
+          );
         } else {
           // fallback
           submissionsQuery.addOrderBy('sfs.id', 'DESC');
@@ -959,19 +962,19 @@ export class SignupFormsServices {
       const submissionList = await submissionsQuery.getRawMany();
 
       const processed = await Promise.all(
-        submissionList.map(async (submission) => {
+        submissionList.map(async submission => {
           console.log('submission', submission);
           const answers = submission.answers || [];
           const instagramAnswer = answers.find((ans: any) =>
-            ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(ans.name)
+            ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(ans.name),
           );
-      
+
           if (!instagramAnswer?.answers) {
             return { ...submission, followerCount: null };
           }
-      
+
           const cleanUsername = instagramAnswer.answers.replace('@', '').trim().toLowerCase();
-      
+
           try {
             const igProfile = await this.getOrFetchInstagramProfile(cleanUsername);
             console.log('igProfile', igProfile);
@@ -981,7 +984,7 @@ export class SignupFormsServices {
 
             return { ...submission, followerCount: null };
           }
-        })
+        }),
       );
 
       if (parsedQuery.sortBy === 'instagramFollowers') {

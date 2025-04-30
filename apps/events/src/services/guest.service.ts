@@ -3937,12 +3937,9 @@ export class GuestService {
       }
     }
 
-
     if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
       throw new ValidationError('You cannot add yourself to an event');
     }
-
-
 
     if (
       payload.phoneNumber &&
