@@ -19,6 +19,7 @@ import {
   TicketBreakdownResponse,
 } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 import { TicketBreakdown as ProtoTicketBreakdown } from 'rumor-utils/shared/events/grpc/events/general.pb';
+import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 
 interface ExtendedTicketBreakdown extends ProtoTicketBreakdown {
   attendeeCount: number;
@@ -31,6 +32,8 @@ interface TicketTypeBreakdown {
   capacity: number;
   enabled: boolean;
   attendeeCount: number;
+  confirmedCount: number;
+  pendingCount: number;
 }
 
 export class TicketTypeService {
@@ -188,13 +191,24 @@ export class TicketTypeService {
     // Get attendee count for each ticket type
     const ticketTypesWithCounts = await Promise.all(
       ticketTypes.map(async ticketType => {
-        const attendeeCount = await this.dbConnection.getRepository(Guest).count({
-          where: {
-            event: { id: event.id },
-            ticketType: { id: ticketType.id },
-            deletedAt: IsNull(),
-          },
-        });
+        const [confirmedCount, pendingCount] = await Promise.all([
+          this.dbConnection.getRepository(Guest).count({
+            where: {
+              event: { id: event.id },
+              ticketType: { id: ticketType.id },
+              status: GuestStatus.CONFIRMED,
+              deletedAt: IsNull(),
+            },
+          }),
+          this.dbConnection.getRepository(Guest).count({
+            where: {
+              event: { id: event.id },
+              ticketType: { id: ticketType.id },
+              status: GuestStatus.INVITED,
+              deletedAt: IsNull(),
+            },
+          }),
+        ]);
 
         return {
           id: ticketType.id,
@@ -202,7 +216,9 @@ export class TicketTypeService {
           description: ticketType.description,
           capacity: ticketType.capacity,
           enabled: ticketType.enabled,
-          attendeeCount,
+          attendeeCount: confirmedCount + pendingCount,
+          confirmedCount,
+          pendingCount,
         };
       }),
     );

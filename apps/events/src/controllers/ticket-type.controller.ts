@@ -20,6 +20,15 @@ import { TicketType } from 'packages/rumor-utils/shared/entities';
 import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
+interface TicketTypeBreakdown {
+  id: string;
+  name: string;
+  description: string;
+  capacity: number;
+  enabled: boolean;
+  attendeeCount: number;
+}
+
 export class TicketTypeController {
   constructor(private readonly ticketTypeService: TicketTypeService) {}
 
@@ -77,8 +86,7 @@ export class TicketTypeController {
     async (req: Request, res: Response): Promise<void> => {
       const { id } = req.params;
       const payload: RequestByIdDto = { id };
-      const ticketTypeResponse: TicketBreakdownResponse[] =
-        await TicketTypeService.getTicketBreakdown(payload);
+      const ticketTypeResponse: TicketTypeBreakdown[] = await TicketTypeService.getTicketBreakdown(payload);
       const successResponse = new GetResponse(ticketTypeResponse);
       res.status(successResponse.statusCode).json(successResponse);
     },
