@@ -144,7 +144,7 @@ export class EventsController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
   public static getEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     // const { user: userId } = req
-    const userId = (req as any).user;
+    const userId = 'cf446353-8245-41f4-971b-ec817027f32e'; //(req as any).user;
     const { id } = req.params;
     const payload: UserAndIdRequestDto = { id, userId };
     // const id = req.params.id;
