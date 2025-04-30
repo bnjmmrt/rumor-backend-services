@@ -1837,7 +1837,7 @@ export class AuthService {
       payload.email = payload.email.trim().toLowerCase();
     }
     console.log("start hostLogin")
-    const user = await this.dbConnection.getRepository(User).findOne({
+    const user = await User.findOne({
       where: {
         email: payload.email,
         deletedAt: IsNull(),
@@ -1859,7 +1859,7 @@ export class AuthService {
 
     let authenticatedUser = null;
     const request: LoginRequest = {
-      loginId: user.email,
+      loginId: payload.email,
       password: payload.password,
     };
 
@@ -1884,6 +1884,8 @@ export class AuthService {
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );
     }
+    console.log('fusion auth Logged In successful');
+
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
