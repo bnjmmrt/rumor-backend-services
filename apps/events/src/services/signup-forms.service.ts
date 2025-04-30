@@ -39,6 +39,7 @@ import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interface
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
+import { InstagramProfile } from 'rumor-utils/shared/users/entities/instagram-profile';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -656,6 +657,35 @@ export class SignupFormsServices {
     }
   }
 
+  public static async getOrFetchInstagramProfile(username: string): Promise<InstagramProfile> {
+    const repo = database.getRepository(InstagramProfile);
+    const lowerUsername = username.toLowerCase();
+  
+    let profile = await repo.findOne({ where: { username: lowerUsername } });
+  
+    if (profile && profile.followerCount) {
+      return profile;
+    }
+  
+    // Fetch from API
+    const response = await fetch(
+      `https://data.hoobe.pro/instagram/info?username_or_id_or_url=${encodeURIComponent(username)}`
+    );
+  
+    if (!response.ok) throw new Error('Failed to fetch IG profile');
+    const json = await response.json();
+  
+    const followerCount = json?.data?.follower_count ?? 0;
+  
+    profile = repo.create({
+      username: lowerUsername,
+      followerCount,
+      });
+  
+    await repo.save(profile);
+    return profile;
+  }
+
   public static async listSubmissions(id: string, hostId: string, payload: any) {
     try {
       const signupForm = await EventSignupForms.findOne({
@@ -899,25 +929,73 @@ export class SignupFormsServices {
       }
 
       // Apply sorting
-      if (parsedQuery.sortBy === 'name') {
+      if (parsedQuery.sortBy) {
+        const sortField = parsedQuery.sortBy;
         const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-        submissionsQuery
-          .addOrderBy('atd.firstName', sortDirection)
-          .addOrderBy('atd.lastName', sortDirection)
-          .offset(skip)
-          .limit(take);
+      
+        // Whitelist valid sortable fields
+        const validSortFields = {
+          firstName: 'atd.firstName',
+          lastName: 'atd.lastName',
+          email: 'atd.email',
+          phone: 'atd.phone_number',
+          status: 'gst.status',
+          partySize: 'gst.maxAdditionalGuests', // or 'partySize' depending on what you want
+          createdAt: 'sfs.created_at',
+        };
+      
+        if (validSortFields[sortField as keyof typeof validSortFields]) {
+          submissionsQuery.addOrderBy(validSortFields[sortField as keyof typeof validSortFields], sortDirection);
+        } else {
+          // fallback
+          submissionsQuery.addOrderBy('sfs.id', 'DESC');
+        }
       } else {
-        submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
+        submissionsQuery.addOrderBy('sfs.id', 'DESC');
       }
 
       // Execute queries
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
 
+      const processed = await Promise.all(
+        submissionList.map(async (submission) => {
+          console.log('submission', submission);
+          const answers = submission.answers || [];
+          const instagramAnswer = answers.find((ans: any) =>
+            ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(ans.name)
+          );
+      
+          if (!instagramAnswer?.answers) {
+            return { ...submission, followerCount: null };
+          }
+      
+          const cleanUsername = instagramAnswer.answers.replace('@', '').trim().toLowerCase();
+      
+          try {
+            const igProfile = await this.getOrFetchInstagramProfile(cleanUsername);
+            console.log('igProfile', igProfile);
+            return { ...submission, followerCount: igProfile.followerCount };
+          } catch (e) {
+            console.error(`IG fetch failed for ${cleanUsername}:`, e);
+
+            return { ...submission, followerCount: null };
+          }
+        })
+      );
+
+      if (parsedQuery.sortBy === 'instagramFollowers') {
+        processed.sort((a, b) => {
+          const fa = a.followerCount || 0;
+          const fb = b.followerCount || 0;
+          return parsedQuery.sortDirection === 'DESC' ? fb - fa : fa - fb;
+        });
+      }
+
       console.log('Filter params received:', parsedQuery); // Debug log
       console.log('Total count after filtering:', count); // Debug log
 
-      const result = { count, result: submissionList };
+      const result = { count, result: processed };
       return result;
     } catch (err) {
       throw err;
