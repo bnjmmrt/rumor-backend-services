@@ -198,6 +198,7 @@ export interface EventData {
   userId?: string | undefined;
   featuredEventSection?: FeaturedEventSection | undefined;
   timeZone?: string | undefined;
+  createdAt?: string | undefined;
   invitationDeclinedBy?: string | undefined;
   isPublished?: boolean | undefined;
   totalCheckedInGuests?: number | undefined;
