@@ -36,6 +36,9 @@ import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notifica
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
 import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
+import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
+import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -385,6 +388,20 @@ export class SignupFormsServices {
     await queryRunner.manager.save(userRole);
   }
 
+  private static async assignRoleToUser(payload: User, queryRunner: QueryRunner) {
+    const nonMemberRole: Role[] = await this.dbConnection
+      .getRepository(Role)
+      .find({ where: { name: 'non_member' } });
+
+    const userRole = UserRole.create({
+      role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
+      user: { id: payload.id },
+    });
+
+    await queryRunner.manager.save(userRole);
+  }
+
   private static async validateUserAsGuest(
     eventId: string,
     userPayload: User,
@@ -495,6 +512,13 @@ export class SignupFormsServices {
 
       if (!userPayload.id) {
         await this.registerUserAsNonMember(userPayload, queryRunner);
+      }
+
+      const isMemberOrNonMember = userPayload?.roles?.some(userRole =>
+        ['member', 'non_member'].includes(userRole.role.name),
+      );
+      if (!isMemberOrNonMember) {
+        await this.assignRoleToUser(userPayload, queryRunner);
       }
 
       /**--Create Submissions */
@@ -658,31 +682,52 @@ export class SignupFormsServices {
       const signupForm = await EventSignupForms.findOne({
         where: { id: id, createdBy: { id: hostId } },
       });
-
       if (!signupForm) {
         throw new ForbiddenError('SignupForm does not exists');
       }
 
       const parsedQuery = parse(payload);
       const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-
       const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-
       const searchValue =
         parsedQuery.findByName && typeof parsedQuery.findByName === 'string'
           ? parsedQuery.findByName.toLowerCase()
           : '';
 
-      // const count = await SignupFormSubmissions.count({
-      //   where: {
-      //     signupForm: { id: id },
-      //   },
-      // });
+      // Parse filter values - following the getAllUsers approach
+      let userTypes = [];
+      if (parsedQuery.type && typeof parsedQuery.type === 'string') {
+        userTypes = parsedQuery.type.split(',').map(name => name.trim());
+      }
 
+      let customListNames: string[] = [];
+      const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
+      let favorite = false;
+      let followed = false;
+
+      if (parsedQuery.list && parsedQuery.list.length) {
+        if (parsedQuery.list && typeof parsedQuery.list === 'string') {
+          const allListNames = parsedQuery.list.split(',').map(name => name.trim());
+          // Separate system default lists and update customListName
+          const separatedLists = allListNames.filter(item => systemDefaultLists.includes(item));
+          customListNames = allListNames.filter(item => !systemDefaultLists.includes(item));
+          favorite = separatedLists.includes('myFavourites-systemDefault');
+          followed = separatedLists.includes('myFollowers-systemDefault');
+        }
+      }
+
+      let pastEventsIds: string[] =
+        (parsedQuery.pastEvents as string)
+          ?.split(',')
+          .map(id => id.trim())
+          .filter(node => node) || [];
+
+      // Create base queries
       const getCountQuery = database
         .getRepository(SignupFormSubmissions)
         .createQueryBuilder('sfs')
         .innerJoin('sfs.attendees', 'atd')
+        .innerJoin('sfs.guest', 'gst')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
 
       const submissionsQuery = database
@@ -702,28 +747,179 @@ export class SignupFormsServices {
         .addSelect('gst.id', 'guestId')
         .addSelect('gst.user_id', 'userId')
         .addSelect('gst.maxAdditionalGuests + 1', 'partySize')
+        .addSelect('sfs.answers', 'answers')
         .where('sfs.signup_form_id = :signupFormId', { signupFormId: id });
+
+      // Apply search conditions
       if (searchValue) {
         const searchWords = searchValue.trim().split(/\s+/);
         getCountQuery.andWhere(
-          new Brackets(qb => {
-            searchWords.forEach(word => {
-              qb.orWhere('atd.firstName ILIKE :word', {
-                word: `%${word}%`,
-              }).orWhere('atd.lastName ILIKE :word', { word: `%${word}%` });
+          new Brackets(qbOuter => {
+            searchWords.forEach((word, index) => {
+              qbOuter.andWhere(
+                new Brackets(qbInner => {
+                  qbInner
+                    .orWhere(`atd.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
+                    .orWhere(`atd.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+                }),
+              );
             });
           }),
         );
+
         submissionsQuery.andWhere(
-          new Brackets(qb => {
-            searchWords.forEach(word => {
-              qb.orWhere('atd.firstName ILIKE :word', {
-                word: `%${word}%`,
-              }).orWhere('atd.lastName ILIKE :word', { word: `%${word}%` });
+          new Brackets(qbOuter => {
+            searchWords.forEach((word, index) => {
+              qbOuter.andWhere(
+                new Brackets(qbInner => {
+                  qbInner
+                    .orWhere(`atd.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
+                    .orWhere(`atd.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+                }),
+              );
             });
           }),
         );
       }
+
+      // Apply type filter - similar to getAllUsers
+      if (userTypes.length) {
+        getCountQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('ur.user_id')
+            .from('user_role', 'ur')
+            .innerJoin('role', 'r', 'ur.role_id = r.id')
+            .where('r.name IN (:...roleNames)', { roleNames: userTypes })
+            .getQuery();
+          return `atd.id IN ${subQuery}`;
+        });
+
+        submissionsQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('ur.user_id')
+            .from('user_role', 'ur')
+            .innerJoin('role', 'r', 'ur.role_id = r.id')
+            .where('r.name IN (:...roleNames)', { roleNames: userTypes })
+            .getQuery();
+          return `atd.id IN ${subQuery}`;
+        });
+      }
+
+      // Apply list filters (favorites, followed, custom lists) - similar to getAllUsers
+      if (favorite || followed || customListNames.length > 0) {
+        getCountQuery.andWhere(
+          new Brackets(qb => {
+            if (favorite) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('hostFavorite.member.id')
+                  .from(HostFavorite, 'hostFavorite')
+                  .where('hostFavorite.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+            if (followed) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('hostFollow.follower.id')
+                  .from(HostFollowing, 'hostFollow')
+                  .where('hostFollow.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+            if (customListNames.length > 0) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('listUsers.user.id')
+                  .from(HostCustomUsersLists, 'customList')
+                  .innerJoin('customList.usersLists', 'listUsers')
+                  .where('customList.listName IN (:...customListNames)', { customListNames })
+                  .andWhere('customList.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+          }),
+        );
+
+        submissionsQuery.andWhere(
+          new Brackets(qb => {
+            if (favorite) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('hostFavorite.member.id')
+                  .from(HostFavorite, 'hostFavorite')
+                  .where('hostFavorite.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+            if (followed) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('hostFollow.follower.id')
+                  .from(HostFollowing, 'hostFollow')
+                  .where('hostFollow.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+            if (customListNames.length > 0) {
+              qb.orWhere(subQb => {
+                const subQuery = subQb
+                  .subQuery()
+                  .select('listUsers.user.id')
+                  .from(HostCustomUsersLists, 'customList')
+                  .innerJoin('customList.usersLists', 'listUsers')
+                  .where('customList.listName IN (:...customListNames)', { customListNames })
+                  .andWhere('customList.host.id = :hostId', { hostId })
+                  .getQuery();
+                return `atd.id IN ${subQuery}`;
+              });
+            }
+          }),
+        );
+      }
+
+      // Apply past events filter - similar to getAllUsers
+      if (pastEventsIds.length) {
+        const confirmedStatus = GuestStatus.CONFIRMED;
+
+        getCountQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('g.user_id')
+            .from(Guest, 'g')
+            .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+            .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+            .andWhere('g.check_in = true')
+            .getQuery();
+          return 'atd.id IN ' + subQuery;
+        });
+
+        submissionsQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('g.user_id')
+            .from(Guest, 'g')
+            .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+            .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+            .andWhere('g.check_in = true')
+            .getQuery();
+          return 'atd.id IN ' + subQuery;
+        });
+      }
+
+      // Apply sorting
       if (parsedQuery.sortBy === 'name') {
         const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
         submissionsQuery
@@ -735,13 +931,26 @@ export class SignupFormsServices {
         submissionsQuery.orderBy('sfs.id', 'DESC').offset(skip).limit(take);
       }
 
+      // Execute queries
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
+
+      console.log('Filter params received:', parsedQuery); // Debug log
+      console.log('Total count after filtering:', count); // Debug log
+
       const result = { count, result: submissionList };
       return result;
     } catch (err) {
       throw err;
     }
+  }
+
+  public static async getSignupFormQuestions(id: string) {
+    //get all questions for a signup form
+    const signupForm = await SignupFormQuestions.find({
+      where: { signupForms: { id: id } },
+    });
+    return signupForm;
   }
 
   // public static async setName(id: string, name: string) {

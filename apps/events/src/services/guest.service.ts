@@ -120,6 +120,8 @@ import {
 } from '../utils/emails.utils';
 import { sendSmsNotification } from '../utils/sms.utils';
 import * as dayjs from 'dayjs';
+import { Role, UserRole } from 'rumor-utils/shared/entities';
+import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 export class GuestService {
   public static dbConnection = database;
 
@@ -550,6 +552,14 @@ export class GuestService {
             where: [{ id: userId }],
             relations: { roles: { role: true } },
           });
+
+          const hasMemberOrNonMember = user?.roles?.some(userRole =>
+            ['member', 'non_member'].includes(userRole.role.name),
+          );
+
+          if (!hasMemberOrNonMember) {
+            this.assignRoleToUser(user);
+          }
           // const user = (await serviceMesh.userService().getUser(userId)).data;
           if (!user) return null;
           const existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
@@ -3552,28 +3562,6 @@ export class GuestService {
 
     // Execute all guest invites concurrently
     const invitedGuestsResults = await Promise.all(invites);
-    const eventId = guests[0].eventId;
-    const userId = guests[0].userId;
-
-    const leadGuest = await this.dbConnection.getRepository(Guest).findOne({
-      where: {
-        event: { id: eventId },
-        user: { id: userId },
-        status: GuestStatus.CONFIRMED,
-        deletedAt: IsNull(),
-      },
-      relations: {
-        user: true,
-        ticketType: true,
-      },
-    });
-    const additionalGuests = await this.dbConnection.getRepository(Guest).find({
-      relations: ['user', 'ticketType', 'declinedBy', 'user.address'],
-      where: { addedBy: { id: leadGuest.user.id }, event: { id: eventId } },
-    });
-
-    leadGuest.maxAdditionalGuests = additionalGuests.length;
-    await this.dbConnection.getRepository(Guest).save(leadGuest);
     const invitedGuests: GuestDataSimple[] = invitedGuestsResults.filter(
       Boolean,
     ) as GuestDataSimple[];
@@ -3683,7 +3671,7 @@ export class GuestService {
       });
       const mappingSet = new Set(existingMappings.map(mapping => mapping.user.id));
       // Step 6: Remove users from validData who were moved to garbageData
-      updatedValidData = validData.filter(row => {
+      updatedValidData = validData.filter(async row => {
         if (removedEmails.has(row.email)) {
           return false; // Remove from validData
         }
@@ -3709,6 +3697,20 @@ export class GuestService {
             if (row.phoneNumber) userMap.delete(row.phoneNumber);
             return false; // Remove from validData
           }
+
+          const userWithRoles = await this.dbConnection.getRepository(User).findOne({
+            where: { id: existingUserData.id },
+            relations: ['roles', 'roles.role'],
+          });
+
+          const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
+            ['member', 'non_member'].includes(userRole.role.name),
+          );
+
+          if (!hasMemberOrNonMember) {
+            this.assignRoleToUser(existingUserData);
+          }
+
           newMappings.push({
             user: existingUserData,
             host: { id: payload.hostId },
@@ -3801,6 +3803,20 @@ export class GuestService {
       errFileUrl: errFileUrl,
       errFilepath: errFilePath,
     };
+  }
+
+  private static async assignRoleToUser(payload: User) {
+    const nonMemberRole: Role[] = await this.dbConnection
+      .getRepository(Role)
+      .find({ where: { name: 'non_member' } });
+
+    const userRole = this.dbConnection.getRepository(UserRole).create({
+      role: { id: nonMemberRole[0].id },
+      source: UserSourceEnum.SIGN_UP_FORM,
+      user: { id: payload.id },
+    });
+
+    await this.dbConnection.getRepository(UserRole).save(userRole);
   }
 
   /**

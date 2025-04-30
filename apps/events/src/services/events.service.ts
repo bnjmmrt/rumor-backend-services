@@ -2490,7 +2490,12 @@ export class EventsService {
         },
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
-        if (!eventFromDb.isPublished && eventFromDb.publishDate) {
+        if (
+          !eventFromDb.isPublished &&
+          eventFromDb.publishDate &&
+          new Date(eventFromDb.publishDate)?.getTime() !==
+            new Date(eventCopy.publishDate)?.getTime()
+        ) {
           try {
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.PUBLISH_EVENT,
@@ -2505,7 +2510,10 @@ export class EventsService {
           }
         }
         //update scheduler if event start date has been change
-        if (payload?.startDate) {
+        if (
+          eventFromDb?.startDate &&
+          new Date(eventFromDb.startDate)?.getTime() !== new Date(eventCopy.startDate)?.getTime()
+        ) {
           try {
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.REMINDER_EVENT,
@@ -2522,9 +2530,10 @@ export class EventsService {
         }
       }
       if (
-        payload?.endDate &&
         (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
-          eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS) &&
+        eventFromDb?.endDate &&
+        new Date(eventFromDb.endDate)?.getTime() !== new Date(eventCopy.endDate)?.getTime()
       ) {
         try {
           let data: SchedulerTriggerPayload = {
@@ -2642,9 +2651,7 @@ export class EventsService {
       where: { id: eventId },
       relations: { location: true },
     });
-    const guestStatuses: GuestStatus[] = [
-      GuestStatus.CONFIRMED,
-    ];
+    const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
     const guests = await this.dbConnection
       .getRepository(Guest)
       .createQueryBuilder('guest')
