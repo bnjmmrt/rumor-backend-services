@@ -3,6 +3,7 @@ import { UpdateTalentRequest } from '../grpc/events/events.pb';
 
 export class UpdateTalentRequestDto implements UpdateTalentRequest {
   @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
   id: string;
 
@@ -22,9 +23,9 @@ export class UpdateTalentRequestDto implements UpdateTalentRequest {
   @IsString()
   socialNetwork?: string;
 
-  @IsOptional()
+ @IsNotEmpty()
   @IsString()
-  imageKeyUrl?: string;
+  imageKeyUrl: string;
 
   @IsOptional()
   @IsBoolean()
@@ -35,6 +36,6 @@ export class UpdateTalentRequestDto implements UpdateTalentRequest {
   eventId?: string;
 
   @IsString()
-  @IsOptional()
-  action?: string;
+  @IsNotEmpty()
+  action: string;
 }

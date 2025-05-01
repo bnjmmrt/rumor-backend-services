@@ -45,6 +45,7 @@ import {
 } from './general.pb';
 
 export const protobufPackage = 'events';
+import { CollaboratorRoles as CollaboratorRolesInterface } from '../../interfaces/event.interface';
 
 /** Empty Request */
 export interface EmptyRequest {}
@@ -109,7 +110,7 @@ export interface AdmissionTypesResponse {
 /** Create Ticket Types */
 export interface CreateTicketTypeRequest {
   name: string;
-  description: string;
+  description?: string| undefined;
   capacity?: number | undefined;
   eventId?: string | undefined;
 }
@@ -118,11 +119,11 @@ export interface CreateTicketTypeRequest {
 export interface UpdateTicketTypeRequest {
   id?: string | undefined;
   name: string;
-  description: string;
-  capacity: number;
+  description?: string;
+  capacity?: number;
   enabled?: boolean | undefined;
   eventId?: string | undefined;
-  action?: string | undefined;
+  action: string;
   reassignTo?: ReassignTo | undefined;
 }
 
@@ -145,7 +146,7 @@ export interface CreateTalentRequest {
   contact?: string | undefined;
   socialNetwork?: string | undefined;
   description?: string | undefined;
-  imageKeyUrl?: string | undefined;
+  imageKeyUrl: string;
   eventId?: string | undefined;
 }
 
@@ -156,7 +157,7 @@ export interface UpdateTalentRequest {
   contact?: string | undefined;
   socialNetwork?: string | undefined;
   description?: string | undefined;
-  imageKeyUrl?: string | undefined;
+  imageKeyUrl: string ;
   enabled?: boolean | undefined;
   eventId?: string | undefined;
   action?: string | undefined;
@@ -242,23 +243,23 @@ export interface QuizQuestionsResponse {
 /** Create Event */
 export interface CreateEventRequest {
   name: string;
-  description?: string | undefined;
+  description: string;
   enabled?: boolean | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
+  startDate: string;
+  endDate: string;
   limitOnePlus?: number | undefined;
   ageLimitId?: string | undefined;
   rsvpDeadline?: string | undefined;
-  useQr?: boolean | undefined;
-  imageFlyer?: string | undefined;
+  useQr: boolean;
+  imageFlyer: string;
   imageCover?: string | undefined;
-  eventTypeId?: string | undefined;
-  eventLocation?: EventLocation | undefined;
+  eventTypeId: string;
+  eventLocation: EventLocation;
   furtherInstructions?: string | undefined;
   showLocation?: boolean | undefined;
   admissionTypeId?: string | undefined;
-  status?: string | undefined;
-  ownerId?: string | undefined;
+  status: string;
+  ownerId: string;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   capacity?: number | undefined;
@@ -266,12 +267,12 @@ export interface CreateEventRequest {
   talents: CreateTalentRequest[];
   collaborators: CreateCollaboratorRequest[];
   quizQuestions: CreateQuizQuestionRequest[];
-  timeZone?: string | undefined;
+  timeZone: string;
 }
 
 /** Update Event */
 export interface UpdateEventRequest {
-  id: string;
+  // id: string;
   name?: string | undefined;
   description?: string | undefined;
   enabled?: boolean | undefined;
@@ -333,7 +334,7 @@ export interface CreateCollaboratorRequest {
   displayName?: string | undefined;
   displayNameListEvent: boolean;
   limitInvitations: boolean;
-  role: RoleCollaboratorEnum;
+  role: CollaboratorRolesInterface;
   editEventDetailsSettings: boolean;
   inviteGuestsToEvent: boolean;
   addGuestsToDrafts: boolean;
@@ -346,32 +347,32 @@ export interface CreateCollaboratorRequest {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+   limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
 }
 
 /** Update Collaborator */
 export interface UpdateCollaboratorRequest {
   id?: string | undefined;
-  email?: string | undefined;
-  role?: RoleCollaboratorEnum | undefined;
+  email: string | undefined;
+  role: CollaboratorRolesInterface;
   displayName?: string | undefined;
-  displayNameListEvent?: boolean | undefined;
-  limitInvitations?: boolean | undefined;
+  displayNameListEvent: boolean | undefined;
+  limitInvitations: boolean | undefined;
   eventId?: string | undefined;
-  editEventDetailsSettings?: boolean | undefined;
-  inviteGuestsToEvent?: boolean | undefined;
-  addGuestsToDrafts?: boolean | undefined;
-  chatWithAllGuests?: boolean | undefined;
-  chatWithGuestsByCollaborator?: boolean | undefined;
-  viewFullGuestList?: boolean | undefined;
-  manageInAppRsvpRequests?: boolean | undefined;
-  manageDedicatedSignUpForm?: boolean | undefined;
-  postAnnouncementsToAllGuests?: boolean | undefined;
-  postAnnouncementsByCollaborator?: boolean | undefined;
-  checkInGuests?: boolean | undefined;
-  generateEventReports?: boolean | undefined;
-  limitInvitationsNumber?: number | undefined;
+  editEventDetailsSettings: boolean | undefined;
+  inviteGuestsToEvent: boolean | undefined;
+  addGuestsToDrafts: boolean | undefined;
+  chatWithAllGuests: boolean | undefined;
+  chatWithGuestsByCollaborator: boolean | undefined;
+  viewFullGuestList: boolean | undefined;
+  manageInAppRsvpRequests: boolean | undefined;
+  manageDedicatedSignUpForm: boolean | undefined;
+  postAnnouncementsToAllGuests: boolean | undefined;
+  postAnnouncementsByCollaborator: boolean | undefined;
+  checkInGuests: boolean | undefined;
+  generateEventReports: boolean | undefined;
+   limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   action?: string | undefined;
 }

@@ -310,7 +310,7 @@ export interface CollaboratorsEvent {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   companyLogo?: string | undefined;
   companyName?: string | undefined;
@@ -338,7 +338,7 @@ export interface Collaborator {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   ticketType?: TicketType | undefined;
 }
 
@@ -354,13 +354,12 @@ export interface EventAddress {
 }
 
 export interface EventLocation {
-  placeId?: string | undefined;
-  location?: string | undefined;
-  latitude?: number | undefined;
-  longitude?: number | undefined;
-  city?: string | undefined;
+  placeId?: string;
+  location?: string ;
+  latitude?: number ;
+  longitude?: number ;
+  city?: string;
   regionCode?: string | undefined;
-  id?: string | undefined;
 }
 
 export interface EventAgeLimit {

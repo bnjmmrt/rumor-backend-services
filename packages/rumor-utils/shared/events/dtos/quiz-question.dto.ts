@@ -43,6 +43,10 @@ export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
 
   @IsString()
   @IsNotEmpty()
+  // @Transform(({ value }) => value?.trim())
+  // @Matches(/^(?!\s*question\s*$).+/i, {
+  //   message: 'Question should be edited before submitting',
+  // })
   question: string;
 
   @IsBoolean()

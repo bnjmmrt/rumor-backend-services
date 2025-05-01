@@ -25,7 +25,7 @@ export class Event extends RumorBaseEntity {
   name: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'description' })
-  description?: string;
+  description: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'further_instructions' })
   furtherInstructions?: string;
@@ -34,13 +34,13 @@ export class Event extends RumorBaseEntity {
   enabled: boolean;
 
   @Column({ type: 'timestamptz', nullable: true, name: 'start_date' })
-  startDate?: Date;
+  startDate: Date;
 
   @Column({ type: 'timestamptz', nullable: true, name: 'end_date' })
-  endDate?: Date;
+  endDate: Date;
 
   @Column({ type: 'varchar', nullable: true, name: 'timezone' })
-  timeZone?: string;
+  timeZone: string;
 
   @Column({ type: 'integer', nullable: true, name: 'limit_one_plus' })
   limitOnePlus?: number;
@@ -55,7 +55,7 @@ export class Event extends RumorBaseEntity {
   useQr: boolean;
 
   @Column({ type: 'varchar', nullable: true, name: 'image_flyer' })
-  imageFlyer?: string;
+  imageFlyer: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'image_cover' })
   imageCover?: string;
@@ -98,15 +98,15 @@ export class Event extends RumorBaseEntity {
 
   @ManyToOne(() => EventTypes, { nullable: true, cascade: true })
   @JoinColumn({ name: 'event_type_id' })
-  eventType?: EventTypes;
+  eventType: EventTypes;
 
   @ManyToOne(() => EventLocation, { nullable: true, cascade: true })
   @JoinColumn({ name: 'event_location_id', referencedColumnName: 'id' })
-  location?: EventLocation;
+  location: EventLocation;
 
   @ManyToOne(() => EventAgeLimit, { nullable: true, cascade: true })
   @JoinColumn({ name: 'event_age_limit_id', referencedColumnName: 'id' })
-  ageLimit?: EventAgeLimit;
+  ageLimit: EventAgeLimit;
 
   @ManyToOne(() => AdmissionType, { nullable: true, cascade: true })
   @JoinColumn({ name: 'admission_type_id', referencedColumnName: 'id' })
@@ -118,7 +118,7 @@ export class Event extends RumorBaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'owner_id', referencedColumnName: 'id' })
-  owner?: User;
+  owner: User;
 
   @OneToMany(() => Guest, guest => guest.event, { cascade: true, onDelete: 'CASCADE' })
   guests: Guest[];
@@ -131,7 +131,7 @@ export class Event extends RumorBaseEntity {
     cascade: true,
     onDelete: 'CASCADE',
   })
-  featuredEventSection: FeaturedEventSection;
+  featuredEventSection?: FeaturedEventSection;
 
   @OneToMany(() => CsvUploadRecords, csvUploads => csvUploads.event, {
     cascade: true,
