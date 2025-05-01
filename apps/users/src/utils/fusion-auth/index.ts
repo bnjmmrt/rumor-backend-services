@@ -81,6 +81,7 @@ class AuthMiddleware {
       const fusionAuthClient = new FusionAuthClient(
         config.get('FUSIONAUTH_API_KEY'),
         config.get('FUSIONAUTH_BASE_URL'),
+        config.get('FUSIONAUTH_TENANT_ID'),
       );
       console.log(
         `Token Validation Value :::  ${config.get('FUSIONAUTH_API_KEY')}  AND ${config.get('FUSIONAUTH_BASE_URL')}`,
