@@ -1323,12 +1323,7 @@ export class EventsService {
     }
     const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
-      this.dbConnection.getRepository(Guest).count({
-        where: {
-          event: { id: payload.id },
-          status: GuestStatus.CONFIRMED,
-        },
-      }),
+      this.getTotalConfirmedGuests(payload.id, event.owner?.id),
 
       // Count total guests who have checked in.
       this.dbConnection.getRepository(Guest).count({
@@ -2406,7 +2401,7 @@ export class EventsService {
       if (payload.imageCover) {
         event.imageCover = payload.imageCover;
       }
-      if (payload.furtherInstructions) {
+      if (payload.furtherInstructions !== undefined) {
         event.furtherInstructions = payload.furtherInstructions;
       }
       if (payload.showLocation !== undefined) {
@@ -2495,7 +2490,12 @@ export class EventsService {
         },
       });
       if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
-        if (!eventFromDb.isPublished && eventFromDb.publishDate) {
+        if (
+          !eventFromDb.isPublished &&
+          eventFromDb.publishDate &&
+          new Date(eventFromDb.publishDate)?.getTime() !==
+            new Date(eventCopy.publishDate)?.getTime()
+        ) {
           try {
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.PUBLISH_EVENT,
@@ -2510,7 +2510,10 @@ export class EventsService {
           }
         }
         //update scheduler if event start date has been change
-        if (payload?.startDate) {
+        if (
+          eventFromDb?.startDate &&
+          new Date(eventFromDb.startDate)?.getTime() !== new Date(eventCopy.startDate)?.getTime()
+        ) {
           try {
             let data: SchedulerTriggerPayload = {
               type: SchedulerJobType.REMINDER_EVENT,
@@ -2527,9 +2530,10 @@ export class EventsService {
         }
       }
       if (
-        payload?.endDate &&
         (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
-          eventFromDb.status === EventStatusEnum.APPROVED_STATUS)
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS) &&
+        eventFromDb?.endDate &&
+        new Date(eventFromDb.endDate)?.getTime() !== new Date(eventCopy.endDate)?.getTime()
       ) {
         try {
           let data: SchedulerTriggerPayload = {
@@ -2647,9 +2651,7 @@ export class EventsService {
       where: { id: eventId },
       relations: { location: true },
     });
-    const guestStatuses: GuestStatus[] = [
-      GuestStatus.CONFIRMED,
-    ];
+    const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
     const guests = await this.dbConnection
       .getRepository(Guest)
       .createQueryBuilder('guest')
@@ -4026,7 +4028,7 @@ export class EventsService {
     // Step 1: Fetch guest details along with associated event.
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
-      relations: ['user', 'event'], // Load related user and event details.
+      relations: ['user', 'event', 'event.owner'], // Load related user and event details.
     });
 
     // If guest does not exist, return an error response.
@@ -4093,12 +4095,7 @@ export class EventsService {
           .findOne({ where: { id: ticket.id }, select: ['status'] }),
 
         // Count total confirmed guests for the event.
-        this.dbConnection.getRepository(Guest).count({
-          where: {
-            event: { id: guest.event.id },
-            status: GuestStatus.CONFIRMED,
-          },
-        }),
+        this.getTotalConfirmedGuests(guest.event.id, guest.event?.owner?.id),
 
         // Count total guests who have checked in.
         this.dbConnection.getRepository(Guest).count({
@@ -4118,6 +4115,19 @@ export class EventsService {
       totalConfirmedGuests,
       totalCheckedInGuests,
     };
+  }
+
+  private static async getTotalConfirmedGuests(eventId: string, userId: string): Promise<number> {
+    const { confirmed_count } = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select('SUM(COALESCE(guest.max_additional_guests, 0) + 1)', 'confirmed_count')
+      .where('guest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED })
+      .andWhere('guest.event_id = :eventId', { eventId })
+      .andWhere('guest.added_by_id = :userId', { userId })
+      .getRawOne();
+
+    return Number(confirmed_count || 0);
   }
 
   /**

@@ -254,6 +254,7 @@ export class AuthController {
   });
 
   public static getMe = asyncWrapper(async (req, res): Promise<void> => {
+    console.log('rocket got here');
     const id = (req as any).user;
     const payload: IdRequestDto = { id };
     const response: CurrentUser = await AuthService.getMe(payload);
