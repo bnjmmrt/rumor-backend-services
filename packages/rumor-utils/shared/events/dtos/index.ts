@@ -8,3 +8,4 @@ export { UpdateTalentRequestDto } from './update-talent.dto';
 export { UpdateTicketTypeRequestDto } from './ticket-type.dto';
 export { AddGuestsRequestDto, GuestsRequestDto, UpdateGuestsRequestDto } from './guest.dto';
 export { CreateEventAnnouncementDto, UpdateEventAnnouncementDto } from './event-announcements.dto';
+export { CreateEventRequestDto, UpdateEventRequestDto } from './events.dto';

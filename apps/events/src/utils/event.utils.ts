@@ -120,7 +120,7 @@ export const validateEventDates = (
     return { error: true, response: 'End Date must be valid and in UTC standard' };
   }
   // Validate publishDate (if provided)
-  if (payload.publishDate) {
+  if (payload.publishDate && !payload.isPrivate) {
     if (!isUtcDate(payload.publishDate)) {
       return { error: true, response: 'Publish Date must be valid and in UTC standard' };
     }

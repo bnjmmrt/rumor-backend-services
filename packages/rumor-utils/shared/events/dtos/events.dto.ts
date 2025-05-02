@@ -10,6 +10,8 @@ import {
   IsArray,
   ValidateNested,
   IsObject,
+  Min,
+  ArrayNotEmpty,
 } from 'class-validator';
 import {
   AddEventToFeaturedSectionRequest,
@@ -43,23 +45,23 @@ import { UpdateTalentRequestDto } from './update-talent.dto';
 
 export class EventLocationDto implements EventLocation {
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   placeId?: string;
   @IsString()
-  @IsOptional()
-  location?: string;
+  @IsNotEmpty()
+  location: string;
   @IsString()
   @IsOptional()
   regionCode?: string;
   @IsString()
-  @IsOptional()
-  city?: string;
-  @IsString()
-  @IsOptional()
-  latitude?: number;
-  @IsString()
-  @IsOptional()
-  longitude?: number;
+  @IsNotEmpty()
+  city: string;
+  @IsNumber()
+  @IsNotEmpty()
+  latitude: number;
+  @IsNumber()
+  @IsNotEmpty()
+  longitude: number;
 }
 
 export class CreateEventTypeRequestDto implements CreateEventTypeRequest {
@@ -104,48 +106,42 @@ export class CreateEventRequestDto implements CreateEventRequest {
   @IsNotEmpty()
   name: string;
   @IsString()
-  @IsOptional()
   @IsNotEmpty()
-  description?: string;
+  description: string;
   @IsBoolean()
   @IsOptional()
   enabled?: boolean;
   @IsString()
-  @IsOptional()
-  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
-  startDate?: string;
-  @IsString()
-  @IsOptional()
-  // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
-  endDate?: string;
-  @IsInt()
-  @IsOptional()
   @IsNotEmpty()
+  startDate: string;
+  @IsString()
+  @IsNotEmpty()
+  endDate: string;
+  @IsInt()
+  @Min(0)
+  @IsOptional()
   limitOnePlus?: number;
   @IsUUID()
-  @IsOptional()
   @IsNotEmpty()
-  ageLimitId?: string;
+  ageLimitId: string;
   @IsString()
   @IsOptional()
   rsvpDeadline?: string;
   @IsBoolean()
-  @IsOptional()
-  useQr?: boolean;
+  useQr: boolean;
   @IsString()
-  @IsOptional()
   @IsNotEmpty()
-  imageFlyer?: string;
+  imageFlyer: string;
   @IsString()
   @IsOptional()
   imageCover?: string;
   @IsString()
-  @IsOptional()
   @IsNotEmpty()
-  eventTypeId?: string;
+  eventTypeId: string;
   @IsObject()
-  @IsOptional()
-  eventLocation?: EventLocationDto;
+  @ValidateNested()
+  @Type(() => EventLocationDto)
+  eventLocation: EventLocationDto;
   @IsString()
   @IsOptional()
   furtherInstructions?: string;
@@ -157,28 +153,27 @@ export class CreateEventRequestDto implements CreateEventRequest {
   showLocation?: boolean;
 
   @IsString()
-  @IsOptional()
-  ownerId?: string;
+  @IsNotEmpty()
+  ownerId: string;
   @IsString()
   @IsOptional()
   // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'publishDate must be in the format MM/DD/YYYY HH:mm' })
   @IsPublishDateValid({ message: 'Publish date cannot be after the start date.' })
   publishDate?: string;
 
-  @IsEnum(EventStatusEnum)
   @IsString()
   @IsOptional()
-  status?: string;
+  status: string;
 
   @IsBoolean()
-  @IsOptional()
   @IsNotEmpty()
-  isPrivate?: boolean;
+  isPrivate: boolean;
   @IsNumber()
   @IsOptional()
   capacity?: number;
 
   @IsArray()
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => CreateTicketTypeRequestDto)
   ticketTypes: CreateTicketTypeRequestDto[];
@@ -201,33 +196,39 @@ export class CreateEventRequestDto implements CreateEventRequest {
   @IsOptional()
   quizQuestions: CreateQuizQuestionRequestDto[];
 
-  @IsOptional()
   @IsString()
-  timeZone?: string;
+  @IsNotEmpty()
+  timeZone: string;
 }
 
 export class UpdateEventRequestDto implements UpdateEventRequest {
-  @IsNotEmpty()
-  @IsString()
-  id: string;
+  // @IsNotEmpty()
+  // @IsString()
+  // @IsUUID()
+  // id: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   name?: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   description?: string;
   @IsBoolean()
   @IsOptional()
   enabled?: boolean;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'startDate must be in the format MM/DD/YYYY HH:mm' })
   startDate?: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   // @Matches(/^(0[1-9]|1[0-2])\/([0-2][0-9]|3[01])\/([0-9]{4}) ([01][0-9]|2[0-3]):[0-5][0-9]$/, { message: 'endDate must be in the format MM/DD/YYYY HH:mm' })
   endDate?: string;
   @IsInt()
+  @Min(0)
   @IsOptional()
   limitOnePlus?: number;
   @IsUUID()
@@ -241,21 +242,26 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   useQr?: boolean;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   imageFlyer?: string;
   @IsString()
   @IsOptional()
   imageCover?: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   eventTypeId?: string;
   @IsObject()
   @IsOptional()
+  @ValidateNested()
+  @Type(() => EventLocationDto)
   eventLocation?: EventLocationDto;
   @IsString()
   @IsOptional()
   furtherInstructions?: string;
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   admissionTypeId?: string;
   @IsBoolean()
   @IsOptional()
@@ -264,6 +270,7 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   @IsEnum(EventStatusEnum)
   @IsString()
   @IsOptional()
+  @IsNotEmpty()
   status?: string;
 
   @IsString()
@@ -282,6 +289,7 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   @IsOptional()
   capacity?: number;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => UpdateTicketTypeRequestDto)
@@ -309,9 +317,9 @@ export class UpdateEventRequestDto implements UpdateEventRequest {
   @IsString()
   timeZone?: string;
 
-  @IsOptional()
-  @IsString()
-  actiion?: string;
+  // @IsOptional()
+  // @IsString()
+  // action?: string;
 }
 
 export class AddressValidationDto implements AddressValidationRequest {

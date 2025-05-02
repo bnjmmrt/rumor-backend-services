@@ -1567,7 +1567,7 @@ export class EventsService {
     //  Get TicketType IDs that are being deleted (avoid duplicate deletions)
     const deleteIdsSet = new Set(
       event.ticketTypes
-        .filter((t: UpdateTicketTypeRequestDto) => t.action === 'delete')
+        .filter((t: Partial<UpdateTicketTypeRequestDto>) => t.action === 'delete')
         .map(t => t.id),
     );
     // Handle collaborator deletions
@@ -2296,8 +2296,10 @@ export class EventsService {
     }
   }
 
-  public static async updateEvent(payload: UpdateEventRequestDto): Promise<EventData> {
-    const eventId = payload.id;
+  public static async updateEvent(
+    payload: UpdateEventRequestDto,
+    eventId: string,
+  ): Promise<EventData> {
     if (!eventId) throw new BadRequestError('Event ID is required');
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
@@ -2305,7 +2307,7 @@ export class EventsService {
     //Imp Note: backend is expecting publish date should come everytime from frontend if not then set to null
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: payload.id, deletedAt: IsNull() },
+        where: { id: eventId, deletedAt: IsNull() },
         relations: [
           'owner',
           'ageLimit',
@@ -3854,11 +3856,6 @@ export class EventsService {
       .where('(owner.id = :userId)', {
         userId,
       })
-      .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', qb =>
-        qb.where('confirmedGuest.status = :confirmed', {
-          confirmed: GuestStatus.CONFIRMED,
-        }),
-      )
       .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', qb =>
         qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', {
           confirmed: GuestStatus.CONFIRMED,
@@ -3911,10 +3908,10 @@ export class EventsService {
       checkedInGuestCount: string;
       confirmedGuestCount: string;
     };
-    const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map(
-      (event: EventWithGuestCounts) => {
+    const formattedEvents: EventData[] = await Promise.all(
+      (events as EventWithGuestCounts[]).map(async (event: EventWithGuestCounts) => {
         const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
-        const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
+        const totalConfirmedGuests = await this.getTotalConfirmedGuests(event.id, userId);
         return toEvent(
           event as Event,
           totalCheckedInGuests,
@@ -3922,7 +3919,7 @@ export class EventsService {
           undefined,
           totalConfirmedGuests,
         );
-      },
+      })
     );
     return {
       result: formattedEvents,
@@ -3944,11 +3941,11 @@ export class EventsService {
       .createQueryBuilder('event')
       .leftJoin('event.owner', 'owner')
       .select([
-        'COUNT(*) FILTER (WHERE event.status = :approved) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :approved AND event."end_date" > NOW()) AS "approvedStatus"',
         'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
         'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
         'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
-        'COUNT(*) FILTER (WHERE event.status = :past) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past AND event."end_date" < NOW()) AS "pastStatus"',
         'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
       ])
       .where('event.owner_id = :userId', { userId })
@@ -3961,7 +3958,6 @@ export class EventsService {
         rejected: EventStatusEnum.REJECTED_STATUS,
       })
       .getRawOne();
-
     return (
       queryResult || {
         approvedStatus: 0,

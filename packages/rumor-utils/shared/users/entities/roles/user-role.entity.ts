@@ -31,4 +31,7 @@ export class UserRole extends RumorBaseEntity {
   @ManyToOne(() => Role, role => role.userRoles)
   @JoinColumn({ name: 'role_id' })
   role: Role;
+
+  @Column({ type: 'boolean', name: 'is_role_deactivated', default: false })
+  isRoleDeactivated: boolean;
 }
