@@ -949,11 +949,14 @@ export class SignupFormsServices {
         });
       }
 
-      // Apply sorting
-      if (parsedQuery.sortBy) {
-        const sortField = parsedQuery.sortBy;
-        const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      // Determine if we're sorting by a custom field
+      const sortField = parsedQuery.sortBy;
+      const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
+      const isCustomField =
+        sortField && typeof sortField === 'string' && sortField.startsWith('question_');
 
+      // For standard database fields, apply sorting at database level
+      if (sortField && !isCustomField) {
         // Whitelist valid sortable fields
         const validSortFields = {
           firstName: 'atd.firstName',
@@ -961,7 +964,7 @@ export class SignupFormsServices {
           email: 'atd.email',
           phone: 'atd.phone_number',
           status: 'gst.status',
-          partySize: 'gst.maxAdditionalGuests', // or 'partySize' depending on what you want
+          partySize: 'gst.maxAdditionalGuests',
           createdAt: 'sfs.created_at',
         };
 
@@ -971,10 +974,11 @@ export class SignupFormsServices {
             sortDirection,
           );
         } else {
-          // fallback
+          // Default sort if not a recognized standard field
           submissionsQuery.addOrderBy('sfs.id', 'DESC');
         }
       } else {
+        // Default sort if no sort field or custom field (we'll handle custom sorting after)
         submissionsQuery.addOrderBy('sfs.id', 'DESC');
       }
 
@@ -982,9 +986,9 @@ export class SignupFormsServices {
       const count = await getCountQuery.getCount();
       const submissionList = await submissionsQuery.getRawMany();
 
+      // Process Instagram follower counts
       const processed = await Promise.all(
         submissionList.map(async submission => {
-          console.log('submission', submission);
           const answers = submission.answers || [];
           const instagramAnswer = answers.find((ans: any) =>
             ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(ans.name),
@@ -998,28 +1002,66 @@ export class SignupFormsServices {
 
           try {
             const igProfile = await this.getOrFetchInstagramProfile(cleanUsername);
-            console.log('igProfile', igProfile);
             return { ...submission, followerCount: igProfile.followerCount };
           } catch (e) {
             console.error(`IG fetch failed for ${cleanUsername}:`, e);
-
             return { ...submission, followerCount: null };
           }
         }),
       );
 
-      if (parsedQuery.sortBy === 'instagramFollowers') {
-        processed.sort((a, b) => {
-          const fa = a.followerCount || 0;
-          const fb = b.followerCount || 0;
-          return parsedQuery.sortDirection === 'DESC' ? fb - fa : fa - fb;
-        });
+      // Apply in-memory sorting for special fields and custom questions
+      if (sortField) {
+        // Handle custom sorting for Instagram followers
+        if (sortField === 'instagramFollowers') {
+          processed.sort((a, b) => {
+            const fa = a.followerCount || 0;
+            const fb = b.followerCount || 0;
+            return sortDirection === 'DESC' ? fb - fa : fa - fb;
+          });
+        }
+
+        // Handle custom question sorting
+        else if (isCustomField) {
+          const questionId = sortField.substring(9); // Extract ID after "question_" prefix
+
+          processed.sort((a, b) => {
+            // Find the answer for the specified question ID in both submissions
+            const aAnswers = a.answers || [];
+            const bAnswers = b.answers || [];
+
+            const aAnswer = aAnswers.find((ans: any) => ans.id === questionId);
+            const bAnswer = bAnswers.find((ans: any) => ans.id === questionId);
+
+            // Extract values (or use empty string if not found)
+            const aValue = aAnswer?.answers || '';
+            const bValue = bAnswer?.answers || '';
+
+            // Sort based on value type
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+              return sortDirection === 'DESC' ? bValue - aValue : aValue - bValue;
+            }
+
+            // Default string comparison
+            if (sortDirection === 'DESC') {
+              return String(bValue).localeCompare(String(aValue));
+            } else {
+              return String(aValue).localeCompare(String(bValue));
+            }
+          });
+        }
+      }
+
+      // Apply pagination (only after all sorting is complete)
+      let paginatedResults = processed;
+      if (skip !== undefined && take !== undefined) {
+        paginatedResults = processed.slice(skip, skip + take);
       }
 
       console.log('Filter params received:', parsedQuery); // Debug log
       console.log('Total count after filtering:', count); // Debug log
 
-      const result = { count, result: processed };
+      const result = { count, result: paginatedResults };
       return result;
     } catch (err) {
       throw err;
