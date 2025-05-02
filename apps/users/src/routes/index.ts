@@ -261,6 +261,10 @@ router.delete(
   AuthController.deleteHostAccount,
 );
 
+// Instagram validation routes
+router.get('/auth/user/:id/instagram-validated', AuthController.getInstagramValidated);
+router.put('/auth/user/:id/instagram-validated', AuthController.setInstagramValidated);
+
 //Role routes
 router.get('/auth/roles', RoleController.listRoles);
 router.post('/auth/role/assign/:id', RoleController.assignRoleToUser);
