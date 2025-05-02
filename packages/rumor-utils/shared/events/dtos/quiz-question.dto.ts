@@ -33,6 +33,7 @@ export class CreateQuizQuestionRequestDto implements CreateQuizQuestionRequest {
   @IsNumber()
   @IsOptional()
   order?: number;
+  //TODO: extra action key was coming from FE, was failing this validation on submit event
 }
 
 export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
