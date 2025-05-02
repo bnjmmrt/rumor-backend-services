@@ -3944,11 +3944,11 @@ export class EventsService {
       .createQueryBuilder('event')
       .leftJoin('event.owner', 'owner')
       .select([
-        'COUNT(*) FILTER (WHERE event.status = :approved) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :approved AND event."end_date" > NOW()) AS "approvedStatus"',
         'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
         'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
         'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
-        'COUNT(*) FILTER (WHERE event.status = :past) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past AND event."end_date" < NOW()) AS "pastStatus"',
         'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
       ])
       .where('event.owner_id = :userId', { userId })
@@ -3961,7 +3961,6 @@ export class EventsService {
         rejected: EventStatusEnum.REJECTED_STATUS,
       })
       .getRawOne();
-
     return (
       queryResult || {
         approvedStatus: 0,
