@@ -161,9 +161,8 @@ export class CreateEventRequestDto implements CreateEventRequest {
   @IsPublishDateValid({ message: 'Publish date cannot be after the start date.' })
   publishDate?: string;
 
-  @IsEnum(EventStatusEnum)
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   status: string;
 
   @IsBoolean()
