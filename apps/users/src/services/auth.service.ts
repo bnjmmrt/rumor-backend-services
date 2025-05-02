@@ -2389,7 +2389,12 @@ export class AuthService {
     }
 
     const failedUsers: string[] = [];
-    const usersToUpdate: { userRole: any; newStatus?: UserStatus; newRole?: any; isRoleDeactivated?: boolean }[] = [];
+    const usersToUpdate: {
+      userRole: any;
+      newStatus?: UserStatus;
+      newRole?: any;
+      isRoleDeactivated?: boolean;
+    }[] = [];
 
     for (const user of users) {
       const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
@@ -2408,7 +2413,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              isRoleDeactivated: false,
+            });
           }
 
           await this.dbConnection.getRepository(User).update(user.id, {
@@ -2427,7 +2436,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              isRoleDeactivated: false,
+            });
           }
           break;
 
@@ -6117,7 +6130,7 @@ export class AuthService {
 
     if (targetRole) {
       // targetRole.status = UserStatus.DEACTIVATED;
-      targetRole.isRoleDeactivated = true
+      targetRole.isRoleDeactivated = true;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 

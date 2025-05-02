@@ -205,7 +205,7 @@ export const toMember = (
     phoneNumber: user.phoneNumber,
     dateOfBirth: user.dateOfBirth,
     sources,
-    isRoleDeactivated: role.isRoleDeactivated
+    isRoleDeactivated: role.isRoleDeactivated,
   };
 };
 
