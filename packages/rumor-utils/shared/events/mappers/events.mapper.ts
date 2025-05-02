@@ -91,6 +91,7 @@ export const toEvent = (
     guestId: guest?.id,
     userId: guest?.user?.id,
     timeZone: event?.timeZone,
+    createdAt: event.createdAt ? event.createdAt.toISOString() : '',
     invitationDeclinedBy: invitationDeclinedBy,
     featuredEventSection: event.featuredEventSection
       ? {
