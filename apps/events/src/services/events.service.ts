@@ -3854,11 +3854,6 @@ export class EventsService {
       .where('(owner.id = :userId)', {
         userId,
       })
-      .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', qb =>
-        qb.where('confirmedGuest.status = :confirmed', {
-          confirmed: GuestStatus.CONFIRMED,
-        }),
-      )
       .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', qb =>
         qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', {
           confirmed: GuestStatus.CONFIRMED,
@@ -3911,10 +3906,10 @@ export class EventsService {
       checkedInGuestCount: string;
       confirmedGuestCount: string;
     };
-    const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map(
-      (event: EventWithGuestCounts) => {
+    const formattedEvents: EventData[] = await Promise.all(
+      (events as EventWithGuestCounts[]).map(async (event: EventWithGuestCounts) => {
         const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
-        const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
+        const totalConfirmedGuests = await this.getTotalConfirmedGuests(event.id, userId);
         return toEvent(
           event as Event,
           totalCheckedInGuests,
@@ -3922,7 +3917,7 @@ export class EventsService {
           undefined,
           totalConfirmedGuests,
         );
-      },
+      })
     );
     return {
       result: formattedEvents,
