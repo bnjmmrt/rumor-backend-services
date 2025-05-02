@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 import { CreateTicketTypeRequest, UpdateTicketTypeRequest } from '../grpc/events/events.pb';
 import { TicketReassignToDto } from './collaborator.dto';
@@ -15,13 +16,15 @@ export class CreateTicketTypeRequestDto implements CreateTicketTypeRequest {
   @IsString()
   name: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
+  @IsOptional()
   @IsNotEmpty()
   @IsNumber()
-  capacity: number;
+  @Min(0)
+  capacity?: number;
 
   @IsOptional()
   @IsUUID()
@@ -37,13 +40,14 @@ export class UpdateTicketTypeRequestDto implements UpdateTicketTypeRequest {
   @IsString()
   name: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
   @IsNotEmpty()
   @IsNumber()
-  capacity: number;
+  @Min(0)
+  capacity?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -53,9 +57,9 @@ export class UpdateTicketTypeRequestDto implements UpdateTicketTypeRequest {
   @IsUUID()
   eventId?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  action?: string;
+  action: string;
 
   @IsOptional()
   @IsObject()
