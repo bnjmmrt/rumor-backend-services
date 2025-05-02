@@ -49,19 +49,19 @@ export class EventLocationDto implements EventLocation {
   placeId?: string;
   @IsString()
   @IsNotEmpty()
-  location?: string;
+  location: string;
   @IsString()
   @IsOptional()
   regionCode?: string;
   @IsString()
   @IsNotEmpty()
-  city?: string;
+  city: string;
   @IsNumber()
   @IsNotEmpty()
-  latitude?: number;
+  latitude: number;
   @IsNumber()
   @IsNotEmpty()
-  longitude?: number;
+  longitude: number;
 }
 
 export class CreateEventTypeRequestDto implements CreateEventTypeRequest {

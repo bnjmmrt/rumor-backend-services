@@ -355,10 +355,10 @@ export interface EventAddress {
 
 export interface EventLocation {
   placeId?: string;
-  location?: string;
-  latitude?: number;
-  longitude?: number;
-  city?: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  city: string;
   regionCode?: string | undefined;
 }
 
