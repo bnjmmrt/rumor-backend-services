@@ -33,6 +33,7 @@ export class CreateQuizQuestionRequestDto implements CreateQuizQuestionRequest {
   @IsNumber()
   @IsOptional()
   order?: number;
+  //TODO: extra action key was coming from FE, was failing this validation on submit event
 }
 
 export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
@@ -43,6 +44,10 @@ export class UpdateQuizQuestionRequestDto implements UpdateQuizQuestionRequest {
 
   @IsString()
   @IsNotEmpty()
+  // @Transform(({ value }) => value?.trim())
+  // @Matches(/^(?!\s*question\s*$).+/i, {
+  //   message: 'Question should be edited before submitting',
+  // })
   question: string;
 
   @IsBoolean()
