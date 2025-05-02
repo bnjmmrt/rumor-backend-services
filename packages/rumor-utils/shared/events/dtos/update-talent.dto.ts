@@ -23,7 +23,7 @@ export class UpdateTalentRequestDto implements UpdateTalentRequest {
   @IsString()
   socialNetwork?: string;
 
- @IsNotEmpty()
+  @IsNotEmpty()
   @IsString()
   imageKeyUrl: string;
 

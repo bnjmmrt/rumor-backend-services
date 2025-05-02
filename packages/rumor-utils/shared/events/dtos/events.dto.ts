@@ -11,7 +11,7 @@ import {
   ValidateNested,
   IsObject,
   Min,
-  ArrayNotEmpty
+  ArrayNotEmpty,
 } from 'class-validator';
 import {
   AddEventToFeaturedSectionRequest,

@@ -46,7 +46,7 @@ export class UpdateTicketTypeRequestDto implements UpdateTicketTypeRequest {
 
   @IsNotEmpty()
   @IsNumber()
-   @Min(0)
+  @Min(0)
   capacity?: number;
 
   @IsOptional()

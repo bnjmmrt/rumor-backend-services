@@ -8,7 +8,7 @@ export const eventAnnouncement = {
 
 export const event = {
   POST: CreateEventRequestDto,
-  PUT: UpdateEventRequestDto
+  PUT: UpdateEventRequestDto,
 };
 
 export const guest = {};

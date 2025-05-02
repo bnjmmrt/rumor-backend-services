@@ -1567,7 +1567,7 @@ export class EventsService {
     //  Get TicketType IDs that are being deleted (avoid duplicate deletions)
     const deleteIdsSet = new Set(
       event.ticketTypes
-        .filter((t:  Partial<UpdateTicketTypeRequestDto>) => t.action === 'delete')
+        .filter((t: Partial<UpdateTicketTypeRequestDto>) => t.action === 'delete')
         .map(t => t.id),
     );
     // Handle collaborator deletions
@@ -2296,7 +2296,10 @@ export class EventsService {
     }
   }
 
-  public static async updateEvent(payload: UpdateEventRequestDto, eventId:string): Promise<EventData> {
+  public static async updateEvent(
+    payload: UpdateEventRequestDto,
+    eventId: string,
+  ): Promise<EventData> {
     if (!eventId) throw new BadRequestError('Event ID is required');
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();

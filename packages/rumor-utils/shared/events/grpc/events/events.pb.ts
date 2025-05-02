@@ -110,7 +110,7 @@ export interface AdmissionTypesResponse {
 /** Create Ticket Types */
 export interface CreateTicketTypeRequest {
   name: string;
-  description?: string| undefined;
+  description?: string | undefined;
   capacity?: number | undefined;
   eventId?: string | undefined;
 }
@@ -157,7 +157,7 @@ export interface UpdateTalentRequest {
   contact?: string | undefined;
   socialNetwork?: string | undefined;
   description?: string | undefined;
-  imageKeyUrl: string ;
+  imageKeyUrl: string;
   enabled?: boolean | undefined;
   eventId?: string | undefined;
   action?: string | undefined;
@@ -347,7 +347,7 @@ export interface CreateCollaboratorRequest {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-   limitInvitationsNumber?: number | undefined;
+  limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
 }
 
@@ -372,7 +372,7 @@ export interface UpdateCollaboratorRequest {
   postAnnouncementsByCollaborator: boolean | undefined;
   checkInGuests: boolean | undefined;
   generateEventReports: boolean | undefined;
-   limitInvitationsNumber?: number | undefined;
+  limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   action?: string | undefined;
 }
