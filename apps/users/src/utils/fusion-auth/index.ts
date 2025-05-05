@@ -163,18 +163,18 @@ class AuthMiddleware {
       if (approvedHostUser?.isRoleDeactivated && !membeOrNonMemberUser?.isRoleDeactivated) {
         redirection = true;
         redirectionRole = {
-          name: membeOrNonMemberUser.role.name,
-          status: membeOrNonMemberUser.status,
-          id: membeOrNonMemberUser.role.id,
+          roleName: membeOrNonMemberUser.role.name,
+          roleStatus: membeOrNonMemberUser.status,
+          roleId: membeOrNonMemberUser.role.id,
         };
       }
 
       if (!approvedHostUser?.isRoleDeactivated && membeOrNonMemberUser?.isRoleDeactivated) {
         redirection = true;
         redirectionRole = {
-          name: approvedHostUser.role.name,
-          status: approvedHostUser.status,
-          id: approvedHostUser.role.id,
+          roleName: approvedHostUser.role.name,
+          roleStatus: approvedHostUser.status,
+          roleId: approvedHostUser.role.id,
         };
       }
 
