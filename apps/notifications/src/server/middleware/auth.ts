@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import config from '../../config';
 import apiService from 'rumor-utils/service-mesh';
 import { AuthorizationError } from 'rumor-utils/errors';
+import { RedirectionResponse } from 'rumor-utils/success';
 class AuthMiddleware {
   static fusionAuthRequired = async (
     req: Request,
@@ -28,6 +29,11 @@ class AuthMiddleware {
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;
@@ -63,6 +69,11 @@ class AuthMiddleware {
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;

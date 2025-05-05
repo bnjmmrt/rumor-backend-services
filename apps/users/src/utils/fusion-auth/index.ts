@@ -36,7 +36,7 @@ class AuthMiddleware {
 
       if (response.redirection) {
         let { redirection, redirectionRole } = response;
-        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        res.status(206).json(new RedirectionResponse({ redirection, ...redirectionRole }));
         return;
       }
 
@@ -80,7 +80,7 @@ class AuthMiddleware {
 
       if (response.redirection) {
         let { redirection, redirectionRole } = response;
-        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        res.status(206).json(new RedirectionResponse({ redirection, ...redirectionRole }));
         return;
       }
 
