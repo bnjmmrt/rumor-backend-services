@@ -12,6 +12,7 @@ class AuthMiddleware {
   fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
       if (!authorization) {
         res.status(401).send('Unauthorized');
         return;
@@ -24,7 +25,7 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
-      const response = await this.validate({ token });
+      const response = await this.validate({ token, requester });
 
       if (!response || !response.userId) {
         res.status(401).send('Unauthorized');
@@ -56,6 +57,8 @@ class AuthMiddleware {
   fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
+
       if (!authorization) {
         next();
         return;
@@ -68,7 +71,7 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
-      const response = await this.validate({ token });
+      const response = await this.validate({ token, requester });
 
       if (!response || !response.userId) {
         res.status(401).send('Unauthorized');
@@ -97,7 +100,7 @@ class AuthMiddleware {
     }
   };
 
-  async validate({ token }: ValidateRequestDto): Promise<any> {
+  async validate({ token, requester }: ValidateRequestDto): Promise<any> {
     try {
       const fusionAuthClient = new FusionAuthClient(
         config.get('FUSIONAUTH_API_KEY'),
@@ -114,68 +117,62 @@ class AuthMiddleware {
         relations: { roles: { role: true } },
       });
 
-      let userSingleRole = userDetails?.roles?.length === 1 || userDetails?.roles?.filter(role => !role.isRoleDeactivated).length === 1;
+      let isAdminUser = userDetails?.roles?.find(userRole => userRole.role.name === 'admin');
 
-      if (userSingleRole) {
-        userDetails.roles = userDetails?.roles?.filter(role => !role.isRoleDeactivated);
-        if (
-          userDetails?.roles[0]?.role?.name === 'host' &&
-          (userDetails?.roles[0]?.status === UserStatus.DEACTIVATED ||
-          userDetails?.roles[0]?.isRoleDeactivated)
-        ) {
-          console.log('User is not active');
-          throw new AuthorizationError('User is not active');
-        } else if (
-          (userDetails?.roles[0]?.role?.name === 'member' ||
-            userDetails?.roles[0]?.role?.name === 'non_member') &&
-          userDetails?.roles[0]?.isRoleDeactivated
-        ) {
-          throw new AuthorizationError('User is not active');
-        } else {
-          return {
-            userId: findUser.response.user.id,
-            user: {
-              username: findUser?.response?.user?.username || '',
-              email: findUser?.response?.user?.email || '',
-              firstName: findUser?.response?.user?.firstName || '',
-              lastName: findUser?.response?.user?.lastName || '',
-              active: !!findUser?.response?.user?.active,
-              birthDate: findUser?.response?.user?.birthDate || '',
-              mobilePhone: findUser?.response?.user?.mobilePhone || '',
-              verified: !!findUser?.response?.user?.verified,
-              roles: [],
-            },
-            redirection: false,
-          };
-        }
+      if (isAdminUser) {
+        return {
+          userId: findUser.response.user.id,
+          user: {
+            username: findUser?.response?.user?.username || '',
+            email: findUser?.response?.user?.email || '',
+            firstName: findUser?.response?.user?.firstName || '',
+            lastName: findUser?.response?.user?.lastName || '',
+            active: !!findUser?.response?.user?.active,
+            birthDate: findUser?.response?.user?.birthDate || '',
+            mobilePhone: findUser?.response?.user?.mobilePhone || '',
+            verified: !!findUser?.response?.user?.verified,
+            roles: [],
+          },
+          redirection: false,
+        };
       }
 
-      const approvedHostUser = userDetails?.roles?.find(
-        role => role.role.name === 'host' && role.status === UserStatus.ACTIVE,
+      let isHostActivated = userDetails?.roles?.find(
+        userRole => userRole.role.name === 'host' && userRole.status === UserStatus.ACTIVE,
       );
-
-      const membeOrNonMemberUser = userDetails?.roles?.find(
-        role => role.role.name === 'member' || role.role.name === 'non_member',
+      let isMemberNonMemberActivated = userDetails?.roles?.find(
+        userRole =>
+          (userRole.role.name === 'member' || userRole.role.name === 'non_member') &&
+          !userRole.isRoleDeactivated &&
+          userRole.status === UserStatus.ACTIVE,
       );
+      
+      if (!isHostActivated && !isMemberNonMemberActivated) {
+        throw new AuthorizationError('User is not active');
+      }
 
       let redirection = false;
       let redirectionRole = {};
 
-      if (approvedHostUser?.isRoleDeactivated && !membeOrNonMemberUser?.isRoleDeactivated) {
+      let requestorIsMemberNonMember = requester === 'member' || requester === 'non_member';
+
+      if (requestorIsMemberNonMember && !isMemberNonMemberActivated && isHostActivated) {
         redirection = true;
         redirectionRole = {
-          roleName: membeOrNonMemberUser.role.name,
-          roleStatus: membeOrNonMemberUser.status,
-          roleId: membeOrNonMemberUser.role.id,
+          roleName: isHostActivated.role.name,
+          roleStatus: isHostActivated.status,
+          roleId: isHostActivated.role.id,
         };
       }
 
-      if (!approvedHostUser?.isRoleDeactivated && membeOrNonMemberUser?.isRoleDeactivated) {
+      let requestorIsHost = requester === 'host';
+
+      if (requestorIsHost && !isHostActivated && isMemberNonMemberActivated) {
         redirection = true;
         redirectionRole = {
-          roleName: approvedHostUser.role.name,
-          roleStatus: approvedHostUser.status,
-          roleId: approvedHostUser.role.id,
+          roleName: isMemberNonMemberActivated.role.name,
+          roleStatus: isMemberNonMemberActivated.status,
+          roleId: isMemberNonMemberActivated.role.id,
         };
       }
 
