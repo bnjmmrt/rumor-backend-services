@@ -12,6 +12,8 @@ class AuthMiddleware {
   ): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
+
       if (!authorization) {
         res.status(401).send('Unauthorized');
         return;
@@ -24,10 +26,9 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
-      
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester });
 
-      const response = await serviceMesh.validate();      
+      const response = await serviceMesh.validate();
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
@@ -44,7 +45,7 @@ class AuthMiddleware {
 
       next();
     } catch (error) {
-      console.log("🚀 ~ AuthMiddleware ~ error:", error)
+      console.log('🚀 ~ AuthMiddleware ~ error:', error);
       const errMsg = new AuthorizationError(`Session has expired, Pleasdqwdqwdwqdqwe login again `);
       res.status(401).send(errMsg);
     }
@@ -53,6 +54,7 @@ class AuthMiddleware {
   static fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
 
       if (!authorization) {
         next();
@@ -65,9 +67,9 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
-            
+
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester });
+
       const response = await serviceMesh.validate();
 
       if (!response || !response.data) {

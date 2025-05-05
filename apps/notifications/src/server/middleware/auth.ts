@@ -12,6 +12,8 @@ class AuthMiddleware {
   ): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
+
       if (!authorization) {
         res.status(401).send('Unauthorized');
         return;
@@ -23,7 +25,7 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester });
 
       const response = await serviceMesh.validate();
 
@@ -51,6 +53,7 @@ class AuthMiddleware {
   static fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
 
       if (!authorization) {
         next();
@@ -63,7 +66,7 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester});
 
       const response = await serviceMesh.validate();
 
