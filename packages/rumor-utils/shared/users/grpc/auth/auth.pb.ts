@@ -157,6 +157,7 @@ export interface MemberSignUpRequest {
   facebookAccessToken?: string | undefined;
   linkedInAccessToken?: string | undefined;
   instagramUserName?: string | undefined;
+  instagramValidated?: boolean | undefined;
   interestsIds: string[];
   profilePicture?: string | undefined;
   fcmToken?: string;
@@ -486,6 +487,7 @@ export interface Member {
   dateOfBirth?: string | undefined;
   sources?: string[] | undefined;
   references?: IReferenceCode;
+  isRoleDeactivated?: boolean | undefined;
 }
 
 export interface GetMembersResponse {
@@ -583,6 +585,7 @@ export interface MemberProfile {
   placeId?: string | undefined;
   eventCount: number;
   sources?: string[] | undefined;
+  isHost?: boolean | undefined;
 }
 
 export interface FocusProto {
@@ -744,6 +747,7 @@ export interface UpdateUserProfileRequest {
   address?: MemberAddressUpdate | undefined;
   focusIds: string[];
   id: string;
+  instagramValidated?: boolean | undefined;
 }
 
 export interface UserProfile {

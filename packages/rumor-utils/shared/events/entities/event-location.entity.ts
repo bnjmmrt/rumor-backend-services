@@ -10,11 +10,11 @@ export class EventLocation extends RumorBaseEntity {
   googlePlaceId: string;
 
   @Column({ type: 'varchar', name: 'city', nullable: true })
-  city?: string;
+  city: string;
 
   @Column({ type: 'double precision', name: 'latitude', nullable: true })
-  latitude?: number;
+  latitude: number;
 
   @Column({ type: 'double precision', name: 'longitude', nullable: true })
-  longitude?: number;
+  longitude: number;
 }

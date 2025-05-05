@@ -92,6 +92,9 @@ export class User extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'isDeactivated', default: false })
   isDeactivated: boolean;
 
+  @Column({ type: 'boolean', name: 'instagram_validated', default: false, nullable: true })
+  instagramValidated: boolean;
+
   @DeleteDateColumn({ type: 'timestamp', nullable: true, name: 'deactivated_at' })
   deactivatedAt: Date | null;
 

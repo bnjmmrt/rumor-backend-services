@@ -202,7 +202,7 @@ export const toMember = (
     categories: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
-    status: role.status ?? 'UNRECOGNIZED',
+    status: role.isRoleDeactivated ? UserStatus.DEACTIVATED : (role.status ?? 'UNRECOGNIZED'),
     source: role.source ? entityToUserSource[role.source] : null,
     profilePicture: user.profilePicture,
     email: user.email,
@@ -213,6 +213,7 @@ export const toMember = (
     dateOfBirth: user.dateOfBirth,
     sources,
     references,
+    isRoleDeactivated: role.isRoleDeactivated
   };
 };
 
@@ -336,7 +337,7 @@ export const toMemberProfile = (
     pastEvents,
     invitedEvents,
     requestedEvents,
-    status: role?.status,
+    status: role?.isRoleDeactivated ? UserStatus.DEACTIVATED : role?.status,
     role: role?.role?.name,
     roleId: role?.role?.id,
     interest: interests.map(interest => interest.name).join(', '),

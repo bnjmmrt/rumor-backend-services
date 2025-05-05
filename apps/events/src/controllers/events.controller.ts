@@ -156,11 +156,10 @@ export class EventsController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'CreateEvent')
   public static updateEvent = asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
-    req.body.id = id;
     const userId = (req as any).user;
     req.body.ownerId = userId;
     const payload: UpdateEventRequestDto = req.body;
-    const event: EventData = await EventsService.updateEvent(payload);
+    const event: EventData = await EventsService.updateEvent(payload, id);
     const successResponse = new UpdateResponse(event);
     res.status(successResponse.statusCode).json(successResponse);
   });

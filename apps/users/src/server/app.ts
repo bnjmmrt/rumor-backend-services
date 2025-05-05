@@ -6,6 +6,7 @@ import * as cors from 'cors';
 import router from '../routes/index';
 import errorHandler from 'rumor-utils/middlewares/global-error-handler.middleware';
 import { NotFoundError } from 'rumor-utils/errors/not-found.error';
+import ConnectionManager from '../database/index';
 
 const app: Express = express();
 
@@ -24,6 +25,11 @@ app.use(
 app.get('/users/v1/health', (req: Request, res: Response) => {
   res.json({ status: 'UP', timestamp: new Date() }).status(200);
 });
+
+app.get('/users/v1/db-health',async (req: Request, res: Response) => {
+  const dbRepository = await ConnectionManager.getRepository('user').query('SELECT 1');
+  res.json({ status: dbRepository ? 'UP' : 'DOWN', timestamp: new Date() }).status(200);
+})
 
 app.use('/users/v1', router);
 
