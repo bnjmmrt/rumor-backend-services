@@ -583,6 +583,7 @@ export interface MemberProfile {
   placeId?: string | undefined;
   eventCount: number;
   sources?: string[] | undefined;
+  isHost?: boolean | undefined;
 }
 
 export interface FocusProto {
