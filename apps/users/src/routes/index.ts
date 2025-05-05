@@ -354,12 +354,41 @@ router.get(
 );
 
 //Referral Codes
-router.post('/auth/referral-code', ReferralCodeController.createReferralCode);
-router.get('/auth/referral-codes/:id', ReferralCodeController.getReferralCode);
-router.get('/auth/referral-codes', ReferralCodeController.getReferralCodes);
-router.put('/auth/referral-codes', ReferralCodeController.updateReferralCode);
-router.put('/auth/referral-codes/:id/deactivate', ReferralCodeController.deactivateReferralCode);
-router.put('/auth/referral-codes/:id/activate', ReferralCodeController.activateReferralCode);
+router.post(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.createReferralCode,
+);
+router.get(
+  '/auth/referral-codes/:id',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.getReferralCode,
+);
+router.get(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.getReferralCodes,
+);
+router.put(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.updateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/deactivate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.deactivateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/activate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.activateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/reactivate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.reactivateReferralCode,
+);
 router.delete('/auth/referral-codes/:id', ReferralCodeController.deleteReferralCode);
 
 //Referrals
