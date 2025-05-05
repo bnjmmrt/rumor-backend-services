@@ -156,6 +156,7 @@ export interface MemberSignUpRequest {
   facebookAccessToken?: string | undefined;
   linkedInAccessToken?: string | undefined;
   instagramUserName?: string | undefined;
+  instagramValidated?: boolean | undefined;
   interestsIds: string[];
   profilePicture?: string | undefined;
   fcmToken?: string;
@@ -484,6 +485,7 @@ export interface Member {
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
   sources?: string[] | undefined;
+  isRoleDeactivated?: boolean | undefined;
 }
 
 export interface GetMembersResponse {
@@ -742,6 +744,7 @@ export interface UpdateUserProfileRequest {
   address?: MemberAddressUpdate | undefined;
   focusIds: string[];
   id: string;
+  instagramValidated?: boolean | undefined;
 }
 
 export interface UserProfile {

@@ -1,3 +1,4 @@
+import { CreateEventRequestDto, UpdateEventRequestDto } from '../shared/events/dtos/events.dto';
 import { CreateEventAnnouncementDto, UpdateEventAnnouncementDto } from '../shared/events/dtos';
 
 export const eventAnnouncement = {
@@ -5,6 +6,9 @@ export const eventAnnouncement = {
   PATCH: UpdateEventAnnouncementDto,
 };
 
-export const event = {};
+export const event = {
+  POST: CreateEventRequestDto,
+  PUT: UpdateEventRequestDto,
+};
 
 export const guest = {};

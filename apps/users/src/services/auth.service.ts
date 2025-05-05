@@ -226,6 +226,7 @@ import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
+import { SocialStats } from '../../packages/rumor-utils/shared/users/entities/social-stats.entity';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -365,18 +366,15 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        try {
-          const code = await fusionAuthClientHandler
-            .fusionAuthClient()
-            .startPasswordlessLogin(request);
-          const authenticatedUser = await fusionAuthClientHandler
-            .fusionAuthClient()
-            .passwordlessLogin({ code: code.response.code });
-          fusionAuthToken = authenticatedUser.response.token;
-          requiresFusionAuthRegistration = false;
-        } catch (error) {
-          requiresFusionAuthRegistration = true;
-        }
+        const code = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: code.response.code });
+        fusionAuthToken = authenticatedUser.response.token;
+
+        requiresFusionAuthRegistration = false;
       } else if (isNonMember) {
         try {
           const fusionAuthResponse = await fusionAuthClientHandler
@@ -405,11 +403,32 @@ export class AuthService {
     let newUser = newMember(payload, address);
 
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // if user exits maintain data and update new data if register
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recovering user with actual information
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // if is new user create a new one
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
 
     if (payload.instagramAccessToken) {
@@ -557,7 +576,7 @@ export class AuthService {
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    payload.email = payload.email.trim()?.toLowerCase();
+    payload.email = payload.email.toLowerCase();
     let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
     let userHasOtherRoles: boolean = false;
     let phoneNumberInUse = false,
@@ -2385,7 +2404,7 @@ export class AuthService {
     }
 
     const failedUsers: string[] = [];
-    const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
+    const usersToUpdate: { userRole: any; newStatus?: UserStatus; newRole?: any; isRoleDeactivated?: boolean }[] = [];
 
     for (const user of users) {
       const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
@@ -2401,9 +2420,10 @@ export class AuthService {
               userRole: nonMemberUserRole,
               newStatus: UserStatus.ACTIVE,
               newRole: memberRole,
+              isRoleDeactivated: false,
             });
           } else if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE });
+            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE, isRoleDeactivated: false });
           }
 
           await this.dbConnection.getRepository(User).update(user.id, {
@@ -2419,17 +2439,18 @@ export class AuthService {
               userRole: memberUserRole,
               newStatus: UserStatus.WAITLISTED,
               newRole: nonMemberRole,
+              isRoleDeactivated: false,
             });
           } else if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED });
+            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED, isRoleDeactivated: false });
           }
           break;
 
         case UserStatus.DEACTIVATED:
           if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.DEACTIVATED });
+            usersToUpdate.push({ userRole: memberUserRole, isRoleDeactivated: true });
           } else if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.DEACTIVATED });
+            usersToUpdate.push({ userRole: nonMemberUserRole, isRoleDeactivated: true });
           }
 
           await this.dbConnection.getRepository(User).update(user.id, {
@@ -2475,7 +2496,14 @@ export class AuthService {
 
     // Perform bulk updates only for valid users
     for (const update of usersToUpdate) {
-      update.userRole.status = update.newStatus;
+      if (update.hasOwnProperty('newStatus')) {
+        update.userRole.status = update.newStatus;
+      }
+
+      if (update.hasOwnProperty('isRoleDeactivated')) {
+        update.userRole.isRoleDeactivated = update.isRoleDeactivated;
+      }
+
       if (update.newRole) {
         update.userRole.role = update.newRole;
       }
@@ -3472,6 +3500,23 @@ export class AuthService {
       const existingMapping = await this.dbConnection.getRepository(HostUserMapping).find({
         where: { host: { id: payload.id }, user: { id: existingUser.id } },
       });
+
+      const userWithRoles = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: ['roles', 'roles.role'],
+      });
+
+      const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
+        ['member', 'non_member'].includes(userRole.role.name),
+      );
+
+      // Assign non_member if user is only a host
+      if (!hasMemberOrNonMember) {
+        await RoleService.assignRoleToUser(
+          { userId: existingUser.id, roleName: RoleType.NonMember },
+          UserSource.INVITED_BY_HOST,
+        );
+      }
 
       if (existingMapping.length > 0) {
         return {
@@ -6086,7 +6131,8 @@ export class AuthService {
     const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
 
     if (targetRole) {
-      targetRole.status = UserStatus.DEACTIVATED;
+      // targetRole.status = UserStatus.DEACTIVATED;
+      targetRole.isRoleDeactivated = true
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
@@ -6112,7 +6158,8 @@ export class AuthService {
     const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
 
     if (targetRole) {
-      targetRole.status = UserStatus.ACTIVE;
+      // targetRole.status = UserStatus.ACTIVE;
+      targetRole.isRoleDeactivated = false;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
@@ -6214,6 +6261,49 @@ export class AuthService {
     }
 
     return '';
+  }
+
+  public static async getInstagramValidated(
+    payload: IdRequestDto,
+  ): Promise<{ instagramValidated: boolean; instagramUserName: string; instagramCount: number }> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Not found');
+    }
+
+    const user_stats = await this.dbConnection.getRepository(SocialStats).findOne({
+      where: {
+        user: {
+          id: user.id,
+        },
+      },
+    });
+
+    console.log(user_stats);
+    return {
+      instagramValidated: user.instagramValidated || false,
+      instagramUserName: user.instagramUserName || '',
+      instagramCount: user_stats?.instagramFollowersCount || 0,
+    };
+  }
+
+  public static async setInstagramValidated(payload: IdRequestDto, value: boolean) {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Not found');
+    }
+
+    const response = await this.dbConnection
+      .getRepository(User)
+      .update({ id: payload.id }, { instagramValidated: value });
+
+    return response;
   }
 
   public static async deleteHostAccount(payload: IdRequestDto): Promise<string> {

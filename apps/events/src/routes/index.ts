@@ -74,6 +74,11 @@ router.get(
   SignupFormsController.getStaticQuestions,
 );
 router.get(
+  '/signup-forms/:id/questions',
+  AuthMiddleware.fusionAuthRequired,
+  SignupFormsController.getSignupFormQuestions,
+);
+router.get(
   '/events/:id/signup-forms',
   AuthMiddleware.fusionAuthRequired,
   SignupFormsController.getByEventId,
@@ -196,6 +201,7 @@ router.delete('/event-location/:id', EventsController.deleteEventLocation);
 router.post(
   '/event',
   AuthMiddleware.fusionAuthRequired,
+  // validateRequest('event'), //TODO: add validation
   EventsController.createEvent,
 ); /**TestStatus: working */
 router.delete(
@@ -206,6 +212,7 @@ router.delete(
 router.put(
   '/event/:id',
   AuthMiddleware.fusionAuthRequired,
+  // validateRequest('event'), //TODO: add validation
   EventsController.updateEvent,
 ); /**TestStatus: working (need to retest mails on update of location or date)*/
 router.put(

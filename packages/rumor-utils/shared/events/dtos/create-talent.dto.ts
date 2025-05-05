@@ -18,9 +18,9 @@ export class CreateTalentRequestDto implements CreateTalentRequest {
   @IsString()
   socialNetwork?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  imageKeyUrl?: string;
+  imageKeyUrl: string;
 
   @IsOptional()
   @IsUUID()

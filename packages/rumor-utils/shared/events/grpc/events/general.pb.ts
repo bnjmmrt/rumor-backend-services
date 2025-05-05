@@ -198,6 +198,7 @@ export interface EventData {
   userId?: string | undefined;
   featuredEventSection?: FeaturedEventSection | undefined;
   timeZone?: string | undefined;
+  createdAt?: string | undefined;
   invitationDeclinedBy?: string | undefined;
   isPublished?: boolean | undefined;
   totalCheckedInGuests?: number | undefined;
@@ -310,7 +311,7 @@ export interface CollaboratorsEvent {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   companyLogo?: string | undefined;
   companyName?: string | undefined;
@@ -338,7 +339,7 @@ export interface Collaborator {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   ticketType?: TicketType | undefined;
 }
 
@@ -354,13 +355,12 @@ export interface EventAddress {
 }
 
 export interface EventLocation {
-  placeId?: string | undefined;
-  location?: string | undefined;
-  latitude?: number | undefined;
-  longitude?: number | undefined;
-  city?: string | undefined;
+  placeId?: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  city: string;
   regionCode?: string | undefined;
-  id?: string | undefined;
 }
 
 export interface EventAgeLimit {
@@ -739,6 +739,8 @@ export interface ISignupFormQuestionsRequest {
   answers?: string;
   ordering?: number;
   value?: string;
+  hasToggle?: boolean;
+  isToggled?: boolean;
 }
 
 export const EVENTS_PACKAGE_NAME = 'events';
