@@ -3381,7 +3381,7 @@ export class AuthService {
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
-          status: item.status,
+          status: item.isRoleDeactivated ? UserStatus.DEACTIVATED : item.status,
           id: item.role.id,
         };
       }),
