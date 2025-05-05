@@ -3726,9 +3726,9 @@ export class GuestService {
             }
 
             return row; // Keep in updatedValidData
-          })
+          }),
         )
-      ).filter(Boolean); // Remove all nulls      
+      ).filter(Boolean); // Remove all nulls
     }
     const mappedUserIds = new Set(newMappings.map(m => m.user.id));
     updatedValidData = updatedValidData.filter(row => {
@@ -3759,7 +3759,7 @@ export class GuestService {
         }
         return null; // Return null for skipped rows
       });
-      
+
       const resolvedUsers = await Promise.all(userPromises);
       users.push(...resolvedUsers.filter(user => user !== null)); // Remove null values
     }
@@ -3800,7 +3800,9 @@ export class GuestService {
     });
 
     if (newMappings.length !== 0) {
-      const createdMappings = await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      const createdMappings = await this.dbConnection
+        .getRepository(HostUserMapping)
+        .save(newMappings);
       newMappings.map(async mapping => {
         await this.dbConnection
           .getRepository(User)

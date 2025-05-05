@@ -213,7 +213,7 @@ export const toMember = (
     dateOfBirth: user.dateOfBirth,
     sources,
     references,
-    isRoleDeactivated: role.isRoleDeactivated
+    isRoleDeactivated: role.isRoleDeactivated,
   };
 };
 

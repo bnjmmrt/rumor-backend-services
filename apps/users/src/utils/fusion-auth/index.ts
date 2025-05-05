@@ -120,7 +120,7 @@ class AuthMiddleware {
         if (
           userDetails?.roles[0]?.role?.name === 'host' &&
           (userDetails?.roles[0]?.status === UserStatus.DEACTIVATED ||
-          userDetails?.roles[0]?.isRoleDeactivated)
+            userDetails?.roles[0]?.isRoleDeactivated)
         ) {
           console.log('User is not active');
           throw new AuthorizationError('User is not active');

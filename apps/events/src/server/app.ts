@@ -25,10 +25,10 @@ app.get('/events/v1/health', (req: Request, res: Response) => {
   res.json({ status: 'UP', timestamp: new Date() }).status(200);
 });
 
-app.get('/events/v1/db-health',async (req: Request, res: Response) => {
+app.get('/events/v1/db-health', async (req: Request, res: Response) => {
   const dbRepository = await ConnectionManager.getRepository('events').query('SELECT 1');
   res.json({ status: dbRepository ? 'UP' : 'DOWN', timestamp: new Date() }).status(200);
-})
+});
 
 app.use('/events/v1', router);
 app.get('*', (req: Request, res: Response, next: NextFunction) =>
