@@ -3671,57 +3671,73 @@ export class GuestService {
       });
       const mappingSet = new Set(existingMappings.map(mapping => mapping.user.id));
       // Step 6: Remove users from validData who were moved to garbageData
-      updatedValidData = validData.filter(async row => {
-        if (removedEmails.has(row.email)) {
-          return false; // Remove from validData
-        }
-        let existingUserData;
-        if (payload.isUploadUser) {
-          existingUserData = existingUsers.find(
-            user => user.email === row.email || user.phoneNumber === row.phoneNumber,
-          );
-        } else {
-          existingUserData = existingUsers.find(user => user.email === row.email);
-        }
-        if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
-          if (mappingSet.has(existingUserData.id)) {
-            const user = {
-              firstName: row.firstName,
-              lastName: row.lastName,
-              email: row.email ? row.email : '',
-              phoneNumber: row.phoneNumber ? row.phoneNumber : '',
-              reason: 'User already exists in users list',
-            };
-            garbageData.push(user);
-            if (row.email) userMap.delete(row.email);
-            if (row.phoneNumber) userMap.delete(row.phoneNumber);
-            return false; // Remove from validData
-          }
+      updatedValidData = (
+        await Promise.all(
+          validData.map(async row => {
+            if (removedEmails.has(row.email)) {
+              return null;
+            }
 
-          const userWithRoles = await this.dbConnection.getRepository(User).findOne({
-            where: { id: existingUserData.id },
-            relations: ['roles', 'roles.role'],
-          });
+            let existingUserData;
+            if (payload.isUploadUser) {
+              existingUserData = existingUsers.find(
+                user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+              );
+            } else {
+              existingUserData = existingUsers.find(user => user.email === row.email);
+            }
 
-          const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
-            ['member', 'non_member'].includes(userRole.role.name),
-          );
+            if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
+              if (mappingSet.has(existingUserData.id)) {
+                const user = {
+                  firstName: row.firstName,
+                  lastName: row.lastName,
+                  email: row.email || '',
+                  phoneNumber: row.phoneNumber || '',
+                  reason: 'User already exists in users list',
+                };
+                garbageData.push(user);
+                if (row.email) userMap.delete(row.email);
+                if (row.phoneNumber) userMap.delete(row.phoneNumber);
+                return null;
+              }
 
-          if (!hasMemberOrNonMember) {
-            this.assignRoleToUser(existingUserData);
-          }
+              const userWithRoles = await this.dbConnection.getRepository(User).findOne({
+                where: { id: existingUserData.id },
+                relations: ['roles', 'roles.role'],
+              });
 
-          newMappings.push({
-            user: existingUserData,
-            host: { id: payload.hostId },
-          });
-          if (row.email) userMap.delete(row.email);
-          if (row.phoneNumber) userMap.delete(row.phoneNumber);
-          return false;
-        }
-        return true; // Keep row in validData
-      });
+              const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
+                ['member', 'non_member'].includes(userRole.role.name),
+              );
+
+              if (!hasMemberOrNonMember) {
+                this.assignRoleToUser(existingUserData);
+              }
+
+              newMappings.push({
+                user: existingUserData,
+                host: { id: payload.hostId },
+              });
+
+              if (row.email) userMap.delete(row.email);
+              if (row.phoneNumber) userMap.delete(row.phoneNumber);
+              return null;
+            }
+
+            return row; // Keep in updatedValidData
+          })
+        )
+      ).filter(Boolean); // Remove all nulls      
     }
+    const mappedUserIds = new Set(newMappings.map(m => m.user.id));
+    updatedValidData = updatedValidData.filter(row => {
+      const existingUser = existingUsers.find(
+        user => user.email === row.email || user.phoneNumber === row.phoneNumber,
+      );
+      return !(existingUser && mappedUserIds.has(existingUser.id));
+    });
+
     const users: SimpleUser[] = [];
     const dataToProcess =
       updatedValidData.length > 0 && existingUsers.length > 0
@@ -3743,7 +3759,7 @@ export class GuestService {
         }
         return null; // Return null for skipped rows
       });
-
+      
       const resolvedUsers = await Promise.all(userPromises);
       users.push(...resolvedUsers.filter(user => user !== null)); // Remove null values
     }
@@ -3784,7 +3800,7 @@ export class GuestService {
     });
 
     if (newMappings.length !== 0) {
-      await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
+      const createdMappings = await this.dbConnection.getRepository(HostUserMapping).save(newMappings);
       newMappings.map(async mapping => {
         await this.dbConnection
           .getRepository(User)
@@ -3812,7 +3828,7 @@ export class GuestService {
 
     const userRole = this.dbConnection.getRepository(UserRole).create({
       role: { id: nonMemberRole[0].id },
-      source: UserSourceEnum.SIGN_UP_FORM,
+      source: UserSourceEnum.INVITED_BY_HOST,
       user: { id: payload.id },
     });
 
