@@ -5469,6 +5469,7 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError('User');
     }
+    const isHost = user.roles.some(r => r.role.name === 'host');
     const [focuses, interests] = await Promise.all([
       await PlatformService.getUserFocuses({ id: user.id }),
       await PlatformService.getUserInterests({ id: user.id }),
@@ -5512,7 +5513,7 @@ export class AuthService {
     userData.isSpam = isSpam;
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
-
+    userData.isHost = isHost;
     return userData;
   }
 
