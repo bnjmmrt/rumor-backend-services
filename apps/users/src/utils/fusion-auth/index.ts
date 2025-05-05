@@ -114,9 +114,10 @@ class AuthMiddleware {
         relations: { roles: { role: true } },
       });
 
-      let userSingleRole = userDetails?.roles?.length === 1;
+      let userSingleRole = userDetails?.roles?.length === 1 || userDetails?.roles?.filter(role => !role.isRoleDeactivated).length === 1;
 
       if (userSingleRole) {
+        userDetails.roles = userDetails?.roles?.filter(role => !role.isRoleDeactivated);
         if (
           userDetails?.roles[0]?.role?.name === 'host' &&
           (userDetails?.roles[0]?.status === UserStatus.DEACTIVATED ||
