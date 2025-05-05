@@ -108,6 +108,9 @@ export class ValidateRequestDto implements ValidateRequest {
   @IsString()
   @IsNotEmpty()
   token: string;
+  @IsString()
+  @IsOptional()
+  requester?: string;
 }
 
 export class ForgotPasswordRequestDto implements ForgotPasswordRequest {

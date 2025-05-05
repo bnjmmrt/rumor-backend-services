@@ -56,6 +56,13 @@ export class ReferralCodeController {
     res.status(updateResponse.statusCode).json(updateResponse);
   });
 
+  public static reactivateReferralCode = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: UpdateReferralCodeRequestDto = req.body;
+    const response: ReferralCodeData = await ReferralCodeService.updateReferralCode(payload, true);
+    const updateResponse = new CreateResponse(response, 'Referral code re-activated successfully!');
+    res.status(updateResponse.statusCode).json(updateResponse);
+  });
+
   public static deleteReferralCode = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
     const payload: IdRequestDto = { id };
