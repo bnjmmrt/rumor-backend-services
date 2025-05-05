@@ -67,7 +67,10 @@ export class SignupFormsController {
     const eventId = req.params.eventId;
     const id = req.params.id;
     const payload = req.body as SignupFormAnswersDto[];
+    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ payload: ${new Date()}`, payload)
+    // const answers = 
     await SignupFormsServices.answers(id, eventId, payload);
+    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ answers: ${new Date()}`)
     res.json(new GetResponse({}));
   });
 

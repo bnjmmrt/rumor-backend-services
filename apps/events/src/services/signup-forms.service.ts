@@ -480,6 +480,7 @@ export class SignupFormsServices {
   }
 
   public static async answers(id: string, eventId: string, payload: SignupFormAnswersDto[]) {
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
     try {
       const signupForm: EventSignupForms | undefined = await EventSignupForms.findOne({
         where: { id: id, event: { id: eventId } },
@@ -507,7 +508,6 @@ export class SignupFormsServices {
       if (signupForm.event.owner.id === userPayload?.id) {
         throw new ValidationError('Host cannot apply to their own event.');
       }
-      const queryRunner: QueryRunner = database.connection.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
 
@@ -583,12 +583,17 @@ export class SignupFormsServices {
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }
-        } catch (err) {}
+        } catch (err) {
+          console.error('Error sending SMS:', err);
+        }
       }
 
-      return submissions;
+      return;
     } catch (err) {
+      console.log('🚀 ~ SignupFormsServices ~ answers ~ error:', err);
       throw err;
+    } finally {
+      await queryRunner.release();
     }
   }
 

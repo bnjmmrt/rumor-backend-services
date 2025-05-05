@@ -257,6 +257,7 @@ export class AuthService {
       };
 
       const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
+      console.log('🚀 ~ AuthService ~ login ~ loginUser:', loginUser);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
         throw new ForbiddenError('User or password not valid.');
@@ -1795,12 +1796,15 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({
-        userId: user.id,
-        token: payload.fcmToken,
-        deviceId: payload.deviceId,
-      });
+      if (user?.id) {
+        // Save FCM Token for the User
+        SettingsService.savePushNotificationToken({
+          userId: user.id,
+          token: payload.fcmToken,
+          deviceId: payload.deviceId,
+        });
+      }
+
       return {
         id: user.id,
         token: completedLogin?.response?.token,
@@ -3377,7 +3381,7 @@ export class AuthService {
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
-          status: item.status,
+          status: item.isRoleDeactivated ? UserStatus.DEACTIVATED : item.status,
           id: item.role.id,
         };
       }),

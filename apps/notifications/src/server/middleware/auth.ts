@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import config from '../../config';
 import apiService from 'rumor-utils/service-mesh';
 import { AuthorizationError } from 'rumor-utils/errors';
+import { RedirectionResponse } from 'rumor-utils/success';
 class AuthMiddleware {
   static fusionAuthRequired = async (
     req: Request,
@@ -11,6 +12,8 @@ class AuthMiddleware {
   ): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
+
       if (!authorization) {
         res.status(401).send('Unauthorized');
         return;
@@ -22,12 +25,17 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester });
 
       const response = await serviceMesh.validate();
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;
@@ -45,6 +53,7 @@ class AuthMiddleware {
   static fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
+      const requester = req.header('requester');
 
       if (!authorization) {
         next();
@@ -57,12 +66,17 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester});
 
       const response = await serviceMesh.validate();
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;
