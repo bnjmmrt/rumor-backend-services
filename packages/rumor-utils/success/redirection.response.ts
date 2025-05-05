@@ -2,7 +2,7 @@ import { SuccessResponse } from './base.success.response';
 
 export class RedirectionResponse<T> implements SuccessResponse<T> {
   success: boolean = true;
-  statusCode: number = 301;
+  statusCode: number = 206;
   message?: string;
   data?: T;
 

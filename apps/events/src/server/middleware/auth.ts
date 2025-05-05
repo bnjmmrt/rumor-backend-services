@@ -24,18 +24,18 @@ class AuthMiddleware {
       }
       const token = tokenParts[1];
 
+      
       apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
 
-      const response = await serviceMesh.validate();
-
-      if (response && response.data) {
-        let { redirection, redirectionRole } = response.data;
-        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
-        return;
-      }
+      const response = await serviceMesh.validate();      
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;
@@ -44,8 +44,8 @@ class AuthMiddleware {
 
       next();
     } catch (error) {
-      console.log('🚀 ~ AuthMiddleware ~ error:', error);
-      const errMsg = new AuthorizationError(`Session has expired, please login again `);
+      console.log("🚀 ~ AuthMiddleware ~ error:", error)
+      const errMsg = new AuthorizationError(`Session has expired, Pleasdqwdqwdwqdqwe login again `);
       res.status(401).send(errMsg);
     }
   };
@@ -64,21 +64,19 @@ class AuthMiddleware {
         res.status(401).send('Unauthorized');
         return;
       }
-
       const token = tokenParts[1];
-
+      
       apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
-
+            
       const response = await serviceMesh.validate();
-
-      if (response && response.data.redirection) {
-        let { redirection, redirectionRole } = response.data;
-        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
-        return;
-      }
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
+      }
+
+      if (response && response.data?.redirection) {
+        res.status(206).json(new RedirectionResponse({ ...response.data }));
+        return;
       }
 
       const userId = response.data;
