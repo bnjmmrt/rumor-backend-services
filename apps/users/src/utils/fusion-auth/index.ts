@@ -144,7 +144,7 @@ class AuthMiddleware {
         userRole =>
           (userRole.role.name === 'member' || userRole.role.name === 'non_member') &&
           !userRole.isRoleDeactivated &&
-          userRole.status === UserStatus.ACTIVE,
+          userRole.status !== UserStatus.DEACTIVATED,
       );
       
       if (!isHostActivated && !isMemberNonMemberActivated) {
