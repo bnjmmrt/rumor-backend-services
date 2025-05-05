@@ -2,6 +2,12 @@ import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeo
 import database from '../database';
 import config from '../config';
 
+export interface IReferenceCode {
+  code?: string | undefined;
+  name?: string | undefined;
+  email?: string | undefined;
+}
+
 import {
   ForgotPasswordRequestDto,
   CheckAgeRequestDto,
@@ -4117,6 +4123,29 @@ export class AuthService {
           }
         });
 
+        const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+          where: [
+            {
+              email: user.email,
+            },
+            {
+              phoneNumber: user.phoneNumber,
+            },
+          ],
+          relations: {
+            inviteeUser: true,
+          },
+        });
+
+        const references: IReferenceCode = {
+          code: referenceCode?.referralCode || '---',
+          name:
+            (referenceCode?.inviteeUser?.firstName || '---') +
+            '  ' +
+            (referenceCode?.inviteeUser?.lastName || '---'),
+          email: referenceCode?.inviteeUser?.email || '---',
+        };
+
         const member = toMember(
           user,
           focuses,
@@ -4125,6 +4154,7 @@ export class AuthService {
           socialNetworkObject,
           socialProvider?.username,
           sources,
+          references,
         );
 
         return member;

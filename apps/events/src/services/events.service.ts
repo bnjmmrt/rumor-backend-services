@@ -3919,7 +3919,7 @@ export class EventsService {
           undefined,
           totalConfirmedGuests,
         );
-      })
+      }),
     );
     return {
       result: formattedEvents,
