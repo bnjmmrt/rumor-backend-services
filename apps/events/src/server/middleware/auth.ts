@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import config from '../../config';
 import apiService from 'rumor-utils/service-mesh';
 import { AuthorizationError } from 'rumor-utils/errors';
+import { RedirectionResponse } from 'rumor-utils/success';
 class AuthMiddleware {
   static fusionAuthRequired = async (
     req: Request,
@@ -22,9 +23,16 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
+
       apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
 
       const response = await serviceMesh.validate();
+
+      if (response && response.data) {
+        let { redirection, redirectionRole } = response.data;
+        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        return;
+      }
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');
@@ -36,7 +44,8 @@ class AuthMiddleware {
 
       next();
     } catch (error) {
-      const errMsg = new AuthorizationError(`Session has expired, Please login again `);
+      console.log('🚀 ~ AuthMiddleware ~ error:', error);
+      const errMsg = new AuthorizationError(`Session has expired, please login again `);
       res.status(401).send(errMsg);
     }
   };
@@ -55,10 +64,18 @@ class AuthMiddleware {
         res.status(401).send('Unauthorized');
         return;
       }
+
       const token = tokenParts[1];
+
       apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token);
 
       const response = await serviceMesh.validate();
+
+      if (response && response.data.redirection) {
+        let { redirection, redirectionRole } = response.data;
+        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        return;
+      }
 
       if (!response || !response.data) {
         throw new AuthorizationError('Authorization Error');

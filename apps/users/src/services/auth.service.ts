@@ -257,6 +257,7 @@ export class AuthService {
       };
 
       const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
+      console.log('🚀 ~ AuthService ~ login ~ loginUser:', loginUser);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
         throw new ForbiddenError('User or password not valid.');
@@ -1795,12 +1796,15 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({
-        userId: user.id,
-        token: payload.fcmToken,
-        deviceId: payload.deviceId,
-      });
+      if (user?.id) {
+        // Save FCM Token for the User
+        SettingsService.savePushNotificationToken({
+          userId: user.id,
+          token: payload.fcmToken,
+          deviceId: payload.deviceId,
+        });
+      }
+
       return {
         id: user.id,
         token: completedLogin?.response?.token,
@@ -2389,7 +2393,12 @@ export class AuthService {
     }
 
     const failedUsers: string[] = [];
-    const usersToUpdate: { userRole: any; newStatus?: UserStatus; newRole?: any; isRoleDeactivated?: boolean }[] = [];
+    const usersToUpdate: {
+      userRole: any;
+      newStatus?: UserStatus;
+      newRole?: any;
+      isRoleDeactivated?: boolean;
+    }[] = [];
 
     for (const user of users) {
       const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
@@ -2408,7 +2417,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              isRoleDeactivated: false,
+            });
           }
 
           await this.dbConnection.getRepository(User).update(user.id, {
@@ -2427,7 +2440,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              isRoleDeactivated: false,
+            });
           }
           break;
 
@@ -6118,7 +6135,7 @@ export class AuthService {
 
     if (targetRole) {
       // targetRole.status = UserStatus.DEACTIVATED;
-      targetRole.isRoleDeactivated = true
+      targetRole.isRoleDeactivated = true;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 

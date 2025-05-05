@@ -1,11 +1,12 @@
-import { Request, Response, NextFunction, response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import config from '../../config';
 import FusionAuthClient from '@fusionauth/typescript-client';
 import { ValidateRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { ForbiddenError, AuthorizationError } from 'rumor-utils/errors';
 import { RoleService } from '../../services/role.service';
-// import { User } from 'rumor-utils/shared/entities';
-// import { UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { User } from 'rumor-utils/shared/entities';
+import { UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { RedirectionResponse } from 'rumor-utils/success';
 
 class AuthMiddleware {
   fusionAuthRequired = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -33,17 +34,28 @@ class AuthMiddleware {
       (req as any).user = response.userId;
       (req as any).token = token;
 
+      if (response.redirection) {
+        let { redirection, redirectionRole } = response;
+        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        return;
+      }
+
       next();
     } catch (error) {
-      const errMsg = new AuthorizationError(`Session has expired, Please login again`);
-      res.status(401).send(errMsg);
+      if (error instanceof ForbiddenError) {
+        res.status(403).send('Forbidden Access');
+        return;
+      } else {
+        const errMsg = new AuthorizationError(`Unauthorized Access, Please login again `);
+        res.status(401).send(errMsg);
+        return;
+      }
     }
   };
 
   fusionAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authorization = req.header('Authorization');
-
       if (!authorization) {
         next();
         return;
@@ -66,10 +78,22 @@ class AuthMiddleware {
       (req as any).user = response.userId;
       (req as any).token = token;
 
+      if (response.redirection) {
+        let { redirection, redirectionRole } = response;
+        res.status(301).json(new RedirectionResponse({ ...redirection, ...redirectionRole }));
+        return;
+      }
+
       next();
     } catch (error) {
-      const errMsg = new AuthorizationError(`Session has expired, Please login again `);
-      res.status(401).send(errMsg);
+      if (error instanceof ForbiddenError) {
+        res.status(403).send('Forbidden Access');
+        return;
+      } else {
+        const errMsg = new AuthorizationError(`Unauthorized Access, Please login again `);
+        res.status(401).send(errMsg);
+        return;
+      }
     }
   };
 
@@ -82,23 +106,77 @@ class AuthMiddleware {
       const findUser = await fusionAuthClient.retrieveUserUsingJWT(token);
 
       if (!findUser?.response?.user?.active) {
-        throw new ForbiddenError('User is not active');
+        throw new AuthorizationError('User is not active');
       }
 
-      // const userDetails = await User.findOne({
-      //   where: { email: findUser.response.user.email },
-      //   relations: { roles: { role: true } },
-      // });
+      const userDetails = await User.findOne({
+        where: { email: findUser.response.user.email },
+        relations: { roles: { role: true } },
+      });
 
-      // const hasRestricted = userDetails?.roles?.filter(
-      //   ur =>
-      //     ['member', 'non_member'].includes(ur?.role?.name) &&
-      //     ur.status === UserStatus.DEACTIVATED
-      // );
+      let userSingleRole = userDetails?.roles?.length === 1;
 
-      // if (hasRestricted?.length > 0) {
-      //   throw new AuthorizationError('User role is deactivated');
-      // }
+      if (userSingleRole) {
+        if (
+          userDetails?.roles[0]?.role?.name === 'host' &&
+          (userDetails?.roles[0]?.status === UserStatus.DEACTIVATED ||
+          userDetails?.roles[0]?.isRoleDeactivated)
+        ) {
+          console.log('User is not active');
+          throw new AuthorizationError('User is not active');
+        } else if (
+          (userDetails?.roles[0]?.role?.name === 'member' ||
+            userDetails?.roles[0]?.role?.name === 'non_member') &&
+          userDetails?.roles[0]?.isRoleDeactivated
+        ) {
+          throw new AuthorizationError('User is not active');
+        } else {
+          return {
+            userId: findUser.response.user.id,
+            user: {
+              username: findUser?.response?.user?.username || '',
+              email: findUser?.response?.user?.email || '',
+              firstName: findUser?.response?.user?.firstName || '',
+              lastName: findUser?.response?.user?.lastName || '',
+              active: !!findUser?.response?.user?.active,
+              birthDate: findUser?.response?.user?.birthDate || '',
+              mobilePhone: findUser?.response?.user?.mobilePhone || '',
+              verified: !!findUser?.response?.user?.verified,
+              roles: [],
+            },
+            redirection: false,
+          };
+        }
+      }
+
+      const approvedHostUser = userDetails?.roles?.find(
+        role => role.role.name === 'host' && role.status === UserStatus.ACTIVE,
+      );
+
+      const membeOrNonMemberUser = userDetails?.roles?.find(
+        role => role.role.name === 'member' || role.role.name === 'non_member',
+      );
+
+      let redirection = false;
+      let redirectionRole = {};
+
+      if (approvedHostUser?.isRoleDeactivated && !membeOrNonMemberUser?.isRoleDeactivated) {
+        redirection = true;
+        redirectionRole = {
+          name: membeOrNonMemberUser.role.name,
+          status: membeOrNonMemberUser.status,
+          id: membeOrNonMemberUser.role.id,
+        };
+      }
+
+      if (!approvedHostUser?.isRoleDeactivated && membeOrNonMemberUser?.isRoleDeactivated) {
+        redirection = true;
+        redirectionRole = {
+          name: approvedHostUser.role.name,
+          status: approvedHostUser.status,
+          id: approvedHostUser.role.id,
+        };
+      }
 
       return {
         userId: findUser.response.user.id,
@@ -113,9 +191,11 @@ class AuthMiddleware {
           verified: !!findUser?.response?.user?.verified,
           roles: [],
         },
+        redirection,
+        redirectionRole,
       };
     } catch (err) {
-      throw new Error(err.statusCode);
+      throw new ForbiddenError(err.statusCode);
     }
   }
 
