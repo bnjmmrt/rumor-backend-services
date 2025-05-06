@@ -14,6 +14,6 @@ export class Interest extends RumorBaseEntity {
   enabled: boolean;
 
   @ManyToMany(() => User, { cascade: true })
-  @JoinTable()
+  @JoinTable({ name: 'interest_users_user' })
   users: User[];
 }

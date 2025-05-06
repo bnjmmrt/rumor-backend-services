@@ -89,7 +89,12 @@ import {
   UserAndIdRequestDto,
 } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
-import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
+import {
+  CreateResponse,
+  DeleteResponse,
+  GetResponse,
+  UpdateResponse,
+} from 'rumor-utils/success';
 
 export class AuthController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'ForgotPassword')

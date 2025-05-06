@@ -22,6 +22,7 @@ import {
   UserSource,
   UserStatus,
 } from './shared.pb';
+import { IReferenceCode } from '../../mappers/auth.mapper';
 
 export const protobufPackage = 'auth';
 
@@ -485,6 +486,7 @@ export interface Member {
   phoneNumber?: string | undefined;
   dateOfBirth?: string | undefined;
   sources?: string[] | undefined;
+  references?: IReferenceCode;
   isRoleDeactivated?: boolean | undefined;
 }
 
@@ -583,6 +585,7 @@ export interface MemberProfile {
   placeId?: string | undefined;
   eventCount: number;
   sources?: string[] | undefined;
+  isHost?: boolean | undefined;
 }
 
 export interface FocusProto {

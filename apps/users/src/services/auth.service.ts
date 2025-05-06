@@ -2,6 +2,12 @@ import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeo
 import database from '../database';
 import config from '../config';
 
+export interface IReferenceCode {
+  code?: string | undefined;
+  name?: string | undefined;
+  email?: string | undefined;
+}
+
 import {
   ForgotPasswordRequestDto,
   CheckAgeRequestDto,
@@ -257,6 +263,7 @@ export class AuthService {
       };
 
       const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
+      console.log('🚀 ~ AuthService ~ login ~ loginUser:', loginUser);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
         throw new ForbiddenError('User or password not valid.');
@@ -1795,12 +1802,15 @@ export class AuthService {
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({
-        userId: user.id,
-        token: payload.fcmToken,
-        deviceId: payload.deviceId,
-      });
+      if (user?.id) {
+        // Save FCM Token for the User
+        SettingsService.savePushNotificationToken({
+          userId: user.id,
+          token: payload.fcmToken,
+          deviceId: payload.deviceId,
+        });
+      }
+
       return {
         id: user.id,
         token: completedLogin?.response?.token,
@@ -2389,7 +2399,12 @@ export class AuthService {
     }
 
     const failedUsers: string[] = [];
-    const usersToUpdate: { userRole: any; newStatus?: UserStatus; newRole?: any; isRoleDeactivated?: boolean }[] = [];
+    const usersToUpdate: {
+      userRole: any;
+      newStatus?: UserStatus;
+      newRole?: any;
+      isRoleDeactivated?: boolean;
+    }[] = [];
 
     for (const user of users) {
       const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
@@ -2408,7 +2423,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (memberUserRole) {
-            usersToUpdate.push({ userRole: memberUserRole, newStatus: UserStatus.ACTIVE, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              isRoleDeactivated: false,
+            });
           }
 
           await this.dbConnection.getRepository(User).update(user.id, {
@@ -2427,7 +2446,11 @@ export class AuthService {
               isRoleDeactivated: false,
             });
           } else if (nonMemberUserRole) {
-            usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: UserStatus.WAITLISTED, isRoleDeactivated: false });
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              isRoleDeactivated: false,
+            });
           }
           break;
 
@@ -3364,7 +3387,7 @@ export class AuthService {
       roles: user.roles.map(item => {
         return {
           name: item.role.name,
-          status: item.status,
+          status: item.isRoleDeactivated ? UserStatus.DEACTIVATED : item.status,
           id: item.role.id,
         };
       }),
@@ -3837,8 +3860,8 @@ export class AuthService {
             qbOuter.andWhere(
               new Brackets(qbInner => {
                 qbInner
-                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
-                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
               }),
             );
           });
@@ -4100,6 +4123,29 @@ export class AuthService {
           }
         });
 
+        const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+          where: [
+            {
+              email: user.email,
+            },
+            {
+              phoneNumber: user.phoneNumber,
+            },
+          ],
+          relations: {
+            inviteeUser: true,
+          },
+        });
+
+        const references: IReferenceCode = {
+          code: referenceCode?.referralCode || '---',
+          name:
+            (referenceCode?.inviteeUser?.firstName || '---') +
+            '  ' +
+            (referenceCode?.inviteeUser?.lastName || '---'),
+          email: referenceCode?.inviteeUser?.email || '---',
+        };
+
         const member = toMember(
           user,
           focuses,
@@ -4108,6 +4154,7 @@ export class AuthService {
           socialNetworkObject,
           socialProvider?.username,
           sources,
+          references,
         );
 
         return member;
@@ -4942,13 +4989,16 @@ export class AuthService {
 
     // Apply search value filter
     if (searchValue) {
-      const searchWords = searchValue.trim().split(/\s+/);
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       queryBuilder.andWhere(
-        new Brackets(qb => {
-          searchWords.forEach(word => {
-            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere(
-              'user.lastName ILIKE :word',
-              { word: `%${word}%` },
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
+              }),
             );
           });
         }),
@@ -5456,6 +5506,7 @@ export class AuthService {
     if (!user) {
       throw new NotFoundError('User');
     }
+    const isHost = user.roles.some(r => r.role.name === 'host');
     const [focuses, interests] = await Promise.all([
       await PlatformService.getUserFocuses({ id: user.id }),
       await PlatformService.getUserInterests({ id: user.id }),
@@ -5499,7 +5550,7 @@ export class AuthService {
     userData.isSpam = isSpam;
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
-
+    userData.isHost = isHost;
     return userData;
   }
 
@@ -6117,7 +6168,7 @@ export class AuthService {
 
     if (targetRole) {
       // targetRole.status = UserStatus.DEACTIVATED;
-      targetRole.isRoleDeactivated = true
+      targetRole.isRoleDeactivated = true;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
