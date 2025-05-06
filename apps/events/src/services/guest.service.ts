@@ -1263,6 +1263,9 @@ export class GuestService {
       .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
       .where({ event: { id: event.id } });
+      
+      //filtering out deactivated users
+      queryBuilder.andWhere('user.isDeactivated = false');
 
     if (!isFromAdmin) {
       queryBuilder.andWhere(
