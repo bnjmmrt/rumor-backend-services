@@ -8,6 +8,6 @@ export class Focus extends RumorBaseEntity {
   name: string;
 
   @ManyToMany(() => User, { cascade: true })
-  @JoinTable()
+  @JoinTable({ name: 'focus_users_user' })
   users: User[];
 }

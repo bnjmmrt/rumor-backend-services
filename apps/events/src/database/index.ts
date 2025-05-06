@@ -32,7 +32,7 @@ export class ConnectionManager {
       }
       return this.connection;
     } catch (error) {
-      console.log("🚀 ~ ConnectionManager ~ initializeDbConnection ~ error:", error)
+      console.log('🚀 ~ ConnectionManager ~ initializeDbConnection ~ error:', error);
       throw error;
     }
   }
