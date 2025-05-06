@@ -1,5 +1,5 @@
 import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { Event } from 'rumor-utils/shared/entities';
+import { Event, User } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import { BadRequestError } from 'rumor-utils/errors';
@@ -83,6 +83,7 @@ export class SchedulerService {
           this.scheduleEventPastAndCancelledDate({ id: e.id, endDate: e.endDate } as Event);
         }
       });
+
     } catch (err) {
       console.log(`Error in scheduling events :: ${err?.message}`);
     }
@@ -153,7 +154,26 @@ export class SchedulerService {
     }
   }
 
-  public static async scheduleUserHardDelete() {}
+  public static async scheduleUserHardDelete(user: User) {
+    // Calculate the deletion time (30 days after deactivation)
+    const deletionTime = new Date(user.deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    // If the deletion time is in the past, skip scheduling
+    const now = new Date();
+    if (deletionTime <= now) {
+      return;
+    }
+    const jobKey = `${SchedulerJobType.DELETE_USER}_${user.id}`;
+    this.cancelScheduledJob(jobKey); // Cancel if already scheduled
+    const job = schedule.scheduleJob(deletionTime, async () => {
+      try {
+       //Do logic here
+        this.removeScheduledJob(jobKey);
+      } catch (err) {
+        console.error('Error during scheduled user deletion:', err);
+      }
+    });
+    this.storeScheduledJob(jobKey, job);
+  }
 
   /**
    * Schedules an event reminder 24 hours before the event's start time.
