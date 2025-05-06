@@ -10,7 +10,6 @@ import {
 import { TicketType } from 'rumor-utils/shared/events/entities/ticket-type.entity';
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses';
-import { normalizeCatalogName } from '../common/helpers';
 import { Event } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
@@ -22,7 +21,7 @@ export class TicketTypeService {
     payload: CreateTicketTypeRequestDto,
   ): Promise<TicketTypeResponse> {
     try {
-      const name = normalizeCatalogName(payload.name);
+      const name = payload.name.trim()
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
         where: {
           name,
@@ -85,7 +84,7 @@ export class TicketTypeService {
     payload: UpdateTicketTypeRequestDto,
   ): Promise<TicketTypeResponse> {
     try {
-      if (payload.name) payload.name = normalizeCatalogName(payload.name);
+      if (payload.name) payload.name = payload.name?.trim()
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
         where: {
           name: payload.name,

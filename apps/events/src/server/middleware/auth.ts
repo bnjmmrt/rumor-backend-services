@@ -46,7 +46,7 @@ class AuthMiddleware {
       next();
     } catch (error) {
       console.log('🚀 ~ AuthMiddleware ~ error:', error);
-      const errMsg = new AuthorizationError(`Session has expired, Pleasdqwdqwdwqdqwe login again `);
+      const errMsg = new AuthorizationError(`Session has expired, Please login again `);
       res.status(401).send(errMsg);
     }
   };

@@ -161,6 +161,12 @@ export const toCurrentUser = (
   };
 };
 
+export interface IReferenceCode {
+  code?: string | undefined;
+  name?: string | undefined;
+  email?: string | undefined;
+}
+
 export const toMember = (
   user: User,
   focuses: FocusProto[] = [],
@@ -169,6 +175,7 @@ export const toMember = (
   socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
   instagramUsername: string = 'N/A',
   sources?: string[],
+  references?: IReferenceCode,
 ): Member => {
   let totalFollowerCount = 0;
 
@@ -205,6 +212,7 @@ export const toMember = (
     phoneNumber: user.phoneNumber,
     dateOfBirth: user.dateOfBirth,
     sources,
+    references,
     isRoleDeactivated: role.isRoleDeactivated,
   };
 };
