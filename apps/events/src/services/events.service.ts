@@ -574,11 +574,9 @@ export class EventsService {
       });
 
       // Convert existing ticket types to a Set for quick lookup
-      const existingTicketNames = new Set(
-        existingTicketTypes.map(ticket => ticket.name?.trim()),
-      );
+      const existingTicketNames = new Set(existingTicketTypes.map(ticket => ticket.name?.trim()));
       const ticketTypeInsertData = ticketTypes.map(ticketTypePayload => {
-        const name = ticketTypePayload.name?.trim()
+        const name = ticketTypePayload.name?.trim();
         if (existingTicketNames.has(name)) {
           throw new Error(
             `Ticket type with name "${ticketTypePayload.name}" already exists for this event.`,
@@ -756,7 +754,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = ticket.name?.trim()
+          const ticketName = ticket.name?.trim();
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
               name: ticketName,
@@ -1672,7 +1670,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = ticket.name?.trim()
+          const ticketName = ticket.name?.trim();
 
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
@@ -1757,15 +1755,13 @@ export class EventsService {
       const ticketNames = updateCollaborators.flatMap(({ collaborator }) =>
         collaborator.tickets
           .filter(ticket => ticket.action === 'create')
-          .map(ticket =>ticket.name?.trim()),
+          .map(ticket => ticket.name?.trim()),
       );
       const ticketTypes = await queryRunner.manager.find(TicketType, {
         where: { name: In(ticketNames), event: { id: eventId } },
       });
 
-      const ticketTypeMap = new Map(
-        ticketTypes.map(ticket => [ticket.name?.trim(), ticket]),
-      );
+      const ticketTypeMap = new Map(ticketTypes.map(ticket => [ticket.name?.trim(), ticket]));
       // Process ticket updates
       const collaboratorsToSave = [];
 
@@ -1811,7 +1807,7 @@ export class EventsService {
               { limitInvitationsNumber: ticket.limitInvitationsNumber },
             );
           } else if (ticket.action === 'create') {
-            const ticketName = ticket.name?.trim()
+            const ticketName = ticket.name?.trim();
             const ticketType = ticketTypeMap.get(ticketName);
             if (!ticketType) {
               throw new Error(`Ticket type ${ticket.name} not found.`);
@@ -1999,7 +1995,7 @@ export class EventsService {
           updateTickets.push({
             id: ticket.id,
             data: {
-              name:ticket.name?.trim(),
+              name: ticket.name?.trim(),
               description: ticket.description,
               capacity: ticket.capacity || 0,
             },
