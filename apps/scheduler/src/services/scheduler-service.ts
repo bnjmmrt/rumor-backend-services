@@ -83,7 +83,6 @@ export class SchedulerService {
           this.scheduleEventPastAndCancelledDate({ id: e.id, endDate: e.endDate } as Event);
         }
       });
-
     } catch (err) {
       console.log(`Error in scheduling events :: ${err?.message}`);
     }
@@ -166,7 +165,7 @@ export class SchedulerService {
     this.cancelScheduledJob(jobKey); // Cancel if already scheduled
     const job = schedule.scheduleJob(deletionTime, async () => {
       try {
-       //Do logic here
+        //Do logic here
         this.removeScheduledJob(jobKey);
       } catch (err) {
         console.error('Error during scheduled user deletion:', err);
