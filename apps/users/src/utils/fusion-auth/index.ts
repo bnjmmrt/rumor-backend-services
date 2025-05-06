@@ -146,7 +146,7 @@ class AuthMiddleware {
           !userRole.isRoleDeactivated &&
           userRole.status !== UserStatus.DEACTIVATED,
       );
-      
+
       if (!isHostActivated && !isMemberNonMemberActivated) {
         throw new AuthorizationError('User is not active');
       }
