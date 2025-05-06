@@ -1420,7 +1420,7 @@ export class GuestService {
       queryBuilder.andWhere(
         new Brackets(qb => {
           searchWords.forEach((word, index) => {
-            const param = `%${word}%`;
+            const param = `${word}%`;
 
             // Match the main guest's name
             qb.orWhere(

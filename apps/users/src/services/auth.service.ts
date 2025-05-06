@@ -3860,8 +3860,8 @@ export class AuthService {
             qbOuter.andWhere(
               new Brackets(qbInner => {
                 qbInner
-                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` })
-                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `%${word}%` });
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
               }),
             );
           });
@@ -4989,13 +4989,16 @@ export class AuthService {
 
     // Apply search value filter
     if (searchValue) {
-      const searchWords = searchValue.trim().split(/\s+/);
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       queryBuilder.andWhere(
-        new Brackets(qb => {
-          searchWords.forEach(word => {
-            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere(
-              'user.lastName ILIKE :word',
-              { word: `%${word}%` },
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
+              }),
             );
           });
         }),
