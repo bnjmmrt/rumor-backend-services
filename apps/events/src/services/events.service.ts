@@ -566,7 +566,7 @@ export class EventsService {
   ): Promise<void> {
     try {
       // Normalize and prepare ticket type names
-      const ticketNames = ticketTypes.map(ticket => normalizeCatalogName(ticket.name));
+      const ticketNames = ticketTypes.map(ticket => ticket.name?.trim());
 
       // Fetch existing ticket types for the event
       const existingTicketTypes = await queryRunner.manager.find(TicketType, {
@@ -575,10 +575,10 @@ export class EventsService {
 
       // Convert existing ticket types to a Set for quick lookup
       const existingTicketNames = new Set(
-        existingTicketTypes.map(ticket => normalizeCatalogName(ticket.name)),
+        existingTicketTypes.map(ticket => ticket.name?.trim()),
       );
       const ticketTypeInsertData = ticketTypes.map(ticketTypePayload => {
-        const name = normalizeCatalogName(ticketTypePayload.name);
+        const name = ticketTypePayload.name?.trim()
         if (existingTicketNames.has(name)) {
           throw new Error(
             `Ticket type with name "${ticketTypePayload.name}" already exists for this event.`,
@@ -756,7 +756,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = normalizeCatalogName(ticket.name);
+          const ticketName = ticket.name?.trim()
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
               name: ticketName,
@@ -1672,7 +1672,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = normalizeCatalogName(ticket.name);
+          const ticketName = ticket.name?.trim()
 
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
@@ -1757,14 +1757,14 @@ export class EventsService {
       const ticketNames = updateCollaborators.flatMap(({ collaborator }) =>
         collaborator.tickets
           .filter(ticket => ticket.action === 'create')
-          .map(ticket => normalizeCatalogName(ticket.name)),
+          .map(ticket =>ticket.name?.trim()),
       );
       const ticketTypes = await queryRunner.manager.find(TicketType, {
         where: { name: In(ticketNames), event: { id: eventId } },
       });
 
       const ticketTypeMap = new Map(
-        ticketTypes.map(ticket => [normalizeCatalogName(ticket.name), ticket]),
+        ticketTypes.map(ticket => [ticket.name?.trim(), ticket]),
       );
       // Process ticket updates
       const collaboratorsToSave = [];
@@ -1811,7 +1811,7 @@ export class EventsService {
               { limitInvitationsNumber: ticket.limitInvitationsNumber },
             );
           } else if (ticket.action === 'create') {
-            const ticketName = normalizeCatalogName(ticket.name);
+            const ticketName = ticket.name?.trim()
             const ticketType = ticketTypeMap.get(ticketName);
             if (!ticketType) {
               throw new Error(`Ticket type ${ticket.name} not found.`);
@@ -1999,7 +1999,7 @@ export class EventsService {
           updateTickets.push({
             id: ticket.id,
             data: {
-              name: normalizeCatalogName(ticket.name),
+              name:ticket.name?.trim(),
               description: ticket.description,
               capacity: ticket.capacity || 0,
             },
@@ -2163,11 +2163,11 @@ export class EventsService {
           .filter(ticket => ticket.action === 'create')
           .map(ticket => `"${ticket.name}"`)
           .join(', ');
-
+        //TODO: add here name instead of oldId
         throw new Error(
           `Invalid reassignment: Ticket(s) [${oldIds.join(
             ', ',
-          )}] were set to be reassigned to "${newName}",  //TODO: add here name instead of oldId
+          )}] were set to be reassigned to "${newName}", 
   but no matching ticket with this name was found. 
   Available tickets are: [${availableCreateNames}]`,
         );
@@ -2178,7 +2178,7 @@ export class EventsService {
         TicketType,
         { id: primaryOldId, event: { id: eventId } },
         {
-          name: normalizeCatalogName(matchingTicket.name),
+          name: matchingTicket.name?.trim(),
           description: matchingTicket.description,
           capacity: matchingTicket.capacity || 0,
         },
