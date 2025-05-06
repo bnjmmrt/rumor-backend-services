@@ -19,7 +19,7 @@ export class EventAnnouncementService {
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
-        status: EventStatusEnum.APPROVED_STATUS,
+        // status: EventStatusEnum.APPROVED_STATUS,
         isPublished: true,
         deletedAt: IsNull(),
       },
@@ -229,7 +229,7 @@ export class EventAnnouncementService {
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
-        status: EventStatusEnum.APPROVED_STATUS,
+        //status: EventStatusEnum.APPROVED_STATUS,
         isPublished: true,
         deletedAt: IsNull(),
       },
@@ -346,7 +346,7 @@ export class EventAnnouncementService {
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
-        status: EventStatusEnum.APPROVED_STATUS,
+        //status: EventStatusEnum.APPROVED_STATUS,
         isPublished: true,
         deletedAt: IsNull(),
       },
@@ -463,7 +463,7 @@ export class EventAnnouncementService {
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
-        status: EventStatusEnum.APPROVED_STATUS,
+        //status: EventStatusEnum.APPROVED_STATUS,
         isPublished: true,
         deletedAt: IsNull(),
       },
