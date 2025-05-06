@@ -66,7 +66,7 @@ class AuthMiddleware {
         return;
       }
       const token = tokenParts[1];
-      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester});
+      apiService.initialize(config.get('USERS_SERVICE_BASE_URL'), token, { requester });
 
       const response = await serviceMesh.validate();
 
