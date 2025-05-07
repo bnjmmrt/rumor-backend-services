@@ -233,7 +233,10 @@ import { Notification } from 'rumor-utils/shared/notifications/entities/notifica
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
 import { SocialStats } from '../../packages/rumor-utils/shared/users/entities/social-stats.entity';
-import { SchedulerJobType, SchedulerTriggerPayload } from 'packages/rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from '../../packages/rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
