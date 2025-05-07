@@ -16,8 +16,6 @@ import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 
-
-
 interface TicketTypeBreakdown {
   id: string;
   name: string;

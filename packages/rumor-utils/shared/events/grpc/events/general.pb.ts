@@ -755,7 +755,7 @@ export interface TicketBreakdown {
 }
 
 export interface TicketBreakdownResponse {
-      ticketBreakdown: TicketBreakdown[];
+  ticketBreakdown: TicketBreakdown[];
 }
 
 export interface TicketBreakdown {
@@ -766,6 +766,5 @@ export interface TicketBreakdown {
   pending: number;
   collaborator: Collaborator;
 }
-
 
 export const EVENTS_PACKAGE_NAME = 'events';
