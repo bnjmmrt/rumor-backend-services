@@ -3,6 +3,7 @@ export enum SchedulerJobType {
   REMINDER_EVENT = 'REMINDER_EVENT',
   PAST_OR_CANCEL_EVENT = 'PAST_OR_CANCEL_EVENT',
   DELETE_USER = 'DELETE_USER',
+  CANCEL_AND_REMOVE_SCHEDULED_JOB = 'CANCEL_AND_REMOVE_SCHEDULED_JOB',
 }
 
 // schedulerPayload.ts
@@ -26,11 +27,16 @@ export type DeleteUserData = {
   deactivatedAt: Date;
 };
 
+export type CancelANDRemoveScheduledJobData = {
+  jobKey: string;
+};
+
 export type SchedulerTriggerPayload =
   | { type: SchedulerJobType.PUBLISH_EVENT; data: PublishEventData }
   | { type: SchedulerJobType.REMINDER_EVENT; data: ReminderEventData }
   | { type: SchedulerJobType.PAST_OR_CANCEL_EVENT; data: EndOrCancelEventData }
   | {
-      type: SchedulerJobType.DELETE_USER;
-      data: DeleteUserData;
-    };
+    type: SchedulerJobType.DELETE_USER;
+    data: DeleteUserData;
+  }
+  | { type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB; data: CancelANDRemoveScheduledJobData };

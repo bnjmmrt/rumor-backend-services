@@ -6216,6 +6216,18 @@ export class AuthService {
       targetRole.isRoleDeactivated = false;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
+    //scheduling user hard delete for 30 days
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB,
+        data: {
+          jobKey: `${SchedulerJobType.DELETE_USER}_${user.id}`
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(`Failed to cancel scheduled delete user job for ${user.firstName} ${user.lastName}`, e);
+    }
 
     return '';
   }

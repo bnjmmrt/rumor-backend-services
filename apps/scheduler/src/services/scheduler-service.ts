@@ -9,6 +9,13 @@ import { IsNull, Not } from 'typeorm';
 
 export class SchedulerService {
   private static scheduledJobs: { [key: string]: schedule.Job } = {};
+  /**
+   * Cancel and remove a previously scheduled job if it exists.
+   */
+  private static cancelAndRemoveScheduledJob(jobKey: string): void {
+    this.cancelScheduledJob(jobKey);
+    this.removeScheduledJob(jobKey);
+  }
 
   /**
    * Cancel a previously scheduled job if exists.
@@ -55,6 +62,8 @@ export class SchedulerService {
       case SchedulerJobType.DELETE_USER:
         await this.scheduleUserHardDelete(data);
         break;
+      case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
+        await this.cancelAndRemoveScheduledJob(data)
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
