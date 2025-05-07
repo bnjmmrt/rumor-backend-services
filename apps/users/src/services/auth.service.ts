@@ -4268,6 +4268,9 @@ export class AuthService {
             })
             .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', {
               searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('user.additional_host_information->>\'companyName\' ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
             });
         }),
       );
