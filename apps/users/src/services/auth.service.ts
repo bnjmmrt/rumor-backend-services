@@ -6226,7 +6226,10 @@ export class AuthService {
       };
       serviceMesh.schedulerService().triggerSchedulerJob(data);
     } catch (e) {
-      console.log(`Failed to cancel scheduled delete user job for ${user.firstName} ${user.lastName}`, e);
+      console.log(
+        `Failed to cancel scheduled delete user job for ${user.firstName} ${user.lastName}`,
+        e,
+      );
     }
 
     return '';

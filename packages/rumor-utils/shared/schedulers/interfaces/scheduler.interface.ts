@@ -36,7 +36,10 @@ export type SchedulerTriggerPayload =
   | { type: SchedulerJobType.REMINDER_EVENT; data: ReminderEventData }
   | { type: SchedulerJobType.PAST_OR_CANCEL_EVENT; data: EndOrCancelEventData }
   | {
-    type: SchedulerJobType.DELETE_USER;
-    data: DeleteUserData;
-  }
-  | { type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB; data: CancelANDRemoveScheduledJobData };
+      type: SchedulerJobType.DELETE_USER;
+      data: DeleteUserData;
+    }
+  | {
+      type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB;
+      data: CancelANDRemoveScheduledJobData;
+    };

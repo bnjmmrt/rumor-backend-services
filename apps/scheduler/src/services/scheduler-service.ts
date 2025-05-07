@@ -63,7 +63,7 @@ export class SchedulerService {
         await this.scheduleUserHardDelete(data);
         break;
       case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
-        await this.cancelAndRemoveScheduledJob(data)
+        await this.cancelAndRemoveScheduledJob(data);
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
