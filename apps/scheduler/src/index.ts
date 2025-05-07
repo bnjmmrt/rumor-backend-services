@@ -12,6 +12,7 @@ const start = async () => {
 
     await server.start();
     await SchedulerService.scheduleEventOnServerRestart();
+    await SchedulerService.scheduleUserHardDeleteRestart();
     console.info('[APP] - Application started. 🚀');
   } catch (err) {
     console.error('[APP] - Failed starting application. Exiting... 👋', err);

@@ -2832,31 +2832,46 @@ export class AuthService {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: userId },
-      relations: {
-        customLists: { usersLists: true },
-        favoritedMembers: true,
-        followers: true,
-      },
-      order: {
-        customLists: { createdAt: 'DESC' },
-      },
+    // Get the custom lists created by the host
+    const customLists = await this.dbConnection.getRepository(HostCustomUsersLists).find({
+      where: { host: { id: userId } },
+      order: { createdAt: 'DESC' },
+      relations: ['usersLists', 'usersLists.user'],
     });
-
-    if (!user) {
-      return { totalCount: 0, result: [] };
-    }
-
-    const allLists = [
-      { id: null, name: 'Followed', totalCount: user.followers.length, result: [] },
-      { id: null, name: 'Favorite', totalCount: user.favoritedMembers.length, result: [] },
-      ...user.customLists.map(list => ({
+  
+    //Get active followed users
+    const followedUsers = await this.dbConnection.getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFollowing, 'f', 'f.host_id = :userId AND f.follower_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
+  
+    //Get active favorited users
+    const favoritedUsers = await this.dbConnection.getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFavorite, 'f', 'f.host_id = :userId AND f.member_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
+  
+    //Prepare custom list data with only active users
+    const customListsWithCounts = customLists.map(list => {
+      const activeUsers = list.usersLists
+        .filter(u => u.user && !u.user.isDeactivated)
+        .map(u => u.user);
+  
+      return {
         id: list.id,
         name: list.listName,
-        totalCount: list.usersLists.length,
+        totalCount: activeUsers.length,
         result: [],
-      })),
+      };
+    });
+  
+    //Combine all lists
+    const allLists = [
+      { id: null, name: 'Followed', totalCount: followedUsers.length, result: [] },
+      { id: null, name: 'Favorite', totalCount: favoritedUsers.length, result: [] },
+      ...customListsWithCounts,
     ];
 
     return {
