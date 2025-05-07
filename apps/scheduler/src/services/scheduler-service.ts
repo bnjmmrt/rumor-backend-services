@@ -5,6 +5,7 @@ import * as schedule from 'node-schedule';
 import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { IsNull, Not } from 'typeorm';
 
 export class SchedulerService {
   private static scheduledJobs: { [key: string]: schedule.Job } = {};
@@ -88,6 +89,22 @@ export class SchedulerService {
     }
   }
 
+  public static async scheduleUserHardDeleteRestart() {
+    try {
+      const users: User[] = await User.find({
+        where: {
+          isDeactivated: true,
+          deactivatedAt: Not(IsNull()),
+        },
+      });
+      users.forEach((u: User) => {
+        this.scheduleUserHardDelete(u);
+      });
+    } catch (e) {
+      console.error('Error during scheduled user deletion:', e);
+    }
+  }
+
   /**
    * Schedule the event's publish date.
    * Cancels previous job if it's already scheduled and reschedules.
@@ -165,13 +182,16 @@ export class SchedulerService {
     this.cancelScheduledJob(jobKey); // Cancel if already scheduled
     const job = schedule.scheduleJob(deletionTime, async () => {
       try {
-        //Do logic here
-        this.removeScheduledJob(jobKey);
+        const job = schedule.scheduleJob(deletionTime, async () => {
+          const foundUser = await User.findOne({ where: { id: user.id } });
+          await serviceMesh.userService().permanantlyDeleteAccount(foundUser.id);
+          this.removeScheduledJob(jobKey);
+        });
+        this.storeScheduledJob(jobKey, job);
       } catch (err) {
         console.error('Error during scheduled user deletion:', err);
       }
     });
-    this.storeScheduledJob(jobKey, job);
   }
 
   /**
