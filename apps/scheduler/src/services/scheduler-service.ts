@@ -52,6 +52,9 @@ export class SchedulerService {
       case SchedulerJobType.PAST_OR_CANCEL_EVENT:
         await this.scheduleEventPastAndCancelledDate(data);
         break;
+      case SchedulerJobType.DELETE_USER:
+        await this.scheduleUserHardDelete(data);
+        break;
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }

@@ -233,6 +233,7 @@ import { Notification } from 'rumor-utils/shared/notifications/entities/notifica
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
 import { SocialStats } from '../../packages/rumor-utils/shared/users/entities/social-stats.entity';
+import { SchedulerJobType, SchedulerTriggerPayload } from 'packages/rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -6170,6 +6171,20 @@ export class AuthService {
       // targetRole.status = UserStatus.DEACTIVATED;
       targetRole.isRoleDeactivated = true;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
+    //scheduling user hard delete for 30 days
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.DELETE_USER,
+        data: {
+          id: user.id,
+          deactivatedAt: user.deactivatedAt,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
     }
 
     return '';
