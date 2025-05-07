@@ -9,6 +9,13 @@ import { IsNull, Not } from 'typeorm';
 
 export class SchedulerService {
   private static scheduledJobs: { [key: string]: schedule.Job } = {};
+  /**
+   * Cancel and remove a previously scheduled job if it exists.
+   */
+  private static cancelAndRemoveScheduledJob(jobKey: string): void {
+    this.cancelScheduledJob(jobKey);
+    this.removeScheduledJob(jobKey);
+  }
 
   /**
    * Cancel a previously scheduled job if exists.
@@ -52,6 +59,11 @@ export class SchedulerService {
       case SchedulerJobType.PAST_OR_CANCEL_EVENT:
         await this.scheduleEventPastAndCancelledDate(data);
         break;
+      case SchedulerJobType.DELETE_USER:
+        await this.scheduleUserHardDelete(data);
+        break;
+      case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
+        await this.cancelAndRemoveScheduledJob(data);
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
@@ -172,26 +184,24 @@ export class SchedulerService {
 
   public static async scheduleUserHardDelete(user: User) {
     // Calculate the deletion time (30 days after deactivation)
-    const deletionTime = new Date(user.deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
-    // If the deletion time is in the past, skip scheduling
-    const now = new Date();
-    if (deletionTime <= now) {
-      return;
-    }
-    const jobKey = `${SchedulerJobType.DELETE_USER}_${user.id}`;
-    this.cancelScheduledJob(jobKey); // Cancel if already scheduled
-    const job = schedule.scheduleJob(deletionTime, async () => {
-      try {
-        const job = schedule.scheduleJob(deletionTime, async () => {
-          const foundUser = await User.findOne({ where: { id: user.id } });
-          await serviceMesh.userService().permanantlyDeleteAccount(foundUser.id);
-          this.removeScheduledJob(jobKey);
-        });
-        this.storeScheduledJob(jobKey, job);
-      } catch (err) {
-        console.error('Error during scheduled user deletion:', err);
+    try {
+      const deletionTime = new Date(user.deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      // If the deletion time is in the past, skip scheduling
+      const now = new Date();
+      if (deletionTime <= now) {
+        return;
       }
-    });
+      const jobKey = `${SchedulerJobType.DELETE_USER}_${user.id}`;
+      this.cancelScheduledJob(jobKey); // Cancel if already scheduled
+      const job = schedule.scheduleJob(deletionTime, async () => {
+        const foundUser = await User.findOne({ where: { id: user.id } });
+        await serviceMesh.userService().permanantlyDeleteAccount(foundUser.id);
+        this.removeScheduledJob(jobKey);
+      });
+      this.storeScheduledJob(jobKey, job);
+    } catch (err) {
+      console.error('Error during scheduled user deletion:', err);
+    }
   }
 
   /**
