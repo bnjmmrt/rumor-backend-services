@@ -6201,19 +6201,20 @@ export class AuthService {
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
-    //scheduling user hard delete for 30 days
-    try {
-      let data: SchedulerTriggerPayload = {
-        type: SchedulerJobType.DELETE_USER,
-        data: {
-          id: user.id,
-          deactivatedAt: user.deactivatedAt,
-        },
-      };
-      serviceMesh.schedulerService().triggerSchedulerJob(data);
-    } catch (e) {
-      console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
-    }
+     //scheduling user hard delete for 30 days
+     const userFromDb = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+     try {
+       let data: SchedulerTriggerPayload = {
+         type: SchedulerJobType.DELETE_USER,
+         data: {
+           id: userFromDb.id,
+           deactivatedAt: userFromDb.deactivatedAt
+         },
+       };
+       serviceMesh.schedulerService().triggerSchedulerJob(data);
+     } catch (e) {
+       console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
+     }
 
     return '';
   }

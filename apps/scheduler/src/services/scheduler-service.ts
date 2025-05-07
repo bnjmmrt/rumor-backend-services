@@ -63,7 +63,8 @@ export class SchedulerService {
         await this.scheduleUserHardDelete(data);
         break;
       case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
-        await this.cancelAndRemoveScheduledJob(data);
+        await this.cancelAndRemoveScheduledJob(data.jobKey);
+        break;
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
@@ -184,8 +185,9 @@ export class SchedulerService {
 
   public static async scheduleUserHardDelete(user: User) {
     // Calculate the deletion time (30 days after deactivation)
+    let deactivationDate= new Date(user.deactivatedAt);
     try {
-      const deletionTime = new Date(user.deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const deletionTime = new Date(deactivationDate.getTime() + 30 * 24 * 60 * 60 * 1000);
       // If the deletion time is in the past, skip scheduling
       const now = new Date();
       if (deletionTime <= now) {
