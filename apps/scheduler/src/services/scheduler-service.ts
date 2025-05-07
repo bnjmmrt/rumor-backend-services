@@ -185,7 +185,7 @@ export class SchedulerService {
 
   public static async scheduleUserHardDelete(user: User) {
     // Calculate the deletion time (30 days after deactivation)
-    let deactivationDate= new Date(user.deactivatedAt);
+    let deactivationDate = new Date(user.deactivatedAt);
     try {
       const deletionTime = new Date(deactivationDate.getTime() + 30 * 24 * 60 * 60 * 1000);
       // If the deletion time is in the past, skip scheduling

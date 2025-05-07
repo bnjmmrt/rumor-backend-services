@@ -2838,27 +2838,29 @@ export class AuthService {
       order: { createdAt: 'DESC' },
       relations: ['usersLists', 'usersLists.user'],
     });
-  
+
     //Get active followed users
-    const followedUsers = await this.dbConnection.getRepository(User)
+    const followedUsers = await this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('u')
       .innerJoin(HostFollowing, 'f', 'f.host_id = :userId AND f.follower_id = u.id', { userId })
       .where('u.isDeactivated = false')
       .getMany();
-  
+
     //Get active favorited users
-    const favoritedUsers = await this.dbConnection.getRepository(User)
+    const favoritedUsers = await this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('u')
       .innerJoin(HostFavorite, 'f', 'f.host_id = :userId AND f.member_id = u.id', { userId })
       .where('u.isDeactivated = false')
       .getMany();
-  
+
     //Prepare custom list data with only active users
     const customListsWithCounts = customLists.map(list => {
       const activeUsers = list.usersLists
         .filter(u => u.user && !u.user.isDeactivated)
         .map(u => u.user);
-  
+
       return {
         id: list.id,
         name: list.listName,
@@ -2866,7 +2868,7 @@ export class AuthService {
         result: [],
       };
     });
-  
+
     //Combine all lists
     const allLists = [
       { id: null, name: 'Followed', totalCount: followedUsers.length, result: [] },
@@ -6201,20 +6203,22 @@ export class AuthService {
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
-     //scheduling user hard delete for 30 days
-     const userFromDb = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
-     try {
-       let data: SchedulerTriggerPayload = {
-         type: SchedulerJobType.DELETE_USER,
-         data: {
-           id: userFromDb.id,
-           deactivatedAt: userFromDb.deactivatedAt
-         },
-       };
-       serviceMesh.schedulerService().triggerSchedulerJob(data);
-     } catch (e) {
-       console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
-     }
+    //scheduling user hard delete for 30 days
+    const userFromDb = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.id } });
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.DELETE_USER,
+        data: {
+          id: userFromDb.id,
+          deactivatedAt: userFromDb.deactivatedAt,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
+    }
 
     return '';
   }
@@ -6247,7 +6251,7 @@ export class AuthService {
       let data: SchedulerTriggerPayload = {
         type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB,
         data: {
-          jobKey: `${SchedulerJobType.DELETE_USER}_${user.id}`
+          jobKey: `${SchedulerJobType.DELETE_USER}_${user.id}`,
         },
       };
       serviceMesh.schedulerService().triggerSchedulerJob(data);
