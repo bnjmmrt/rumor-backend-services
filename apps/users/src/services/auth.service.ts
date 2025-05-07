@@ -2914,6 +2914,9 @@ export class AuthService {
       .where('customList.host_id = :hostId', { hostId: hostId })
       .andWhere('customList.id = :listId', { listId: customListId });
 
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
       userTypes = type.split(',').map(name => name.trim());
@@ -3228,6 +3231,9 @@ export class AuthService {
       .where('hf.host.id = :hostId', { hostId: payload.userId })
       .take(take)
       .skip(skip);
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
 
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
@@ -5612,6 +5618,10 @@ export class AuthService {
       .where('hf.host.id = :hostId', { hostId: payload.userId })
       .take(take)
       .skip(skip);
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
       userTypes = type.split(',').map(name => name.trim());
