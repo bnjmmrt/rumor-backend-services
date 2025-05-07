@@ -12,6 +12,7 @@
     "scheduler": "nodemon apps/scheduler/src/index.ts",
     "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
+  "workspaces": ["packages/*"],
   "author": "shivam@techalchemy.com",
   "license": "ISC",
   "devDependencies": {

@@ -17,8 +17,6 @@ import {
 } from '../../packages/rumor-utils/success';
 import { Request, Response } from 'express';
 import { TicketType } from 'packages/rumor-utils/shared/entities';
-import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
-import { TicketBreakdownResponse } from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
 
 interface TicketTypeBreakdown {
   id: string;

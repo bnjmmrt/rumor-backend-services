@@ -14,16 +14,9 @@ import { normalizeCatalogName } from '../common/helpers';
 import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
-import {
-  TicketBreakdown,
-  TicketBreakdownResponse,
-} from 'packages/rumor-utils/shared/events/grpc/events/general.pb';
-import { TicketBreakdown as ProtoTicketBreakdown } from 'rumor-utils/shared/events/grpc/events/general.pb';
 import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 
-interface ExtendedTicketBreakdown extends ProtoTicketBreakdown {
-  attendeeCount: number;
-}
+
 
 interface TicketTypeBreakdown {
   id: string;
