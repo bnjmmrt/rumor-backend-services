@@ -27,7 +27,9 @@ class AuthMiddleware {
 
       const response = await this.validate({ token, requester });
 
+      console.log(`Response Validated${response?.userId}`)
       if (!response || !response.userId) {
+        console.log(`Response Validation Failed`);
         res.status(401).send('Unauthorized');
         return;
       }
@@ -102,11 +104,17 @@ class AuthMiddleware {
 
   async validate({ token, requester }: ValidateRequestDto): Promise<any> {
     try {
+      console.log('Token Validation started');
       const fusionAuthClient = new FusionAuthClient(
         config.get('FUSIONAUTH_API_KEY'),
         config.get('FUSIONAUTH_BASE_URL'),
+        config.get('FUSIONAUTH_TENANT_ID'),
+      );
+      console.log(
+        `Token Validation Value :::  ${config.get('FUSIONAUTH_API_KEY')}  AND ${config.get('FUSIONAUTH_BASE_URL')}`,
       );
       const findUser = await fusionAuthClient.retrieveUserUsingJWT(token);
+      console.log('Retrieved User from FusionAuth');
 
       if (!findUser?.response?.user?.active) {
         throw new AuthorizationError('User is not active');
@@ -194,7 +202,8 @@ class AuthMiddleware {
         redirectionRole,
       };
     } catch (err) {
-      throw new ForbiddenError(err.statusCode);
+      console.log('FusionAuth Throws an error');
+      throw new Error(err.statusCode);
     }
   }
 
