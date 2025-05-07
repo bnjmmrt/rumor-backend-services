@@ -87,4 +87,5 @@ export const createHostCollaborator = (
 
 export const getAllusers = (query: string) => apiService.getApi().get(`/auth/users-list?${query}`);
 
-export const permanantlyDeleteAccount = (userId: string) => apiService.getApi().delete(`auth/user/${userId}/delete`)
+export const permanantlyDeleteAccount = (userId: string) =>
+  apiService.getApi().delete(`auth/user/${userId}/delete`);
