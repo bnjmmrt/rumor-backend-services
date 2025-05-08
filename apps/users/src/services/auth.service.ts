@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner  } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
 import database from '../database';
 import config from '../config';
 
@@ -6233,188 +6233,185 @@ export class AuthService {
     return '';
   }
 
-/**
- * Sends deactivation email and SMS notification to the user.
- *
- * @param user - The user being deactivated
- */
-private static async sendDeactivationNotification(user: User) {
-  const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-  const smsToSend: { phoneNumber: string; message: string }[] = [];
+  /**
+   * Sends deactivation email and SMS notification to the user.
+   *
+   * @param user - The user being deactivated
+   */
+  private static async sendDeactivationNotification(user: User) {
+    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
+    const smsToSend: { phoneNumber: string; message: string }[] = [];
 
-  const today = new Date();
-  const afterThirtyDays = new Date(
-    today.getFullYear(),
-    today.getMonth() + 1,
-    today.getDate()
-  );
+    const today = new Date();
+    const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
 
-  const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-  const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+    const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+    const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
 
-  // Prepare email
-  emailsToSend.push({
-    email: user.email,
-    subject: 'Account Deactivated',
-    data: [
-      { key: 'first_name', value: user.firstName },
-      { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-    ],
-  });
+    // Prepare email
+    emailsToSend.push({
+      email: user.email,
+      subject: 'Account Deactivated',
+      data: [
+        { key: 'first_name', value: user.firstName },
+        { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+      ],
+    });
 
-  // // Prepare SMS (if applicable - example message)
-  // if (user.phoneNumber) {
-  //   smsToSend.push({
-  //     phoneNumber: user.phoneNumber,
-  //     message: `Hi ${user.firstName}, your account has been deactivated. You can reactivate it before ${reactivateBeforeTimestamp}.`,
-  //   });
-  // }
+    // // Prepare SMS (if applicable - example message)
+    // if (user.phoneNumber) {
+    //   smsToSend.push({
+    //     phoneNumber: user.phoneNumber,
+    //     message: `Hi ${user.firstName}, your account has been deactivated. You can reactivate it before ${reactivateBeforeTimestamp}.`,
+    //   });
+    // }
 
-  // Send Emails
-  try {
-    await Promise.all(
-      emailsToSend.map(email =>
-        serviceMesh.notificationService().sendEmailFromTemplate(
-          email.data,
-          email.subject,
-          [email.email.trim().toLowerCase()],
-          null
-        )
-      )
-    );
-  } catch (error) {
-    console.error(`❌ Failed to send deactivation email:`, error);
+    // Send Emails
+    try {
+      await Promise.all(
+        emailsToSend.map(email =>
+          serviceMesh
+            .notificationService()
+            .sendEmailFromTemplate(
+              email.data,
+              email.subject,
+              [email.email.trim().toLowerCase()],
+              null,
+            ),
+        ),
+      );
+    } catch (error) {
+      console.error(`❌ Failed to send deactivation email:`, error);
+    }
+
+    //TODO: Uncomment when SMS is available(currently no text is provide in sheet)
+    // // Send SMS
+    // try {
+    //   await Promise.all(
+    //     smsToSend.map(sms => {
+    //       const validateNumber = isValidPhoneNumber(sms.phoneNumber);
+    //       if (validateNumber) {
+    //         const cleanedNumber = sms.phoneNumber.replace(/[\s\-()]/g, '');
+    //         return serviceMesh.notificationService().sendTextMessage(cleanedNumber, sms.message);
+    //       }
+    //     })
+    //   );
+    // } catch (err) {
+    //   console.error(`❌ Failed to send deactivation SMS:`, err);
+    // }
   }
 
-  //TODO: Uncomment when SMS is available(currently no text is provide in sheet)
-  // // Send SMS 
-  // try {
-  //   await Promise.all(
-  //     smsToSend.map(sms => {
-  //       const validateNumber = isValidPhoneNumber(sms.phoneNumber);
-  //       if (validateNumber) {
-  //         const cleanedNumber = sms.phoneNumber.replace(/[\s\-()]/g, '');
-  //         return serviceMesh.notificationService().sendTextMessage(cleanedNumber, sms.message);
-  //       }
-  //     })
-  //   );
-  // } catch (err) {
-  //   console.error(`❌ Failed to send deactivation SMS:`, err);
-  // }
-}
+  /**
+   * Deletes guest, ticket, and signup form entries for the specified lead guest (userId)
+   * across all events they are part of. Also removes related entries for plus-ones,
+   * but only if those plus-ones were added by this lead guest and for those specific events.
+   *
+   * @param userId - The ID of the lead guest to deactivate
+   */
+  private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(userId: string) {
+    const guestRepo = this.dbConnection.getRepository(Guest);
+    const ticketRepo = this.dbConnection.getRepository(Ticket);
+    const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
 
+    // 1. Get all events where the lead guest (userId) is listed as a guest.
+    const leadGuestEntries = await guestRepo.find({
+      where: { user: { id: userId } },
+      relations: ['event'],
+    });
 
-/**
- * Deletes guest, ticket, and signup form entries for the specified lead guest (userId)
- * across all events they are part of. Also removes related entries for plus-ones,
- * but only if those plus-ones were added by this lead guest and for those specific events.
- *
- * @param userId - The ID of the lead guest to deactivate
- */
-private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(userId: string) {
-  const guestRepo = this.dbConnection.getRepository(Guest);
-  const ticketRepo = this.dbConnection.getRepository(Ticket);
-  const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
+    // Extract unique event IDs where the lead guest is participating.
+    const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
 
-  // 1. Get all events where the lead guest (userId) is listed as a guest.
-  const leadGuestEntries = await guestRepo.find({
-    where: { user: { id: userId } },
-    relations: ['event'],
-  });
+    if (eventIds.length === 0) return; // Nothing to delete if the user has no guest entries.
 
-  // Extract unique event IDs where the lead guest is participating.
-  const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
+    // 2. Get all guests (plus-ones) who were added by this lead guest for these events.
+    const plusOneGuests = await guestRepo.find({
+      where: {
+        addedBy: { id: userId },
+        event: { id: In(eventIds) },
+      },
+      relations: ['user', 'event'],
+    });
 
-  if (eventIds.length === 0) return; // Nothing to delete if the user has no guest entries.
+    // Extract the user IDs of the plus-ones.
+    const plusOneUserIds = plusOneGuests
+      .map(g => g.user?.id)
+      .filter((id): id is string => Boolean(id));
 
-  // 2. Get all guests (plus-ones) who were added by this lead guest for these events.
-  const plusOneGuests = await guestRepo.find({
-    where: {
-      addedBy: { id: userId },
-      event: { id: In(eventIds) },
-    },
-    relations: ['user', 'event'],
-  });
-
-  // Extract the user IDs of the plus-ones.
-  const plusOneUserIds = plusOneGuests
-    .map(g => g.user?.id)
-    .filter((id): id is string => Boolean(id));
-
-  // 3. Delete Tickets:
-  // - Lead guest: delete across all their events.
-  // - Plus-ones: delete only for events they were added by this lead guest.
-  await ticketRepo
-    .createQueryBuilder()
-    .delete()
-    .where(
-      new Brackets(qb => {
-        qb.where('user_id = :userId', { userId });
-        if (plusOneUserIds.length > 0) {
-          qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
-        }
+    // 3. Delete Tickets:
+    // - Lead guest: delete across all their events.
+    // - Plus-ones: delete only for events they were added by this lead guest.
+    await ticketRepo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        new Brackets(qb => {
+          qb.where('user_id = :userId', { userId });
+          if (plusOneUserIds.length > 0) {
+            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+          }
+        }),
+      )
+      .andWhere('event_id IN (:...eventIds)', { eventIds })
+      .setParameters({
+        userId,
+        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+        eventIds,
       })
-    )
-    .andWhere('event_id IN (:...eventIds)', { eventIds })
-    .setParameters({
-      userId,
-      ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
-      eventIds,
-    })
-    .execute();
+      .execute();
 
-  // 4. Delete Signup Form Submissions:
-  // - Lead guest: delete all for relevant events.
-  // - Plus-ones: delete only if added by this user for relevant events.
-  await signupFormRepo
-    .createQueryBuilder()
-    .delete()
-    .where(
-      new Brackets(qb => {
-        qb.where('user_id = :userId', { userId });
-        if (plusOneUserIds.length > 0) {
-          qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
-        }
-      })
-    )
-    .andWhere(
-      `signup_form_id IN (
+    // 4. Delete Signup Form Submissions:
+    // - Lead guest: delete all for relevant events.
+    // - Plus-ones: delete only if added by this user for relevant events.
+    await signupFormRepo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        new Brackets(qb => {
+          qb.where('user_id = :userId', { userId });
+          if (plusOneUserIds.length > 0) {
+            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+          }
+        }),
+      )
+      .andWhere(
+        `signup_form_id IN (
         SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
       )`,
-      { eventIds }
-    )
-    .setParameters({
-      userId,
-      ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
-      eventIds,
-    })
-    .execute();
+        { eventIds },
+      )
+      .setParameters({
+        userId,
+        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+        eventIds,
+      })
+      .execute();
 
-  // 5. Delete the guest entry of the lead user for all their events.
-  await guestRepo
-    .createQueryBuilder()
-    .delete()
-    .where('user_id = :userId', { userId })
-    .andWhere('event_id IN (:...eventIds)', { eventIds })
-    .setParameters({ userId, eventIds })
-    .execute();
-
-  // 6. Delete guest entries for plus-ones (only if they were added by the lead user for these events).
-  if (plusOneUserIds.length > 0) {
+    // 5. Delete the guest entry of the lead user for all their events.
     await guestRepo
       .createQueryBuilder()
       .delete()
-      .where('user_id IN (:...userIds)', { userIds: plusOneUserIds })
+      .where('user_id = :userId', { userId })
       .andWhere('event_id IN (:...eventIds)', { eventIds })
-      .andWhere('added_by_id = :addedBy', { addedBy: userId })
-      .setParameters({
-        userIds: plusOneUserIds,
-        eventIds,
-        addedBy: userId,
-      })
+      .setParameters({ userId, eventIds })
       .execute();
+
+    // 6. Delete guest entries for plus-ones (only if they were added by the lead user for these events).
+    if (plusOneUserIds.length > 0) {
+      await guestRepo
+        .createQueryBuilder()
+        .delete()
+        .where('user_id IN (:...userIds)', { userIds: plusOneUserIds })
+        .andWhere('event_id IN (:...eventIds)', { eventIds })
+        .andWhere('added_by_id = :addedBy', { addedBy: userId })
+        .setParameters({
+          userIds: plusOneUserIds,
+          eventIds,
+          addedBy: userId,
+        })
+        .execute();
+    }
   }
-}
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
