@@ -1,13 +1,21 @@
 import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { Event } from 'rumor-utils/shared/entities';
+import { Event, User } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { IsNull, Not } from 'typeorm';
 
 export class SchedulerService {
   private static scheduledJobs: { [key: string]: schedule.Job } = {};
+  /**
+   * Cancel and remove a previously scheduled job if it exists.
+   */
+  private static cancelAndRemoveScheduledJob(jobKey: string): void {
+    this.cancelScheduledJob(jobKey);
+    this.removeScheduledJob(jobKey);
+  }
 
   /**
    * Cancel a previously scheduled job if exists.
@@ -51,6 +59,12 @@ export class SchedulerService {
       case SchedulerJobType.PAST_OR_CANCEL_EVENT:
         await this.scheduleEventPastAndCancelledDate(data);
         break;
+      case SchedulerJobType.DELETE_USER:
+        await this.scheduleUserHardDelete(data);
+        break;
+      case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
+        await this.cancelAndRemoveScheduledJob(data.jobKey);
+        break;
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
@@ -85,6 +99,22 @@ export class SchedulerService {
       });
     } catch (err) {
       console.log(`Error in scheduling events :: ${err?.message}`);
+    }
+  }
+
+  public static async scheduleUserHardDeleteRestart() {
+    try {
+      const users: User[] = await User.find({
+        where: {
+          isDeactivated: true,
+          deactivatedAt: Not(IsNull()),
+        },
+      });
+      users.forEach((u: User) => {
+        this.scheduleUserHardDelete(u);
+      });
+    } catch (e) {
+      console.error('Error during scheduled user deletion:', e);
     }
   }
 
@@ -153,7 +183,28 @@ export class SchedulerService {
     }
   }
 
-  public static async scheduleUserHardDelete() {}
+  public static async scheduleUserHardDelete(user: User) {
+    // Calculate the deletion time (30 days after deactivation)
+    let deactivationDate = new Date(user.deactivatedAt);
+    try {
+      const deletionTime = new Date(deactivationDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+      // If the deletion time is in the past, skip scheduling
+      const now = new Date();
+      if (deletionTime <= now) {
+        return;
+      }
+      const jobKey = `${SchedulerJobType.DELETE_USER}_${user.id}`;
+      this.cancelScheduledJob(jobKey); // Cancel if already scheduled
+      const job = schedule.scheduleJob(deletionTime, async () => {
+        const foundUser = await User.findOne({ where: { id: user.id } });
+        await serviceMesh.userService().permanantlyDeleteAccount(foundUser.id);
+        this.removeScheduledJob(jobKey);
+      });
+      this.storeScheduledJob(jobKey, job);
+    } catch (err) {
+      console.error('Error during scheduled user deletion:', err);
+    }
+  }
 
   /**
    * Schedules an event reminder 24 hours before the event's start time.

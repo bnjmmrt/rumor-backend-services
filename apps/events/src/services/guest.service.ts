@@ -1263,6 +1263,12 @@ export class GuestService {
       .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
       .where({ event: { id: event.id } });
+      
+      //filtering out deactivated users
+      queryBuilder.andWhere('user.isDeactivated = false');
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = false');
 
     if (!isFromAdmin) {
       queryBuilder.andWhere(
@@ -2946,6 +2952,7 @@ export class GuestService {
       throw new BadRequestError('Guest has  incorrect status :' + alreadyGuest.status);
 
     alreadyGuest.additionalRequestedGuests = payload.additionalGuests;
+    alreadyGuest.maxAdditionalGuests = payload.additionalGuests;
     await this.dbConnection.getRepository(Guest).save(alreadyGuest);
 
     const quiz = await this.dbConnection.getRepository(QuizQuestion).find({

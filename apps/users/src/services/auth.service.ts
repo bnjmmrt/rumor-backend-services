@@ -233,6 +233,10 @@ import { Notification } from 'rumor-utils/shared/notifications/entities/notifica
 import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
 import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
 import { SocialStats } from '../../packages/rumor-utils/shared/users/entities/social-stats.entity';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from '../../packages/rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
@@ -2828,31 +2832,48 @@ export class AuthService {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: userId },
-      relations: {
-        customLists: { usersLists: true },
-        favoritedMembers: true,
-        followers: true,
-      },
-      order: {
-        customLists: { createdAt: 'DESC' },
-      },
+    // Get the custom lists created by the host
+    const customLists = await this.dbConnection.getRepository(HostCustomUsersLists).find({
+      where: { host: { id: userId } },
+      order: { createdAt: 'DESC' },
+      relations: ['usersLists', 'usersLists.user'],
     });
 
-    if (!user) {
-      return { totalCount: 0, result: [] };
-    }
+    //Get active followed users
+    const followedUsers = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFollowing, 'f', 'f.host_id = :userId AND f.follower_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
 
-    const allLists = [
-      { id: null, name: 'Followed', totalCount: user.followers.length, result: [] },
-      { id: null, name: 'Favorite', totalCount: user.favoritedMembers.length, result: [] },
-      ...user.customLists.map(list => ({
+    //Get active favorited users
+    const favoritedUsers = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFavorite, 'f', 'f.host_id = :userId AND f.member_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
+
+    //Prepare custom list data with only active users
+    const customListsWithCounts = customLists.map(list => {
+      const activeUsers = list.usersLists
+        .filter(u => u.user && !u.user.isDeactivated)
+        .map(u => u.user);
+
+      return {
         id: list.id,
         name: list.listName,
-        totalCount: list.usersLists.length,
+        totalCount: activeUsers.length,
         result: [],
-      })),
+      };
+    });
+
+    //Combine all lists
+    const allLists = [
+      { id: null, name: 'Followed', totalCount: followedUsers.length, result: [] },
+      { id: null, name: 'Favorite', totalCount: favoritedUsers.length, result: [] },
+      ...customListsWithCounts,
     ];
 
     return {
@@ -2913,6 +2934,9 @@ export class AuthService {
       .innerJoin('host_custom_users_lists', 'customList', 'usersList.list_id = customList.id')
       .where('customList.host_id = :hostId', { hostId: hostId })
       .andWhere('customList.id = :listId', { listId: customListId });
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
 
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
@@ -3228,6 +3252,9 @@ export class AuthService {
       .where('hf.host.id = :hostId', { hostId: payload.userId })
       .take(take)
       .skip(skip);
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
 
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
@@ -5612,6 +5639,10 @@ export class AuthService {
       .where('hf.host.id = :hostId', { hostId: payload.userId })
       .take(take)
       .skip(skip);
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
       userTypes = type.split(',').map(name => name.trim());
@@ -6172,6 +6203,23 @@ export class AuthService {
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
+    //scheduling user hard delete for 30 days
+    const userFromDb = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.id } });
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.DELETE_USER,
+        data: {
+          id: userFromDb.id,
+          deactivatedAt: userFromDb.deactivatedAt,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
+    }
+
     return '';
   }
 
@@ -6197,6 +6245,21 @@ export class AuthService {
       // targetRole.status = UserStatus.ACTIVE;
       targetRole.isRoleDeactivated = false;
       await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+    //scheduling user hard delete for 30 days
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB,
+        data: {
+          jobKey: `${SchedulerJobType.DELETE_USER}_${user.id}`,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(
+        `Failed to cancel scheduled delete user job for ${user.firstName} ${user.lastName}`,
+        e,
+      );
     }
 
     return '';
