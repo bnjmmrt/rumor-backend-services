@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner  } from 'typeorm';
 import database from '../database';
 import config from '../config';
 
@@ -6227,95 +6227,194 @@ export class AuthService {
       console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
     }
 
+    //send notifications
+    await this.sendDeactivationNotification(user);
+    // ends here
     return '';
   }
 
-  /**
-   * Deletes Guest, Ticket, and SignupFormSubmission entries for:
-   * 1. The lead guest (user_id) across all events.
-   * 2. The plus-ones (guests added by the lead guest) only for specific events.
-   *
-   * - The lead guest's tickets and signup form submissions are deleted for all events.
-   * - The plus-ones' tickets and signup form submissions are deleted only for events they were added to by the lead guest.
-   *
-   * @param userId - The ID of the lead guest (main user).
-   * @param dbConnection - TypeORM DB connection to interact with the database.
-   */
-  private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(userId: string) {
-    const guestRepo = this.dbConnection.getRepository(Guest);
-    const ticketRepo = this.dbConnection.getRepository(Ticket);
-    const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
+/**
+ * Sends deactivation email and SMS notification to the user.
+ *
+ * @param user - The user being deactivated
+ */
+private static async sendDeactivationNotification(user: User) {
+  const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
+  const smsToSend: { phoneNumber: string; message: string }[] = [];
 
-    // 1. Get all events where the lead guest (userId) is involved as a guest.
-    const leadGuestEntries = await guestRepo.find({
-      where: { user: { id: userId } },
-      relations: ['event'],
-    });
+  const today = new Date();
+  const afterThirtyDays = new Date(
+    today.getFullYear(),
+    today.getMonth() + 1,
+    today.getDate()
+  );
 
-    // Extract unique event IDs where the lead guest is present.
-    const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
+  const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+  const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
 
-    // 2. Find all plus-ones (guests) added by the lead guest for these specific events.
-    const plusOneGuests = await guestRepo.find({
-      where: {
-        addedBy: { id: userId }, // Only guests added by the lead guest
-        event: { id: In(eventIds) }, // Only guests for the specific events the lead guest is part of
-      },
-      relations: ['user', 'event'],
-    });
+  // Prepare email
+  emailsToSend.push({
+    email: user.email,
+    subject: 'Account Deactivated',
+    data: [
+      { key: 'first_name', value: user.firstName },
+      { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+    ],
+  });
 
-    // Collect user IDs of the plus-ones (added by the lead guest).
-    const plusOneUserIds = plusOneGuests
-      .map(g => g.user?.id)
-      .filter((id): id is string => Boolean(id));
+  // // Prepare SMS (if applicable - example message)
+  // if (user.phoneNumber) {
+  //   smsToSend.push({
+  //     phoneNumber: user.phoneNumber,
+  //     message: `Hi ${user.firstName}, your account has been deactivated. You can reactivate it before ${reactivateBeforeTimestamp}.`,
+  //   });
+  // }
 
-    // 3. Delete Tickets:
-    // - Delete tickets for the lead guest across all events.
-    // - Delete tickets for plus-ones only for events they were added by the lead guest.
-    await ticketRepo
-      .createQueryBuilder()
-      .delete()
-      .where('user_id = :userId', { userId }) // Delete lead guest's tickets
-      .orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Plus-ones' tickets to be deleted
-      .andWhere('event_id IN (:...eventIds)', { eventIds }) // Limit by events the lead guest is part of
-      .execute();
+  // Send Emails
+  try {
+    await Promise.all(
+      emailsToSend.map(email =>
+        serviceMesh.notificationService().sendEmailFromTemplate(
+          email.data,
+          email.subject,
+          [email.email.trim().toLowerCase()],
+          null
+        )
+      )
+    );
+  } catch (error) {
+    console.error(`❌ Failed to send deactivation email:`, error);
+  }
 
-    // 4. Delete SignupFormSubmissions:
-    // - Delete signup form submissions for the lead guest across all events.
-    // - Delete signup form submissions for plus-ones only for events they were added by the lead guest.
-    await signupFormRepo
-      .createQueryBuilder()
-      .delete()
-      .where('user_id = :userId', { userId }) // Delete lead guest's signup submissions
-      .orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Plus-ones' submissions to be deleted
-      .andWhere(
-        qb => {
-          return `signup_form_id IN (
+  //TODO: Uncomment when SMS is available(currently no text is provide in sheet)
+  // // Send SMS 
+  // try {
+  //   await Promise.all(
+  //     smsToSend.map(sms => {
+  //       const validateNumber = isValidPhoneNumber(sms.phoneNumber);
+  //       if (validateNumber) {
+  //         const cleanedNumber = sms.phoneNumber.replace(/[\s\-()]/g, '');
+  //         return serviceMesh.notificationService().sendTextMessage(cleanedNumber, sms.message);
+  //       }
+  //     })
+  //   );
+  // } catch (err) {
+  //   console.error(`❌ Failed to send deactivation SMS:`, err);
+  // }
+}
+
+
+/**
+ * Deletes guest, ticket, and signup form entries for the specified lead guest (userId)
+ * across all events they are part of. Also removes related entries for plus-ones,
+ * but only if those plus-ones were added by this lead guest and for those specific events.
+ *
+ * @param userId - The ID of the lead guest to deactivate
+ */
+private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(userId: string) {
+  const guestRepo = this.dbConnection.getRepository(Guest);
+  const ticketRepo = this.dbConnection.getRepository(Ticket);
+  const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
+
+  // 1. Get all events where the lead guest (userId) is listed as a guest.
+  const leadGuestEntries = await guestRepo.find({
+    where: { user: { id: userId } },
+    relations: ['event'],
+  });
+
+  // Extract unique event IDs where the lead guest is participating.
+  const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
+
+  if (eventIds.length === 0) return; // Nothing to delete if the user has no guest entries.
+
+  // 2. Get all guests (plus-ones) who were added by this lead guest for these events.
+  const plusOneGuests = await guestRepo.find({
+    where: {
+      addedBy: { id: userId },
+      event: { id: In(eventIds) },
+    },
+    relations: ['user', 'event'],
+  });
+
+  // Extract the user IDs of the plus-ones.
+  const plusOneUserIds = plusOneGuests
+    .map(g => g.user?.id)
+    .filter((id): id is string => Boolean(id));
+
+  // 3. Delete Tickets:
+  // - Lead guest: delete across all their events.
+  // - Plus-ones: delete only for events they were added by this lead guest.
+  await ticketRepo
+    .createQueryBuilder()
+    .delete()
+    .where(
+      new Brackets(qb => {
+        qb.where('user_id = :userId', { userId });
+        if (plusOneUserIds.length > 0) {
+          qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+        }
+      })
+    )
+    .andWhere('event_id IN (:...eventIds)', { eventIds })
+    .setParameters({
+      userId,
+      ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+      eventIds,
+    })
+    .execute();
+
+  // 4. Delete Signup Form Submissions:
+  // - Lead guest: delete all for relevant events.
+  // - Plus-ones: delete only if added by this user for relevant events.
+  await signupFormRepo
+    .createQueryBuilder()
+    .delete()
+    .where(
+      new Brackets(qb => {
+        qb.where('user_id = :userId', { userId });
+        if (plusOneUserIds.length > 0) {
+          qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+        }
+      })
+    )
+    .andWhere(
+      `signup_form_id IN (
         SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
-      )`;
-        },
-        { eventIds },
-      ) // Limit by events the lead guest is part of
-      .execute();
+      )`,
+      { eventIds }
+    )
+    .setParameters({
+      userId,
+      ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+      eventIds,
+    })
+    .execute();
 
-    // 5. Delete the lead guest's entry for all events.
+  // 5. Delete the guest entry of the lead user for all their events.
+  await guestRepo
+    .createQueryBuilder()
+    .delete()
+    .where('user_id = :userId', { userId })
+    .andWhere('event_id IN (:...eventIds)', { eventIds })
+    .setParameters({ userId, eventIds })
+    .execute();
+
+  // 6. Delete guest entries for plus-ones (only if they were added by the lead user for these events).
+  if (plusOneUserIds.length > 0) {
     await guestRepo
       .createQueryBuilder()
       .delete()
-      .where('user_id = :userId', { userId }) // Only delete lead guest's guest entries
+      .where('user_id IN (:...userIds)', { userIds: plusOneUserIds })
+      .andWhere('event_id IN (:...eventIds)', { eventIds })
+      .andWhere('added_by_id = :addedBy', { addedBy: userId })
+      .setParameters({
+        userIds: plusOneUserIds,
+        eventIds,
+        addedBy: userId,
+      })
       .execute();
-
-    // 6. Delete guest entries for plus-ones (only for events where they were added by the lead guest).
-    if (plusOneUserIds.length) {
-      await guestRepo
-        .createQueryBuilder()
-        .delete()
-        .where('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Delete plus-ones' guest entries
-        .andWhere('event_id IN (:...eventIds)', { eventIds }) // Limit by events the lead guest is part of
-        .andWhere('added_by_id = :addedBy', { addedBy: userId }) // Ensure the plus-one was added by the lead guest
-        .execute();
-    }
   }
+}
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
