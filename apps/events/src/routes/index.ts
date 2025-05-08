@@ -113,6 +113,8 @@ router.get(
   SignupFormsController.listSubmissions,
 );
 
+router.get('/signup-forms/:id/export', AuthMiddleware.fusionAuthRequired, SignupFormsController.exportCsv);
+
 router.post('/signup-forms/check-guest-exists', SignupFormsController.checkIfGuestExists);
 
 // router.patch(
