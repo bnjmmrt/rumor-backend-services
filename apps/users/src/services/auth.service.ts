@@ -225,7 +225,7 @@ import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
 import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
-import { RestrictedInvites } from 'rumor-utils/shared/events/entities';
+import { RestrictedInvites, SignupFormSubmissions, Ticket } from 'rumor-utils/shared/events/entities';
 import { stringify } from 'csv-stringify';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
@@ -6203,6 +6203,9 @@ export class AuthService {
       await this.dbConnection.getRepository(UserRole).save(targetRole);
     }
 
+      // 3. Delete all associated user data
+  await this.deleteGuestTicketSignupFormForUserAndTheirPlusOnes(user.id);
+
     //scheduling user hard delete for 30 days
     const userFromDb = await this.dbConnection
       .getRepository(User)
@@ -6222,6 +6225,92 @@ export class AuthService {
 
     return '';
   }
+
+/**
+ * Deletes Guest, Ticket, and SignupFormSubmission entries for:
+ * 1. The lead guest (user_id) across all events.
+ * 2. The plus-ones (guests added by the lead guest) only for specific events.
+ *
+ * - The lead guest's tickets and signup form submissions are deleted for all events.
+ * - The plus-ones' tickets and signup form submissions are deleted only for events they were added to by the lead guest.
+ *
+ * @param userId - The ID of the lead guest (main user).
+ * @param dbConnection - TypeORM DB connection to interact with the database.
+ */
+private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(
+  userId: string
+) {
+  const guestRepo = this.dbConnection.getRepository(Guest);
+  const ticketRepo = this.dbConnection.getRepository(Ticket);
+  const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
+
+  // 1. Get all events where the lead guest (userId) is involved as a guest.
+  const leadGuestEntries = await guestRepo.find({
+    where: { user: { id: userId } },
+    relations: ['event'],
+  });
+
+  // Extract unique event IDs where the lead guest is present.
+  const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
+
+  // 2. Find all plus-ones (guests) added by the lead guest for these specific events.
+  const plusOneGuests = await guestRepo.find({
+    where: {
+      addedBy: { id: userId }, // Only guests added by the lead guest
+      event: { id: In(eventIds) }, // Only guests for the specific events the lead guest is part of
+    },
+    relations: ['user', 'event'],
+  });
+
+  // Collect user IDs of the plus-ones (added by the lead guest).
+  const plusOneUserIds = plusOneGuests
+    .map(g => g.user?.id)
+    .filter((id): id is string => Boolean(id));
+
+  // 3. Delete Tickets:
+  // - Delete tickets for the lead guest across all events.
+  // - Delete tickets for plus-ones only for events they were added by the lead guest.
+  await ticketRepo
+    .createQueryBuilder()
+    .delete()
+    .where('user_id = :userId', { userId }) // Delete lead guest's tickets
+    .orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Plus-ones' tickets to be deleted
+    .andWhere('event_id IN (:...eventIds)', { eventIds }) // Limit by events the lead guest is part of
+    .execute();
+
+  // 4. Delete SignupFormSubmissions:
+  // - Delete signup form submissions for the lead guest across all events.
+  // - Delete signup form submissions for plus-ones only for events they were added by the lead guest.
+  await signupFormRepo
+    .createQueryBuilder()
+    .delete()
+    .where('user_id = :userId', { userId }) // Delete lead guest's signup submissions
+    .orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Plus-ones' submissions to be deleted
+    .andWhere(qb => {
+      return `signup_form_id IN (
+        SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
+      )`;
+    }, { eventIds }) // Limit by events the lead guest is part of
+    .execute();
+
+  // 5. Delete the lead guest's entry for all events.
+  await guestRepo
+    .createQueryBuilder()
+    .delete()
+    .where('user_id = :userId', { userId }) // Only delete lead guest's guest entries
+    .execute();
+
+  // 6. Delete guest entries for plus-ones (only for events where they were added by the lead guest).
+  if (plusOneUserIds.length) {
+    await guestRepo
+      .createQueryBuilder()
+      .delete()
+      .where('user_id IN (:...userIds)', { userIds: plusOneUserIds }) // Delete plus-ones' guest entries
+      .andWhere('event_id IN (:...eventIds)', { eventIds }) // Limit by events the lead guest is part of
+      .andWhere('added_by_id = :addedBy', { addedBy: userId }) // Ensure the plus-one was added by the lead guest
+      .execute();
+  }
+}
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
