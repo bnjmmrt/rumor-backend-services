@@ -6312,19 +6312,17 @@ export class AuthService {
     const guestRepo = this.dbConnection.getRepository(Guest);
     const ticketRepo = this.dbConnection.getRepository(Ticket);
     const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
-
-    // 1. Get all events where the lead guest (userId) is listed as a guest.
+  
+    // 1. Get all events where the lead guest is involved.
     const leadGuestEntries = await guestRepo.find({
       where: { user: { id: userId } },
       relations: ['event'],
     });
-
-    // Extract unique event IDs where the lead guest is participating.
+  
     const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
-
-    if (eventIds.length === 0) return; // Nothing to delete if the user has no guest entries.
-
-    // 2. Get all guests (plus-ones) who were added by this lead guest for these events.
+    if (eventIds.length === 0) return;
+  
+    // 2. Get plus-ones added by the lead guest for those events.
     const plusOneGuests = await guestRepo.find({
       where: {
         addedBy: { id: userId },
@@ -6332,15 +6330,12 @@ export class AuthService {
       },
       relations: ['user', 'event'],
     });
-
-    // Extract the user IDs of the plus-ones.
+  
     const plusOneUserIds = plusOneGuests
       .map(g => g.user?.id)
       .filter((id): id is string => Boolean(id));
-
-    // 3. Delete Tickets:
-    // - Lead guest: delete across all their events.
-    // - Plus-ones: delete only for events they were added by this lead guest.
+  
+    // 3. Delete Tickets
     await ticketRepo
       .createQueryBuilder()
       .delete()
@@ -6350,7 +6345,7 @@ export class AuthService {
           if (plusOneUserIds.length > 0) {
             qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
           }
-        }),
+        })
       )
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({
@@ -6359,35 +6354,8 @@ export class AuthService {
         eventIds,
       })
       .execute();
-
-    // 4. Delete Signup Form Submissions:
-    // - Lead guest: delete all for relevant events.
-    // - Plus-ones: delete only if added by this user for relevant events.
-    await signupFormRepo
-      .createQueryBuilder()
-      .delete()
-      .where(
-        new Brackets(qb => {
-          qb.where('user_id = :userId', { userId });
-          if (plusOneUserIds.length > 0) {
-            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
-          }
-        }),
-      )
-      .andWhere(
-        `signup_form_id IN (
-        SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
-      )`,
-        { eventIds },
-      )
-      .setParameters({
-        userId,
-        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
-        eventIds,
-      })
-      .execute();
-
-    // 5. Delete the guest entry of the lead user for all their events.
+  
+    // 4. Delete Guest entries (first lead, then plus-ones)
     await guestRepo
       .createQueryBuilder()
       .delete()
@@ -6395,8 +6363,7 @@ export class AuthService {
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({ userId, eventIds })
       .execute();
-
-    // 6. Delete guest entries for plus-ones (only if they were added by the lead user for these events).
+  
     if (plusOneUserIds.length > 0) {
       await guestRepo
         .createQueryBuilder()
@@ -6411,7 +6378,33 @@ export class AuthService {
         })
         .execute();
     }
+  
+    // 5. Delete Signup Form Submissions (after guests are deleted)
+    await signupFormRepo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        new Brackets(qb => {
+          qb.where('user_id = :userId', { userId });
+          if (plusOneUserIds.length > 0) {
+            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+          }
+        })
+      )
+      .andWhere(
+        `signup_form_id IN (
+          SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
+        )`,
+        { eventIds }
+      )
+      .setParameters({
+        userId,
+        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+        eventIds,
+      })
+      .execute();
   }
+  
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
