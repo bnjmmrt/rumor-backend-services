@@ -40,6 +40,7 @@ import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.en
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { InstagramProfile } from 'rumor-utils/shared/users/entities/instagram-profile';
+import { stringify } from 'csv-stringify';
 
 export class SignupFormsServices {
   public static dbConnection = database;
@@ -1071,6 +1072,43 @@ export class SignupFormsServices {
     } catch (err) {
       throw err;
     }
+  }
+
+  public static async exportCsv(id: string, hostId: string, query: any): Promise<string> {
+    // Get the guest data
+    const data = await this.listSubmissions(id, hostId, query);
+
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'firstName', title: 'First Name' },
+      { id: 'lastName', title: 'Last Name' },
+      { id: 'partySize', title: 'Party Size' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'email', title: 'Email' },
+      { id: 'phone', title: 'Phone Number' },
+      { id: 'status', title: 'Guest Status' },
+    ];
+    const lineItems = data.result.map((item: any) => {
+      const lineItem: any = {};
+      titleMapping.forEach(title => {
+        lineItem[title.title] = item[title.id];
+      });
+      return lineItem;
+    });
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(
+        lineItems,
+        { header: true, columns: titleMapping.map(item => item.title) },
+        (err, output) => {
+          if (err) {
+            reject(err);
+          }
+          resolve(output);
+        },
+      );
+    });
   }
 
   public static async getSignupFormQuestions(id: string) {
