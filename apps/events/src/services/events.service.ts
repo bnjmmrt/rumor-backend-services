@@ -3889,10 +3889,7 @@ export class EventsService {
       query.andWhere('event.end_date < :currentTime', { currentTime });
     }
 
-    // Apply pagination if necessary
-    if (pagination.take > 0) query.take(pagination.take);
-    if (pagination.skip > 0) query.skip(pagination.skip);
-
+   
     // Add eventName filter if provided
     if (parsedQuery.eventName) {
       const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
@@ -3901,6 +3898,20 @@ export class EventsService {
         eventName: `%${eventName}%`,
       });
     }
+
+    // Apply dynamic sorting
+    const sortableFields = ['startDate', 'endDate', 'publishDate', 'name', 'createdAt'];
+    const sortField = parsedQuery.sortBy;
+    const sortOrder = (parsedQuery.order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    if (sortField && sortableFields.includes(sortField)) {
+      query.orderBy(`event.${sortField}`, sortOrder as 'ASC' | 'DESC');
+    }
+
+     // Apply pagination if necessary
+     if (pagination.take > 0) query.take(pagination.take);
+     if (pagination.skip > 0) query.skip(pagination.skip);
+ 
 
     const totalCount = await query.getCount();
     const events = await query.getMany();
