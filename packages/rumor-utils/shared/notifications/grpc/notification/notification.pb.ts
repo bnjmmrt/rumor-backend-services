@@ -1,3 +1,9 @@
+export enum AdminNotificationRecipients {
+  MEMBERS = 'MEMBERS',
+  HOSTS = 'HOSTS',
+  NON_MEMBERS = 'NON_MEMBERS',
+}
+
 export enum NotificationType {
   SMS = 0,
   EMAIL = 1,
@@ -66,6 +72,18 @@ export interface GenericResponse {
 export interface Error {
   type: string;
   message: string;
+}
+
+export interface CreateAdminNotificationRequest {
+  isScheduled: boolean;
+  title?: string;
+  message: string;
+  scheduledDate?: string;
+  recipients: AdminNotificationRecipients[];
+}
+
+export interface AdminNotificationResponse extends CreateAdminNotificationRequest {
+  id: string;
 }
 
 export interface CreateNotificationRequest {

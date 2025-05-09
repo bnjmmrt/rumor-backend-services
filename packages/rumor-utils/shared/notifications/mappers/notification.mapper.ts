@@ -1,4 +1,7 @@
+import dayjs from 'dayjs';
+import { AdminNotification } from '../entities/admin-notification.entity';
 import { Notification } from '../entities/notification.entity';
+import { AdminNotificationResponse } from '../grpc/notification/notification.pb';
 interface NotificationResponse {
   id: string;
   title: string;
@@ -46,4 +49,17 @@ function toNotification(notification: Partial<Notification>): NotificationRespon
   };
 }
 
-export { toNotificationslisting, toNotification };
+function toAdminNotification(notification: Partial<AdminNotification>): AdminNotificationResponse {
+  return {
+    id: notification.id,
+    isScheduled: notification.isScheduled,
+    title: notification.title,
+    message: notification.message,
+    recipients: notification.recipients,
+    scheduledDate: notification.scheduledDate
+      ? dayjs(notification.scheduledDate).format('MM/DD/YYYY')
+      : null,
+  };
+}
+
+export { toNotificationslisting, toNotification, toAdminNotification };

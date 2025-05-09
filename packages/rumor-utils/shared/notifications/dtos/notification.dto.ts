@@ -6,6 +6,7 @@ import {
   IsUUID,
   IsEnum,
   Matches,
+  IsBoolean,
 } from 'class-validator';
 import {
   CreateNotificationRequest,
@@ -17,7 +18,10 @@ import {
   RequestById,
   NotificationData,
   SendPushNotificationRequest,
+  CreateAdminNotificationRequest,
+  AdminNotificationRecipients,
 } from '../grpc/notification/notification.pb';
+//import { AdminNotification } from 'shared/users/entities/admin-notification.entity';
 
 export class RequestByIdDto implements RequestById {
   @IsUUID()
@@ -29,6 +33,38 @@ export class ListNotificationsRequestDto implements ListNotificationsRequest {
   @IsOptional()
   @IsString()
   query?: string;
+}
+
+export class CreateAdminNotificationRequestDto implements CreateAdminNotificationRequest {
+  @IsBoolean()
+  @IsNotEmpty()
+  isScheduled: boolean;
+
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  message: string;
+
+  @IsString()
+  @IsOptional()
+  scheduledDate?: string;
+
+  @IsString()
+  @IsOptional()
+  scheduledTime?: string;
+
+  @IsNotEmpty()
+  @IsEnum(AdminNotificationRecipients, { each: true })
+  recipients: AdminNotificationRecipients[];
+
+  /*
+  @IsOptional()
+  @IsEnum(NotificationSource)
+  source?: NotificationSource;
+  */
 }
 
 export class CreateNotificationRequestDto implements CreateNotificationRequest {
