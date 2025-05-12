@@ -86,3 +86,6 @@ export const createHostCollaborator = (
     .post(`/auth/host-collaborator/create`, { email, phoneNumber, firstName, lastName, role });
 
 export const getAllusers = (query: string) => apiService.getApi().get(`/auth/users-list?${query}`);
+
+export const permanantlyDeleteAccount = (userId: string) =>
+  apiService.getApi().delete(`auth/user/${userId}/delete`);

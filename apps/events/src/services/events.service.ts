@@ -574,11 +574,9 @@ export class EventsService {
       });
 
       // Convert existing ticket types to a Set for quick lookup
-      const existingTicketNames = new Set(
-        existingTicketTypes.map(ticket => ticket.name?.trim()),
-      );
+      const existingTicketNames = new Set(existingTicketTypes.map(ticket => ticket.name?.trim()));
       const ticketTypeInsertData = ticketTypes.map(ticketTypePayload => {
-        const name = ticketTypePayload.name?.trim()
+        const name = ticketTypePayload.name?.trim();
         if (existingTicketNames.has(name)) {
           throw new Error(
             `Ticket type with name "${ticketTypePayload.name}" already exists for this event.`,
@@ -756,7 +754,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = ticket.name?.trim()
+          const ticketName = ticket.name?.trim();
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
               name: ticketName,
@@ -1672,7 +1670,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = ticket.name?.trim()
+          const ticketName = ticket.name?.trim();
 
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
@@ -1757,15 +1755,13 @@ export class EventsService {
       const ticketNames = updateCollaborators.flatMap(({ collaborator }) =>
         collaborator.tickets
           .filter(ticket => ticket.action === 'create')
-          .map(ticket =>ticket.name?.trim()),
+          .map(ticket => ticket.name?.trim()),
       );
       const ticketTypes = await queryRunner.manager.find(TicketType, {
         where: { name: In(ticketNames), event: { id: eventId } },
       });
 
-      const ticketTypeMap = new Map(
-        ticketTypes.map(ticket => [ticket.name?.trim(), ticket]),
-      );
+      const ticketTypeMap = new Map(ticketTypes.map(ticket => [ticket.name?.trim(), ticket]));
       // Process ticket updates
       const collaboratorsToSave = [];
 
@@ -1811,7 +1807,7 @@ export class EventsService {
               { limitInvitationsNumber: ticket.limitInvitationsNumber },
             );
           } else if (ticket.action === 'create') {
-            const ticketName = ticket.name?.trim()
+            const ticketName = ticket.name?.trim();
             const ticketType = ticketTypeMap.get(ticketName);
             if (!ticketType) {
               throw new Error(`Ticket type ${ticket.name} not found.`);
@@ -1999,7 +1995,7 @@ export class EventsService {
           updateTickets.push({
             id: ticket.id,
             data: {
-              name:ticket.name?.trim(),
+              name: ticket.name?.trim(),
               description: ticket.description,
               capacity: ticket.capacity || 0,
             },
@@ -3889,10 +3885,6 @@ export class EventsService {
       query.andWhere('event.end_date < :currentTime', { currentTime });
     }
 
-    // Apply pagination if necessary
-    if (pagination.take > 0) query.take(pagination.take);
-    if (pagination.skip > 0) query.skip(pagination.skip);
-
     // Add eventName filter if provided
     if (parsedQuery.eventName) {
       const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
@@ -3901,6 +3893,19 @@ export class EventsService {
         eventName: `%${eventName}%`,
       });
     }
+
+    // Apply dynamic sorting
+    const sortableFields = ['startDate', 'endDate', 'publishDate', 'name', 'createdAt'];
+    const sortField = parsedQuery.sortBy;
+    const sortOrder = (parsedQuery.order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    if (sortField && sortableFields.includes(sortField)) {
+      query.orderBy(`event.${sortField}`, sortOrder as 'ASC' | 'DESC');
+    }
+
+    // Apply pagination if necessary
+    if (pagination.take > 0) query.take(pagination.take);
+    if (pagination.skip > 0) query.skip(pagination.skip);
 
     const totalCount = await query.getCount();
     const events = await query.getMany();
@@ -4121,6 +4126,10 @@ export class EventsService {
       .where('guest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED })
       .andWhere('guest.event_id = :eventId', { eventId })
       .andWhere('guest.added_by_id = :userId', { userId })
+      .andWhere(
+        `guest.user_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE )`,
+      )
       .getRawOne();
 
     return Number(confirmed_count || 0);
@@ -4253,12 +4262,12 @@ export class EventsService {
       .getRepository(Guest)
       .createQueryBuilder('guest')
       .select([
-        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
-        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
-        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
-        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
-        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
-        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
+        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
       ])
       .setParameters({
         eventId,

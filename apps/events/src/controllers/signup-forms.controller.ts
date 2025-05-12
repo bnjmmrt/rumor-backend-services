@@ -115,6 +115,27 @@ export class SignupFormsController {
     },
   );
 
+  public static exportCsv = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const hostId = (req as any).user;
+    const query = req.query as string;
+
+    try {
+      // Call the service to generate the CSV
+      const csvData = await SignupFormsServices.exportCsv(id, hostId, query);
+
+      // Set the headers to indicate the content type and prompt a download
+      res.header('Content-Type', 'text/csv');
+      res.attachment('submissions_export.csv');
+
+      // Send the generated CSV data to the client
+      res.send(csvData);
+    } catch (error) {
+      // If any error occurs, return a 500 status code
+      res.status(500).send('Error generating CSV');
+    }
+  });
+
   public static getSignupFormQuestions = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
       const id = req.params.id;
