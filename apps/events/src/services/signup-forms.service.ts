@@ -57,8 +57,10 @@ export class SignupFormsServices {
         isRequired: true,
         isToggled: true,
         hasToggle: true,
+        hasRequired: true,
       },
     });
+    console.log(staticQuestions);
     return staticQuestions;
   }
 
@@ -170,6 +172,8 @@ export class SignupFormsServices {
         where: { id: eventId },
         relations: { owner: true },
       });
+
+      console.log("body", body)
       if (!event) {
         throw new NotFoundError('Event');
       }
@@ -206,6 +210,8 @@ export class SignupFormsServices {
 
         questionList.push(question);
       }
+
+      console.log("questionList", questionList)
       const savedQuestions = SignupFormQuestions.create(questionList);
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map(q => q.id);
@@ -310,6 +316,7 @@ export class SignupFormsServices {
         question.value = q.value;
         question.hasToggle = q.hasToggle || false;
         question.isToggled = q.isToggled || false;
+        question.isRequired = q.isRequired;
         const updatesQuestion = SignupFormQuestions.update(q.id, question);
         questionPromises.push(updatesQuestion);
       }
@@ -981,11 +988,11 @@ export class SignupFormsServices {
           );
         } else {
           // Default sort if not a recognized standard field
-          submissionsQuery.addOrderBy('sfs.id', 'DESC');
+          submissionsQuery.addOrderBy('sfs.created_at', 'DESC');
         }
       } else {
         // Default sort if no sort field or custom field (we'll handle custom sorting after)
-        submissionsQuery.addOrderBy('sfs.id', 'DESC');
+        submissionsQuery.addOrderBy('sfs.created_at', 'DESC');
       }
 
       // Execute queries

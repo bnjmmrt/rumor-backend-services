@@ -5132,6 +5132,7 @@ export class AuthService {
       'age',
       'interest',
       'type',
+      'newType',
       'ticketType',
       'partySize',
       'checkedIn',
@@ -5234,6 +5235,16 @@ export class AuthService {
         id: event.id,
       }));
     } catch (e) {}
+
+    const newTypeObj = {
+      id: 'newType',
+      label: 'New Type',
+      options: [
+        { id: 'existing_user_in_database', name: 'Existing User in Database' },
+        { id: 'existing_user_not_in_database', name: 'Existing User Not in Database' },
+      ],
+      type: FilterTypeValues.newType,
+    };
 
     const pastEventsObj = {
       id: 'pastEvents',

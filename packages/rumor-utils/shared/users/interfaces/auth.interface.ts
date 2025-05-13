@@ -75,6 +75,7 @@ export enum FilterTypes {
   age = 'age',
   interest = 'interest',
   type = 'type',
+  newType = 'newType',
   ticketType = 'ticketType',
   partySize = 'partySize',
   addedBy = 'addedBy',
@@ -106,4 +107,5 @@ export const FilterTypeValues: Record<FilterTypes, string> = {
   [FilterTypes.userSource]: 'checkbox',
   [FilterTypes.vouch]: 'checkbox',
   [FilterTypes.followers]: 'followers',
+  [FilterTypes.newType]: 'checkbox',
 };

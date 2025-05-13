@@ -142,6 +142,7 @@ export class Seeders {
         isDefault: true,
         isActive: true,
         isRequired: true,
+        hasRequired: true,
         key: 'requestAdditionalGuests',
         hasToggle: true,
         isToggled: true,
@@ -152,6 +153,7 @@ export class Seeders {
         isDefault: true,
         isActive: false,
         isRequired: true,
+        hasRequired: true,
         key: 'instagram',
         hasToggle: true,
         isToggled: true,
@@ -159,10 +161,13 @@ export class Seeders {
       {
         name: 'Gender',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: false,
+        isDefault: true,
+        isActive: true,
+        isRequired: false,
+        hasRequired: true,
         key: 'gender',
+        hasToggle: true,  
+        isToggled: true,
       },
     ];
 

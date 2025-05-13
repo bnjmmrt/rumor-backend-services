@@ -25,6 +25,9 @@ export class SignupFormStaticQuestions extends RumorBaseEntity {
   @Column({ type: 'boolean', default: true, name: 'is_required' })
   isRequired: boolean;
 
+  @Column({ type: 'boolean', default: false, name: 'has_required' })
+  hasRequired: boolean;
+
   @Column({ type: 'varchar', name: 'key' })
   key: string;
 
