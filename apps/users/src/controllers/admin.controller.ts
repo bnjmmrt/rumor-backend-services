@@ -141,4 +141,124 @@ export class AdminController {
       res.status(500).send('Error generating CSV');
     }
   });
+
+  public static getMembersCSV = asyncWrapper(async (req, res): Promise<void> => {
+    const userId = (req as any).user;
+    // Remove pagination parameters from query
+    const query = { ...req.query };
+    delete query.take;
+    delete query.skip;
+    
+    const payload: PaginatedRequestDto = { userId, query: query as string };
+    
+    try {
+      // Get members data without pagination
+      const response: GetMembersResponse = await AuthService.getMembers(payload);
+      const members = response.data;
+
+      // Transform members data to CSV rows with frontend validations
+      const rows = members.map(member => {
+        // Format gender
+        const gender = member.gender 
+          ? member.gender.charAt(0).toUpperCase() + member.gender.slice(1).toLowerCase()
+          : '------';
+
+        // Format city
+        const city = !member.city || member.city === 'N/A' ? '------' : member.city;
+
+        // Format status
+        let status = member.status || '';
+        if (member.status === 'ACTIVE' && member.sources?.includes('REQUEST_IN_APP')) {
+          status = 'Active';
+        } else if (member.status === 'DEACTIVATED') {
+          status = 'DEACTIVATED';
+        } else if (member.status === 'WAITLISTED') {
+          status = 'WAITLISTED';
+        } else if (member.role === 'non_member' && 
+                  member.status !== 'NEW_APPLICANT' && 
+                  member.status !== 'DEACTIVATED') {
+          status = 'Non Member';
+        } else if (member.sources?.includes('PLUS_1') || 
+                  member.sources?.includes('INVITED_BY_HOST') || 
+                  member.sources?.includes('SIGN_UP_FORM')) {
+          status = 'Non Member';
+        }
+
+        // Format phone
+        const phone = member.phoneNumber || '------';
+
+        // Format birthday and calculate age
+        let birthday = '------';
+        let age = '------';
+        if (member.dateOfBirth) {
+          const date = new Date(member.dateOfBirth);
+          birthday = date.toISOString().split('T')[0].replace(/-/g, '/');
+          age = (new Date().getFullYear() - date.getFullYear()).toString();
+        }
+
+        // Format categories
+        const categories = member.categories?.length 
+          ? member.categories.join(', ') 
+          : '------';
+
+        // Format referral info
+        const referralCode = member.references?.code || '------';
+        const referredBy = member.references?.name || member.references?.email || '------';
+
+        // Format role
+        const role = member.role === 'non_member' ? 'Non Member' : (member.role || '');
+
+        return [
+          `"${member.name || ''}"`,
+          `"${member.email || ''}"`,
+          `"${phone}"`,
+          `"${gender}"`,
+          `"${categories}"`,
+          `"${city}"`,
+          `"${member.followerCount || ''}"`,
+          `"${member.types?.join(', ') || ''}"`,
+          `"${status}"`,
+          `"${member.instagramUsername || ''}"`,
+          `"${birthday}"`,
+          `"${age}"`,
+          `"${member.isFavourite ? 'Yes' : 'No'}"`,
+          `"${role}"`,
+          `"${referralCode}"`,
+          `"${referredBy}"`,
+        ].join(',');
+      });
+
+      // Update headers to include new columns
+      const headers = [
+        'Name',
+        'Email',
+        'Phone',
+        'Gender',
+        'Interests',
+        'Base City',
+        'Followers',
+        'Category',
+        'Status',
+        'Instagram Username',
+        'Birthday',
+        'Age',
+        'Favourite',
+        'Type',
+        'Referral Code',
+        'Referred by'
+      ].join(',');
+
+      // Combine headers and rows
+      const csvContent = [headers, ...rows].join('\n');
+
+      // Set headers for CSV download
+      res.header('Content-Type', 'text/csv');
+      res.attachment('members_export.csv');
+
+      // Send CSV content
+      res.send(csvContent);
+    } catch (error) {
+      res.status(500).send('Error generating CSV');
+    }
+  });
 }
