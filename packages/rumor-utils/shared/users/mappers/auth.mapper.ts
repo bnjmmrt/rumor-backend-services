@@ -316,6 +316,7 @@ export const toMemberProfile = (
   invitedEvents?: MemberEvent[],
   requestedEvents?: MemberEvent[],
   referredBy?: ReferrerMembers[],
+  references?: IReferenceCode,
 ): MemberProfile => {
   return {
     id: user.id,
@@ -351,5 +352,6 @@ export const toMemberProfile = (
       ? user.roles.filter(r => r.source !== null).map(item => item.source as string)
       : [],
     referralCode,
+    references,
   };
 };

@@ -4982,6 +4982,29 @@ export class AuthService {
       .andWhere('referral.isApproved = true')
       .getRawMany();
 
+    const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+      where: [
+        {
+          email: user.email,
+        },
+        {
+          phoneNumber: user.phoneNumber,
+        },
+      ],
+      relations: {
+        inviteeUser: true,
+      },
+    });
+
+    const references: IReferenceCode = {
+      code: referenceCode?.referralCode || '---',
+      name:
+        (referenceCode?.inviteeUser?.firstName || '---') +
+        '  ' +
+        (referenceCode?.inviteeUser?.lastName || '---'),
+      email: referenceCode?.inviteeUser?.email || '---',
+    };
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4997,6 +5020,7 @@ export class AuthService {
         guestEvents?.invited,
         guestEvents?.requested,
         referredByMembers,
+        references,
       ),
     );
   }
