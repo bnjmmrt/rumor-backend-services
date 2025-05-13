@@ -96,13 +96,12 @@ class NotificationService {
         let companyName = () => {
           if (linkedHost && linkedHost?.additionalHostInformation?.companyName) {
             return linkedHost?.additionalHostInformation?.companyName;
-          } else if(linkedUser || linkedUser?.additionalHostInformation) {
+          } else if (linkedUser || linkedUser?.additionalHostInformation) {
             return linkedUser?.additionalHostInformation
               ? linkedUser?.additionalHostInformation?.companyName
               : `${linkedUser.firstName} ${linkedUser.lastName}`;
-          }
-          else{
-            return ""
+          } else {
+            return '';
           }
         };
 

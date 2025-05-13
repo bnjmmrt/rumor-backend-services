@@ -21,7 +21,7 @@ export class TicketTypeService {
     payload: CreateTicketTypeRequestDto,
   ): Promise<TicketTypeResponse> {
     try {
-      const name = payload.name.trim()
+      const name = payload.name.trim();
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
         where: {
           name,
@@ -84,7 +84,7 @@ export class TicketTypeService {
     payload: UpdateTicketTypeRequestDto,
   ): Promise<TicketTypeResponse> {
     try {
-      if (payload.name) payload.name = payload.name?.trim()
+      if (payload.name) payload.name = payload.name?.trim();
       const existingTicketType = await this.dbConnection.getRepository(TicketType).findOne({
         where: {
           name: payload.name,

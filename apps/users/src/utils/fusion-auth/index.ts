@@ -135,7 +135,6 @@ class AuthMiddleware {
           },
           redirection: false,
         };
-
       }
 
       let isHostActivated = userDetails?.roles?.find(
