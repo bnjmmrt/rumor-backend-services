@@ -148,9 +148,9 @@ export class AdminController {
     const query = { ...req.query };
     delete query.take;
     delete query.skip;
-    
+
     const payload: PaginatedRequestDto = { userId, query: query as string };
-    
+
     try {
       // Get members data without pagination
       const response: GetMembersResponse = await AuthService.getMembers(payload);
@@ -159,7 +159,7 @@ export class AdminController {
       // Transform members data to CSV rows with frontend validations
       const rows = members.map(member => {
         // Format gender
-        const gender = member.gender 
+        const gender = member.gender
           ? member.gender.charAt(0).toUpperCase() + member.gender.slice(1).toLowerCase()
           : '------';
 
@@ -174,13 +174,17 @@ export class AdminController {
           status = 'DEACTIVATED';
         } else if (member.status === 'WAITLISTED') {
           status = 'WAITLISTED';
-        } else if (member.role === 'non_member' && 
-                  member.status !== 'NEW_APPLICANT' && 
-                  member.status !== 'DEACTIVATED') {
+        } else if (
+          member.role === 'non_member' &&
+          member.status !== 'NEW_APPLICANT' &&
+          member.status !== 'DEACTIVATED'
+        ) {
           status = 'Non Member';
-        } else if (member.sources?.includes('PLUS_1') || 
-                  member.sources?.includes('INVITED_BY_HOST') || 
-                  member.sources?.includes('SIGN_UP_FORM')) {
+        } else if (
+          member.sources?.includes('PLUS_1') ||
+          member.sources?.includes('INVITED_BY_HOST') ||
+          member.sources?.includes('SIGN_UP_FORM')
+        ) {
           status = 'Non Member';
         }
 
@@ -197,16 +201,14 @@ export class AdminController {
         }
 
         // Format categories
-        const categories = member.categories?.length 
-          ? member.categories.join(', ') 
-          : '------';
+        const categories = member.categories?.length ? member.categories.join(', ') : '------';
 
         // Format referral info
         const referralCode = member.references?.code || '------';
         const referredBy = member.references?.name || member.references?.email || '------';
 
         // Format role
-        const role = member.role === 'non_member' ? 'Non Member' : (member.role || '');
+        const role = member.role === 'non_member' ? 'Non Member' : member.role || '';
 
         return [
           `"${member.name || ''}"`,
@@ -245,7 +247,7 @@ export class AdminController {
         'Favourite',
         'Type',
         'Referral Code',
-        'Referred by'
+        'Referred by',
       ].join(',');
 
       // Combine headers and rows

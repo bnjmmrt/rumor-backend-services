@@ -135,7 +135,6 @@ class AuthMiddleware {
           },
           redirection: false,
         };
-
       }
 
       let isHostActivated = userDetails?.roles?.find(
@@ -147,7 +146,7 @@ class AuthMiddleware {
           !userRole.isRoleDeactivated &&
           userRole.status !== UserStatus.DEACTIVATED,
       );
-      
+
       if (!isHostActivated && !isMemberNonMemberActivated) {
         throw new AuthorizationError('User is not active');
       }
