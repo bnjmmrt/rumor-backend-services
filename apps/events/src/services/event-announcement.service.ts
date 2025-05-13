@@ -97,7 +97,7 @@ export class EventAnnouncementService {
     const event = await database.getRepository(Event).findOne({
       where: {
         id: eventId,
-        status: EventStatusEnum.APPROVED_STATUS,
+        status: In([EventStatusEnum.APPROVED_STATUS, EventStatusEnum.PAST_STATUS]),
         isPublished: true,
         deletedAt: IsNull(),
       },
