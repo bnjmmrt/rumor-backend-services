@@ -167,7 +167,7 @@ export class Seeders {
         isRequired: false,
         hasRequired: true,
         key: 'gender',
-        hasToggle: true,  
+        hasToggle: true,
         isToggled: true,
       },
     ];
