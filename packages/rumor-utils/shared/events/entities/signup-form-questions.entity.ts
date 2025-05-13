@@ -9,6 +9,7 @@ export class SignupFormQuestions extends RumorBaseEntity {
 
   @Column({ type: 'boolean', default: true, name: 'is_required' })
   isRequired: boolean;
+  
 
   @Column({ type: 'boolean', default: false, name: 'is_default' })
   isDefault: boolean;

@@ -143,6 +143,7 @@ export class Seeders {
         isActive: true,
         isRequired: true,
         hasRequired: true,
+        hasRequired: true,
         key: 'requestAdditionalGuests',
         hasToggle: true,
         isToggled: true,
@@ -166,7 +167,7 @@ export class Seeders {
         isRequired: false,
         hasRequired: true,
         key: 'gender',
-        hasToggle: true,
+        hasToggle: true,  
         isToggled: true,
       },
     ];

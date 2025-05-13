@@ -58,8 +58,10 @@ export class SignupFormsServices {
         isToggled: true,
         hasToggle: true,
         hasRequired: true,
+        hasRequired: true,
       },
     });
+    console.log(staticQuestions);
     console.log(staticQuestions);
     return staticQuestions;
   }
@@ -173,7 +175,7 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
 
-      console.log('body', body);
+      console.log("body", body)
       if (!event) {
         throw new NotFoundError('Event');
       }
@@ -211,7 +213,7 @@ export class SignupFormsServices {
         questionList.push(question);
       }
 
-      console.log('questionList', questionList);
+      console.log("questionList", questionList)
       const savedQuestions = SignupFormQuestions.create(questionList);
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map(q => q.id);
