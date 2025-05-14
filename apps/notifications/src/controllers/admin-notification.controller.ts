@@ -13,7 +13,7 @@ export class AdminNotificationController {
     res.status(createResponse.statusCode).json(createResponse);
   });
 
-  public static sendAdminNotification = asyncWrapper(async (req, res): Promise<void> => { 
+  public static sendAdminNotification = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
     await AdminNotificationService.sendAdminNotification(id);
     const createResponse = new CreateResponse({}, 'Notification sent successfully!');
