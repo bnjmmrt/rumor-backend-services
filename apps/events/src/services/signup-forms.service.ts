@@ -58,7 +58,6 @@ export class SignupFormsServices {
         isToggled: true,
         hasToggle: true,
         hasRequired: true,
-        hasRequired: true,
       },
     });
     console.log(staticQuestions);
@@ -850,6 +849,70 @@ export class SignupFormsServices {
             .getQuery();
           return `atd.id IN ${subQuery}`;
         });
+      }
+
+      let newTypeFilters = [];
+      if (parsedQuery.newType && typeof parsedQuery.newType === 'string') {
+        newTypeFilters = parsedQuery.newType.split(',').map(type => type.trim());
+      }
+
+      // Apply newType filter
+      if (newTypeFilters.length) {
+        if (newTypeFilters.includes('existing_user_in_database')) {
+          // Get users who have more than 1 event with this host
+          getCountQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) > 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+
+          submissionsQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) > 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+        } else if (newTypeFilters.includes('existing_user_not_in_database')) {
+          // Get users who have 0 or 1 event with this host
+          getCountQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) <= 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+
+          submissionsQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) <= 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+        }
       }
 
       // Apply list filters (favorites, followed, custom lists) - similar to getAllUsers

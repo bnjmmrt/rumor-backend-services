@@ -2,7 +2,7 @@
     "name": "rumor-utils",
     "version": "1.0.0",
     "description": "",
-    "main": "dist/index.ts",
+    "main": "dist/index.js",
     "scripts": {
         "build": "npx tsc"
     },
@@ -42,7 +42,6 @@
         "qs": "^6.12.1",
         "querystring": "^0.2.1",
         "reflect-metadata": "^0.2.2",
-        "rumor-utils": "file:../../rumor-utils",
         "rxjs": "^7.2.0",
         "twilio": "^5.0.4",
         "typeorm": "^0.3.20"

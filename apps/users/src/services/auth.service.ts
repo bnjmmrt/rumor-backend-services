@@ -5350,6 +5350,7 @@ export class AuthService {
       age: ageObj,
       interest: interestObj,
       category: categoryObj,
+      newType: newTypeObj,
       type: typeObj,
       list: listObj,
       pastEvents: pastEventsObj,
