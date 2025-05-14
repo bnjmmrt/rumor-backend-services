@@ -20,6 +20,7 @@ import {
   SendPushNotificationRequest,
   CreateAdminNotificationRequest,
   AdminNotificationRecipients,
+  AdminNotificationType,
 } from '../grpc/notification/notification.pb';
 //import { AdminNotification } from 'shared/users/entities/admin-notification.entity';
 
@@ -60,11 +61,9 @@ export class CreateAdminNotificationRequestDto implements CreateAdminNotificatio
   @IsEnum(AdminNotificationRecipients, { each: true })
   recipients: AdminNotificationRecipients[];
 
-  /*
-  @IsOptional()
-  @IsEnum(NotificationSource)
-  source?: NotificationSource;
-  */
+  @IsNotEmpty()
+  @IsEnum(AdminNotificationType, { each: true })
+  types: AdminNotificationType[];
 }
 
 export class CreateNotificationRequestDto implements CreateNotificationRequest {

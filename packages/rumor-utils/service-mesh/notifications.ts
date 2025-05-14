@@ -38,3 +38,6 @@ export const sendNotification = (
     linkedUserId,
     linkedHostId,
   });
+
+export const sendAdminNotification = (notificationId: string) =>
+  apiService.getApi().post(`/admin-notifications/${notificationId}/send`);

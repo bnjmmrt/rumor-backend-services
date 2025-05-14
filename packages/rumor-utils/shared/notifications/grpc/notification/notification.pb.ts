@@ -1,3 +1,8 @@
+export enum AdminNotificationType {
+  SMS = 'SMS',
+  PUSH = 'PUSH',
+}
+
 export enum AdminNotificationRecipients {
   MEMBERS = 'MEMBERS',
   HOSTS = 'HOSTS',
@@ -80,6 +85,7 @@ export interface CreateAdminNotificationRequest {
   message: string;
   scheduledDate?: string;
   recipients: AdminNotificationRecipients[];
+  types: AdminNotificationType[];
 }
 
 export interface AdminNotificationResponse extends CreateAdminNotificationRequest {

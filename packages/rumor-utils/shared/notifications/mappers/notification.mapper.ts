@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import * as dayjs from 'dayjs';
 import { AdminNotification } from '../entities/admin-notification.entity';
 import { Notification } from '../entities/notification.entity';
 import { AdminNotificationResponse } from '../grpc/notification/notification.pb';
@@ -56,8 +56,9 @@ function toAdminNotification(notification: Partial<AdminNotification>): AdminNot
     title: notification.title,
     message: notification.message,
     recipients: notification.recipients,
+    types: notification.types,
     scheduledDate: notification.scheduledDate
-      ? dayjs(notification.scheduledDate).format('MM/DD/YYYY')
+      ? dayjs(notification.scheduledDate).format('MM/DD/YYYY HH:mm')
       : null,
   };
 }
