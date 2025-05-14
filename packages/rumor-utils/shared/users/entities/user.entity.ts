@@ -244,5 +244,4 @@ export class User extends RumorBaseEntity {
   })
   @JoinColumn({ name: 'csv_upload_id' })
   uploadedViaCsv: CsvUploadRecords | null;
-
 }
