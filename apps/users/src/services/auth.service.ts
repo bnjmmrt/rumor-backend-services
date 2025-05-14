@@ -4294,7 +4294,7 @@ export class AuthService {
             .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', {
               searchValue: `%${parsedQuery.searchValue}%`,
             })
-            .orWhere('user.additional_host_information->>\'companyName\' ILIKE :searchValue', {
+            .orWhere("user.additional_host_information->>'companyName' ILIKE :searchValue", {
               searchValue: `%${parsedQuery.searchValue}%`,
             });
         }),
@@ -6327,16 +6327,16 @@ export class AuthService {
     const guestRepo = this.dbConnection.getRepository(Guest);
     const ticketRepo = this.dbConnection.getRepository(Ticket);
     const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
-  
+
     // 1. Get all events where the lead guest is involved.
     const leadGuestEntries = await guestRepo.find({
       where: { user: { id: userId } },
       relations: ['event'],
     });
-  
+
     const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
     if (eventIds.length === 0) return;
-  
+
     // 2. Get plus-ones added by the lead guest for those events.
     const plusOneGuests = await guestRepo.find({
       where: {
@@ -6345,11 +6345,11 @@ export class AuthService {
       },
       relations: ['user', 'event'],
     });
-  
+
     const plusOneUserIds = plusOneGuests
       .map(g => g.user?.id)
       .filter((id): id is string => Boolean(id));
-  
+
     // 3. Delete Tickets
     await ticketRepo
       .createQueryBuilder()
@@ -6360,7 +6360,7 @@ export class AuthService {
           if (plusOneUserIds.length > 0) {
             qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
           }
-        })
+        }),
       )
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({
@@ -6369,7 +6369,7 @@ export class AuthService {
         eventIds,
       })
       .execute();
-  
+
     // 4. Delete Guest entries (first lead, then plus-ones)
     await guestRepo
       .createQueryBuilder()
@@ -6378,7 +6378,7 @@ export class AuthService {
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({ userId, eventIds })
       .execute();
-  
+
     if (plusOneUserIds.length > 0) {
       await guestRepo
         .createQueryBuilder()
@@ -6393,7 +6393,7 @@ export class AuthService {
         })
         .execute();
     }
-  
+
     // 5. Delete Signup Form Submissions (after guests are deleted)
     await signupFormRepo
       .createQueryBuilder()
@@ -6404,13 +6404,13 @@ export class AuthService {
           if (plusOneUserIds.length > 0) {
             qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
           }
-        })
+        }),
       )
       .andWhere(
         `signup_form_id IN (
           SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
         )`,
-        { eventIds }
+        { eventIds },
       )
       .setParameters({
         userId,
@@ -6419,7 +6419,6 @@ export class AuthService {
       })
       .execute();
   }
-  
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
