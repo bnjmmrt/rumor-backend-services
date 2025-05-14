@@ -54,7 +54,6 @@ export class SignupFormsController {
     if (payload.userId !== hostId) {
       throw new BadRequestError('Invalid host id provided.');
     }
-    console.log('payload', payload);
     const data: SignupFormsResponse = await SignupFormsServices.update(id, eventId, payload);
     res.json(new GetResponse(data));
   });
@@ -68,10 +67,8 @@ export class SignupFormsController {
     const eventId = req.params.eventId;
     const id = req.params.id;
     const payload = req.body as SignupFormAnswersDto[];
-    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ payload: ${new Date()}`, payload)
-    // const answers =
+
     await SignupFormsServices.answers(id, eventId, payload);
-    // console.log(`🚀 ~ SignupFormsController ~ submitAnswers=asyncWrapper ~ answers: ${new Date()}`)
     res.json(new GetResponse({}));
   });
 

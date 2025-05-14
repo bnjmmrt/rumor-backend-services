@@ -60,8 +60,6 @@ export class SignupFormsServices {
         hasRequired: true,
       },
     });
-    console.log(staticQuestions);
-    console.log(staticQuestions);
     return staticQuestions;
   }
 
@@ -1135,9 +1133,6 @@ export class SignupFormsServices {
       if (skip !== undefined && take !== undefined) {
         paginatedResults = processed.slice(skip, skip + take);
       }
-
-      console.log('Filter params received:', parsedQuery); // Debug log
-      console.log('Total count after filtering:', count); // Debug log
 
       const result = { count, result: paginatedResults };
       return result;
