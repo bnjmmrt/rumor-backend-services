@@ -95,6 +95,12 @@ export class User extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'instagram_validated', default: false, nullable: true })
   instagramValidated: boolean;
 
+  @Column({ type: 'varchar', name: '2fa_code', nullable: true })
+  twoFactorCode: string | null;
+
+  @Column({ type: 'timestamp', name: '2fa_code_date', nullable: true })
+  twoFactorCodeDate: Date | null;
+
   @DeleteDateColumn({ type: 'timestamp', nullable: true, name: 'deactivated_at' })
   deactivatedAt: Date | null;
 
@@ -238,4 +244,5 @@ export class User extends RumorBaseEntity {
   })
   @JoinColumn({ name: 'csv_upload_id' })
   uploadedViaCsv: CsvUploadRecords | null;
+
 }

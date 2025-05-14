@@ -102,6 +102,9 @@ export class LoginRequestDto implements LoginRequest {
   @IsString()
   @IsOptional()
   deviceId?: string;
+  @IsString()
+  @IsOptional()
+  code?: string;
 }
 
 export class ValidateRequestDto implements ValidateRequest {
@@ -869,4 +872,11 @@ export class SwitchProfileDto {
   @IsString()
   @IsNotEmpty()
   targetRole: string;
+}
+
+export class Send2FACodeDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
 }

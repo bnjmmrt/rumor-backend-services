@@ -23,6 +23,7 @@ const router: Router = express.Router();
 // Admin routes
 router.get('/auth/admin/members', AuthMiddleware.fusionAuthRequired, AdminController.getMembers);
 router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
+router.post('/auth/admin/2fa-send-code', AdminController.send2FACode);
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
 router.get(

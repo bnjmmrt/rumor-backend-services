@@ -535,7 +535,7 @@ export class AuthService {
         ['admin@therumor.com'],
         null,
       );
-    } catch (error) {}
+    } catch (error) { }
 
     const savedUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: newUser.id },
@@ -687,7 +687,7 @@ export class AuthService {
         ['admin@therumor.com'],
         null,
       );
-    } catch (error) {}
+    } catch (error) { }
 
     // Save FCM Token for the user
     SettingsService.savePushNotificationToken({
@@ -729,7 +729,7 @@ export class AuthService {
     let response;
     try {
       response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
-    } catch (error) {}
+    } catch (error) { }
 
     if (!response.wasSuccessful()) {
       throw new BadRequestError('Invalid session token.');
@@ -1129,7 +1129,7 @@ export class AuthService {
     //Micro-service call
     try {
       await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
-    } catch (error) {}
+    } catch (error) { }
     return { isValid: true };
   }
 
@@ -1186,7 +1186,7 @@ export class AuthService {
       if (!success) {
         throw new BadRequestError('An error occured while sending invitations, please try again.');
       }
-    } catch (error) {}
+    } catch (error) { }
 
     return '';
   }
@@ -1297,7 +1297,7 @@ export class AuthService {
             [payload.email.trim().toLowerCase()],
             null,
           );
-      } catch (error) {}
+      } catch (error) { }
     }
 
     return '';
@@ -1372,7 +1372,7 @@ export class AuthService {
           [payload.email.trim().toLowerCase()],
           null,
         );
-    } catch (error) {}
+    } catch (error) { }
 
     return '';
   }
@@ -1473,7 +1473,7 @@ export class AuthService {
         } else {
           await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
         }
-      } catch (error) {}
+      } catch (error) { }
       return { isValid: false };
     }
 
@@ -1510,7 +1510,7 @@ export class AuthService {
           } else {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
-        } catch (error) {}
+        } catch (error) { }
         return { isValid: true, isGuest: true, isDeactivated: user.isDeactivated };
       } else {
         try {
@@ -1519,7 +1519,7 @@ export class AuthService {
           } else {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
-        } catch (error) {}
+        } catch (error) { }
         return { isValid: true, isGuest: false, isDeactivated: user.isDeactivated };
       }
     }
@@ -1567,7 +1567,7 @@ export class AuthService {
           console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
-    } catch (error) {}
+    } catch (error) { }
 
     return { isValid: true, isDeactivated: user.isDeactivated };
   }
@@ -1801,7 +1801,7 @@ export class AuthService {
             user: user,
             isGuest: false,
           };
-        } catch (error) {}
+        } catch (error) { }
       }
 
       // if (completedLogin.statusCode > 299) {
@@ -2176,12 +2176,12 @@ export class AuthService {
       source: userSource,
       address: responseUser.address
         ? {
-            address: responseUser.address?.address,
-            placeId: responseUser.address.googlePlaceId,
-            latitude: String(responseUser.address.latitude),
-            longitude: String(responseUser.address.longitude),
-            city: responseUser.address.city,
-          }
+          address: responseUser.address?.address,
+          placeId: responseUser.address.googlePlaceId,
+          latitude: String(responseUser.address.latitude),
+          longitude: String(responseUser.address.longitude),
+          city: responseUser.address.city,
+        }
         : null,
     };
   }
@@ -2326,7 +2326,7 @@ export class AuthService {
         [user.email.trim().toLowerCase()],
         null,
       );
-    } catch (error) {}
+    } catch (error) { }
 
     try {
       // Send Notification
@@ -2568,7 +2568,7 @@ export class AuthService {
             }
           }
         }
-      } catch (error) {}
+      } catch (error) { }
     }
 
     return { failedUsers, usersToUpdate };
@@ -2631,9 +2631,9 @@ export class AuthService {
     const hostId = payload.userId;
     const pagination = hasPagination(parsedQuery)
       ? {
-          take: parseInt(parsedQuery.take),
-          skip: parseInt(parsedQuery.skip),
-        }
+        take: parseInt(parsedQuery.take),
+        skip: parseInt(parsedQuery.skip),
+      }
       : {};
     const where: unknown = { deletedAt: null };
     let customListName = parsedQuery.customListName;
@@ -3522,13 +3522,13 @@ export class AuthService {
     const [userByEmail, userByPhone] = await Promise.all([
       payload.email
         ? this.dbConnection
-            .getRepository(User)
-            .findOne({ where: { email: payload.email, deletedAt: IsNull() } })
+          .getRepository(User)
+          .findOne({ where: { email: payload.email, deletedAt: IsNull() } })
         : null,
       payload.phoneNumber
         ? this.dbConnection
-            .getRepository(User)
-            .findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } })
+          .getRepository(User)
+          .findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } })
         : null,
     ]);
     const hasEmail = !!userByEmail;
@@ -3679,7 +3679,7 @@ export class AuthService {
           null,
         );
       }
-    } catch (error) {}
+    } catch (error) { }
 
     // Save the verification code and email into the TemporaryLoginCode entity
     const temporaryLoginCode = new TemporaryLoginCode();
@@ -3954,9 +3954,9 @@ export class AuthService {
           : 0; // Default minimum age is 0
       const ageTo =
         parsedQuery.ageTo &&
-        typeof parsedQuery.ageTo === 'string' &&
-        parsedQuery.ageTo.trim() &&
-        parsedQuery.ageTo !== 'No Max'
+          typeof parsedQuery.ageTo === 'string' &&
+          parsedQuery.ageTo.trim() &&
+          parsedQuery.ageTo !== 'No Max'
           ? parseInt(parsedQuery.ageTo, 10)
           : null; // Null indicates no upper limit
       const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
@@ -4308,11 +4308,8 @@ export class AuthService {
     return responses.data(hosts);
   }
 
-  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
-    if (payload.email) {
-      payload.email = payload.email.trim().toLowerCase();
-    }
-    const user: User = await this.dbConnection.getRepository(User).findOne({
+  public static async send2FACode(payload: { email: string }): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
         roles: {
@@ -4323,7 +4320,7 @@ export class AuthService {
 
     if (!user) {
       throw new ForbiddenError(
-        'The email address you provided doesn’t match any account in our system. Please check for any typos or try a different email.',
+        'The email address you provided doesnt match any account in our system. Please check for any typos or try a different email.',
       );
     }
 
@@ -4337,32 +4334,117 @@ export class AuthService {
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
-        'We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        'We couldnt send the code. Either your email is incorrect or you don\'t have admin permissions.',
       );
     }
 
-    const loginResponse = await fusionAuthClientHandler
-      .fusionAuthClient()
-      .login({ loginId: payload.email, password: payload.password });
+    // Generate random 5 digit code
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
 
-    if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      throw new ForbiddenError(
-        'We couldn’t sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+    // Save code and expiration date (5 minutes from now)
+    user.twoFactorCode = code;
+    user.twoFactorCodeDate = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    await this.dbConnection.getRepository(User).save(user);
+
+    // Send email with code
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'code',
+            value: code,
+          },
+        ],
+        'Super Admin - 2FA Code',
+        [user.email.trim().toLowerCase()],
+        null,
       );
+    } catch (error) {
+      throw new BadRequestError('Unable to send 2FA code email. Please try again.');
     }
 
-    if (loginResponse?.response?.user?.passwordChangeRequired) {
-      throw new ForbiddenError('Password change is required');
-    }
-
-    return {
-      id: user.id,
-      token: loginResponse.response.token,
-      roles: user.roles.map(item => {
-        return { roleName: item.role.name, roleId: item.role.id };
-      }),
-    };
+    return '';
   }
+
+public static async adminLogin(payload: LoginRequestDto & { code?: string }): Promise<TokenResponseAndRoles> {
+  if (payload.email) {
+    payload.email = payload.email.trim().toLowerCase();
+  }
+  const user: User = await this.dbConnection.getRepository(User).findOne({
+    where: { email: payload.email, deletedAt: IsNull() },
+    relations: {
+      roles: {
+        role: true,
+      },
+    },
+  });
+
+  if (!user) {
+    throw new ForbiddenError(
+      'The email address you provided doesnt match any account in our system. Please check for any typos or try a different email.',
+    );
+  }
+
+  const userRoles = await this.dbConnection.getRepository(UserRole).find({
+    where: { user: { id: user.id } },
+    relations: ['role', 'role.parentRole'],
+  });
+
+  const isAllowed = userRoles.find(
+    role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
+  );
+  if (isAllowed === undefined) {
+    throw new ForbiddenError(
+      'We couldnt sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+    );
+  }
+
+  // Validate 2FA code
+  if (!payload.code) {
+    throw new BadRequestError('2FA code is required');
+  }
+
+  if (!user.twoFactorCode || !user.twoFactorCodeDate) {
+    throw new BadRequestError('Please request a new 2FA code');
+  }
+
+  if (user.twoFactorCode !== payload.code) {
+    throw new BadRequestError('Invalid 2FA code');
+  }
+
+  const codeExpiration = new Date(user.twoFactorCodeDate);
+  if (codeExpiration < new Date()) {
+    throw new BadRequestError('2FA code has expired. Please request a new code.');
+  }
+
+  const loginResponse = await fusionAuthClientHandler
+    .fusionAuthClient()
+    .login({ loginId: payload.email, password: payload.password });
+
+  if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
+    throw new ForbiddenError(
+      'We couldnt sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+    );
+  }
+
+  if (loginResponse?.response?.user?.passwordChangeRequired) {
+    throw new ForbiddenError('Password change is required');
+  }
+
+  // Clear 2FA code after successful login
+  user.twoFactorCode = null;
+  user.twoFactorCodeDate = null;
+  await this.dbConnection.getRepository(User).save(user);
+
+  return {
+    id: user.id,
+    token: loginResponse.response.token,
+    roles: user.roles.map(item => {
+      return { roleName: item.role.name, roleId: item.role.id };
+    }),
+  };
+}
+
 
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
     if (payload.email) {
@@ -4704,7 +4786,7 @@ export class AuthService {
         // If changing to WAITLIST, prevent already approved users from being waitlisted
         if (
           newUserStatusTosUserStatus[payload.status] ===
-            newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+          newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
           hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
         ) {
           skippedUsers.push(user.email);
@@ -5125,9 +5207,9 @@ export class AuthService {
           : 0;
       const ageTo =
         parsedQuery.ageTo &&
-        typeof parsedQuery.ageTo === 'string' &&
-        parsedQuery.ageTo.trim() &&
-        parsedQuery.ageTo !== 'No Max'
+          typeof parsedQuery.ageTo === 'string' &&
+          parsedQuery.ageTo.trim() &&
+          parsedQuery.ageTo !== 'No Max'
           ? parseInt(parsedQuery.ageTo, 10)
           : null;
       const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
@@ -5257,7 +5339,7 @@ export class AuthService {
         name: event.name,
         id: event.id,
       }));
-    } catch (e) {}
+    } catch (e) { }
 
     const pastEventsObj = {
       id: 'pastEvents',
@@ -6048,7 +6130,7 @@ export class AuthService {
         [user.email.trim().toLowerCase()],
         null,
       );
-    } catch (error) {}
+    } catch (error) { }
 
     return '';
   }
@@ -6080,19 +6162,19 @@ export class AuthService {
         description: feedback.description ?? null,
         user: feedback.user
           ? {
-              id: feedback.user.id ?? null,
-              firstName: feedback.user.firstName ?? null,
-              lastName: feedback.user.lastName ?? null,
-              dateOfBirth: feedback.user.dateOfBirth ?? null,
-              email: feedback.user.email ?? null,
-              username: feedback.user.username ?? null,
-              phoneNumber: feedback.user.phoneNumber ?? null,
-              gender: feedback.user.gender ?? null,
-              additionalHostInformation: feedback.user.additionalHostInformation ?? null,
-              profilePicture: feedback.user.profilePicture ?? null,
-              instagramUserName: feedback.user.instagramUserName ?? null,
-              isFirstTimeLoggedIn: feedback.user.isFirstTimeLoggedIn ?? null,
-            }
+            id: feedback.user.id ?? null,
+            firstName: feedback.user.firstName ?? null,
+            lastName: feedback.user.lastName ?? null,
+            dateOfBirth: feedback.user.dateOfBirth ?? null,
+            email: feedback.user.email ?? null,
+            username: feedback.user.username ?? null,
+            phoneNumber: feedback.user.phoneNumber ?? null,
+            gender: feedback.user.gender ?? null,
+            additionalHostInformation: feedback.user.additionalHostInformation ?? null,
+            profilePicture: feedback.user.profilePicture ?? null,
+            instagramUserName: feedback.user.instagramUserName ?? null,
+            isFirstTimeLoggedIn: feedback.user.isFirstTimeLoggedIn ?? null,
+          }
           : undefined,
       })),
     });
@@ -6339,16 +6421,16 @@ export class AuthService {
     const guestRepo = this.dbConnection.getRepository(Guest);
     const ticketRepo = this.dbConnection.getRepository(Ticket);
     const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
-  
+
     // 1. Get all events where the lead guest is involved.
     const leadGuestEntries = await guestRepo.find({
       where: { user: { id: userId } },
       relations: ['event'],
     });
-  
+
     const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
     if (eventIds.length === 0) return;
-  
+
     // 2. Get plus-ones added by the lead guest for those events.
     const plusOneGuests = await guestRepo.find({
       where: {
@@ -6357,11 +6439,11 @@ export class AuthService {
       },
       relations: ['user', 'event'],
     });
-  
+
     const plusOneUserIds = plusOneGuests
       .map(g => g.user?.id)
       .filter((id): id is string => Boolean(id));
-  
+
     // 3. Delete Tickets
     await ticketRepo
       .createQueryBuilder()
@@ -6381,7 +6463,7 @@ export class AuthService {
         eventIds,
       })
       .execute();
-  
+
     // 4. Delete Guest entries (first lead, then plus-ones)
     await guestRepo
       .createQueryBuilder()
@@ -6390,7 +6472,7 @@ export class AuthService {
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({ userId, eventIds })
       .execute();
-  
+
     if (plusOneUserIds.length > 0) {
       await guestRepo
         .createQueryBuilder()
@@ -6405,7 +6487,7 @@ export class AuthService {
         })
         .execute();
     }
-  
+
     // 5. Delete Signup Form Submissions (after guests are deleted)
     await signupFormRepo
       .createQueryBuilder()
@@ -6431,7 +6513,7 @@ export class AuthService {
       })
       .execute();
   }
-  
+
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection
@@ -6631,7 +6713,7 @@ export class AuthService {
 
       try {
         await serviceMesh.eventService().deleteHostEvents(payload.id);
-      } catch (error) {}
+      } catch (error) { }
       // Step 2: Remove user from all notifications (join table cleanup)
       if (user.notifications?.length) {
         await queryRunner.manager
