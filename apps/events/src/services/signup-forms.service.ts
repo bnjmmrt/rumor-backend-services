@@ -57,7 +57,6 @@ export class SignupFormsServices {
         isRequired: true,
         isToggled: true,
         hasToggle: true,
-        hasRequired: true,
       },
     });
     return staticQuestions;
