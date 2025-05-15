@@ -1,17 +1,20 @@
-import { CreateAdminNotificationRequestDto } from 'rumor-utils/shared/notifications/dtos/notification.dto';
 import database from '../database';
+import serviceMesh from '../server/helpers/serviceMeshHandler';
+import firebaseNotificationsService from '../utils/firebase-notifications/firebase-notifications.service';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { AdminNotification } from 'rumor-utils/shared/notifications/entities/admin-notification.entity';
 import { toAdminNotification } from 'rumor-utils/shared/notifications/mappers/notification.mapper';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import {
   AdminNotificationResponse,
   AdminNotificationType,
 } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
-import serviceMesh from '../server/helpers/serviceMeshHandler';
+import { CreateAdminNotificationRequestDto } from 'rumor-utils/shared/notifications/dtos/notification.dto';
 import {
   SchedulerJobType,
   SchedulerTriggerPayload,
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { PushNotificationPayload } from '../utils/firebase-notifications/firebase-notifications.interface';
 
 export class AdminNotificationService {
   private dbConnection = database;
@@ -63,7 +66,6 @@ export class AdminNotificationService {
 
     //MEMBERS => member, NON_MEMBERS => non_member, HOSTS => host
     const recipientList = notification.recipients.map(r => r.toLowerCase().replace(/s$/, ''));
-    console.log('NotificationService => Sending admin notification to:', recipientList);
 
     if (notification.types.includes(AdminNotificationType.PUSH)) {
       this.sendPushNotification(notification, recipientList);
@@ -84,12 +86,26 @@ export class AdminNotificationService {
       .leftJoin('user.roles', 'userRole')
       .leftJoin('userRole.role', 'role')
       .leftJoin('user.pushNotificationToken', 'pushToken')
-      .where('role.name IN (:...recipientList)', { recipientList })
       .select('user.id, user.phoneNumber, user.email, role.name, pushToken.notificationToken')
-      .limit(5)
+      .where('role.name IN (:...recipientList)', { recipientList })
+      .where('pushToken.notificationToken IS NOT NULL')
       .getRawMany();
 
-    console.log('NotificationService sendPushNotification() => MSG: ', notification.message);
+    const payload = {
+      tokens: recipients.map(r => r.notification_token),
+      body: notification.message,
+      title: notification.title || 'Rumor',
+      image: 'https://host.therumor.com/images/app/rumor_icon.svg',
+      data: {
+        notificationId: notification.id,
+        notificationType: NotificationType.MANUAL_ADMIN_NOTIFICATION,
+        notificationModule: 'admin',
+      },
+    } as PushNotificationPayload;
+
+    await firebaseNotificationsService.sendPushNotification(payload);
+
+    console.log('NotificationService sendPushNotification() => payload: ', payload);
     console.log(recipients);
   }
 

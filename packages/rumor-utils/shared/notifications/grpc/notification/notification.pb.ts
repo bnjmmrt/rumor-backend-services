@@ -9,12 +9,14 @@ export enum AdminNotificationRecipients {
   NON_MEMBERS = 'NON_MEMBERS',
 }
 
+/*
+Redefined enum below
 export enum NotificationType {
   SMS = 0,
   EMAIL = 1,
   PUSH = 2,
   UNRECOGNIZED = -1,
-}
+} */
 
 export enum RecipientsType {
   MEMBERS = 0,
@@ -65,6 +67,7 @@ export enum NotificationType {
   EVENT_APPROVED = 'eventApproved',
   NEW_GUEST_REQUEST = 'newGuestRequest',
   RSVP_SIGNUP_FORM_REQUEST = 'rsvpSignupFormRequest',
+  MANUAL_ADMIN_NOTIFICATION = 'manualAdminNotification',
 }
 
 /** Generic Response */
