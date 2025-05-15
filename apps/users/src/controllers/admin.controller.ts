@@ -59,6 +59,13 @@ export class AdminController {
     res.status(getResponse.statusCode).json(getResponse);
   });
 
+  public static adminLoginPreview = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: LoginRequestDto = req.body;
+    const response: TokenResponseAndRoles = await AuthService.adminLoginPreview(payload);
+    const getResponse = new GetResponse(response);
+    res.status(getResponse.statusCode).json(getResponse);
+  });
+
   //@GrpcMethod(AUTH_SERVICE_NAME, 'CreateAdmin')
   public static createAdmin = asyncWrapper(async (req, res): Promise<void> => {
     const payload: AdminSignUpRequestDto = req.body;
