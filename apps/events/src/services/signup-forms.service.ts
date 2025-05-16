@@ -848,14 +848,14 @@ export class SignupFormsServices {
         });
       }
 
-      let newTypeFilters = [];
-      if (parsedQuery.newType && typeof parsedQuery.newType === 'string') {
-        newTypeFilters = parsedQuery.newType.split(',').map(type => type.trim());
+      let userHostRelationshipFilters = [];
+      if (parsedQuery.userHostRelationship && typeof parsedQuery.userHostRelationship === 'string') {
+        userHostRelationshipFilters = parsedQuery.userHostRelationship.split(',').map(type => type.trim());
       }
 
-      // Apply newType filter
-      if (newTypeFilters.length) {
-        if (newTypeFilters.includes('existing_user_in_database')) {
+      // Apply userHostRelationship filter
+      if (userHostRelationshipFilters.length) {
+        if (userHostRelationshipFilters.includes('existing_user_in_host_list')) {
           // Get users who have more than 1 event with this host
           getCountQuery.andWhere(qb => {
             const subQuery = qb
@@ -882,7 +882,7 @@ export class SignupFormsServices {
               .getQuery();
             return 'atd.id IN ' + subQuery;
           });
-        } else if (newTypeFilters.includes('existing_user_not_in_database')) {
+        } else if (userHostRelationshipFilters.includes('new_user_not_in_host_list')) {
           // Get users who have 0 or 1 event with this host
           getCountQuery.andWhere(qb => {
             const subQuery = qb

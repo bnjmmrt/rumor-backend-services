@@ -104,7 +104,6 @@ export class SchedulerService {
 
   public static async scheduleUserHardDeleteRestart() {
     try {
-      // Alternative approach using TypeORM's newer query builder style
       const users: User[] = await User.find({
         where: {
           isDeactivated: true,

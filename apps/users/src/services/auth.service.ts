@@ -5132,7 +5132,7 @@ export class AuthService {
       'age',
       'interest',
       'type',
-      'newType',
+      'userHostRelationship',
       'ticketType',
       'partySize',
       'checkedIn',
@@ -5236,14 +5236,14 @@ export class AuthService {
       }));
     } catch (e) {}
 
-    const newTypeObj = {
-      id: 'newType',
-      label: 'New Type',
+    const userHostRelationshipObj = {
+      id: 'userHostRelationship',
+      label: 'Type',
       options: [
-        { id: 'existing_user_in_database', name: 'Existing User in Database' },
-        { id: 'existing_user_not_in_database', name: 'Existing User Not in Database' },
+        { id: 'existing_user_in_host_list', name: 'Existing User in Database' },
+        { id: 'new_user_not_in_host_list', name: 'New User (Not in Database)' },
       ],
-      type: FilterTypeValues.newType,
+      type: FilterTypeValues.userHostRelationship,
     };
 
     const pastEventsObj = {
@@ -5350,7 +5350,7 @@ export class AuthService {
       age: ageObj,
       interest: interestObj,
       category: categoryObj,
-      newType: newTypeObj,
+      userHostRelationship: userHostRelationshipObj,
       type: typeObj,
       list: listObj,
       pastEvents: pastEventsObj,
