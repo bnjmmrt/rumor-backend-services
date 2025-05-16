@@ -183,7 +183,7 @@ class TwilioService {
 
     try {
       const r = await client.notify.v1
-        .services('IS3c3104d01fea30539ce68ba74b3da48f')//TODO: move to env
+        .services('IS3c3104d01fea30539ce68ba74b3da48f') //TODO: move to env
         .notifications.create({
           toBinding: phoneNumbers,
           body: message,

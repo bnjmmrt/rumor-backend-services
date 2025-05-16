@@ -17,6 +17,7 @@ import {
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { PushNotificationPayload } from '../utils/firebase-notifications/firebase-notifications.interface';
 import TwilioService from '../utils/twilio/sms';
+import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 
 export class AdminNotificationService {
   private dbConnection = database;
@@ -145,12 +146,14 @@ export class AdminNotificationService {
 
       await TwilioService.sendBulkTextMessage(
         notification.message,
-        recipientsChunk.map(r =>
-          JSON.stringify({
-            binding_type: 'sms',
-            address: r.phone_number,
-          }),
-        ),
+        recipientsChunk
+          .filter(r => isValidPhoneNumber(r.phone_number))
+          .map(r =>
+            JSON.stringify({
+              binding_type: 'sms',
+              address: r.phone_number,
+            }),
+          ),
       );
     }
   }
