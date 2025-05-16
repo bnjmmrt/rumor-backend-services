@@ -849,8 +849,13 @@ export class SignupFormsServices {
       }
 
       let userHostRelationshipFilters = [];
-      if (parsedQuery.userHostRelationship && typeof parsedQuery.userHostRelationship === 'string') {
-        userHostRelationshipFilters = parsedQuery.userHostRelationship.split(',').map(type => type.trim());
+      if (
+        parsedQuery.userHostRelationship &&
+        typeof parsedQuery.userHostRelationship === 'string'
+      ) {
+        userHostRelationshipFilters = parsedQuery.userHostRelationship
+          .split(',')
+          .map(type => type.trim());
       }
 
       // Apply userHostRelationship filter
