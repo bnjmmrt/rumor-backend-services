@@ -92,7 +92,7 @@ export interface CreateAdminNotificationRequest {
   message: string;
   scheduledDate?: string;
   recipients: AdminNotificationRecipients[];
-  channel: NotificationDeliveryChannel[];
+  channels: NotificationDeliveryChannel[];
   deliveryType: NotificationDeliveryType;
 }
 

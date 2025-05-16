@@ -54,7 +54,7 @@ export class CreateAdminNotificationRequestDto implements CreateAdminNotificatio
 
   @IsNotEmpty()
   @IsEnum(NotificationDeliveryChannel, { each: true })
-  channel: NotificationDeliveryChannel[];
+  channels: NotificationDeliveryChannel[];
 
   @IsNotEmpty()
   @IsEnum(NotificationDeliveryType)

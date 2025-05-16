@@ -21,8 +21,8 @@ export class AdminNotification extends RumorBaseEntity {
   @Column('text', { array: true, name: 'recipients' })
   recipients: AdminNotificationRecipients[];
 
-  @Column('text', { array: true, name: 'channel' })
-  channel: NotificationDeliveryChannel[];
+  @Column('text', { array: true, name: 'channels' })
+  channels: NotificationDeliveryChannel[];
 
   @Column({ type: 'enum', enum: NotificationStatus, name: 'status' })
   status: NotificationStatus;

@@ -27,7 +27,7 @@ export class AdminNotificationService {
     adminNotification.title = payload.title;
     adminNotification.message = payload.message;
     adminNotification.recipients = payload.recipients;
-    adminNotification.channel = payload.channel;
+    adminNotification.channels = payload.channels;
     adminNotification.deliveryType = payload.deliveryType;
     adminNotification.status = NotificationStatus.CREATED;
 
@@ -69,11 +69,11 @@ export class AdminNotificationService {
     //MEMBERS => member, NON_MEMBERS => non_member, HOSTS => host
     const recipientList = adminNotification.recipients.map(r => r.toLowerCase().replace(/s$/, ''));
 
-    if (adminNotification.channel.includes(NotificationDeliveryChannel.PUSH)) {
+    if (adminNotification.channels.includes(NotificationDeliveryChannel.PUSH)) {
       this.sendPushNotification(adminNotification, recipientList);
     }
 
-    if (adminNotification.channel.includes(NotificationDeliveryChannel.SMS)) {
+    if (adminNotification.channels.includes(NotificationDeliveryChannel.SMS)) {
       this.sendSMSNotification(adminNotification, recipientList);
     }
 

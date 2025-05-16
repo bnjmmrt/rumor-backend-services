@@ -55,7 +55,7 @@ function toAdminNotification(notification: Partial<AdminNotification>): AdminNot
     title: notification.title,
     message: notification.message,
     recipients: notification.recipients,
-    channel: notification.channel,
+    channels: notification.channels,
     scheduledDate: notification.scheduledDate
       ? dayjs(notification.scheduledDate).format('MM/DD/YYYY HH:mm')
       : null,
