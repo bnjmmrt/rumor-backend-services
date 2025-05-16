@@ -1,4 +1,4 @@
-export enum AdminNotificationType {
+export enum NotificationDeliveryChannel {
   SMS = 'SMS',
   PUSH = 'PUSH',
 }
@@ -83,17 +83,18 @@ export interface Error {
 }
 
 export interface CreateAdminNotificationRequest {
-  isScheduled: boolean;
   title?: string;
   message: string;
   scheduledDate?: string;
   recipients: AdminNotificationRecipients[];
-  types: AdminNotificationType[];
+  channel: NotificationDeliveryChannel[];
 }
 
+/*
 export interface AdminNotificationResponse extends CreateAdminNotificationRequest {
   id: string;
-}
+  status: NotificationStatus;
+} */
 
 export interface CreateNotificationRequest {
   title: string;

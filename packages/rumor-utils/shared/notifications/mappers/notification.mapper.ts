@@ -1,7 +1,7 @@
 import * as dayjs from 'dayjs';
 import { AdminNotification } from '../entities/admin-notification.entity';
 import { Notification } from '../entities/notification.entity';
-import { AdminNotificationResponse } from '../grpc/notification/notification.pb';
+import { AdminNotificationResponse } from '../interfaces/notification.interface';
 interface NotificationResponse {
   id: string;
   title: string;
@@ -52,14 +52,14 @@ function toNotification(notification: Partial<Notification>): NotificationRespon
 function toAdminNotification(notification: Partial<AdminNotification>): AdminNotificationResponse {
   return {
     id: notification.id,
-    isScheduled: notification.isScheduled,
     title: notification.title,
     message: notification.message,
     recipients: notification.recipients,
-    types: notification.types,
+    channel: notification.channel,
     scheduledDate: notification.scheduledDate
       ? dayjs(notification.scheduledDate).format('MM/DD/YYYY HH:mm')
       : null,
+    status: notification.status,
   };
 }
 

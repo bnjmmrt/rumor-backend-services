@@ -1,5 +1,6 @@
 import { CreateAdminNotificationRequest } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
-import { AdminNotificationResponse } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+//import { AdminNotificationResponse } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { AdminNotificationResponse } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
 import { CreateResponse } from 'rumor-utils/success';
 import adminNotificationService from '../services/admin-notification.service';
 import asyncWrapper from '../server/helpers/asyncWrapper';

@@ -5,10 +5,11 @@ import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { AdminNotification } from 'rumor-utils/shared/notifications/entities/admin-notification.entity';
 import { toAdminNotification } from 'rumor-utils/shared/notifications/mappers/notification.mapper';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { NotificationDeliveryChannel } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import {
   AdminNotificationResponse,
-  AdminNotificationType,
-} from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+  NotificationStatus,
+} from 'rumor-utils/shared/notifications/interfaces/notification.interface';
 import { CreateAdminNotificationRequestDto } from 'rumor-utils/shared/notifications/dtos/notification.dto';
 import {
   SchedulerJobType,
@@ -26,10 +27,10 @@ export class AdminNotificationService {
     adminNotification.title = payload.title;
     adminNotification.message = payload.message;
     adminNotification.recipients = payload.recipients;
-    adminNotification.types = payload.types;
-    adminNotification.isScheduled = payload.isScheduled;
+    adminNotification.channel = payload.channel;
+    adminNotification.status = NotificationStatus.CREATED;
 
-    if (payload.isScheduled && payload.scheduledDate) {
+    if (payload.scheduledDate) {
       adminNotification.scheduledDate = new Date(payload.scheduledDate);
     }
 
@@ -55,31 +56,36 @@ export class AdminNotificationService {
   }
 
   public async sendAdminNotification(notificationId: string): Promise<void> {
-    const notification = await this.dbConnection.getRepository(AdminNotification).findOne({
+    const adminNotification = await this.dbConnection.getRepository(AdminNotification).findOne({
       where: { id: notificationId },
     });
 
-    if (!notification) {
+    if (!adminNotification) {
       console.log('Notification not found');
       return;
     }
 
     //MEMBERS => member, NON_MEMBERS => non_member, HOSTS => host
-    const recipientList = notification.recipients.map(r => r.toLowerCase().replace(/s$/, ''));
+    const recipientList = adminNotification.recipients.map(r => r.toLowerCase().replace(/s$/, ''));
 
-    if (notification.types.includes(AdminNotificationType.PUSH)) {
-      this.sendPushNotification(notification, recipientList);
+    if (adminNotification.channel.includes(NotificationDeliveryChannel.PUSH)) {
+      this.sendPushNotification(adminNotification, recipientList);
     }
 
-    if (notification.types.includes(AdminNotificationType.SMS)) {
-      this.sendSMSNotification(notification, recipientList);
+    if (adminNotification.channel.includes(NotificationDeliveryChannel.SMS)) {
+      this.sendSMSNotification(adminNotification, recipientList);
     }
+
+    adminNotification.status = NotificationStatus.SENT;
+    await this.dbConnection.getRepository(AdminNotification).save(adminNotification);
   }
 
   private async sendPushNotification(
     notification: AdminNotification,
     recipientList: string[],
   ): Promise<void> {
+    const CHUNK_SIZE = 200;
+
     const recipients = await this.dbConnection
       .getRepository(User)
       .createQueryBuilder('user')
@@ -91,22 +97,23 @@ export class AdminNotificationService {
       .where('pushToken.notificationToken IS NOT NULL')
       .getRawMany();
 
-    const payload = {
-      tokens: recipients.map(r => r.notification_token),
-      body: notification.message,
-      title: notification.title || 'Rumor',
-      image: 'https://host.therumor.com/images/app/rumor_icon.svg',
-      data: {
-        notificationId: notification.id,
-        notificationType: NotificationType.MANUAL_ADMIN_NOTIFICATION,
-        notificationModule: 'admin',
-      },
-    } as PushNotificationPayload;
+    for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+      const recipientChunk = recipients.slice(i, i + CHUNK_SIZE);
 
-    await firebaseNotificationsService.sendPushNotification(payload);
+      const payload = {
+        tokens: recipientChunk.map(r => r.notification_token),
+        body: notification.message,
+        title: notification.title || 'Rumor',
+        image: 'https://host.therumor.com/images/app/rumor_icon.svg',
+        data: {
+          notificationId: notification.id,
+          notificationType: NotificationType.MANUAL_ADMIN_NOTIFICATION,
+          notificationModule: 'admin',
+        },
+      } as PushNotificationPayload;
 
-    console.log('NotificationService sendPushNotification() => payload: ', payload);
-    console.log(recipients);
+      await firebaseNotificationsService.sendPushNotification(payload);
+    }
   }
 
   private async sendSMSNotification(
