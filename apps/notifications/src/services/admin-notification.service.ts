@@ -16,6 +16,7 @@ import {
   SchedulerTriggerPayload,
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { PushNotificationPayload } from '../utils/firebase-notifications/firebase-notifications.interface';
+import TwilioService from '../utils/twilio/sms';
 
 export class AdminNotificationService {
   private dbConnection = database;
@@ -93,16 +94,16 @@ export class AdminNotificationService {
       .leftJoin('user.roles', 'userRole')
       .leftJoin('userRole.role', 'role')
       .leftJoin('user.pushNotificationToken', 'pushToken')
-      .select('user.id, user.phoneNumber, user.email, role.name, pushToken.notificationToken')
+      .select('user.id, role.name, pushToken.notificationToken')
       .where('role.name IN (:...recipientList)', { recipientList })
-      .where('pushToken.notificationToken IS NOT NULL')
+      .andWhere('pushToken.notificationToken IS NOT NULL')
       .getRawMany();
 
     for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
-      const recipientChunk = recipients.slice(i, i + CHUNK_SIZE);
+      const recipientsChunk = recipients.slice(i, i + CHUNK_SIZE);
 
       const payload = {
-        tokens: recipientChunk.map(r => r.notification_token),
+        tokens: recipientsChunk.map(r => r.notification_token),
         body: notification.message,
         title: notification.title || 'Rumor',
         image: 'https://host.therumor.com/images/app/rumor_icon.svg',
@@ -121,19 +122,37 @@ export class AdminNotificationService {
     notification: AdminNotification,
     recipientList: string[],
   ): Promise<void> {
+    const CHUNK_SIZE = 1000;
+
     const recipients = await this.dbConnection
       .getRepository(User)
       .createQueryBuilder('user')
       .leftJoin('user.roles', 'userRole')
       .leftJoin('userRole.role', 'role')
-      .leftJoin('user.pushNotificationToken', 'pushToken')
+      .select('user.id, user.phoneNumber, role.name')
       .where('role.name IN (:...recipientList)', { recipientList })
-      .select('user.id, user.phoneNumber, user.email, role.name, pushToken.notificationToken')
-      .limit(10)
+      .andWhere('user.phoneNumber IS NOT NULL')
+      .andWhere(
+        `user.phoneNumber NOT IN (
+          SELECT phone_number FROM sms_recipients 
+          WHERE has_received_compliance_message = true AND replied_stop = true
+        )`,
+      )
       .getRawMany();
 
-    console.log('NotificationService sendSMSNotification() => MSG: ', notification.message);
-    console.log(recipients);
+    for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+      const recipientsChunk = recipients.slice(i, i + CHUNK_SIZE);
+
+      await TwilioService.sendBulkTextMessage(
+        notification.message,
+        recipientsChunk.map(r =>
+          JSON.stringify({
+            binding_type: 'sms',
+            address: r.phone_number,
+          }),
+        ),
+      );
+    }
   }
 }
 

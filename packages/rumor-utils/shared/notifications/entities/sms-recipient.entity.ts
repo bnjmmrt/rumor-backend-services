@@ -11,4 +11,7 @@ export class SmsRecipient extends RumorBaseEntity {
 
   @Column({ type: 'timestamp', name: 'last_message_sent_at', nullable: true })
   lastMessageSentAt?: Date;
+
+  @Column({ type: 'boolean', name: 'replied_stop', default: false })
+  repliedStop: boolean;
 }
