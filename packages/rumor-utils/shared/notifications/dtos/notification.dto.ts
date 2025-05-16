@@ -20,6 +20,7 @@ import {
   AdminNotificationRecipients,
   NotificationDeliveryChannel,
   CreateAdminNotificationRequest,
+  NotificationDeliveryType,
 } from '../grpc/notification/notification.pb';
 
 export class RequestByIdDto implements RequestById {
@@ -54,6 +55,10 @@ export class CreateAdminNotificationRequestDto implements CreateAdminNotificatio
   @IsNotEmpty()
   @IsEnum(NotificationDeliveryChannel, { each: true })
   channel: NotificationDeliveryChannel[];
+
+  @IsNotEmpty()
+  @IsEnum(NotificationDeliveryType)
+  deliveryType: NotificationDeliveryType;
 }
 
 export class CreateNotificationRequestDto implements CreateNotificationRequest {

@@ -60,6 +60,7 @@ function toAdminNotification(notification: Partial<AdminNotification>): AdminNot
       ? dayjs(notification.scheduledDate).format('MM/DD/YYYY HH:mm')
       : null,
     status: notification.status,
+    deliveryType: notification.deliveryType,
   };
 }
 

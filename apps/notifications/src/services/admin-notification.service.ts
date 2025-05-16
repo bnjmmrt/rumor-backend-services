@@ -28,6 +28,7 @@ export class AdminNotificationService {
     adminNotification.message = payload.message;
     adminNotification.recipients = payload.recipients;
     adminNotification.channel = payload.channel;
+    adminNotification.deliveryType = payload.deliveryType;
     adminNotification.status = NotificationStatus.CREATED;
 
     if (payload.scheduledDate) {
