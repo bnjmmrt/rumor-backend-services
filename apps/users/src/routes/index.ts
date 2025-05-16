@@ -22,6 +22,11 @@ const router: Router = express.Router();
 
 // Admin routes
 router.get('/auth/admin/members', AuthMiddleware.fusionAuthRequired, AdminController.getMembers);
+router.get(
+  '/auth/admin/membersCSV',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getMembersCSV,
+);
 router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
 router.post('/auth/admin/login', AdminController.adminLogin);
 router.post('/auth/admin/create', AdminController.createAdmin);
