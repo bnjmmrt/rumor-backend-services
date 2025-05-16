@@ -4339,7 +4339,7 @@ export class AuthService {
   }
 
   public static async send2FACode(payload: { email: string }): Promise<string> {
-    const user = await this.dbConnection.getRepository(User).findOne({
+    const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
         roles: {
@@ -4368,14 +4368,17 @@ export class AuthService {
       );
     }
 
-    // Generate random 5 digit code
-    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    // Generate random 4 digit code
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
 
     // Save code and expiration date (5 minutes from now)
     user.twoFactorCode = code;
     user.twoFactorCodeDate = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
     await this.dbConnection.getRepository(User).save(user);
 
+    console.info(' ************* 2FA CODE *************');
+    console.info(' **********  [', code, '] ***********');
+    console.info(' ************* 2FA CODE *************');
     // Send email with code
     try {
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -4385,7 +4388,7 @@ export class AuthService {
             value: code,
           },
         ],
-        'Super Admin - 2FA Code',
+        'Rumor Admin: Rumor 2FA Code',
         [user.email.trim().toLowerCase()],
         null,
       );
