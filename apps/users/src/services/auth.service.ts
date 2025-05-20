@@ -4430,7 +4430,7 @@ export class AuthService {
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
-        'We couldnt sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
       );
     }
 
@@ -4460,7 +4460,7 @@ export class AuthService {
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
       throw new ForbiddenError(
-        'We couldnt sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
       );
     }
 
