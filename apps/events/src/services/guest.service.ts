@@ -3633,6 +3633,7 @@ export class GuestService {
     const userMap = new Map<string, string>();
     const removedEmails = new Set<string>();
     const newMappings = [];
+    const arrForInviteGuest = []; //for existing users who is already part of host crm
     let updatedValidData: CsvRecord[] = [];
     if (existingUsers.length > 0) {
       existingUsers.forEach(user => {
@@ -3696,14 +3697,20 @@ export class GuestService {
 
             if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
               if (mappingSet.has(existingUserData.id)) {
-                const user = {
+                // Create a empty array of user if
+                let user: any = {
                   firstName: row.firstName,
                   lastName: row.lastName,
                   email: row.email || '',
                   phoneNumber: row.phoneNumber || '',
                   reason: 'User already exists in users list',
                 };
-                garbageData.push(user);
+                if (!payload.isUploadUser) {
+                  user = { ...user, id: existingUserData.id };
+                  arrForInviteGuest.push(user);
+                } else {
+                  garbageData.push(user); //instaed of if uploading for guest add logic to upload guest
+                }
                 if (row.email) userMap.delete(row.email);
                 if (row.phoneNumber) userMap.delete(row.phoneNumber);
                 return null;
@@ -3805,6 +3812,13 @@ export class GuestService {
         .getRepository(User)
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
+    if (arrForInviteGuest.length) {
+      arrForInviteGuest.map(async user => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     if (newMappings.length !== 0) {
       const createdMappings = await this.dbConnection
@@ -3820,7 +3834,7 @@ export class GuestService {
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length + newMappings.length,
+      SuccessUserCount: users.length + newMappings.length + arrForInviteGuest.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
