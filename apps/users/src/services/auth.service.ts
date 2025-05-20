@@ -6830,7 +6830,7 @@ export class AuthService {
         relations: { roles: { role: true }, notifications: true },
       });
       if (!user) throw new NotFoundError('User');
-      const isHost = user.roles?.some(role => role.role.name === 'host');
+      const isHost = user.roles && user.roles.some(role => role.role && role.role.name === 'host');
       if (!isHost) throw new NotFoundError('Host');
 
       try {
