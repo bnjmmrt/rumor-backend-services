@@ -4364,7 +4364,7 @@ export class AuthService {
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
-        "We couldnt send the code. Either your email is incorrect or you don't have admin permissions.",
+        "We could not send the code. Either your email is incorrect or you don't have admin permissions.",
       );
     }
 
