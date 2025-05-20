@@ -722,6 +722,16 @@ export class SeedDatabase {
         ],
       },
       {
+        templateName: 'Rumor Admin: Rumor 2FA Code',
+        templateSendgridId: 'd-e0f6ba98f8af450a88a5a82323f80f41',
+        params: [
+          {
+            key: 'code',
+            mandatory: true,
+          },
+        ],
+      },
+      {
         templateName: 'Member + Non-Member:  Added to Confirmed',
         templateSendgridId: 'd-edbebf00cfab486d9ca0fa2e86ba9c03',
         params: [
