@@ -1873,7 +1873,8 @@ export class AuthService {
     if (payload.email) {
       payload.email = payload.email.trim().toLowerCase();
     }
-    const user = await this.dbConnection.getRepository(User).findOne({
+    console.log("start hostLogin")
+    const user = await User.findOne({
       where: {
         email: payload.email,
         deletedAt: IsNull(),
@@ -1887,27 +1888,41 @@ export class AuthService {
         roles: { role: true },
       },
     });
+
+    console.log('fetched user')
     if (!user) {
       throw new NotFoundError('Host');
     }
 
     let authenticatedUser = null;
     const request: LoginRequest = {
-      loginId: user.email,
+      loginId: payload.email,
       password: payload.password,
     };
+
     try {
+      console.log('fusion auth started')
+
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
+
+      console.log('fusion auth completed')
     } catch (e) {
+      console.log(":rocket: ~ AuthService ~ hostLogin ~ e:", e)
+      console.log('fusion auth error')
+
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );
     }
+    console.log(":rocket: ~ AuthService ~ hostLogin ~ authenticatedUser:", authenticatedUser)
     if (!authenticatedUser) {
+      console.log('authenticatedUser error')
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );
     }
+    console.log('fusion auth Logged In successful');
+
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
@@ -4294,7 +4309,7 @@ export class AuthService {
             .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', {
               searchValue: `%${parsedQuery.searchValue}%`,
             })
-            .orWhere('user.additional_host_information->>\'companyName\' ILIKE :searchValue', {
+            .orWhere("user.additional_host_information->>'companyName' ILIKE :searchValue", {
               searchValue: `%${parsedQuery.searchValue}%`,
             });
         }),
@@ -4982,6 +4997,29 @@ export class AuthService {
       .andWhere('referral.isApproved = true')
       .getRawMany();
 
+    const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+      where: [
+        {
+          email: user.email,
+        },
+        {
+          phoneNumber: user.phoneNumber,
+        },
+      ],
+      relations: {
+        inviteeUser: true,
+      },
+    });
+
+    const references: IReferenceCode = {
+      code: referenceCode?.referralCode || '---',
+      name:
+        (referenceCode?.inviteeUser?.firstName || '---') +
+        '  ' +
+        (referenceCode?.inviteeUser?.lastName || '---'),
+      email: referenceCode?.inviteeUser?.email || '---',
+    };
+
     return responses.data(
       toMemberProfile(
         user,
@@ -4997,6 +5035,7 @@ export class AuthService {
         guestEvents?.invited,
         guestEvents?.requested,
         referredByMembers,
+        references,
       ),
     );
   }
@@ -6315,16 +6354,16 @@ export class AuthService {
     const guestRepo = this.dbConnection.getRepository(Guest);
     const ticketRepo = this.dbConnection.getRepository(Ticket);
     const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
-  
+
     // 1. Get all events where the lead guest is involved.
     const leadGuestEntries = await guestRepo.find({
       where: { user: { id: userId } },
       relations: ['event'],
     });
-  
+
     const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
     if (eventIds.length === 0) return;
-  
+
     // 2. Get plus-ones added by the lead guest for those events.
     const plusOneGuests = await guestRepo.find({
       where: {
@@ -6333,11 +6372,11 @@ export class AuthService {
       },
       relations: ['user', 'event'],
     });
-  
+
     const plusOneUserIds = plusOneGuests
       .map(g => g.user?.id)
       .filter((id): id is string => Boolean(id));
-  
+
     // 3. Delete Tickets
     await ticketRepo
       .createQueryBuilder()
@@ -6348,7 +6387,7 @@ export class AuthService {
           if (plusOneUserIds.length > 0) {
             qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
           }
-        })
+        }),
       )
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({
@@ -6357,7 +6396,7 @@ export class AuthService {
         eventIds,
       })
       .execute();
-  
+
     // 4. Delete Guest entries (first lead, then plus-ones)
     await guestRepo
       .createQueryBuilder()
@@ -6366,7 +6405,7 @@ export class AuthService {
       .andWhere('event_id IN (:...eventIds)', { eventIds })
       .setParameters({ userId, eventIds })
       .execute();
-  
+
     if (plusOneUserIds.length > 0) {
       await guestRepo
         .createQueryBuilder()
@@ -6381,7 +6420,7 @@ export class AuthService {
         })
         .execute();
     }
-  
+
     // 5. Delete Signup Form Submissions (after guests are deleted)
     await signupFormRepo
       .createQueryBuilder()
@@ -6392,13 +6431,13 @@ export class AuthService {
           if (plusOneUserIds.length > 0) {
             qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
           }
-        })
+        }),
       )
       .andWhere(
         `signup_form_id IN (
           SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
         )`,
-        { eventIds }
+        { eventIds },
       )
       .setParameters({
         userId,
@@ -6407,7 +6446,6 @@ export class AuthService {
       })
       .execute();
   }
-  
 
   public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
     const user = await this.dbConnection

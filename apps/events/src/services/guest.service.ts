@@ -686,7 +686,7 @@ export class GuestService {
               imageFlyer: event.imageFlyer,
               location: event.location.location,
               city: event.location.city,
-              hostName: host.firstName,
+              hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
@@ -954,7 +954,7 @@ export class GuestService {
                 imageFlyer: event.imageFlyer,
                 location: event.location.location,
                 city: event.location.city,
-                hostName: event.owner.firstName,
+                hostName: event.owner?.additionalHostInformation?.companyName ?? 'Host',
                 emailsData: {
                   eventId: data.eventId,
                   id: data.id,
@@ -993,7 +993,7 @@ export class GuestService {
                 imageFlyer: event.imageFlyer,
                 location: event.location.location,
                 city: event.location.city,
-                hostName: event.owner.firstName,
+                hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
                 emailsData: {
                   eventId: data.eventId,
                   id: data.id,
@@ -3386,7 +3386,7 @@ export class GuestService {
         imageFlyer: event.imageFlyer,
         location: event.location.location,
         city: event.location.city,
-        hostName: event.owner.firstName,
+        hostName: event.owner?.additionalHostInformation.companyName ?? event.owner.firstName,
       };
       const addOnMailPayload = {
         email: payload.email,
@@ -3567,7 +3567,7 @@ export class GuestService {
             imageFlyer: event.imageFlyer,
             location: event.location.location,
             city: event.location.city,
-            hostName: event.owner.firstName,
+            hostName: event.owner?.additionalHostInformation.companyName ?? event.owner.firstName,
           };
           const addOnMailPayload = {
             email: guest.user.email,

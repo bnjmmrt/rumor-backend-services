@@ -586,6 +586,7 @@ export interface MemberProfile {
   eventCount: number;
   sources?: string[] | undefined;
   isHost?: boolean | undefined;
+  references?: IReferenceCode;
 }
 
 export interface FocusProto {
