@@ -31,6 +31,7 @@ import {
   TicketType,
   User,
   UserAttendeeStats,
+  Ticket,
 } from 'rumor-utils/shared/events/entities';
 import {
   EventLocationInterface,
@@ -1263,9 +1264,9 @@ export class GuestService {
       .leftJoinAndSelect('guest.declinedBy', 'declinedBy')
       .leftJoinAndSelect('guest.ticketType', 'ticketType')
       .where({ event: { id: event.id } });
-      
-      //filtering out deactivated users
-      queryBuilder.andWhere('user.isDeactivated = false');
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = false');
 
     //filtering out deactivated users
     queryBuilder.andWhere('user.isDeactivated = false');
@@ -3150,7 +3151,34 @@ export class GuestService {
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
     guest.checkIn = false;
-    await this.dbConnection.getRepository(Guest).save(guest);
+
+    // Find and decline all plus-one guests added by the lead guest
+    const plusOnes = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        event: { id: payload.eventId },
+        addedBy: { id: payload.userId },
+      },
+    });
+
+    for (const plusOne of plusOnes) {
+      plusOne.status = GuestStatus.DECLINED;
+      plusOne.rejectedReason = 'Lead guest declined the invitation';
+      plusOne.declinedBy = { id: payload.userId } as User;
+      plusOne.checkIn = false;
+    }
+
+    // Collect all guest IDs (lead + plus ones)
+    const guestIdsToRemoveTickets = [guest.id, ...plusOnes.map(g => g.id)];
+
+    // Delete associated tickets
+    if (guestIdsToRemoveTickets.length > 0) {
+      await this.dbConnection.getRepository(Ticket).delete({
+        guest: { id: In(guestIdsToRemoveTickets) },
+      });
+    }
+
+    // Save all updated guests
+    await this.dbConnection.getRepository(Guest).save([guest, ...plusOnes]);
     return '';
   }
 
@@ -3633,6 +3661,7 @@ export class GuestService {
     const userMap = new Map<string, string>();
     const removedEmails = new Set<string>();
     const newMappings = [];
+    const arrForInviteGuest = []; //for existing users who is already part of host crm
     let updatedValidData: CsvRecord[] = [];
     if (existingUsers.length > 0) {
       existingUsers.forEach(user => {
@@ -3696,14 +3725,20 @@ export class GuestService {
 
             if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
               if (mappingSet.has(existingUserData.id)) {
-                const user = {
+                // Create a empty array of user if
+                let user: any = {
                   firstName: row.firstName,
                   lastName: row.lastName,
                   email: row.email || '',
                   phoneNumber: row.phoneNumber || '',
                   reason: 'User already exists in users list',
                 };
-                garbageData.push(user);
+                if (!payload.isUploadUser) {
+                  user = { ...user, id: existingUserData.id };
+                  arrForInviteGuest.push(user);
+                } else {
+                  garbageData.push(user); //instaed of if uploading for guest add logic to upload guest
+                }
                 if (row.email) userMap.delete(row.email);
                 if (row.phoneNumber) userMap.delete(row.phoneNumber);
                 return null;
@@ -3805,6 +3840,13 @@ export class GuestService {
         .getRepository(User)
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
+    if (arrForInviteGuest.length) {
+      arrForInviteGuest.map(async user => {
+        await this.dbConnection
+          .getRepository(User)
+          .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
+      });
+    }
 
     if (newMappings.length !== 0) {
       const createdMappings = await this.dbConnection
@@ -3820,7 +3862,7 @@ export class GuestService {
     // Step 9: Return the response with success and failure counts
     return {
       message: 'Bulk user creation completed.',
-      SuccessUserCount: users.length + newMappings.length,
+      SuccessUserCount: users.length + newMappings.length + arrForInviteGuest.length,
       failedUserCount: garbageData.length,
       hostId: payload.hostId,
       users,
