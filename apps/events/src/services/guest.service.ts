@@ -3697,7 +3697,7 @@ export class GuestService {
 
             if (existingUserData && (userMap.has(row.email) || userMap.has(row.phoneNumber))) {
               if (mappingSet.has(existingUserData.id)) {
-                // Create a empty array of user if 
+                // Create a empty array of user if
                 let user: any = {
                   firstName: row.firstName,
                   lastName: row.lastName,
@@ -3705,8 +3705,8 @@ export class GuestService {
                   phoneNumber: row.phoneNumber || '',
                   reason: 'User already exists in users list',
                 };
-                if(!payload.isUploadUser) {
-                  user = { ...user, id: existingUserData.id }
+                if (!payload.isUploadUser) {
+                  user = { ...user, id: existingUserData.id };
                   arrForInviteGuest.push(user);
                 } else {
                   garbageData.push(user); //instaed of if uploading for guest add logic to upload guest
@@ -3812,7 +3812,7 @@ export class GuestService {
         .getRepository(User)
         .update({ id: user.id }, { uploadedViaCsv: { id: csvUploadRecord.id } });
     });
-    if(arrForInviteGuest.length) {
+    if (arrForInviteGuest.length) {
       arrForInviteGuest.map(async user => {
         await this.dbConnection
           .getRepository(User)
