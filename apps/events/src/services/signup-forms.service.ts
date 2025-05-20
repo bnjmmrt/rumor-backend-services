@@ -170,6 +170,8 @@ export class SignupFormsServices {
         where: { id: eventId },
         relations: { owner: true },
       });
+
+      console.log('body', body);
       if (!event) {
         throw new NotFoundError('Event');
       }
@@ -206,6 +208,8 @@ export class SignupFormsServices {
 
         questionList.push(question);
       }
+
+      console.log('questionList', questionList);
       const savedQuestions = SignupFormQuestions.create(questionList);
       await SignupFormQuestions.insert(savedQuestions);
       signupForm.questionIds = savedQuestions.map(q => q.id);
@@ -310,6 +314,7 @@ export class SignupFormsServices {
         question.value = q.value;
         question.hasToggle = q.hasToggle || false;
         question.isToggled = q.isToggled || false;
+        question.isRequired = q.isRequired;
         const updatesQuestion = SignupFormQuestions.update(q.id, question);
         questionPromises.push(updatesQuestion);
       }
@@ -843,6 +848,75 @@ export class SignupFormsServices {
         });
       }
 
+      let userHostRelationshipFilters = [];
+      if (
+        parsedQuery.userHostRelationship &&
+        typeof parsedQuery.userHostRelationship === 'string'
+      ) {
+        userHostRelationshipFilters = parsedQuery.userHostRelationship
+          .split(',')
+          .map(type => type.trim());
+      }
+
+      // Apply userHostRelationship filter
+      if (userHostRelationshipFilters.length) {
+        if (userHostRelationshipFilters.includes('existing_user_in_host_list')) {
+          // Get users who have more than 1 event with this host
+          getCountQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) > 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+
+          submissionsQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) > 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+        } else if (userHostRelationshipFilters.includes('new_user_not_in_host_list')) {
+          // Get users who have 0 or 1 event with this host
+          getCountQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) <= 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+
+          submissionsQuery.andWhere(qb => {
+            const subQuery = qb
+              .subQuery()
+              .select('g.user_id')
+              .from(Guest, 'g')
+              .innerJoin('g.event', 'e')
+              .where('e.owner_id = :hostId', { hostId })
+              .groupBy('g.user_id')
+              .having('COUNT(DISTINCT e.id) <= 1')
+              .getQuery();
+            return 'atd.id IN ' + subQuery;
+          });
+        }
+      }
+
       // Apply list filters (favorites, followed, custom lists) - similar to getAllUsers
       if (favorite || followed || customListNames.length > 0) {
         getCountQuery.andWhere(
@@ -981,11 +1055,11 @@ export class SignupFormsServices {
           );
         } else {
           // Default sort if not a recognized standard field
-          submissionsQuery.addOrderBy('sfs.id', 'DESC');
+          submissionsQuery.addOrderBy('sfs.created_at', 'DESC');
         }
       } else {
         // Default sort if no sort field or custom field (we'll handle custom sorting after)
-        submissionsQuery.addOrderBy('sfs.id', 'DESC');
+        submissionsQuery.addOrderBy('sfs.created_at', 'DESC');
       }
 
       // Execute queries
@@ -1063,9 +1137,6 @@ export class SignupFormsServices {
       if (skip !== undefined && take !== undefined) {
         paginatedResults = processed.slice(skip, skip + take);
       }
-
-      console.log('Filter params received:', parsedQuery); // Debug log
-      console.log('Total count after filtering:', count); // Debug log
 
       const result = { count, result: paginatedResults };
       return result;

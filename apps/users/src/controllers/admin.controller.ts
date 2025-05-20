@@ -45,9 +45,23 @@ export class AdminController {
     res.status(getResponse.statusCode).json(getResponse);
   });
 
+  public static send2FACode = asyncWrapper(async (req, res): Promise<void> => {
+    const payload = req.body;
+    const response = await AuthService.send2FACode(payload);
+    const getResponse = new GetResponse(response);
+    res.status(getResponse.statusCode).json(getResponse);
+  });
+
   public static adminLogin = asyncWrapper(async (req, res): Promise<void> => {
     const payload: LoginRequestDto = req.body;
     const response: TokenResponseAndRoles = await AuthService.adminLogin(payload);
+    const getResponse = new GetResponse(response);
+    res.status(getResponse.statusCode).json(getResponse);
+  });
+
+  public static adminLoginPreview = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: LoginRequestDto = req.body;
+    const response: TokenResponseAndRoles = await AuthService.adminLoginPreview(payload);
     const getResponse = new GetResponse(response);
     res.status(getResponse.statusCode).json(getResponse);
   });
