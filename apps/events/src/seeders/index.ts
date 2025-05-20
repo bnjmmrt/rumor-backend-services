@@ -159,10 +159,12 @@ export class Seeders {
       {
         name: 'Gender',
         type: QuestionValueType.STRING,
-        is_default: true,
-        is_active: true,
-        is_required: false,
+        isDefault: true,
+        isActive: true,
+        isRequired: false,
         key: 'gender',
+        hasToggle: true,
+        isToggled: true,
       },
     ];
 
