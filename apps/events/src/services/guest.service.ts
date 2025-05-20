@@ -31,6 +31,7 @@ import {
   TicketType,
   User,
   UserAttendeeStats,
+  Ticket,
 } from 'rumor-utils/shared/events/entities';
 import {
   EventLocationInterface,
@@ -3150,7 +3151,34 @@ export class GuestService {
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
     guest.checkIn = false;
-    await this.dbConnection.getRepository(Guest).save(guest);
+
+    // Find and decline all plus-one guests added by the lead guest
+    const plusOnes = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        event: { id: payload.eventId },
+        addedBy: { id: payload.userId },
+      },
+    });
+
+    for (const plusOne of plusOnes) {
+      plusOne.status = GuestStatus.DECLINED;
+      plusOne.rejectedReason = 'Lead guest declined the invitation';
+      plusOne.declinedBy = { id: payload.userId } as User;
+      plusOne.checkIn = false;
+    }
+
+    // Collect all guest IDs (lead + plus ones)
+    const guestIdsToRemoveTickets = [guest.id, ...plusOnes.map(g => g.id)];
+
+    // Delete associated tickets
+    if (guestIdsToRemoveTickets.length > 0) {
+      await this.dbConnection.getRepository(Ticket).delete({
+        guest: { id: In(guestIdsToRemoveTickets) },
+      });
+    }
+
+    // Save all updated guests
+    await this.dbConnection.getRepository(Guest).save([guest, ...plusOnes]);
     return '';
   }
 
