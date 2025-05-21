@@ -49,13 +49,26 @@ export class Seeders {
       { name: 'Tech', description: 'Is a Tech type', enabled: true },
     ];
 
+    const repository = this.dbConnection.getRepository(EventTypes);
+
     for (const eventTypeData of eventTypesData) {
-      let eventType = await this.dbConnection
-        .getRepository(EventTypes)
-        .findOne({ where: { name: eventTypeData.name } });
+      let eventType = await repository.findOne({ where: { name: eventTypeData.name } });
       if (!eventType) {
-        eventType = this.dbConnection.getRepository(EventTypes).create(eventTypeData);
-        await this.dbConnection.getRepository(EventTypes).save(eventType);
+        eventType = repository.create(eventTypeData);
+        await repository.save(eventType);
+      } else {
+        let hasChanges = false;
+        for (const [key, value] of Object.entries(eventTypeData)) {
+          if (eventType[key] !== value) {
+            hasChanges = true;
+            break;
+          }
+        }
+
+        if (hasChanges) {
+          Object.assign(eventType, eventTypeData);
+          await repository.save(eventType);
+        }
       }
     }
   }
@@ -147,10 +160,10 @@ export class Seeders {
         isToggled: true,
       },
       {
-        name: 'Instagram',
+        name: 'What is your Instagram handle?',
         type: QuestionValueType.STRING,
         isDefault: true,
-        isActive: false,
+        isActive: true,
         isRequired: true,
         key: 'instagram',
         hasToggle: true,
@@ -168,13 +181,27 @@ export class Seeders {
       },
     ];
 
+    const repository = this.dbConnection.getRepository(SignupFormStaticQuestions);
+
     for (const questionData of questionsData) {
-      let question = await this.dbConnection
-        .getRepository(SignupFormStaticQuestions)
-        .findOne({ where: { key: questionData.key } });
+      let question = await repository.findOne({ where: { key: questionData.key } });
+
       if (!question) {
-        question = this.dbConnection.getRepository(SignupFormStaticQuestions).create(questionData);
-        await this.dbConnection.getRepository(SignupFormStaticQuestions).save(question);
+        question = repository.create(questionData);
+        await repository.save(question);
+      } else {
+        let hasChanges = false;
+        for (const [key, value] of Object.entries(questionData)) {
+          if (question[key] !== value) {
+            hasChanges = true;
+            break;
+          }
+        }
+
+        if (hasChanges) {
+          Object.assign(question, questionData);
+          await repository.save(question);
+        }
       }
     }
   }
