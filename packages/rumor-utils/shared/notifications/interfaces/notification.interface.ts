@@ -21,6 +21,7 @@ export enum AdminNotificationRecipients {
 export interface AdminNotificationResponse extends CreateAdminNotificationRequest {
   id: string;
   status: NotificationStatus;
+  sentDate?: string;
 }
 
 export enum NotificationType {}

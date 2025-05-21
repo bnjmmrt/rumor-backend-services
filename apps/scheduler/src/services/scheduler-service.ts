@@ -5,6 +5,7 @@ import * as schedule from 'node-schedule';
 import * as dayjs from 'dayjs';
 import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { NotificationStatus } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { IsNull, Not } from 'typeorm';
 
@@ -92,6 +93,11 @@ export class SchedulerService {
           if (!adminNotification) return; // Stop execution if the notification was deleted
 
           serviceMesh.notificationService().sendAdminNotification(adminNotification.id);
+
+          if(payload.scheduledDate) {
+            adminNotification.status = NotificationStatus.SCHEDULED
+            await adminNotification.save();
+          }
         }
         this.removeScheduledJob(jobKey);
       });

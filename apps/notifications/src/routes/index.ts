@@ -88,6 +88,16 @@ router.post(
   AuthMiddleware.fusionAuthRequired,
   AdminNotificationController.createAdminNotification,
 );
+router.get(
+  '/admin-notifications',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.getAllAdminNotifications,
+);
+router.get(
+  '/admin-notifications/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.getAdminNotification,
+);
 //Interservice call
 router.post(
   '/admin-notifications/:notificationId/send',

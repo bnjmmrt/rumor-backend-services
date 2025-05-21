@@ -31,10 +31,12 @@ export class AdminNotificationService {
     adminNotification.recipients = payload.recipients;
     adminNotification.channels = payload.channels;
     adminNotification.deliveryType = payload.deliveryType;
-    adminNotification.status = NotificationStatus.CREATED;
 
     if (payload.scheduledDate) {
       adminNotification.scheduledDate = new Date(payload.scheduledDate);
+      adminNotification.status = NotificationStatus.SCHEDULED;
+    } else {
+      adminNotification.status = NotificationStatus.CREATED;
     }
 
     const notification = await this.dbConnection
@@ -156,6 +158,26 @@ export class AdminNotificationService {
           ),
       );
     }
+  }
+
+  public async getAllAdminNotifications(): Promise<AdminNotificationResponse[]> {
+    const notifications = await this.dbConnection.getRepository(AdminNotification).find({
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    return notifications.map(notification => toAdminNotification(notification));
+  }
+
+  public async getAdminNotification(notificationId: string): Promise<AdminNotificationResponse> {
+    const notification = await this.dbConnection.getRepository(AdminNotification).findOne({
+      where: {
+        id: notificationId,
+      },
+    });
+
+    return toAdminNotification(notification);
   }
 }
 
