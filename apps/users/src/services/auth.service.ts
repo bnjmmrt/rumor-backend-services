@@ -1897,11 +1897,11 @@ export class AuthService {
     if (payload.email) {
       payload.email = payload.email.trim().toLowerCase();
     }
-    console.log("start hostLogin")
+    console.log('start hostLogin');
     const user = await User.findOne({
       where: {
         email: payload.email,
-        deletedAt: IsNull(),
+        deletedAt: IsNull() as any,
         roles: {
           role: {
             name: RoleType.Host,
@@ -1913,7 +1913,7 @@ export class AuthService {
       },
     });
 
-    console.log('fetched user')
+    console.log('fetched user');
     if (!user) {
       throw new NotFoundError('Host');
     }
@@ -1925,22 +1925,22 @@ export class AuthService {
     };
 
     try {
-      console.log('fusion auth started')
+      console.log('fusion auth started');
 
       authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
 
-      console.log('fusion auth completed')
+      console.log('fusion auth completed');
     } catch (e) {
-      console.log(":rocket: ~ AuthService ~ hostLogin ~ e:", e)
-      console.log('fusion auth error')
+      console.log(':rocket: ~ AuthService ~ hostLogin ~ e:', e);
+      console.log('fusion auth error');
 
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );
     }
-    console.log(":rocket: ~ AuthService ~ hostLogin ~ authenticatedUser:", authenticatedUser)
+    console.log(':rocket: ~ AuthService ~ hostLogin ~ authenticatedUser:', authenticatedUser);
     if (!authenticatedUser) {
-      console.log('authenticatedUser error')
+      console.log('authenticatedUser error');
       throw new BadRequestError(
         `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
       );

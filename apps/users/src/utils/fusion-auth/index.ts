@@ -27,7 +27,7 @@ class AuthMiddleware {
 
       const response = await this.validate({ token, requester });
 
-      console.log(`Response Validated${response?.userId}`)
+      console.log(`Response Validated${response?.userId}`);
       if (!response || !response.userId) {
         console.log(`Response Validation Failed`);
         res.status(401).send('Unauthorized');
