@@ -10,13 +10,8 @@
     "users": "nodemon apps/users/src/index.ts",
     "notifications": "nodemon apps/notifications/src/index.ts",
     "scheduler": "nodemon apps/scheduler/src/index.ts",
-    "format": "prettier --write \"./apps/**/*.ts\" \"./packages/**/*.ts\"",
+    "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "prepare": "husky install"
-  },
-  "lint-staged": {
-    "*.ts": [
-      "prettier --write"
-    ]
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",

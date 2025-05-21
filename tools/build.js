@@ -18,66 +18,66 @@ const packagesToBuild = argv.packages ? argv.packages.split(',') : packageNames;
 const appsToBuild = argv.apps ? argv.apps.split(',') : appNames;
 
 const packages = [
-    {
-        name: utils,
-        builder: 'rumor_utils_builder',
-        path: `${root}/packages/rumor-utils`
-    }
+  {
+    name: utils,
+    builder: 'rumor_utils_builder',
+    path: `${root}/packages/rumor-utils`,
+  },
 ];
 
 const apps = [
-    {
-        name: users,
-        appDirectory: `${root}/apps/users`,
-        packagesDirectory: `${root}/apps/users/packages`,
-        dependencies: [utils]
-    },
-    {
-        name: events,
-        appDirectory: `${root}/apps/events`,
-        packagesDirectory: `${root}/apps/events/packages`,
-        dependencies: [utils]
-    },
-    {
-        name: notifications,
-        appDirectory: `${root}/apps/notifications`,
-        packagesDirectory: `${root}/apps/notifications/packages`,
-        dependencies: [utils]
-    },
-    {
-        name: scheduler,
-        appDirectory: `${root}/apps/scheduler`,
-        packagesDirectory: `${root}/apps/scheduler/packages`,
-        dependencies: [utils]
-    }
+  {
+    name: users,
+    appDirectory: `${root}/apps/users`,
+    packagesDirectory: `${root}/apps/users/packages`,
+    dependencies: [utils],
+  },
+  {
+    name: events,
+    appDirectory: `${root}/apps/events`,
+    packagesDirectory: `${root}/apps/events/packages`,
+    dependencies: [utils],
+  },
+  {
+    name: notifications,
+    appDirectory: `${root}/apps/notifications`,
+    packagesDirectory: `${root}/apps/notifications/packages`,
+    dependencies: [utils],
+  },
+  {
+    name: scheduler,
+    appDirectory: `${root}/apps/scheduler`,
+    packagesDirectory: `${root}/apps/scheduler/packages`,
+    dependencies: [utils],
+  },
 ];
 
 const copyDependencies = (dependencies, destinationName, destinationPath) => {
-    console.log(`Copying packages over to ${destinationName}...`);
-    rm('-rf', destinationPath);
-    mkdir(destinationPath);
+  console.log(`Copying packages over to ${destinationName}...`);
+  rm('-rf', destinationPath);
+  mkdir(destinationPath);
 
-    dependencies.forEach(packageName => {
-        const { path } = packages.find(({ name }) => name === packageName);
-        rm('-rf', `${destinationPath}/${packageName}`);
-        cp('-r', `${path}/dist/`, `${destinationPath}/${packageName}`);
-    });
+  dependencies.forEach(packageName => {
+    const { path } = packages.find(({ name }) => name === packageName);
+    rm('-rf', `${destinationPath}/${packageName}`);
+    cp('-r', `${path}/dist/`, `${destinationPath}/${packageName}`);
+  });
 };
 
 const buildPackage = ({ name, path }) => {
-    console.log(`Building ${name} package...`);
-    cd(path);
-    rm('-rf', 'dist');
-    exec('npm install');
-    exec('npm run build');
-    cd(root);
+  console.log(`Building ${name} package...`);
+  cd(path);
+  rm('-rf', 'dist');
+  exec('npm install');
+  exec('npm run build');
+  cd(root);
 };
 
 const distributePackages = ({ name: appName, appDirectory, packagesDirectory, dependencies }) => {
-    copyDependencies(dependencies, appName, packagesDirectory);
-    cd(appDirectory);
-    exec('npm install');
-    cd(root);
+  copyDependencies(dependencies, appName, packagesDirectory);
+  cd(appDirectory);
+  exec('npm install');
+  cd(root);
 };
 
 packages.filter(({ name }) => packagesToBuild.includes(name)).forEach(buildPackage);

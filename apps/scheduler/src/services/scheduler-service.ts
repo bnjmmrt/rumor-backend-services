@@ -107,7 +107,7 @@ export class SchedulerService {
       const users: User[] = await User.find({
         where: {
           isDeactivated: true,
-          deactivatedAt: Not(IsNull()),
+          deactivatedAt: Not(IsNull()) as any,
         },
       });
       users.forEach((u: User) => {
