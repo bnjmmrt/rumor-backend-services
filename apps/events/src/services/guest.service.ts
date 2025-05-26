@@ -281,7 +281,7 @@ export class GuestService {
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
             const smsPromises: Promise<{ success: boolean }>[] = [];
 
-            const baseRedirectUrl = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+            const baseRedirectUrl = event.branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect';
 
             for (const guest of updateGuests) {
               const { phoneNumber, invitationSource, userId } = guest;
