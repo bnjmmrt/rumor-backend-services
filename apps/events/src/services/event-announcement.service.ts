@@ -206,6 +206,7 @@ export class EventAnnouncementService {
               event.name,
               event.id,
               data.user.email,
+              event.branchLink,
             );
           }
           if (data?.user?.phoneNumber) {

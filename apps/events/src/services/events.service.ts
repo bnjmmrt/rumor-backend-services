@@ -145,6 +145,7 @@ import {
   SchedulerJobType,
   SchedulerTriggerPayload,
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { generateBranchLink } from '../utils/branch.utils';
 
 const responses = {
   conflict: (message: string) => ({
@@ -416,7 +417,7 @@ export class EventsService {
         },
         {
           key: 'event_url',
-          value: config.get('RUMOR_WEBSITE_ADMIN') + `${redirectPath}`,
+          value: config.get('RUMOR_WEBSITE_ADMIN') + `/${redirectPath}`,
         },
       ],
       'Super Admin - New Event Submission',
@@ -453,6 +454,26 @@ export class EventsService {
     event.imageCover = payload.imageCover;
     event.furtherInstructions = payload.furtherInstructions;
     event.showLocation = payload.showLocation;
+
+    // Generate Branch link for the event
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
+    const deepLinkPath = `events/event-details?id=${event.id}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${event.name}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    event.branchLink = branchLink;
 
     if (payload.eventTypeId) {
       event.eventType = await this.dbConnection
@@ -2669,6 +2690,7 @@ export class EventsService {
             eventDate: event.startDate,
             location: event.location?.location,
             city: event.location?.city,
+            branchLink: event.branchLink,
           };
           return sendEventReminder(
             mailPayload,
@@ -2755,6 +2777,7 @@ export class EventsService {
           eventDate: event.startDate,
           location: event.location.location,
           city: event.location.city,
+          branchLink: event.branchLink,
         };
         sendEventUpdation(
           createMailPayload,
@@ -3056,6 +3079,7 @@ export class EventsService {
         imageFlyer: updatedEvent.imageFlyer,
         location: updatedEvent.location.location,
         city: updatedEvent.location.city,
+        branchLink: updatedEvent.branchLink,
       };
       sendEventPublishedApproval(
         createPayload,
@@ -3312,6 +3336,7 @@ export class EventsService {
           imageFlyer: updatedEvent.imageFlyer,
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
         };
         sendEventPublishedApproval(
           createPayload,
@@ -3337,6 +3362,7 @@ export class EventsService {
           imageFlyer: updatedEvent.imageFlyer,
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
         };
         sendEventPrePublishApproval(
           createPayload,
@@ -3738,6 +3764,7 @@ export class EventsService {
               city: event.location.city || ' ',
               hostName:
                 event.owner?.additionalHostInformation?.companyName || event.owner.email || '',
+              branchLink: event.branchLink,
             };
             let mailServiceResponse = sendEventCancellation(
               createPayload,

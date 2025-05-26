@@ -643,6 +643,7 @@ export class GuestService {
               location: event.location.location,
               city: event.location.city,
               hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+              branchLink: event.branchLink,
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
@@ -687,6 +688,7 @@ export class GuestService {
               location: event.location.location,
               city: event.location.city,
               hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+              branchLink: event.branchLink,
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
@@ -736,6 +738,7 @@ export class GuestService {
             location: event.location.location,
             city: event.location.city,
             hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+            branchLink: event.branchLink,
             emailsData: {
               eventId: data.eventId,
               id: data.id,
@@ -955,6 +958,7 @@ export class GuestService {
                 location: event.location.location,
                 city: event.location.city,
                 hostName: event.owner?.additionalHostInformation?.companyName ?? 'Host',
+                branchLink: event.branchLink,
                 emailsData: {
                   eventId: data.eventId,
                   id: data.id,
@@ -994,6 +998,7 @@ export class GuestService {
                 location: event.location.location,
                 city: event.location.city,
                 hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+                branchLink: event.branchLink,
                 emailsData: {
                   eventId: data.eventId,
                   id: data.id,
@@ -1044,6 +1049,7 @@ export class GuestService {
               imageFlyer: event.imageFlyer,
               location: event.location.location,
               city: event.location.city,
+              branchLink: event.branchLink,
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
@@ -1073,6 +1079,7 @@ export class GuestService {
             location: event.location.location,
             city: event.location.city,
             hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+            branchLink: event.branchLink,
             emailsData: {
               eventId: data.eventId,
               id: data.id,
@@ -3387,6 +3394,7 @@ export class GuestService {
         location: event.location.location,
         city: event.location.city,
         hostName: event.owner?.additionalHostInformation.companyName ?? event.owner.firstName,
+        branchLink: event.branchLink,
       };
       const addOnMailPayload = {
         email: payload.email,
@@ -3568,6 +3576,7 @@ export class GuestService {
             location: event.location.location,
             city: event.location.city,
             hostName: event.owner?.additionalHostInformation.companyName ?? event.owner.firstName,
+            branchLink: event.branchLink,
           };
           const addOnMailPayload = {
             email: guest.user.email,
@@ -4166,6 +4175,7 @@ export class GuestService {
           location: event.location.location,
           city: event.location.city,
           hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+          branchLink: event.branchLink,
           emailsData: emailData,
         };
         sendEventInviteNonMember(createPayload, event.timeZone);
@@ -4192,6 +4202,7 @@ export class GuestService {
           location: event.location.location,
           city: event.location.city,
           hostName: event.owner?.additionalHostInformation.companyName ?? 'Host',
+          branchLink: event.branchLink,
           emailsData: emailData,
         };
         sendEventInviteToConfirmedGuest(createPayload, event.timeZone);
