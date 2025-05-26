@@ -10,8 +10,7 @@
     "users": "nodemon apps/users/src/index.ts",
     "notifications": "nodemon apps/notifications/src/index.ts",
     "scheduler": "nodemon apps/scheduler/src/index.ts",
-    "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "prepare": "husky install"
+    "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",
@@ -20,8 +19,6 @@
     "@types/lodash": "^4.17.14",
     "@types/node": "^22.10.7",
     "concurrently": "^9.1.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^15.5.0",
     "nodemon": "^3.1.9",
     "prettier": "^3.5.3",
     "shelljs": "^0.8.5",
