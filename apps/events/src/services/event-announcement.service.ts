@@ -140,7 +140,14 @@ export class EventAnnouncementService {
      */
     try {
       const link = event.branchLink || `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
-      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement for ${event?.name || 'Event'}. ${link}. `;
+
+      let textMessage = `
+            ${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement  for ${event?.name || 'Event'}.
+            
+            ${announcement} 
+            
+            Click here to view it in the Rumor app: 
+            ${link}. `;
 
       let recipientsData: Guest[] = [];
 
@@ -207,9 +214,11 @@ export class EventAnnouncementService {
               event.id,
               data.user.email,
               event.branchLink,
+              announcement,
             );
           }
           if (data?.user?.phoneNumber) {
+            textMessage = `Hi ${data.user.firstName},` + textMessage;
             sendSmsNotification({ phoneNumber: data.user.phoneNumber, textMessage });
           }
         });

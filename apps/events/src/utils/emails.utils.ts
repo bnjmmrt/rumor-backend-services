@@ -512,6 +512,7 @@ export const sendEventAnnouncement = async (
   eventId: string,
   email: string,
   branchLink?: string,
+  copy?: string,
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect';
   const params = [
@@ -519,6 +520,7 @@ export const sendEventAnnouncement = async (
     { key: 'host', value: hostName },
     { key: 'recipient_first_name', value: firstName },
     { key: 'url_button', value: redirectPath },
+    { key: 'copy', value: copy },
   ];
   try {
     const emailData = await serviceMesh
