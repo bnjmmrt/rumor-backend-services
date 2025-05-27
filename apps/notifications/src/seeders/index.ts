@@ -675,6 +675,10 @@ export class SeedDatabase {
             key: 'url_button',
             mandatory: true,
           },
+          {
+            key: 'copy',
+            mandatory: true,
+          },
         ],
       },
       {
