@@ -3897,9 +3897,16 @@ export class EventsService {
     // Apply dynamic sorting
     const sortableFields = ['startDate', 'endDate', 'publishDate', 'name', 'createdAt'];
     const sortField = parsedQuery.sortBy;
-    const sortOrder = (parsedQuery.order || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    const sortOrder =
+      typeof parsedQuery.order === 'string'
+        ? parsedQuery.order.toUpperCase() === 'DESC'
+          ? 'DESC'
+          : 'ASC'
+        : 'ASC';
 
-    if (sortField && sortableFields.includes(sortField)) {
+    if (status === EventStatusEnum.PAST_STATUS) {
+      query.orderBy('event.endDate', 'DESC');
+    } else if (sortField && sortableFields.includes(sortField)) {
       query.orderBy(`event.${sortField}`, sortOrder as 'ASC' | 'DESC');
     }
 

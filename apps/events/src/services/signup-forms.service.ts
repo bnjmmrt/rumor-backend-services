@@ -433,9 +433,19 @@ export class SignupFormsServices {
     if (user.id) {
       const guest = await Guest.findOne({
         where: { user: { id: user.id }, event: { id: eventId } },
+        relations: { declinedBy: true },
       });
+
       if (guest) {
-        if (guest.status !== GuestStatus.DRAFT) {
+        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== user.id;
+
+        if (guest.status === GuestStatus.DECLINED) {
+          if (declinedByHost) {
+            throw new ForbiddenError(
+              'You have been declined by the host. Please contact the host for more information.',
+            );
+          }
+        } else if (guest.status !== GuestStatus.DRAFT) {
           throw new ForbiddenError(
             'You are already part of this event. Please log into application and check your event status.',
           );
@@ -465,22 +475,47 @@ export class SignupFormsServices {
     if (userFoundWithEmail?.id) {
       const guest = await Guest.findOne({
         where: { user: { id: userFoundWithEmail.id }, event: { id: userPayload.id } },
+        relations: { declinedBy: true },
       });
-      if (guest && guest.status !== GuestStatus.DRAFT) {
-        throw new ForbiddenError(
-          'This email address is already associated with a status on the guest list.',
-        );
+
+      if (guest) {
+        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithEmail.id;
+
+        if (guest.status === GuestStatus.DECLINED) {
+          if (declinedByHost) {
+            throw new ForbiddenError(
+              'You have been declined by the host. Please contact the host for more information.',
+            );
+          }
+        } else if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'This email address is already associated with a status on the guest list.',
+          );
+        }
       }
     }
     if (userFoundWithPhone?.id) {
       const guest = await Guest.findOne({
         where: { user: { id: userFoundWithPhone.id }, event: { id: userPayload.id } },
+        relations: { declinedBy: true },
       });
-      if (guest && guest.status !== GuestStatus.DRAFT) {
-        throw new ForbiddenError(
-          'This phone number is already associated with a status on the guest list.',
-        );
+
+      if (guest) {
+        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithPhone.id;
+
+        if (guest.status === GuestStatus.DECLINED) {
+          if (declinedByHost) {
+            throw new ForbiddenError(
+              'You have been declined by the host. Please contact the host for more information.',
+            );
+          }
+        } else if (guest.status !== GuestStatus.DRAFT) {
+          throw new ForbiddenError(
+            'This phone number is already associated with a status on the guest list.',
+          );
+        }
       }
+
     }
     return '';
   }
@@ -543,6 +578,7 @@ export class SignupFormsServices {
       inviteGuestPayload.invitationSource = UserSource.SIGN_UP_FORM;
       inviteGuestPayload.ticketType = undefined;
       inviteGuestPayload.status = GuestStatus.APPLIED;
+      inviteGuestPayload.declinedBy = null;
       inviteGuestPayload.signupFormSubmissions = {
         id: submissions.id,
       } as SignupFormSubmissions;
