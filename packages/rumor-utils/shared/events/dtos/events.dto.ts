@@ -453,3 +453,78 @@ export class CancelEventAndNotifyRequestDto implements CancelEventAndNotifyReque
   @IsOptional()
   customMessage: string;
 }
+
+export class EventResponseDto {
+  @IsUUID()
+  id: string;
+
+  @IsString()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsOptional()
+  startDate?: Date;
+
+  @IsOptional()
+  endDate?: Date;
+
+  @IsString()
+  @IsOptional()
+  timeZone?: string;
+
+  @IsInt()
+  @IsOptional()
+  limitOnePlus?: number;
+
+  @IsOptional()
+  rsvpDeadline?: Date;
+
+  @IsBoolean()
+  @IsOptional()
+  showLocation?: boolean;
+
+  @IsBoolean()
+  useQr: boolean;
+
+  @IsString()
+  @IsOptional()
+  imageFlyer?: string;
+
+  @IsString()
+  @IsOptional()
+  imageCover?: string;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsOptional()
+  publishDate?: Date;
+
+  @IsBoolean()
+  @IsOptional()
+  isPublished?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isPrivate?: boolean;
+
+  @IsInt()
+  @IsOptional()
+  capacity?: number;
+
+  @IsOptional()
+  createdAt?: Date;
+
+  @IsOptional()
+  updatedAt?: Date;
+
+  @IsOptional()
+  deletedAt?: Date;
+}
