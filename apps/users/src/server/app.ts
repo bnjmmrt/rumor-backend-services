@@ -11,17 +11,7 @@ import ConnectionManager from '../database/index';
 const app: Express = express();
 
 app.use(bodyParser.json());
-
-if(!process.env.NODE_ENV || process.env.NODE_ENV.toLowerCase() === 'development') {
-  app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: {
-      policy: "cross-origin" 
-    }
-  }));
-} else {
-  app.use(helmet());
-}
+app.use(helmet());
 
 app.use(
   cors({
