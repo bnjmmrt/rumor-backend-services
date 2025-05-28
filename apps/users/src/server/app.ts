@@ -12,7 +12,16 @@ const app: Express = express();
 
 app.use(bodyParser.json());
 
-app.use(helmet());
+if(!process.env.NODE_ENV || process.env.NODE_ENV.toLowerCase() === 'development') {
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: {
+      policy: "cross-origin" 
+    }
+  }));
+} else {
+  app.use(helmet());
+}
 
 app.use(
   cors({
