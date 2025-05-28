@@ -49,6 +49,7 @@ export const registerInvitesAsNonMember = (payload: InvitedGuestRequestDto) =>
     email: payload.email,
     id: payload.userId,
     source: payload.source,
+    status: payload.status,
   });
 
 export const getCurrentUser = () => apiService.getApi().get(`/auth/current-user`);
