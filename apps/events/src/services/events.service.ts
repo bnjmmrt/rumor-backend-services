@@ -3975,7 +3975,9 @@ export class EventsService {
           : 'ASC'
         : 'ASC';
 
-    if (sortField && sortableFields.includes(sortField)) {
+    if (status === EventStatusEnum.PAST_STATUS) {
+      query.orderBy('event.endDate', 'DESC');
+    } else if (sortField && sortableFields.includes(sortField)) {
       query.orderBy(`event.${sortField}`, sortOrder as 'ASC' | 'DESC');
     }
 
