@@ -537,13 +537,19 @@ export const sendEventAnnouncement = async (
   }
 };
 
-export const sendEventPublishedApproval = async (
-  mailComponents: MailComponent,
-  email: string,
-  companyName: string,
-  eventId: string,
-  timeZone: string,
-): Promise<AxiosResponse<any, any>> => {
+export const sendEventPublishedApproval = async ({
+  mailComponents,
+  email,
+  companyName,
+  eventId,
+  timeZone,
+}: {
+  mailComponents: MailComponent;
+  email: string;
+  companyName: string;
+  eventId: string;
+  timeZone: string;
+}): Promise<AxiosResponse<any, any>> => {
   const { eventDate, eventName, imageFlyer, city, branchLink } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
@@ -600,19 +606,27 @@ export const sendEventPublishedApproval = async (
       );
     return emailData;
   } catch (e) {
-    console.log(`Evant Published Approval failed at function sendEventPublishedApproval:: ${e}`);
+    console.log(`Event Published Approval failed at function sendEventPublishedApproval:: ${e}`);
   }
 };
 
-export const sendEventPrePublishApproval = async (
-  mailComponents: MailComponent,
-  email: string,
-  companyName: string,
-  eventId: string,
-  publishDate: Date,
-  timeZone: string,
-): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city, branchLink } = mailComponents;
+export const sendEventPrePublishApproval = async ({
+  createPayload,
+  ownerEmail,
+  companyName,
+  eventId,
+  publishDate,
+  timeZone,
+}: {
+  createPayload: MailComponent;
+  ownerEmail: string;
+  companyName: string;
+  eventId: string;
+  publishDate: Date;
+  timeZone: string;
+}): Promise<AxiosResponse<any, any>> => {
+  const { eventDate, eventName, imageFlyer, city, branchLink } = createPayload;
+
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const publishDateData = extractDate(publishDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
@@ -663,7 +677,7 @@ export const sendEventPrePublishApproval = async (
     },
     {
       key: 'view_event',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + `/${redirectPath}`,
     },
   ];
   try {
@@ -672,7 +686,7 @@ export const sendEventPrePublishApproval = async (
       .sendEmailFromTemplate(
         params,
         'Host Event Approved by Admin - Pre-Publish',
-        [email.trim().toLowerCase()],
+        [ownerEmail.trim().toLowerCase()],
         null,
       );
     return emailData;

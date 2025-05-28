@@ -330,6 +330,9 @@ export class EventsService {
       // Save event within the transaction
       const createdEvent = await queryRunner.manager.save(event);
 
+      // Generate and update Branch link now that the event has an ID
+      await this.generateAndUpdateBranchLink(createdEvent.id, createdEvent.name, queryRunner);
+
       // Save associated data (ticket types, talents, collaborators, quiz questions)
       await this.saveAssociatedData(payload, createdEvent.id, queryRunner);
 
@@ -455,26 +458,6 @@ export class EventsService {
     event.furtherInstructions = payload.furtherInstructions;
     event.showLocation = payload.showLocation;
 
-    // Generate Branch link for the event
-    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
-    const deepLinkPath = `events/event-details?id=${event.id}`;
-
-    const branchData = {
-      $web_only: false,
-      $fallback_url: webUrl,
-      $ios_url: `therumorapp://${deepLinkPath}`,
-      $android_url: `com.therumor://${deepLinkPath}`,
-      $desktop_url: webUrl,
-      $marketing_title: `Event: ${event.name}`,
-    };
-
-    const branchLink = await generateBranchLink({
-      path: deepLinkPath,
-      data: branchData,
-    });
-
-    event.branchLink = branchLink;
-
     if (payload.eventTypeId) {
       event.eventType = await this.dbConnection
         .getRepository(EventTypes)
@@ -538,6 +521,42 @@ export class EventsService {
       .getOne();
 
     return event;
+  }
+
+  /**
+   * Generates and updates the Branch link for an event after it has been saved and has an ID.
+   *
+   * @param eventId - The ID of the saved event.
+   * @param eventName - The name of the event for the marketing title.
+   * @param queryRunner - The query runner to handle the transaction.
+   * @returns The generated Branch link.
+   */
+  private static async generateAndUpdateBranchLink(
+    eventId: string,
+    eventName: string,
+    queryRunner: QueryRunner,
+  ): Promise<string> {
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${eventId}`;
+    const deepLinkPath = `events/event-details?id=${eventId}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${eventName}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    await queryRunner.manager.update(Event, { id: eventId }, { branchLink });
+
+    return branchLink;
   }
 
   /**
@@ -3081,13 +3100,13 @@ export class EventsService {
         city: updatedEvent.location.city,
         branchLink: updatedEvent.branchLink,
       };
-      sendEventPublishedApproval(
-        createPayload,
-        updatedEvent.owner.email,
-        host.additionalHostInformation.companyName,
-        updatedEvent.id,
-        updatedEvent.timeZone,
-      );
+      sendEventPublishedApproval({
+        mailComponents: createPayload,
+        email: updatedEvent.owner.email,
+        companyName: host.additionalHostInformation.companyName,
+        eventId: updatedEvent.id,
+        timeZone: updatedEvent.timeZone,
+      });
     }
     return;
   }
@@ -3163,7 +3182,32 @@ export class EventsService {
     newEvent.ticketTypes = event.ticketTypes;
     newEvent.collaborators = event.collaborators;
     newEvent.quizQuestions = event.quizQuestions;
+
+    // Save the duplicated event first to get an ID
     const createdEvent = await this.dbConnection.getRepository(Event).save(newEvent);
+
+    // Generate a new Branch link for the duplicated event
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${createdEvent.id}`;
+    const deepLinkPath = `events/event-details?id=${createdEvent.id}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${createdEvent.name}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    createdEvent.branchLink = branchLink;
+    await this.dbConnection.getRepository(Event).save(createdEvent);
+
     return responses.data(toEvent(createdEvent, null));
   }
 
@@ -3338,13 +3382,13 @@ export class EventsService {
           city: updatedEvent.location.city,
           branchLink: updatedEvent.branchLink,
         };
-        sendEventPublishedApproval(
-          createPayload,
-          updatedEvent.owner.email,
-          host.additionalHostInformation.companyName,
-          updatedEvent.id,
-          updatedEvent.timeZone,
-        );
+        sendEventPublishedApproval({
+          mailComponents: createPayload,
+          email: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          timeZone: updatedEvent.timeZone,
+        });
         // Send Push Notification
         try {
           serviceMesh
@@ -3364,14 +3408,14 @@ export class EventsService {
           city: updatedEvent.location.city,
           branchLink: updatedEvent.branchLink,
         };
-        sendEventPrePublishApproval(
+        sendEventPrePublishApproval({
           createPayload,
-          updatedEvent.owner.email,
-          host.additionalHostInformation.companyName,
-          updatedEvent.id,
-          updatedEvent.publishDate,
-          updatedEvent.timeZone,
-        );
+          ownerEmail: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          publishDate: updatedEvent.publishDate,
+          timeZone: updatedEvent.timeZone,
+        });
         try {
           //Send Push Notifications
           serviceMesh
