@@ -146,6 +146,7 @@ import {
   SchedulerTriggerPayload,
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { generateBranchLink } from '../utils/branch.utils';
+import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
 
 const responses = {
   conflict: (message: string) => ({
@@ -1431,6 +1432,24 @@ export class EventsService {
     if (isEventApprovedAndNotEnded) {
       throw new ConflictError('Cannot delete an approved event that has not ended');
     }
+
+    // Get associated sponsorship opportunities and their dependencies
+    const sponsorshipOpportunityRepo = this.dbConnection.getRepository(SponsorshipOpportunity);
+    const sponsorshipOpportunities = await sponsorshipOpportunityRepo.find({
+      where: { event: { id: event.id } },
+      relations: ['targetSponsors', 'inquiries'] // Include relations that have cascade soft-remove
+    });
+    
+    // First set event_id to null for all sponsorship opportunities
+    await sponsorshipOpportunityRepo
+      .createQueryBuilder()
+      .update(SponsorshipOpportunity)
+      .set({ event: null })
+      .where('event.id = :eventId', { eventId: event.id })
+      .execute();
+      
+    // Then perform the soft remove
+    await sponsorshipOpportunityRepo.softRemove(sponsorshipOpportunities);
 
     const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
       where: { event: { id: event.id } },

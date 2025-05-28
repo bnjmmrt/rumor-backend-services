@@ -8,6 +8,7 @@ import database from '../database';
 import { QuestionValueType } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { generateBranchLink } from '../utils/branch.utils';
 import config from '../config';
+import { SponsorshipCategory } from 'rumor-utils/shared/sponsorships/entities/sponsorship-category.entity';
 
 export class Seeders {
   public static dbConnection = database;
@@ -286,6 +287,23 @@ export class Seeders {
     } catch (error) {
       console.error('Error in seedEventBranchLinks:', error);
       throw error;
+    }
+  }
+
+  public static async seedSponsorshipCategories() {
+    const category = {
+      name: 'Generally Restricted Categories',
+      enabled: true,
+    };
+
+    const repository = this.dbConnection.getRepository(SponsorshipCategory);
+    const existingCategory = await repository.findOne({
+      where: { name: category.name, deletedAt: null },
+    });
+
+    if (!existingCategory) {
+      const newCategory = repository.create(category);
+      await repository.save(newCategory);
     }
   }
 }
