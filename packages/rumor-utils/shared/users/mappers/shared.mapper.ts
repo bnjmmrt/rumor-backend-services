@@ -12,6 +12,7 @@ export const userStatusToEntity: { [s in UserStatusProto]: UserStatus } = {
   [UserStatusProto.DEACTIVATED]: UserStatus.DEACTIVATED,
   [UserStatusProto.REJECTED]: UserStatus.REJECTED,
   [UserStatusProto.UNRECOGNIZED]: UserStatus.UNRECOGNIZED,
+  [UserStatusProto.NON_MEMBER]: UserStatus.NON_MEMBER,
 };
 
 export const entityToUserStatus: { [s in UserStatus]: UserStatusProto } = {
@@ -21,6 +22,7 @@ export const entityToUserStatus: { [s in UserStatus]: UserStatusProto } = {
   [UserStatus.DEACTIVATED]: UserStatusProto.DEACTIVATED,
   [UserStatus.REJECTED]: UserStatusProto.REJECTED,
   [UserStatus.UNRECOGNIZED]: UserStatusProto.UNRECOGNIZED,
+  [UserStatus.NON_MEMBER]: UserStatusProto.NON_MEMBER,
 };
 
 export const userSourceToEntity: { [s in UserSourceProto]: UserSource } = {

@@ -15,6 +15,7 @@ export enum UserStatus {
   DEACTIVATED = 'DEACTIVATED',
   REJECTED = 'REJECTED',
   UNRECOGNIZED = 'UNRECOGNIZED',
+  NON_MEMBER = 'NON_MEMBER',
 }
 
 export enum UserSource {
