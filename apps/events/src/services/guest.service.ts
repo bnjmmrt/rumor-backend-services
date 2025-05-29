@@ -123,6 +123,7 @@ import { sendSmsNotification } from '../utils/sms.utils';
 import * as dayjs from 'dayjs';
 import { Role, UserRole } from 'rumor-utils/shared/entities';
 import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
+
 export class GuestService {
   public static dbConnection = database;
 
@@ -284,7 +285,7 @@ export class GuestService {
             const baseRedirectUrl = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
 
             for (const guest of updateGuests) {
-              const { phoneNumber, invitationSource, userId } = guest;
+              const { phoneNumber, invitationSource, userId, email } = guest;
 
               if (!phoneNumber) continue;
 
@@ -301,7 +302,7 @@ export class GuestService {
                 textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
               } else if (shouldSendApproval) {
                 if (invitationSource === UserSource.SIGN_UP_FORM) {
-                  textMessage = `Good news! Your request for ${event.name} was approved. Log in or download the app to access your confirmation and important event details.\n${baseRedirectUrl}`;
+                  textMessage = `Good news! Your request for ${event.name} was approved. Download the Rumor app and log in with this phone number: [${phoneNumber}] to view your confirmation. .\n${baseRedirectUrl}`;
                 } else if (invitationSource === UserSource.REQUEST_IN_APP) {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
@@ -1044,6 +1045,7 @@ export class GuestService {
               imageFlyer: event.imageFlyer,
               location: event.location.location,
               city: event.location.city,
+              email: data.email,
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,

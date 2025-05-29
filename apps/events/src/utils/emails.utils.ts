@@ -484,6 +484,10 @@ export const sendGuestEventApproval = async (
       key: 'link_to_application',
       value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
     },
+    {
+      key: 'email',
+      value: emailsData.email,
+    },
   ];
 
   try {

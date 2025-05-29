@@ -439,6 +439,10 @@ export class SeedDatabase {
             key: 'link_to_application',
             mandatory: true,
           },
+          {
+            key: 'email',
+            mandatory: true,
+          },
         ],
       },
       {
