@@ -60,6 +60,9 @@ export class Event extends RumorBaseEntity {
   @Column({ type: 'varchar', nullable: true, name: 'image_cover' })
   imageCover?: string;
 
+  @Column({ type: 'varchar', nullable: true, name: 'branch_link' })
+  branchLink?: string;
+
   @Column({ type: 'enum', enum: EventStatusEnum, nullable: true, name: 'status' })
   status: EventStatusEnum;
 

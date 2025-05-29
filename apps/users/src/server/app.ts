@@ -11,7 +11,6 @@ import ConnectionManager from '../database/index';
 const app: Express = express();
 
 app.use(bodyParser.json());
-
 app.use(helmet());
 
 app.use(

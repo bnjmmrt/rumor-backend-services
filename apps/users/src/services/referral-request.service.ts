@@ -59,7 +59,7 @@ export class ReferralRequestService {
     //send text message to user to whom the referral request is sent
     if (userPhoneNumber) {
       try {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = 'https://app.therumor.com/app';
         let message = `Hey ${user?.firstName} - Someone has requested your referral to Rumor. Click to refer them now! ${link}`;
         const validateNumber = isValidPhoneNumber(userPhoneNumber);
         if (validateNumber) {
