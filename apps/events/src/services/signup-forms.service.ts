@@ -35,7 +35,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
-import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { UserSource as UserSourceEnum, UserStatus as UserStatusEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
@@ -379,20 +379,24 @@ export class SignupFormsServices {
     });
   }
 
-  private static async registerUserAsNonMember(payload: User, queryRunner: QueryRunner) {
+  private static async registerUserAsNonMember(payload: User, queryRunner: QueryRunner): Promise<UserRole> {
     await queryRunner.manager.save(payload);
 
-    const nonMemberRole: Role[] = await this.dbConnection
+    const nonMemberRole: Role = await this.dbConnection
       .getRepository(Role)
-      .find({ where: { name: 'non_member' } });
+      .findOne({ where: { name: 'non_member' } });
 
     const userRole = UserRole.create({
-      role: { id: nonMemberRole[0].id },
+      role: { id: nonMemberRole.id },
       source: UserSourceEnum.SIGN_UP_FORM,
+      status: UserStatusEnum.NON_MEMBER,
       user: { id: payload.id },
     });
 
-    await queryRunner.manager.save(userRole);
+    const newUserRole = await queryRunner.manager.save(userRole);
+    newUserRole.role = nonMemberRole; // Ensure role is populated
+
+    return newUserRole;
   }
 
   private static async assignRoleToUser(payload: User, queryRunner: QueryRunner) {
@@ -403,6 +407,7 @@ export class SignupFormsServices {
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
       source: UserSourceEnum.SIGN_UP_FORM,
+      status: UserStatusEnum.NON_MEMBER,
       user: { id: payload.id },
     });
 
@@ -553,7 +558,8 @@ export class SignupFormsServices {
       await queryRunner.startTransaction();
 
       if (!userPayload.id) {
-        await this.registerUserAsNonMember(userPayload, queryRunner);
+        const userRole = await this.registerUserAsNonMember(userPayload, queryRunner);
+        userPayload.roles = [userRole];
       }
 
       const isMemberOrNonMember = userPayload?.roles?.some(userRole =>
