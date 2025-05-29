@@ -2,9 +2,13 @@ import {
   EventAgeLimit,
   EventTypes,
   SignupFormStaticQuestions,
+  Event,
 } from 'rumor-utils/shared/entities/index';
 import database from '../database';
 import { QuestionValueType } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { generateBranchLink } from '../utils/branch.utils';
+import config from '../config';
+import { SponsorshipCategory } from 'rumor-utils/shared/sponsorships/entities/sponsorship-category.entity';
 
 export class Seeders {
   public static dbConnection = database;
@@ -203,6 +207,103 @@ export class Seeders {
           await repository.save(question);
         }
       }
+    }
+  }
+
+  public static async seedEventBranchLinks() {
+    try {
+      console.log('Starting branch links seeder...');
+
+      // Find all events that don't have a branch link
+      const eventsWithoutBranchLinks = await this.dbConnection
+        .getRepository(Event)
+        .createQueryBuilder('event')
+        .where("event.branchLink IS NULL OR event.branchLink = ''")
+        .andWhere('event.deletedAt IS NULL')
+        .getMany();
+
+      if (eventsWithoutBranchLinks.length === 0) {
+        console.log('No events found without branch links.');
+        return;
+      }
+
+      console.log(
+        `Found ${eventsWithoutBranchLinks.length} events without branch links. Processing...`,
+      );
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Process events in batches to avoid overwhelming the Branch API
+      const batchSize = 10;
+      for (let i = 0; i < eventsWithoutBranchLinks.length; i += batchSize) {
+        const batch = eventsWithoutBranchLinks.slice(i, i + batchSize);
+
+        await Promise.all(
+          batch.map(async event => {
+            try {
+              // Generate branch link for the event
+              const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
+              const deepLinkPath = `events/event-details?id=${event.id}`;
+
+              const branchData = {
+                $web_only: false,
+                $fallback_url: webUrl,
+                $ios_url: `therumorapp://${deepLinkPath}`,
+                $android_url: `com.therumor://${deepLinkPath}`,
+                $desktop_url: webUrl,
+                $marketing_title: `Event: ${event.name}`,
+              };
+
+              const branchLink = await generateBranchLink({
+                path: deepLinkPath,
+                data: branchData,
+              });
+
+              // Update the event with the generated branch link
+              await this.dbConnection.getRepository(Event).update({ id: event.id }, { branchLink });
+
+              console.log(`✅ Generated branch link for event: ${event.name} (ID: ${event.id})`);
+              successCount++;
+            } catch (error) {
+              console.error(
+                `❌ Failed to generate branch link for event: ${event.name} (ID: ${event.id})`,
+                error,
+              );
+              errorCount++;
+            }
+          }),
+        );
+
+        // Add a small delay between batches to be respectful to the Branch API
+        if (i + batchSize < eventsWithoutBranchLinks.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`Branch links seeder completed:`);
+      console.log(`  ✅ Success: ${successCount} events`);
+      console.log(`  ❌ Errors: ${errorCount} events`);
+    } catch (error) {
+      console.error('Error in seedEventBranchLinks:', error);
+      throw error;
+    }
+  }
+
+  public static async seedSponsorshipCategories() {
+    const category = {
+      name: 'Generally Restricted Categories',
+      enabled: true,
+    };
+
+    const repository = this.dbConnection.getRepository(SponsorshipCategory);
+    const existingCategory = await repository.findOne({
+      where: { name: category.name, deletedAt: null },
+    });
+
+    if (!existingCategory) {
+      const newCategory = repository.create(category);
+      await repository.save(newCategory);
     }
   }
 }

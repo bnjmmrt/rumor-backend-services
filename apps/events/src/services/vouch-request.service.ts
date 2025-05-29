@@ -68,7 +68,7 @@ export class VouchRequestService {
     });
     //send text message
     if (user?.phoneNumber) {
-      let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+      let link = event.branchLink || 'https://app.therumor.com/app';
       let textMessage = `Hey ${user?.firstName || 'User'} - Someone has requested your vouch to attend ${event?.name || 'Event'}. Click to Refer them now! ${link}`;
       // Send SMS notification
       sendSmsNotification({
