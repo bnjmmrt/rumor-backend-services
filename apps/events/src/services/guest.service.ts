@@ -91,6 +91,7 @@ import {
   GuestDataSimple,
   UserAttendee,
   UserSource,
+  UserStatus,
   GuestData,
   GuestDetails,
   BulkUserData,
@@ -3552,6 +3553,7 @@ export class GuestService {
           email: guestPayload.email,
           phoneNumber: guestPayload.phoneNumber,
           source: UserSource.PLUS_1,
+          status: UserStatus.NON_MEMBER,
         };
         const newUser = (
           await serviceMesh.userService().registerInvitesAsNonMember(transformedPayload)
@@ -4135,6 +4137,7 @@ export class GuestService {
         email: email || '',
         phoneNumber: phoneNumber || '',
         source: UserSource.INVITED_BY_HOST,
+        status: UserStatus.NON_MEMBER,
       }))(payload);
       const member: SimpleUser = (
         await serviceMesh.userService().registerInvitesAsNonMember(memberPayload)
