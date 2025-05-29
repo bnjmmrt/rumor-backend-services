@@ -69,7 +69,7 @@ export const sendEventInviteMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'view_event',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   );
   try {
@@ -139,7 +139,7 @@ export const sendEventInviteNonMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'link_to_application',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   );
   try {
@@ -210,7 +210,7 @@ export const sendEventInviteToConfirmedGuest = async (
       { key: 'first_name', value: data.firstName },
       {
         key: 'view_ticket',
-        value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+        value: branchLink || 'https://app.therumor.com/app',
       },
     );
     const emailData = await serviceMesh
@@ -347,7 +347,7 @@ export const sendEventUpdation = async (
     },
     {
       key: 'view_event',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 
@@ -421,7 +421,7 @@ export const sendEventInvitePlusOnes = async (
     },
     {
       key: 'link_to_application',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 
@@ -486,7 +486,7 @@ export const sendGuestEventApproval = async (
     },
     {
       key: 'link_to_application',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 
@@ -514,7 +514,7 @@ export const sendEventAnnouncement = async (
   branchLink?: string,
   copy?: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const redirectPath = branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+  const redirectPath = branchLink || 'https://app.therumor.com/app';
   const params = [
     { key: 'event', value: eventName },
     { key: 'host', value: hostName },
@@ -771,7 +771,7 @@ export const sendEventReminder = async (
     },
     {
       key: 'view_rsvp',
-      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 

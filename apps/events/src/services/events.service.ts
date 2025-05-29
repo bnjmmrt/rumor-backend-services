@@ -1437,9 +1437,9 @@ export class EventsService {
     const sponsorshipOpportunityRepo = this.dbConnection.getRepository(SponsorshipOpportunity);
     const sponsorshipOpportunities = await sponsorshipOpportunityRepo.find({
       where: { event: { id: event.id } },
-      relations: ['targetSponsors', 'inquiries'] // Include relations that have cascade soft-remove
+      relations: ['targetSponsors', 'inquiries'], // Include relations that have cascade soft-remove
     });
-    
+
     // First set event_id to null for all sponsorship opportunities
     await sponsorshipOpportunityRepo
       .createQueryBuilder()
@@ -1447,7 +1447,7 @@ export class EventsService {
       .set({ event: null })
       .where('event.id = :eventId', { eventId: event.id })
       .execute();
-      
+
     // Then perform the soft remove
     await sponsorshipOpportunityRepo.softRemove(sponsorshipOpportunities);
 
@@ -3378,7 +3378,7 @@ export class EventsService {
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       //send text notification
       if (updatedEvent?.owner?.phoneNumber) {
-        let link = updatedEvent.branchLink || config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = updatedEvent.branchLink || 'https://app.therumor.com/app';
         let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
         //Micro-service call
         let number = updatedEvent?.owner?.phoneNumber;

@@ -139,7 +139,7 @@ export class EventAnnouncementService {
      *
      */
     try {
-      const link = event.branchLink || `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+      const link = event.branchLink || 'https://app.therumor.com/app';
 
       let textMessage = `
             ${event?.owner?.additionalHostInformation?.companyName || 'Host'} just posted a new event announcement  for ${event?.name || 'Event'}.
