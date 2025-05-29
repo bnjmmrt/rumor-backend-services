@@ -15,6 +15,7 @@ const start = async () => {
     await Seeders.seedEventTypes();
     await Seeders.seedEventAgeLimits();
     await Seeders.seedSignupFormStaticQuestions();
+    await Seeders.seedEventBranchLinks();
     await Seeders.seedSponsorshipCategories();
     if (config.get('runSeeds')) {
       await connectionManager.runSeeders();

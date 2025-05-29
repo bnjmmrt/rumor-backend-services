@@ -437,7 +437,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== user.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== user.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -479,7 +480,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithEmail.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithEmail.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -501,7 +503,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithPhone.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithPhone.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -515,7 +518,6 @@ export class SignupFormsServices {
           );
         }
       }
-
     }
     return '';
   }
@@ -621,7 +623,7 @@ export class SignupFormsServices {
           const validateNumber = isValidPhoneNumber(userPayload.phoneNumber);
           if (validateNumber) {
             const cleanedNumber = userPayload.phoneNumber.replace(/[\s\-()]/g, '').trim();
-            const link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+            const link = 'https://app.therumor.com/app';
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }

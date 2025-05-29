@@ -1264,7 +1264,7 @@ export class AuthService {
         (payload.referralCode
           ? `Enter code ${payload.referralCode} to expedite your application review.`
           : ``) +
-        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+        `\n https://app.therumor.com/app`;
 
       //Micro-service call
       try {
@@ -1286,7 +1286,7 @@ export class AuthService {
         },
         {
           key: 'link_to_application',
-          value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
+          value: 'https://app.therumor.com/app', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -1353,7 +1353,7 @@ export class AuthService {
     if (payload?.phoneNumber) {
       let message =
         `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
-        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+        `\n https://app.therumor.com/app`;
 
       //Micro-service call
       try {
@@ -2354,7 +2354,7 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+            value: 'https://app.therumor.com/app',
           },
           {
             key: 'first_name',
@@ -2383,7 +2383,7 @@ export class AuthService {
     let userPhoneNumber = user?.phoneNumber;
     if (userPhoneNumber) {
       try {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = 'https://app.therumor.com/app';
         let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
         const validateNumber = isValidPhoneNumber(userPhoneNumber);
         if (validateNumber) {
@@ -2568,7 +2568,7 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = 'https://app.therumor.com/app';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
           console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
@@ -4933,7 +4933,7 @@ export class AuthService {
           if (user?.phoneNumber) {
             //Micro-service call
             try {
-              let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+              let link = 'https://app.therumor.com/app';
               let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
               smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
             } catch (err) {
