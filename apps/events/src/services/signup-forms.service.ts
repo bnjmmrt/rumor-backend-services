@@ -171,6 +171,8 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
 
+      const maxAdditionalGuests = event?.limitOnePlus;
+
       console.log('body', body);
       if (!event) {
         throw new NotFoundError('Event');
@@ -203,6 +205,9 @@ export class SignupFormsServices {
         question.isRequired = q.isRequired;
         question.hasToggle = q.hasToggle || false;
         question.isToggled = q.isToggled || false;
+        if (q.name === 'Request Access for Additional Guests' && maxAdditionalGuests === 0) {
+          question.isToggled = false;
+        }
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
 
