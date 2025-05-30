@@ -425,12 +425,13 @@ export class AuthService {
         lastName: payload.lastName,
         dateOfBirth: payload.dateOfBirth,
         phoneNumber: payload.phoneNumber,
+        instagramUserName: payload.instagramUserName,
         address: address,
         additionalMemberInformation: {
           ...existingUser.additionalMemberInformation,
           ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
         },
-      };
+      } as Partial<User>;
 
       await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
 
