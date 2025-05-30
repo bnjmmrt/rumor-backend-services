@@ -1,9 +1,16 @@
-import { ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments, registerDecorator, ValidationOptions } from 'class-validator';
+import {
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
+  registerDecorator,
+  ValidationOptions,
+} from 'class-validator';
 
 @ValidatorConstraint({ name: 'isStrongPassword', async: false })
 export class IsStrongPasswordConstraint implements ValidatorConstraintInterface {
   validate(password: string): boolean {
-    const passwordRegex = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])[a-zA-Z0-9!@#$%^&*(),.?":{}|<>]{8,}$/;
+    const passwordRegex =
+      /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])[a-zA-Z0-9!@#$%^&*(),.?":{}|<>]{8,}$/;
     return passwordRegex.test(password);
   }
 

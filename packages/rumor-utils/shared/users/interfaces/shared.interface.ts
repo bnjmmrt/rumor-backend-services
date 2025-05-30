@@ -15,6 +15,7 @@ export enum UserStatus {
   DEACTIVATED = 'DEACTIVATED',
   REJECTED = 'REJECTED',
   UNRECOGNIZED = 'UNRECOGNIZED',
+  NON_MEMBER = 'NON_MEMBER',
 }
 
 export enum UserSource {
@@ -25,4 +26,5 @@ export enum UserSource {
   REQUEST_IN_APP = 'REQUEST_IN_APP',
   PLUS_1 = 'PLUS_1',
   UNRECOGNIZED = 'UNRECOGNIZED',
+  HOST_APPLICATION = 'HOST_APPLICATION',
 }

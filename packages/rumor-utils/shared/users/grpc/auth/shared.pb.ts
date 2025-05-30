@@ -6,7 +6,7 @@
 
 /* eslint-disable */
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 /** ProviderType */
 export enum ProviderType {
@@ -27,6 +27,7 @@ export enum UserStatus {
   DEACTIVATED = 3,
   REJECTED = 4,
   UNRECOGNIZED = -1,
+  NON_MEMBER = 5,
 }
 
 export enum UserSource {
@@ -37,6 +38,7 @@ export enum UserSource {
   REQUEST_IN_APP = 4,
   PLUS_1 = 5,
   UNRECOGNIZED = -1,
+  HOST_APPLICATION = 6,
 }
 
 export enum NewUserStatus {
@@ -59,8 +61,7 @@ export interface GenericResponse {
 }
 
 /** Empty Request */
-export interface EmptyRequest {
-}
+export interface EmptyRequest {}
 
 /** Id Request */
 export interface IdRequest {
@@ -70,6 +71,8 @@ export interface IdRequest {
 /** Token Request */
 export interface TokenRequest {
   token: string;
+  fcmToken?: string;
+  deviceId?: string;
 }
 
 export interface UserAndIdRequest {
@@ -80,7 +83,7 @@ export interface UserAndIdRequest {
 /** Paginated Request */
 export interface PaginatedRequest {
   userId?: string | undefined;
-  query: string;
+  query?: string;
 }
 
 export interface RequestByUserAndEventRequest {
@@ -107,4 +110,4 @@ export interface UserIdData {
   userId: string;
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';

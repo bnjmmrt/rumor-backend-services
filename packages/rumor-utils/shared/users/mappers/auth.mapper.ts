@@ -14,6 +14,8 @@ import {
   UsersList,
   MemberProfile,
   customListData,
+  MemberEvent,
+  ReferrerMembers,
 } from '../grpc/auth/auth.pb';
 import { Gender, RawHost } from '../interfaces/auth.interface';
 import * as dayjs from 'dayjs';
@@ -40,7 +42,12 @@ export const entityToGender: { [g in Gender]: GenderProto } = {
   [Gender.NOT_APPLICABLE]: GenderProto.NOT_APPLICABLE,
 };
 
-export const toCurrentMember = (user: User, focuses: FocusProto[], role: UserRole, instagramUsername?: string): CurrentMember => {
+export const toCurrentMember = (
+  user: User,
+  focuses: FocusProto[],
+  role: UserRole,
+  instagramUsername?: string,
+): CurrentMember => {
   return {
     id: user.id,
     phoneNumber: user.phoneNumber,
@@ -57,14 +64,14 @@ export const toCurrentMember = (user: User, focuses: FocusProto[], role: UserRol
     approved: role?.status === UserStatus.ACTIVE,
     referralCode: 'user.referralCode',
     focuses,
-    socialProviders: user.socialProviders.map((provider) => {
+    socialProviders: user.socialProviders.map(provider => {
       return {
         type: entityToProviderType[provider.type],
         accessToken: provider.longLivedToken,
         username: provider.username,
       };
     }),
-    userRoles: user.roles.map((role) => {
+    userRoles: user.roles.map(role => {
       return {
         id: role.id,
         name: role.role.name,
@@ -102,7 +109,11 @@ export const toCreateUser = (user: User): SimpleUser => {
   };
 };
 
-export const toCurrentUser = (user: User, focuses: FocusProto[], roles: UserRole[]): CurrentUser => {
+export const toCurrentUser = (
+  user: User,
+  focuses: FocusProto[],
+  roles: UserRole[],
+): CurrentUser => {
   // Construct role data based on user roles
   const roleData = roles.map(role => {
     // Basic structure for each role
@@ -150,6 +161,12 @@ export const toCurrentUser = (user: User, focuses: FocusProto[], roles: UserRole
   };
 };
 
+export interface IReferenceCode {
+  code?: string | undefined;
+  name?: string | undefined;
+  email?: string | undefined;
+}
+
 export const toMember = (
   user: User,
   focuses: FocusProto[] = [],
@@ -157,6 +174,8 @@ export const toMember = (
   role: UserRole,
   socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {},
   instagramUsername: string = 'N/A',
+  sources?: string[],
+  references?: IReferenceCode,
 ): Member => {
   let totalFollowerCount = 0;
 
@@ -178,17 +197,23 @@ export const toMember = (
   return {
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
-    gender: user.gender,
-    types: focuses.map((focus) => focus.name),
-    categories: interests.map((interest) => interest.name),
+    gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
+    types: focuses.map(focus => focus.name),
+    categories: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
-    status: role.status ?? 'UNRECOGNIZED',
+    status: role.isRoleDeactivated ? UserStatus.DEACTIVATED : (role.status ?? 'UNRECOGNIZED'),
+    source: role.source ? entityToUserSource[role.source] : null,
     profilePicture: user.profilePicture,
     email: user.email,
     instagramUsername,
     role: role.role.name,
     age: calculateAge(user.dateOfBirth),
+    phoneNumber: user.phoneNumber,
+    dateOfBirth: user.dateOfBirth,
+    sources,
+    references,
+    isRoleDeactivated: role.isRoleDeactivated,
   };
 };
 
@@ -220,8 +245,8 @@ export const toUser = (
     id: user.id,
     name: `${_.startCase(user.firstName || '')} ${_.startCase(user.lastName || '')}`,
     gender: entityToGender[user.gender] ?? entityToGender.NOT_APPLICABLE,
-    categories: focuses.map((focus) => focus.name),
-    interests: interests.map((interest) => interest.name),
+    categories: focuses.map(focus => focus.name),
+    interests: interests.map(interest => interest.name),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     followerCount,
     profilePicture: user.profilePicture,
@@ -277,12 +302,28 @@ export const toConfirmedMember = (user: User): ConfirmedMember => {
   };
 };
 
-export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interests: InterestData[] = [], role: UserRole, customLists: customListData[], instagramUsername?: string): MemberProfile => {
+export const toMemberProfile = (
+  user: User,
+  focuses: FocusProto[] = [],
+  interests: InterestData[] = [],
+  role: UserRole,
+  customLists: customListData[],
+  instagramUsername?: string,
+  referralCode: string = '',
+  eventCount: number = 0,
+  upcomingEvents?: MemberEvent[],
+  pastEvents?: MemberEvent[],
+  invitedEvents?: MemberEvent[],
+  requestedEvents?: MemberEvent[],
+  referredBy?: ReferrerMembers[],
+  references?: IReferenceCode,
+): MemberProfile => {
   return {
     id: user.id,
+    userId: user.id,
     firstName: user.firstName,
     lastName: user.lastName,
-    category: focuses.map((focus) => focus.name).join(', '),
+    category: focuses.map(focus => focus.name).join(', '),
     city: user.address?.city ?? user.address?.address ?? 'N/A',
     dateOfBirth: user.dateOfBirth,
     placeId: user?.address?.googlePlaceId,
@@ -292,19 +333,25 @@ export const toMemberProfile = (user: User, focuses: FocusProto[] = [], interest
     socialStats: {
       instagramFollowersCount: user.socialStats?.instagramFollowersCount || 0,
     },
-    referredBy: [],
-    upcomingEvents: [],
-    pastEvents: [],
-    invitedEvents: [],
-    requestedEvents: [],
-    status: role.status,
+    referredBy,
+    upcomingEvents,
+    pastEvents,
+    invitedEvents,
+    requestedEvents,
+    status: role?.isRoleDeactivated ? UserStatus.DEACTIVATED : role?.status,
     role: role?.role?.name,
     roleId: role?.role?.id,
-    interest: interests.map((interest) => interest.name).join(', '),
+    interest: interests.map(interest => interest.name).join(', '),
     age: calculateAge(user.dateOfBirth),
     imageUrl: user.profilePicture || '',
-    instagramUsername: instagramUsername,
+    instagramUsername: user.instagramUserName,
     customLists: customLists,
-    focuses: focuses.map((focus) => ({ id: focus.id, name: focus.name })),
+    focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
+    eventCount: eventCount,
+    sources: user.roles?.length
+      ? user.roles.filter(r => r.source !== null).map(item => item.source as string)
+      : [],
+    referralCode,
+    references,
   };
 };

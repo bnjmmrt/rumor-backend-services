@@ -1,4 +1,8 @@
-import { UserStatus as UserStatusProto, UserSource as UserSourceProto, NewUserStatus } from '../grpc/auth/shared.pb';
+import {
+  UserStatus as UserStatusProto,
+  UserSource as UserSourceProto,
+  NewUserStatus,
+} from '../grpc/auth/shared.pb';
 import { UserSource, UserStatus } from '../interfaces/shared.interface';
 
 export const userStatusToEntity: { [s in UserStatusProto]: UserStatus } = {
@@ -8,6 +12,7 @@ export const userStatusToEntity: { [s in UserStatusProto]: UserStatus } = {
   [UserStatusProto.DEACTIVATED]: UserStatus.DEACTIVATED,
   [UserStatusProto.REJECTED]: UserStatus.REJECTED,
   [UserStatusProto.UNRECOGNIZED]: UserStatus.UNRECOGNIZED,
+  [UserStatusProto.NON_MEMBER]: UserStatus.NON_MEMBER,
 };
 
 export const entityToUserStatus: { [s in UserStatus]: UserStatusProto } = {
@@ -17,6 +22,7 @@ export const entityToUserStatus: { [s in UserStatus]: UserStatusProto } = {
   [UserStatus.DEACTIVATED]: UserStatusProto.DEACTIVATED,
   [UserStatus.REJECTED]: UserStatusProto.REJECTED,
   [UserStatus.UNRECOGNIZED]: UserStatusProto.UNRECOGNIZED,
+  [UserStatus.NON_MEMBER]: UserStatusProto.NON_MEMBER,
 };
 
 export const userSourceToEntity: { [s in UserSourceProto]: UserSource } = {
@@ -27,6 +33,7 @@ export const userSourceToEntity: { [s in UserSourceProto]: UserSource } = {
   [UserSourceProto.REQUEST_IN_APP]: UserSource.REQUEST_IN_APP,
   [UserSourceProto.PLUS_1]: UserSource.PLUS_1,
   [UserSourceProto.UNRECOGNIZED]: UserSource.UNRECOGNIZED,
+  [UserSourceProto.HOST_APPLICATION]: UserSource.HOST_APPLICATION,
 };
 
 export const entityToUserSource: { [s in UserSource]: UserSourceProto } = {
@@ -37,6 +44,7 @@ export const entityToUserSource: { [s in UserSource]: UserSourceProto } = {
   [UserSource.REQUEST_IN_APP]: UserSourceProto.REQUEST_IN_APP,
   [UserSource.PLUS_1]: UserSourceProto.PLUS_1,
   [UserSource.UNRECOGNIZED]: UserSourceProto.UNRECOGNIZED,
+  [UserSource.HOST_APPLICATION]: UserSourceProto.HOST_APPLICATION,
 };
 
 export const newUserStatusTosUserStatus: { [s in NewUserStatus]: UserStatus } = {

@@ -1,11 +1,13 @@
 const config = {
-    parameters: [],
-    secrets: [
-        
-    ],
-    values: {
-        PORT: 8000,
-    }
+  parameters: [],
+  secrets: [
+    {
+      remoteKey: 'prod-rumor-secrets',
+    },
+  ],
+  values: {
+    PORT: 8000,
+  },
 };
 
 export default config;

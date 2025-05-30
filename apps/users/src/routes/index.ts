@@ -12,37 +12,70 @@ import { ReferralCodeController } from '../controllers/referral-code.controller'
 import FilesController from '../controllers/files.controller';
 const multer = require('multer');
 const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 5 * 1024 * 1024,
-    },
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
 });
 
 const router: Router = express.Router();
 
 // Admin routes
 router.get('/auth/admin/members', AuthMiddleware.fusionAuthRequired, AdminController.getMembers);
+router.get(
+  '/auth/admin/membersCSV',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getMembersCSV,
+);
 router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
+router.post('/auth/admin/2fa-send-code', AdminController.send2FACode);
 router.post('/auth/admin/login', AdminController.adminLogin);
+router.post('/auth/admin/login-preview', AdminController.adminLoginPreview);
 router.post('/auth/admin/create', AdminController.createAdmin);
-router.get('/auth/admin/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile);                // get host profile for admin
-router.get('/auth/host/:id', AdminController.getHostProfile);                      // get host profile by id (Here we might get one uissue)
-router.get('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);   // get basic host profile for admin
-router.put('/auth/admin/host/:id/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);     // update host profile for admin
+router.get(
+  '/auth/admin/host/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getHostProfile,
+); // get host profile for admin
+router.get('/auth/host/:id', AuthMiddleware.fusionAuthRequired, AdminController.getHostProfile); // get host profile by id (Here we might get one uissue)
+router.get(
+  '/auth/admin/host/:id/profile',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getBasicHostProfile,
+); // get basic host profile for admin
+router.put(
+  '/auth/admin/host/:id/profile',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.updateHostProfile,
+); // update host profile for admin
 
 /**
  * Added Authorization in these 2 APIs & updated the endpoints
  */
 
-router.get('/host/profile',AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile);         // get basic host profile by id
-router.put('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile);           // update host profile 
+router.get('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.getBasicHostProfile); // get basic host profile by id
+router.put('/host/profile', AuthMiddleware.fusionAuthRequired, AdminController.updateHostProfile); // update host profile
 
-router.post('/auth/admin/host/status', AuthMiddleware.fusionAuthRequired, AdminController.updateHostStatus);
-router.post('/auth/admin/member/status', AuthMiddleware.fusionAuthRequired, AdminController.updateMemberStatus);
-router.get('/auth/admin/member/:id', AuthMiddleware.fusionAuthRequired, AdminController.getMemberProfile);
+router.post(
+  '/auth/admin/host/status',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.updateHostStatus,
+);
+router.post(
+  '/auth/admin/member/status',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.updateMemberStatus,
+);
+router.get(
+  '/auth/admin/member/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getMemberProfile,
+);
+router.get('/users/export', AuthMiddleware.fusionAuthRequired, AdminController.exportUsersCsv);
 
 // Auth routes
-router.post('/auth/forgot-password', AuthController.forgotPassword);
+router.post('/auth/admin/forgot-password', AuthController.forgotAdminPassword);
+router.post('/auth/host/forgot-password', AuthController.forgotHostPassword);
 router.post('/auth/set-password', AuthController.setPassword);
 router.post('/auth/login', AuthController.login);
 
@@ -54,10 +87,19 @@ router.get('/check-service-call', AuthController.checkService);
 
 router.post('/auth/member-sign-up', AuthController.memberSignUp);
 router.post('/auth/host-sign-up', AuthController.hostSignUp);
-router.post('/auth/logout', AuthMiddleware.fusionAuthRequired, AuthController.logout);
+router.post('/auth/logout', AuthController.logout);
 router.post('/auth/validate-password-token', AuthController.validatePasswordToken);
 router.post('/auth/host/set-password', AuthController.setHostPassword);
-router.put('/auth/host/password', AuthMiddleware.fusionAuthRequired, AuthController.updateHostPassword);
+router.put(
+  '/auth/admin/password',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.updateAdminPassword,
+);
+router.put(
+  '/auth/host/password',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.updateHostPassword,
+);
 router.get('/auth/login-sso', AuthController.loginSSO);
 router.get('/auth/oauth-redirect', AuthController.oAuthRedirect);
 router.post('/auth/check-phone-number', AuthController.checkPhoneNumber);
@@ -66,13 +108,35 @@ router.post('/auth/check-age', AuthController.checkAge);
 router.post('/auth/check-member-login', AuthController.checkMemberLogin);
 router.post('/auth/member-login', AuthController.memberLogin);
 router.post('/auth/host-login', AuthController.hostLogin);
-router.get('/auth/get-current-member', AuthMiddleware.fusionAuthRequired, AuthController.getCurrentMember);
+router.get(
+  '/auth/get-current-member',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getCurrentMember,
+);
 router.get('/auth/user/:id/get-user', AuthController.getUser);
-router.get('/auth/me', AuthMiddleware.fusionAuthRequired,AuthMiddleware.checkHostRole, AuthController.getMe);
-router.get('/auth/admin/me', AuthMiddleware.fusionAuthRequired,AuthMiddleware.checkAdminRole, AuthController.getMe);
+router.get(
+  '/auth/me',
+  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.checkHostRole,
+  AuthController.getMe,
+);
+router.get(
+  '/auth/admin/me',
+  AuthMiddleware.fusionAuthRequired,
+  AuthMiddleware.checkAdminRole,
+  AuthController.getMe,
+);
 router.post('/auth/save-or-update-provider', AuthController.saveOrUpdateProvider);
-router.post('/auth/send-invitations', AuthMiddleware.fusionAuthRequired, AuthController.sendInvitations);
-router.post('/auth/save-invitations', AuthMiddleware.fusionAuthRequired, AuthController.saveInvitations);
+router.post(
+  '/auth/send-invitations',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.sendInvitations,
+);
+router.post(
+  '/auth/save-invitations',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.saveInvitations,
+);
 router.post('/auth/admin/invite-new-member', AuthController.inviteNewMember);
 router.post('/auth/admin/invite-new-host', AuthController.inviteNewHost);
 router.put('/auth/user-profile-picture/:id', AuthController.updateUserProfilePicture);
@@ -80,22 +144,54 @@ router.put('/auth/user-profile/:id', AuthController.updateUserProfile);
 router.get('/auth/bio-profile/:id', AuthController.getBioProfile);
 router.post('/auth/bio-profile', AuthController.createBioProfile);
 router.put('/auth/bio-profile/:id', AuthController.updateBioProfile);
-router.put('/auth/member-approve/:id', AuthMiddleware.fusionAuthRequired, AuthController.approveMember);
+router.put(
+  '/auth/member-approve/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.approveMember,
+);
 router.get('/auth/users/{type}', AuthController.listUsersByType);
-router.put('/auth/admin/users/status', AuthMiddleware.fusionAuthRequired, AuthController.updateUsersStatus);
+router.put(
+  '/auth/admin/users/status',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.updateUsersStatus,
+);
 router.post('/auth/non-member', AuthController.createNonMemberUser);
 router.post('/auth/user/get-member-or-non-member', AuthController.getMembersOrNonMembers);
 router.post('/auth/host/:id/follow', AuthController.manageFollowHost);
 router.delete('/auth/host/:id/follow', AuthController.manageFollowHost);
 router.get('/auth/hosts-followed/:id', AuthController.getFollowedHosts);
-router.get('/auth/hosts/custom-lists', AuthMiddleware.fusionAuthRequired, AuthController.getCustomUsersLists);
-router.get('/auth/host/custom-lists/:id/users', AuthMiddleware.fusionAuthRequired, AuthController.getCustomUsersList);
-router.delete('/auth/host/custom-lists/:id', AuthMiddleware.fusionAuthRequired, AuthController.deleteCustomUsersList);
-router.post('/auth/host/custom-lists', AuthMiddleware.fusionAuthRequired, AuthController.createCustomUsersList);
-router.put('/auth/host/custom-lists/:id/users', AuthMiddleware.fusionAuthRequired, AuthController.updateCustomUsersList);
+router.get(
+  '/auth/hosts/custom-lists',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getCustomUsersLists,
+);
+router.get(
+  '/auth/host/custom-lists/:id/users',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getCustomUsersList,
+);
+router.delete(
+  '/auth/host/custom-lists/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.deleteCustomUsersList,
+);
+router.post(
+  '/auth/host/custom-lists',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.createCustomUsersList,
+);
+router.put(
+  '/auth/host/custom-lists/:id/users',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.updateCustomUsersList,
+);
 router.post('/auth/user/:id/favorite', AuthController.manageFavoriteUser);
 router.delete('/auth/user/:id/favorite', AuthController.manageFavoriteUser);
-router.get('/auth/hosts/favorites', AuthMiddleware.fusionAuthRequired, AuthController.getFavoriteUsers);
+router.get(
+  '/auth/hosts/favorites',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getFavoriteUsers,
+);
 router.post('/auth/get-confirmed-members', AuthController.getConfirmedMembers);
 router.post('/auth/get-user-with-roles-by-email', AuthController.getUserWithRolesByEmail);
 router.post('/auth/get-user-with-roles-by-id', AuthController.getUserWithRolesById);
@@ -104,24 +200,77 @@ router.post('/auth/user/invite-as-non-member', AuthController.registerInvitesAsN
 router.post('/auth/create-user', AuthMiddleware.fusionAuthRequired, AuthController.createUser);
 // router.post('/auth/bulk-users', AuthMiddleware.fusionAuthRequired, AuthController.bulkUploadUser);
 router.get('/auth/users-list', AuthMiddleware.fusionAuthRequired, AuthController.getAllUsers);
-router.get('/auth/host/:id/filters', AuthMiddleware.fusionAuthRequired, AuthController.getUserFiltersOptions);
+router.get(
+  '/auth/host/:id/filters',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getUserFiltersOptions,
+);
 router.post('/auth/host-feedback', AuthMiddleware.fusionAuthRequired, AuthController.hostFeedback);
 router.post('/auth/send-verification-code-by-email', AuthController.sendVerificationCodeByEmail);
 router.post('/auth/verify-code-by-email', AuthController.verifyCodeByEmail);
 router.post('/auth/user/:id/set-login-status', AuthController.setLoginStatus);
-router.post('/auth/hosts/custom-lists/duplicate', AuthMiddleware.fusionAuthRequired, AuthController.duplicateCustomList);
-router.delete('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.deleteHostUserMapping);
+router.post(
+  '/auth/hosts/custom-lists/duplicate',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.duplicateCustomList,
+);
+router.delete(
+  '/auth/user/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.deleteHostUserMapping,
+);
 router.get('/auth/user/:id', AuthMiddleware.fusionAuthRequired, AuthController.getUserProfile);
-router.get('/auth/hosts/followers', AuthMiddleware.fusionAuthRequired, AuthController.getFollowedUsers);
-router.post('/auth/user/:id/spam', AuthMiddleware.fusionAuthRequired, AuthController.manageUserSpam);
+router.get(
+  '/auth/hosts/followers',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.getFollowedUsers,
+);
+router.post(
+  '/auth/user/:id/spam',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.manageUserSpam,
+);
+router.post(
+  '/auth/users/spam',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.manageMultipleUsersSpam,
+);
 router.post('/auth/user/:id/report', AuthMiddleware.fusionAuthRequired, AuthController.reportUser);
-router.post('/auth/users/:id/hosts/:hostId/block', AuthMiddleware.fusionAuthRequired, AuthController.blockHost);
-router.post('/auth/users/:id/hosts/:hostId/unblock', AuthMiddleware.fusionAuthRequired, AuthController.unblockHost);
-router.post('/auth/users/:id/hosts/:hostId/report-and-block', AuthMiddleware.fusionAuthRequired, AuthController.reportAndBlockHost);
-router.post('/auth/send-support-email', AuthMiddleware.fusionAuthRequired, AuthController.sendSupportEmail);
+router.post(
+  '/auth/users/:id/hosts/:hostId/block',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.blockHost,
+);
+router.post(
+  '/auth/users/:id/hosts/:hostId/unblock',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.unblockHost,
+);
+router.post(
+  '/auth/users/:id/hosts/:hostId/report-and-block',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.reportAndBlockHost,
+);
+router.post(
+  '/auth/send-support-email',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.sendSupportEmail,
+);
 router.get('/auth/admin/reports', AuthController.getAllReports);
 router.post('/auth/switch-profile/:id', AuthController.switchProfile);
-router.post('/auth/user/:id/note', AuthController.addUserNote);
+router.post('/auth/user/:id/note', AuthMiddleware.fusionAuthRequired, AuthController.addUserNote);
+router.delete('/auth/users/:id', AuthController.deactivateUserAccount);
+router.post('/auth/user/:id/reactivate', AuthController.reactivateUserAccount);
+router.delete('/auth/user/:id/delete', AuthController.permanantlyDeleteAccount);
+router.delete(
+  '/auth/hosts/:id',
+  AuthMiddleware.fusionAuthRequired,
+  AuthController.deleteHostAccount,
+);
+
+// Instagram validation routes
+router.get('/auth/user/:id/instagram-validated', AuthController.getInstagramValidated);
+router.put('/auth/user/:id/instagram-validated', AuthController.setInstagramValidated);
 
 //Role routes
 router.get('/auth/roles', RoleController.listRoles);
@@ -134,18 +283,18 @@ router.post('/auth/roles/revoke/:id', RoleController.revokeRoleFromUser);
 router.post('/auth/roles/get-role-by-name', RoleController.getRoleByName);
 router.post('/auth/roles/mark-spam', RoleController.markUserAsSpam);
 
-
 // Settings routes
 
 //Below 2 routes will not be used instead we'll be using notification-preference endpoint
 // router.post('/auth/settings/notification', SettingsController.getNotificationSettings);
 // router.put('/auth/profile-notification-settings/:id', SettingsController.updateNotificationSettings);
 
-
 // router.post('/auth/settings/push-notification-tokens', SettingsController.getPushNotificationTokens);
 router.post('/auth/user/:id/push-notification-token', SettingsController.savePushNotificationToken);
-router.delete('/auth/user/:id/push-notification-token', SettingsController.deletePushNotificationToken);
-
+router.delete(
+  '/auth/user/:id/push-notification-token',
+  SettingsController.deletePushNotificationToken,
+);
 
 // Social routes
 router.get('/auth/get-facebook-auth-url', SocialController.getFacebookAuthUrl);
@@ -190,42 +339,147 @@ router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser)
 router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
 
 //Referral Requests
-router.post("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.createReferralRequest)
-router.put("/auth/referral-requests/:id", AuthMiddleware.fusionAuthRequired, ReferralRequestController.updateReferralRequest)
-router.get("/auth/referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getAllReferralRequests)
-router.get("/auth/list-referral-requests", AuthMiddleware.fusionAuthRequired, ReferralRequestController.getSentReferralRequests)
+router.post(
+  '/auth/referral-requests',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralRequestController.createReferralRequest,
+);
+router.put(
+  '/auth/referral-requests/:id',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralRequestController.updateReferralRequest,
+);
+router.get(
+  '/auth/referral-requests',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralRequestController.getAllReferralRequests,
+);
+router.get(
+  '/auth/list-referral-requests',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralRequestController.getSentReferralRequests,
+);
 
 //Referral Codes
-router.post("/auth/referred-users", ReferralCodeController.createReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCode)
-router.get("/auth/referred-users", ReferralCodeController.getReferralCodes)
-router.put("/auth/referred-users", ReferralCodeController.updateReferralCode)
-router.put("/auth/referred-users", ReferralCodeController.deactivateReferralCode)
+router.post(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.createReferralCode,
+);
+router.get(
+  '/auth/referral-codes/:id',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.getReferralCode,
+);
+router.get(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.getReferralCodes,
+);
+router.put(
+  '/auth/referral-codes',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.updateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/deactivate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.deactivateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/activate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.activateReferralCode,
+);
+router.put(
+  '/auth/referral-codes/:id/reactivate',
+  AuthMiddleware.fusionAuthRequired,
+  ReferralCodeController.reactivateReferralCode,
+);
+router.delete('/auth/referral-codes/:id', ReferralCodeController.deleteReferralCode);
+
 //Referrals
-router.post("/auth/save-referred-users", ReferralCodeController.saveReferredUser)
+router.post('/auth/save-referred-users', ReferralCodeController.saveReferredUser);
 
+router.get(
+  '/notification-preferences',
+  AuthMiddleware.fusionAuth,
+  SettingsController.getNotificationSettings,
+);
 
-router.get('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.getNotificationSettings);
-router.put('/notification-preferences', AuthMiddleware.fusionAuthRequired, SettingsController.updateNotificationSettings);
+router.put(
+  '/notification-preferences',
+  AuthMiddleware.fusionAuth,
+  SettingsController.updateNotificationSettings,
+);
 
 //collaborator user routes
-router.post("/auth/host-collaborator/create", AuthController.createHostCollaborator)
-
+router.post('/auth/host-collaborator/create', AuthController.createHostCollaborator);
 
 /**
  * Files Endpoints
  */
 
-router.post("/files/generate-download-url", FilesController.getFile);
+router.post('/files/generate-download-url', FilesController.getFile);
 
-router.post("/files/generate-upload-url", FilesController.getSignedUploadUrl);
+router.post('/files/generate-upload-url', FilesController.getSignedUploadUrl);
 
-router.post("/files/upload", upload.single("file"), FilesController.uploadFile);
-
-router.get("/files/view/:id", FilesController.viewFile);
-
-router.put('/files/:id', FilesController.updateFile);
+router.get('/files/view/*', FilesController.viewFile);
 
 router.delete('/files:id', FilesController.removeFile);
+
+router.post('/files/upload', upload.single('file'), FilesController.uploadFile);
+
+router.get('/redirect', (req, res) => {
+  // Replace these with your actual links
+  const WEBSITE_URL = 'https://therumor.com';
+  const ANDROID_APP_LINK = 'therumorapp://';
+  const IOS_APP_LINK = 'therumorapp://';
+  const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.therumor';
+  const IOS_STORE_URL = 'https://apps.apple.com/us/app/the-rumor/id6503365397';
+
+  const userAgent = req.headers['user-agent'] || '';
+  const isAndroid = /Android/i.test(userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+
+  const isMobile = isAndroid || isIOS;
+  if (!isMobile) {
+    // Desktop browser
+    return res.redirect(WEBSITE_URL);
+  }
+
+  // For mobile devices – serve an HTML with JS-based fallback
+  const fallbackUrl = isIOS ? IOS_STORE_URL : ANDROID_STORE_URL;
+  const appUrl = isIOS ? IOS_APP_LINK : ANDROID_APP_LINK;
+
+  res.redirect(fallbackUrl);
+
+  //   res.send(`
+  //     <!DOCTYPE html>
+  //     <html>
+  //       <head>
+  //         <title>Redirecting...</title>
+  //         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //         <script type="text/javascript">
+  //         try{
+  // setTimeout(function() {
+  //             window.location.href = "${fallbackUrl}";
+  //           }, 2500); // fallback after 2.5s
+
+  //           window.location = "${appUrl}";
+
+  //         }
+  //           catch(e){
+  //           console.log('------',e)
+  //           }
+
+  //         </script>
+  //       </head>
+  //       <body>
+  //         <p>Redirecting to the app...</p>
+  //       </body>
+  //     </html>
+  //   `);
+});
 
 export default router;

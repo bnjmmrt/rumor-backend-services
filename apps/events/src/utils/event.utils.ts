@@ -2,7 +2,11 @@ import { EventStatus, GuestStatus } from 'rumor-utils/shared/events/grpc/events/
 import { parse } from 'qs';
 // import { Gender } from 'rumor-utils/shared/events/utils/event.utils';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { CreateEventRequestDto, EventLocationDto, UpdateEventRequestDto } from 'rumor-utils/shared/events/dtos/events.dto';
+import {
+  CreateEventRequestDto,
+  EventLocationDto,
+  UpdateEventRequestDto,
+} from 'rumor-utils/shared/events/dtos/events.dto';
 import { Event, EventLocation } from 'rumor-utils/shared/entities';
 import { Gender } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
@@ -12,7 +16,9 @@ interface AddressComponent {
   types: string[];
 }
 
-export const getCityNameFromAddressComponents = (addressComponents: AddressComponent[]): string | undefined => {
+export const getCityNameFromAddressComponents = (
+  addressComponents: AddressComponent[],
+): string | undefined => {
   for (const component of addressComponents) {
     if (component.types.includes('locality')) {
       return component.long_name;
@@ -40,9 +46,15 @@ export const isValidUserGender = (gender: string): boolean => {
 
 export const validateFilters = (query: string): { error: boolean; response: string } => {
   const parsedFilters = parse(query);
-  const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-  const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-  const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+  const socialNetworkNames = parsedFilters?.socialNetworkNames
+    ? parsedFilters.socialNetworkNames
+    : undefined;
+  const followerCountFrom = parsedFilters?.followerCountFrom
+    ? parseInt(parsedFilters.followerCountFrom as string)
+    : undefined;
+  const followerCountTo = parsedFilters?.followerCountTo
+    ? parseInt(parsedFilters.followerCountTo as string)
+    : undefined;
   const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
   if (searchValue) {
     if (typeof searchValue !== 'string' || searchValue.length === 0) {
@@ -58,16 +70,24 @@ export const validateFilters = (query: string): { error: boolean; response: stri
       };
     }
     if (followerCountFrom > followerCountTo) {
-      return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
+      return {
+        error: true,
+        response: 'followerCountFrom must be less than or equal to followerCountTo.',
+      };
     }
 
     if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      const socialNetworkArray = socialNetworkNames
+        .split(',')
+        .map(name => name.trim().toUpperCase());
 
-      const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+      const invalidNames = socialNetworkArray.filter(name => !(name in SocialProviderType));
 
       if (invalidNames.length > 0) {
-        return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+        return {
+          error: true,
+          response: `Invalid social network names: ${invalidNames.join(', ')}`,
+        };
       }
 
       return { error: false, response: socialNetworkArray.join(',') };
@@ -82,8 +102,17 @@ export const validateFilters = (query: string): { error: boolean; response: stri
  * @param {CreateEventRequestDto} payload - The event data containing startDate, endDate, and optionally publishDate.
  * @returns {{ error: boolean; response?: string }} - Returns an error flag and an optional error message.
  */
-export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventRequestDto): { error: boolean; response?: string } => {
+export const validateEventDates = (
+  payload: CreateEventRequestDto | UpdateEventRequestDto,
+): { error: boolean; response?: string } => {
   const currentDate = new Date();
+  /**added console to debug the dates issue if any on live server*/
+  // console.log('\n', 'validateEventDates --> user Time zone: ', payload.timeZone);
+  // console.log('\n', 'validateEventDates --> currentDate:   ', currentDate);
+  // console.log(' validateEventDates --> payload.startDate:  ', payload.startDate);
+  // console.log('validateEventDates --> payload.endDate:     ', payload.endDate);
+  // console.log('validateEventDates --> payload.publishDate: ', payload.publishDate);
+
   if (!payload.startDate || !isUtcDate(payload.startDate)) {
     return { error: true, response: 'Start Date must be valid and in UTC standard' };
   }
@@ -91,7 +120,7 @@ export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventR
     return { error: true, response: 'End Date must be valid and in UTC standard' };
   }
   // Validate publishDate (if provided)
-  if (payload.publishDate) {
+  if (payload.publishDate && !payload.isPrivate) {
     if (!isUtcDate(payload.publishDate)) {
       return { error: true, response: 'Publish Date must be valid and in UTC standard' };
     }
@@ -99,6 +128,11 @@ export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventR
     // Publish date must be later than the current date and time
     if (new Date(payload.publishDate).getTime() < currentDate.getTime()) {
       return { error: true, response: 'Publish date must be later than the current date.' };
+    }
+
+    // Start date must be later than publish date
+    if (new Date(payload.startDate).getTime() <= new Date(payload.publishDate).getTime()) {
+      return { error: true, response: 'Start date must be later than the publish date.' };
     }
 
     // End date must be later than publish date
@@ -112,7 +146,10 @@ export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventR
   }
 
   // Ensure the end date is later than the start date
-  if (!payload.endDate || new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()) {
+  if (
+    !payload.endDate ||
+    new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()
+  ) {
     return { error: true, response: 'End date must be later than the start date.' };
   }
   return { error: false }; // No errors found
@@ -170,7 +207,10 @@ export const isUtcDate = (dateString: string): boolean => {
  * @param existingEvent - The existing event details stored in the database.
  * @returns An object indicating whether changes exist and specifying which fields changed.
  */
-export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, existingEvent: Event): { changed: boolean; changes: string[] } {
+export function hasEventDateOrLocationChanged(
+  updatedDateAndLocation: any,
+  existingEvent: Event,
+): { changed: boolean; changes: string[] } {
   const changes: string[] = [];
 
   /**
@@ -185,8 +225,12 @@ export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, exist
     return normalizeDate(date1)?.toISOString() === normalizeDate(date2)?.toISOString();
   };
   // Convert possible string dates to Date objects
-  const newEventStartDate = updatedDateAndLocation.startDate ? new Date(updatedDateAndLocation.startDate) : existingEvent.startDate;
-  const newEventEndDate = updatedDateAndLocation.endDate ? new Date(updatedDateAndLocation.endDate) : existingEvent.endDate;
+  const newEventStartDate = updatedDateAndLocation.startDate
+    ? new Date(updatedDateAndLocation.startDate)
+    : existingEvent.startDate;
+  const newEventEndDate = updatedDateAndLocation.endDate
+    ? new Date(updatedDateAndLocation.endDate)
+    : existingEvent.endDate;
 
   // Compare start date (ignoring seconds)
   if (updatedDateAndLocation.startDate) {
@@ -220,3 +264,77 @@ export function hasEventDateOrLocationChanged(updatedDateAndLocation: any, exist
   }
   return { changed: changes.length > 0, changes };
 }
+export function extractDate(
+  date: Date,
+  timeZone: string,
+): {
+  year: string;
+  month: string;
+  day: string;
+  dayOfWeek: string;
+  hour: string;
+  minutes: string;
+  period: string;
+  timeZone: string;
+} {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error('Invalid date object provided');
+  }
+
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone,
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true, // <-- this enables AM/PM
+  };
+
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(date);
+
+  const lookup: Record<string, string> = {};
+  parts.forEach(({ type, value }) => {
+    lookup[type] = value;
+  });
+
+  return {
+    year: lookup.year,
+    month: lookup.month,
+    day: lookup.day,
+    dayOfWeek: lookup.weekday,
+    hour: lookup.hour,
+    minutes: lookup.minute,
+    period: lookup.dayPeriod, // "AM" or "PM"
+    timeZone,
+  };
+}
+
+// export function extractDateWithDate(date: Date, timeZone: string): Date {
+//   if (!(date instanceof Date) || isNaN(date.getTime())) {
+//     throw new Error('Invalid date object provided');
+//   }
+
+//   const options: Intl.DateTimeFormatOptions = {
+//     timeZone,
+//     year: 'numeric',
+//     month: 'short',
+//     day: '2-digit',
+//     weekday: 'long',
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     hour12: true, // <-- this enables AM/PM
+//   };
+
+//   const formatter = new Intl.DateTimeFormat('en-US', options);
+//   const parts = formatter.formatToParts(date);
+
+//   const lookup: Record<string, string> = {};
+//   parts.forEach(({ type, value }) => {
+//     lookup[type] = value;
+//   });
+
+// return new Date()
+// }

@@ -6,15 +6,15 @@ import { Entity, Column, Index, JoinColumn, ManyToOne } from 'typeorm';
 @Entity()
 export class VouchRequest extends RumorBaseEntity {
   @Index()
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Event, { nullable: false })
+  @ManyToOne(() => Event, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'event_id' })
   event: Event;
 
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'requester_id' })
   requester: User;
 

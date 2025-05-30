@@ -1,8 +1,8 @@
-import { Observable } from "rxjs";
-import { UserDataSimple } from "./auth.pb";
-import { Error, GenericResponse, IdRequest } from "./shared.pb";
+import { Observable } from 'rxjs';
+import { UserDataSimple } from './auth.pb';
+import { Error, GenericResponse, IdRequest } from './shared.pb';
 
-export const protobufPackage = "auth";
+export const protobufPackage = 'auth';
 
 export interface ProfileNotificationSetting {
   allowPushNotifications: boolean;
@@ -75,4 +75,4 @@ export interface DeletePushNotificationTokenRequest {
   deviceId: string;
 }
 
-export const AUTH_PACKAGE_NAME = "auth";
+export const AUTH_PACKAGE_NAME = 'auth';

@@ -1,7 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { RumorBaseEntity } from '../../entities/rumor-base.entity';
 import { Event } from './event.entity';
-import { Role } from '../../users/entities/roles/role.entity'
+import { Role } from '../../users/entities/roles/role.entity';
 import { User } from '../../users/entities/user.entity';
 import { TicketType } from './ticket-type.entity';
 
@@ -56,7 +56,7 @@ export class Collaborator extends RumorBaseEntity {
   generateEventReports: boolean;
 
   @Index()
-  @ManyToOne(() => Event, (event) => event.collaborators, {
+  @ManyToOne(() => Event, event => event.collaborators, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
@@ -64,24 +64,24 @@ export class Collaborator extends RumorBaseEntity {
   event: Event;
 
   @Index()
-  @ManyToOne(() => Role, (role) => role.collaborators, {
-    onDelete: 'RESTRICT',
+  @ManyToOne(() => Role, role => role.collaborators, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'role_id' })
   role: Partial<Role>;
 
   @Index()
-  @ManyToOne(() => User, (user) => user.collaborators, {
-    onDelete: 'RESTRICT',
+  @ManyToOne(() => User, user => user.collaborators, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
   user: Partial<User>;
 
   @Index()
-  @ManyToOne(() => TicketType, (ticketType) => ticketType.collaborators, {
-    onDelete: 'RESTRICT',
+  @ManyToOne(() => TicketType, ticketType => ticketType.collaborators, {
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
   @JoinColumn({ name: 'ticket_type_id' })

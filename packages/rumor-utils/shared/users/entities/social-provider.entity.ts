@@ -45,7 +45,7 @@ export class SocialProvider extends RumorBaseEntity {
   })
   type: SocialProviderType;
 
-  @ManyToOne(() => User, (user) => user.socialProviders, { nullable: true })
+  @ManyToOne(() => User, user => user.socialProviders, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

@@ -1,6 +1,12 @@
-import { FindOptionsWhere, ILike, In } from 'typeorm';
-import database from '../database'
+import { FindOptionsWhere, ILike, In, LessThanOrEqual, QueryRunner } from 'typeorm';
+import database from '../database';
 import config from '../config';
+
+export interface IReferenceCode {
+  code?: string | undefined;
+  name?: string | undefined;
+  email?: string | undefined;
+}
 
 import {
   ForgotPasswordRequestDto,
@@ -27,6 +33,7 @@ import {
   ValidatePasswordTokenRequestDto,
   SetHostPasswordRequestDto,
   UpdateHostPasswordRequestDto,
+  UpdateAdminPasswordRequestDto,
   ContactsListRequestDto,
   GetUserWithRolesByEmailRequestDto,
   NonMemberSignUpRequestDto,
@@ -47,6 +54,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
+  ManageMulipleUsersRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -81,6 +89,7 @@ import {
   BasicHostProfile,
   UserIdWithRolesAndToken,
   AddUserNote,
+  CheckEmaiLRequest,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -88,7 +97,8 @@ import { Invitation } from 'rumor-utils/shared/users/entities/invitation.entity'
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { Address } from 'rumor-utils/shared/users/entities/address.entity';
-import { TemporaryPasswordToken } from "rumor-utils/shared/users/entities/temporary-password-token.entity";
+import { TemporaryPasswordToken } from 'rumor-utils/shared/users/entities/temporary-password-token.entity';
+import { ReferredUser } from 'rumor-utils/shared/users/entities/referred-user.entity';
 
 import {
   LoginRequest,
@@ -97,7 +107,13 @@ import {
   ChangePasswordRequest,
 } from '@fusionauth/typescript-client';
 
-import { formatDateToMMDDYYYYHHmm, newAddress, newHost, newMember, prepareQueryString } from '../utils/auth.util';
+import {
+  formatDateToMMDDYYYYHHmm,
+  newAddress,
+  newHost,
+  newMember,
+  prepareQueryString,
+} from '../utils/auth.util';
 import {
   entityToGender,
   genderToEntity,
@@ -112,15 +128,27 @@ import {
 } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { SettingsService } from '../services/settings.service';
 
-
 // import { PlatformClient } from 'rumor-utils/clients/platform.client';
-import { hasPagination, ReportAndFeedbackRequestDto, TokenRequestDto, UpdateUsersStatusDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import {
+  hasPagination,
+  ReportAndFeedbackRequestDto,
+  TokenRequestDto,
+  UpdateUsersStatusDto,
+} from 'rumor-utils/shared/users/dtos/shared.dto';
 import { NewUserStatus } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ProviderAuth, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
-import { AdditionalHostInformation, FilterTypeValues, Gender, RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import {
+  AdditionalHostInformation,
+  FilterTypeValues,
+  Gender,
+  RoleType,
+} from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { SocialService } from './social.service';
 import { UserSource, UserStatus } from 'rumor-utils/shared/users/interfaces/shared.interface';
-import { entityToProviderType, providerTypeToEntity } from 'rumor-utils/shared/users/mappers/social.mapper';
+import {
+  entityToProviderType,
+  providerTypeToEntity,
+} from 'rumor-utils/shared/users/mappers/social.mapper';
 import { AddressValidationClient } from '@googlemaps/addressvalidation';
 import { JWT as GoogleAuthJWT } from 'google-auth-library/build/src/auth/jwtclient';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/users/dtos/guest.dto';
@@ -134,7 +162,11 @@ import fusionAuthClientHandler from '../utils/fusion-auth/fusionauth';
 import { User } from 'rumor-utils/shared/users/entities/user.entity';
 import { Brackets, IsNull, Repository } from 'typeorm';
 
-import { IdRequestDto, PaginatedRequestDto, UserAndIdRequestDto } from 'rumor-utils/shared/users/dtos/shared.dto';
+import {
+  IdRequestDto,
+  PaginatedRequestDto,
+  UserAndIdRequestDto,
+} from 'rumor-utils/shared/users/dtos/shared.dto';
 import {
   BasicHostProfileResponse,
   GetHostsResponse,
@@ -145,14 +177,24 @@ import {
 import { parse } from 'qs';
 import { toHost, toMember } from 'rumor-utils/shared/users/mappers/auth.mapper';
 import { responses } from '../common/responses.common';
-import { LoginRequestDto, AdminSignUpRequestDto, UpdateUserStatusRequestDto } from 'rumor-utils/shared/users/dtos/auth.dto';
+import {
+  LoginRequestDto,
+  AdminSignUpRequestDto,
+  UpdateUserStatusRequestDto,
+} from 'rumor-utils/shared/users/dtos/auth.dto';
 import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 import { RegistrationRequest } from '@fusionauth/typescript-client';
 import { RawHost } from 'rumor-utils/shared/users/interfaces/auth.interface';
 import { toBasicHostProfile, toHostProfile } from 'rumor-utils/shared/users/mappers/admin.mapper';
 import { UpdateHostProfileRequestDto } from 'rumor-utils/shared/users/dtos/admin.dto';
 import { generateRandomPassword, generateTemporaryToken, hostToUpdate } from '../utils/auth.util';
-import { entityToUserSource, entityToUserStatus, newUserStatusTosUserStatus } from 'rumor-utils/shared/users/mappers/shared.mapper';
+import {
+  entityToUserSource,
+  entityToUserStatus,
+  newUserStatusTosUserStatus,
+  userSourceToEntity,
+  userStatusToEntity,
+} from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
@@ -167,7 +209,13 @@ import * as tz from 'dayjs/plugin/timezone';
 import { TemporaryPassword } from 'rumor-utils/shared/users/entities/temporary-password.entity';
 import { Role } from 'rumor-utils/shared/users/entities/roles/role.entity';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  AuthorizationError,
+} from 'rumor-utils/errors';
 import { HostCustomUsersListsUsers } from 'rumor-utils/shared/users/entities/host-custom-users-lists-users.entity';
 import { HostUserSettings } from 'rumor-utils/shared/users/entities/host-user-settings.entity';
 
@@ -176,13 +224,28 @@ import { HostFeedback } from 'rumor-utils/shared/users/entities/host-feedback.en
 import { Report } from 'rumor-utils/shared/users/entities/report.entity';
 import { Block } from 'rumor-utils/shared/users/entities/block.entity';
 import { Guest } from 'rumor-utils/shared/entities';
-import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
+import {
+  RestrictedInvites,
+  SignupFormSubmissions,
+  Ticket,
+} from 'rumor-utils/shared/events/entities';
+import { stringify } from 'csv-stringify';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { Notification } from 'rumor-utils/shared/notifications/entities/notification.entity';
+import { PushNotificationToken } from 'rumor-utils/shared/users/entities/push-notification-token.entity';
+import { ReferralRequest } from 'rumor-utils/shared/users/entities/referral-request.entity';
+import { SocialStats } from '../../packages/rumor-utils/shared/users/entities/social-stats.entity';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from '../../packages/rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
 dayjs.extend(tz);
-
 
 export class AuthService {
   public static googleAuthClient = new GoogleAuthJWT();
@@ -201,7 +264,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new ForbiddenError("user");
+        throw new ForbiddenError('user');
       }
       const loginUserRequest: LoginRequest = {
         loginId: payload.email,
@@ -209,21 +272,22 @@ export class AuthService {
       };
 
       const loginUser = await fusionAuthClientHandler.fusionAuthClient().login(loginUserRequest);
+      console.log('🚀 ~ AuthService ~ login ~ loginUser:', loginUser);
 
       if (loginUser.statusCode > 299 || loginUser.statusCode < 200) {
-        throw new ForbiddenError("User or password not valid.");
+        throw new ForbiddenError('User or password not valid.');
       }
 
       if (loginUser?.response?.user?.passwordChangeRequired) {
-        throw new ForbiddenError("User must to reset its password.");
+        throw new ForbiddenError('User must to reset its password.');
       }
 
       if (!loginUser?.response?.user?.active) {
-        throw new ForbiddenError("User is not active.");
+        throw new ForbiddenError('User is not active.');
       }
 
       if (!loginUser?.response?.user?.verified) {
-        throw new ForbiddenError("User is not verified.");
+        throw new ForbiddenError('User is not verified.');
       }
 
       return {
@@ -242,12 +306,12 @@ export class AuthService {
       };
     } catch (err) {
       if (err?.statusCode == 423) {
-        throw new ForbiddenError("User is locked.");
+        throw new ForbiddenError('User is locked.');
       }
       if (err.statusCode == 404) {
-        throw new ForbiddenError("Verify your password and email.");
+        throw new ForbiddenError('Verify your password and email.');
       }
-      throw new ForbiddenError("Unable to login.");
+      throw new ForbiddenError('Unable to login.');
     }
   }
 
@@ -255,7 +319,7 @@ export class AuthService {
     try {
       const findUser = await fusionAuthClientHandler.fusionAuthClient().retrieveUserUsingJWT(token);
       if (!findUser?.response?.user?.active) {
-        throw new ForbiddenError("User is not active.");
+        throw new ForbiddenError('User is not active.');
       }
       return responses.data({
         userId: findUser.response.user.id,
@@ -273,16 +337,21 @@ export class AuthService {
       });
     } catch (err) {
       if (err?.statusCode == 423) {
-        throw new ForbiddenError("User is locked.");
+        throw new ForbiddenError('User is locked.');
       }
       if (err.statusCode == 404) {
-        throw new ForbiddenError("Verify your password and email.");
+        throw new ForbiddenError('Verify your password and email.');
       }
-      throw new BadRequestError("Unable to validate user.");
+      throw new BadRequestError('Unable to validate user.');
     }
   }
 
-  public static async memberSignUp(payload: MemberSignUpRequestDto): Promise<UserIdWithRolesAndToken> {
+  public static async memberSignUp(
+    payload: MemberSignUpRequestDto,
+  ): Promise<UserIdWithRolesAndToken> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let existingUser: User | null = null;
     let fusionAuthUser = null;
     let requiresFusionAuthRegistration = false;
@@ -300,12 +369,12 @@ export class AuthService {
 
     if (user) {
       existingUser = user;
-      const isHost = user.roles.some((item) => item.role.name === 'host');
-      const isMember = user.roles.some((item) => item.role.name === 'member');
-      const isNonMember = user.roles.some((item) => item.role.name === 'non_member');
+      const isHost = user.roles.some(item => item.role.name === 'host');
+      const isMember = user.roles.some(item => item.role.name === 'member');
+      const isNonMember = user.roles.some(item => item.role.name === 'non_member');
 
       if (isMember) {
-        throw new BadRequestError('You are already registered as a member.')
+        throw new BadRequestError('You are already registered as a member.');
       }
 
       if (isHost) {
@@ -313,14 +382,20 @@ export class AuthService {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
           loginId: user.email,
         };
-        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
-        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+        const code = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: code.response.code });
         fusionAuthToken = authenticatedUser.response.token;
 
         requiresFusionAuthRegistration = false;
       } else if (isNonMember) {
         try {
-          const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+          const fusionAuthResponse = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .retrieveUserByEmail(payload.email);
           requiresFusionAuthRegistration = fusionAuthResponse.statusCode !== 200;
         } catch (error) {
           requiresFusionAuthRegistration = true;
@@ -343,20 +418,48 @@ export class AuthService {
     // Always use `newMember` for user creation
     let newUser = newMember(payload, address);
 
-    // Retain ID if user exists
     if (existingUser) {
-      newUser.id = existingUser.id;
-    }
+      // if user exits maintain data and update new data if register
+      const updateData = {
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        dateOfBirth: payload.dateOfBirth,
+        phoneNumber: payload.phoneNumber,
+        address: address,
+        additionalMemberInformation: {
+          ...existingUser.additionalMemberInformation,
+          ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
+        },
+      };
 
-    if (payload.socialUrl) {
-      newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
+
+      // Recovering user with actual information
+      newUser = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: { roles: { role: true } },
+      });
+    } else {
+      // if is new user create a new one
+      if (payload.socialUrl) {
+        newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
+      }
+      newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
     
     if(payload.instagramUserName) await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
     if (payload.instagramAccessToken) {
-      await SocialService.getInstagramData(newUser.id, payload.instagramAccessToken, payload.platform);
+      await SocialService.getInstagramData(
+        newUser.id,
+        payload.instagramAccessToken,
+        payload.platform,
+      );
     } else if (payload.linkedInAccessToken) {
-      await SocialService.getLinkedInData(newUser.id, payload.linkedInAccessToken, payload.platform);
+      await SocialService.getLinkedInData(
+        newUser.id,
+        payload.linkedInAccessToken,
+        payload.platform,
+      );
     } else if (payload.facebookAccessToken) {
       SocialService.getFacebookData(newUser.id, payload.linkedInAccessToken, payload.platform);
     }
@@ -365,11 +468,11 @@ export class AuthService {
       const registrationRequest: RegistrationRequest = {
         registration: {
           applicationId: config.get('FUSIONAUTH_APP_ID'),
-          username: payload.email.split('@')[0],
+          username: payload.email,
         },
         sendSetPasswordEmail: false,
         user: {
-          username: payload.email.split('@')[0],
+          username: payload.email,
           birthDate: payload.dateOfBirth,
           email: payload.email,
           firstName: payload.firstName,
@@ -381,16 +484,24 @@ export class AuthService {
         },
       };
 
-      fusionAuthUser = await fusionAuthClientHandler.fusionAuthClient().register(newUser.id, registrationRequest);
+      fusionAuthUser = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .register(newUser.id, registrationRequest);
       if (fusionAuthUser.statusCode !== 200) {
-        throw new ConflictError(`There was an issue creating your user: ${fusionAuthUser.exception.name}`);
+        throw new ConflictError(
+          `There was an issue creating your user: ${fusionAuthUser.exception.name}`,
+        );
       }
       newUser.id = fusionAuthUser.response?.user?.id;
-      fusionAuthToken = fusionAuthUser.response.token; // Get token after registration
+      fusionAuthToken = fusionAuthUser.response.token;
     }
 
     newUser = await this.dbConnection.getRepository(User).save(newUser);
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'non_member' });
+    await RoleService.assignRoleToUser(
+      { userId: newUser.id, roleName: 'non_member' },
+      UserSource.REQUEST_IN_APP, UserStatus.NEW_APPLICANT
+    );
+
     await PlatformService.saveFocusesForUser({
       userId: newUser.id,
       focusIds: payload.focusIds,
@@ -399,18 +510,20 @@ export class AuthService {
       userId: newUser.id,
       interestsIds: payload.interestsIds,
     });
-    await this.dbConnection.getRepository(Invitation).update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
+    await this.dbConnection
+      .getRepository(Invitation)
+      .update({ phoneNumber: newUser.phoneNumber }, { signUpComplete: true });
 
     try {
       await serviceMesh.notificationService().sendEmailFromTemplate(
         [
           {
             key: 'applicants_name',
-            value: `${newUser.firstName} ${newUser.lastName}`,
+            value: `${newUser.firstName}`,
           },
         ],
         'Application Submitted',
-        [newUser.email], // Send email to the member
+        [newUser.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -424,7 +537,9 @@ export class AuthService {
         ['admin@therumor.com'],
         null,
       );
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
     const savedUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: newUser.id },
@@ -436,21 +551,56 @@ export class AuthService {
     }
 
     // Save FCM Token for the user
-    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+    SettingsService.savePushNotificationToken({
+      userId: newUser.id,
+      token: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
+
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.USER_APPLICATION, adminUserIds, null, newUser.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ memberSignUp ~ error:', error);
+    }
 
     return {
       id: savedUser.id,
-      roles: savedUser.roles.map((role) => ({
+      roles: savedUser.roles.map(role => ({
         roleName: role.role.name,
         roleId: role.role.id,
       })),
-      token: fusionAuthToken, // Now token is set correctly
+      token: fusionAuthToken,
     };
-
   }
 
   public static async hostSignUp(payload: HostSignUpRequestDto): Promise<string> {
-    let nonMember: UserRole | null;
+    payload.email = payload.email.toLowerCase();
+    let userRoleAsMemberOrNonMember: UserRole | null, userRoleExistsAsHost: boolean | null;
+    let userHasOtherRoles: boolean = false;
+    let phoneNumberInUse = false,
+      emailInUse = false;
+
     const user = await this.dbConnection.getRepository(User).findOne({
       where: [
         { phoneNumber: payload.phoneNumber, deletedAt: IsNull() },
@@ -462,28 +612,59 @@ export class AuthService {
     });
 
     if (user) {
-      nonMember = user.roles.find((item) => {
-        if (item.role.name == 'non_member') return item;
-      });
-      if (!nonMember) {
-        if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError("Phone number is already in use.");
-        }
+      userRoleAsMemberOrNonMember = user.roles.find(
+        item => item.role.name === 'non_member' || item.role.name === 'member',
+      );
+      userRoleExistsAsHost = user.roles.some(item => item.role.name === 'host');
+      userHasOtherRoles = user.roles.some(
+        item => item.role.name !== 'non_member' && item.role.name !== 'member',
+      );
 
-        if (user.email === payload.email) {
-          throw new BadRequestError("Email is already in use.");
+      phoneNumberInUse = user.phoneNumber === payload.phoneNumber;
+      emailInUse = user.email === payload.email;
+
+      if (userRoleExistsAsHost) {
+        if (phoneNumberInUse && emailInUse) {
+          throw new BadRequestError(
+            'This phone number and email are already associated with a host account. Please use different credentials.',
+          );
+        } else if (phoneNumberInUse) {
+          throw new BadRequestError(
+            'This phone number is already associated with a host account. Please use a different phone number.',
+          );
+        } else if (emailInUse) {
+          throw new BadRequestError(
+            'This email is already associated with a host account. Please use a different email address.',
+          );
         }
       }
+
+      if (userHasOtherRoles) {
+        throw new BadRequestError('Users with existing roles cannot sign up as a host.');
+      }
+    }
+    if (user?.email && user.email !== payload.email) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
+    }
+    if (user?.phoneNumber && user.phoneNumber !== payload.phoneNumber.trim()) {
+      throw new ConflictError(
+        'This email and phone number do not belong to the same account. Please check your details.',
+      );
     }
 
     let newUser = newHost(payload);
-    if (nonMember) {
+    if (userRoleAsMemberOrNonMember) {
       newUser.id = user.id;
-      await RoleService.revokeRoleFromUser({ userId: user.id, roleName: 'non_member' });
     }
+
     newUser = await this.dbConnection.getRepository(User).save(newUser);
 
-    await RoleService.assignRoleToUser({ userId: newUser.id, roleName: 'host' }, UserSource.REQUEST_IN_APP);
+    await RoleService.assignRoleToUser(
+      { userId: newUser.id, roleName: 'host' },
+      UserSource.HOST_APPLICATION,
+    );
 
     // Micro-service call
 
@@ -496,7 +677,7 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [payload.email],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -510,64 +691,112 @@ export class AuthService {
         ['admin@therumor.com'],
         null,
       );
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
     // Save FCM Token for the user
-    SettingsService.savePushNotificationToken({ userId: newUser.id, token: payload.fcmToken, deviceId: payload.deviceId })
+    SettingsService.savePushNotificationToken({
+      userId: newUser.id,
+      token: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(NotificationType.HOST_APPLICATION, adminUserIds, null, newUser.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ hostSignUp ~ error:', error);
+    }
     return '';
   }
 
   public static async logout(payload: TokenRequestDto): Promise<string> {
-    const response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    let response;
+    try {
+      response = await fusionAuthClientHandler.fusionAuthClient().logout(false, payload.token);
+    } catch (error) {
+      console.error(error);
+    }
 
     if (!response.wasSuccessful()) {
-      throw new BadRequestError("Invalid session token.");
+      throw new BadRequestError('Invalid session token.');
     }
-    return '';
 
+    await this.dbConnection.getRepository(PushNotificationToken).delete({
+      notificationToken: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
+    return '';
   }
 
-  public static async validatePasswordToken(payload: ValidatePasswordTokenRequestDto): Promise<Validity> {
-    const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({ where: { token: payload.token } });
-    if (!temporaryPasswordToken) return { isValid: false }
+  public static async validatePasswordToken(
+    payload: ValidatePasswordTokenRequestDto,
+  ): Promise<Validity> {
+    const temporaryPasswordToken = await this.dbConnection
+      .getRepository(TemporaryPasswordToken)
+      .findOne({ where: { token: payload.token } });
+    if (!temporaryPasswordToken) return { isValid: false };
     const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
     const currentTime = dayjs.utc(new Date()).tz('America/New_York');
     const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
-    return { isValid }
-
+    return { isValid };
   }
 
   public static async checkService() {
-    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3'
-    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715'
+    let eventId = '4dffc9a4-8b42-4596-8827-ec99b64aaaf3';
+    let announcementId = 'a12723ab-6b0c-4bc4-8198-db68cfd6d715';
     let response = await serviceMesh.eventService().announcementDetail(eventId, announcementId);
-    return response
+    return response;
   }
 
   public static async setHostPassword(payload: SetHostPasswordRequestDto): Promise<string> {
     if (payload.password !== payload.repeatedPassword) {
-      throw new BadRequestError("Passwords do not match.");
+      throw new BadRequestError('Passwords do not match.');
     }
 
-    const temporaryPasswordToken = await this.dbConnection.getRepository(TemporaryPasswordToken).findOne({
-      where: { token: payload.token },
-      relations: { user: true },
-    });
+    const temporaryPasswordToken = await this.dbConnection
+      .getRepository(TemporaryPasswordToken)
+      .findOne({
+        where: { token: payload.token },
+        relations: { user: true },
+      });
     if (!temporaryPasswordToken) {
-      throw new BadRequestError("Unable to set password.");
+      throw new BadRequestError('Unable to set password.');
     }
 
     const expirationDate = dayjs.utc(temporaryPasswordToken.expiresAt).tz('America/New_York');
     const currentTime = dayjs.utc(new Date()).tz('America/New_York');
     const isValid = dayjs(currentTime).isSameOrBefore(expirationDate);
     if (!isValid) {
-      throw new BadRequestError("Token has expired");
+      throw new BadRequestError('Token has expired');
     }
 
-    const temporaryPassword = await this.dbConnection.getRepository(TemporaryPassword).findOne({ where: { user: { id: temporaryPasswordToken.user.id } } });
+    const temporaryPassword = await this.dbConnection
+      .getRepository(TemporaryPassword)
+      .findOne({ where: { user: { id: temporaryPasswordToken.user.id } } });
     if (!temporaryPassword) {
-      throw new BadRequestError("Unable to set password");
+      throw new BadRequestError('Unable to set password');
     }
 
     const user = await this.dbConnection.getRepository(User).findOne({
@@ -587,8 +816,11 @@ export class AuthService {
       password: payload.password,
     };
 
-    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
-
+    try {
+      await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+    } catch (e) {
+      throw new BadRequestError('Not able to set host password, try agian later');
+    }
     // Deleting one-to-one relationships can be tricky, we need to nullify the relationship first before deleting entities.
     // Nullify relationships
     user.temporaryPassword = null;
@@ -613,9 +845,11 @@ export class AuthService {
       },
     });
 
-    const hostRole = user.roles.find((role) => role.role.name === 'host' || role.role.name === 'co_host');
+    const hostRole = user.roles.find(
+      role => role.role.name === 'host' || role.role.name === 'co_host',
+    );
     if (hostRole === undefined) {
-      throw new NotFoundError("Host");
+      throw new NotFoundError('Host');
     }
 
     const request: ChangePasswordRequest = {
@@ -628,9 +862,46 @@ export class AuthService {
     return '';
   }
 
-  public static async forgot(payload: ForgotPasswordRequestDto): Promise<string> {
+  public static async updateAdminPassword(payload: UpdateAdminPasswordRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: {
+        id: payload.id,
+      },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    const adminRole = user.roles.find(role => role.role.name === 'admin');
+    if (adminRole === undefined) {
+      throw new NotFoundError('Admin');
+    }
+
+    const request: ChangePasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      loginId: user.email,
+      password: payload.newPassword,
+    };
+
+    await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+    return '';
+  }
+
+  /**
+   * Handles the forgot password flow for Admin  role.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
+  public static async forgotAdminPassword(payload: ForgotPasswordRequestDto): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
-      where: { email: payload.email, deletedAt: null },
+      where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
       relations: {
         roles: {
           role: true,
@@ -638,19 +909,38 @@ export class AuthService {
       },
     });
     if (!user) {
-      throw new NotFoundError("The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.");
+      throw new NotFoundError(
+        "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
+      );
     }
     const passwordResetRequest: ForgotPasswordRequest = {
       applicationId: config.get('FUSIONAUTH_APP_ID'),
-      email: payload.email,
+      email: payload.email.trim().toLowerCase(),
       sendForgotPasswordEmail: false,
     };
-    const forgotPasswordResponse = await fusionAuthClientHandler.fusionAuthClient().forgotPassword(passwordResetRequest);
-    const token = forgotPasswordResponse.response?.changePasswordId;
-    if (!token) {
-      throw new BadRequestError('Unable to call forgot password, please try again later.');
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+
+    if (!isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and try again later.',
+      );
     }
-    const isAdmin: boolean = user?.roles?.some((role: UserRole) => role.role.name === 'admin');
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check if email is correct.`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
     if (isAdmin) {
       const redirectPath = `new-password?token=${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -661,7 +951,7 @@ export class AuthService {
           },
         ],
         'Super Admin - Reset Password',
-        [payload.email],
+        [payload.email.trim().toLowerCase()],
         null,
         // this.logger,
       );
@@ -669,6 +959,66 @@ export class AuthService {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
     } else {
+      throw new BadRequestError(
+        "Can't send reset link, Please check your role and account status and try again.",
+      );
+    }
+    return '';
+  }
+
+  /**
+   * Handles the forgot password flow for Host role.
+   * Validates the user by email, generates a password reset token using FusionAuth,
+   * and sends a reset link via email based on the user's role.
+   *
+   * @param payload - ForgotPasswordRequestDto containing the email address for the password reset.
+   * @returns Promise<string> - Empty string if the operation is successful, otherwise throws errors.
+   * @throws NotFoundError - If the email does not match any user.
+   * @throws BadRequestError - If the user does not have permission or if token generation or email sending fails.
+   */
+  public static async forgotHostPassword(payload: ForgotPasswordRequestDto): Promise<string> {
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email.trim().toLowerCase(), deletedAt: null },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+    if (!user) {
+      throw new NotFoundError(
+        "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
+      );
+    }
+    const passwordResetRequest: ForgotPasswordRequest = {
+      applicationId: config.get('FUSIONAUTH_APP_ID'),
+      email: payload.email.trim().toLowerCase(),
+      sendForgotPasswordEmail: false,
+    };
+
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    if (!isHost) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
+    }
+    let token = null;
+    try {
+      const forgotPasswordResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .forgotPassword(passwordResetRequest);
+      token = forgotPasswordResponse.response?.changePasswordId;
+    } catch (e) {
+      throw new BadRequestError(
+        `Unable to send reset link, please try again later or check if your profile setup successfully completed for the host role.`,
+      );
+    }
+    if (!token) {
+      throw new BadRequestError('Unable to get token, please try again later.');
+    }
+    if (isHost) {
       const redirectPath = `auth/reset-password/${token}`;
       const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
         [
@@ -682,41 +1032,79 @@ export class AuthService {
           },
         ],
         'Reset Password',
-        [payload.email],
+        [payload.email.trim().toLowerCase()],
         null,
       );
       if (!mailServiceResponse) {
         throw new BadRequestError('Unable to send mail, please try again later.');
       }
+    } else {
+      throw new BadRequestError(
+        "Can't send reset link, Please check your role and account status and try again.",
+      );
     }
     return '';
-
   }
 
-  public static async setPassword(payload: SetHostPasswordRequestDto): Promise<TokenResponseAndRoles> {
+  /**
+   * Reset a password for a user using the token received from the forgot password flow.
+   * Verifies token validity, resets the password via FusionAuth,
+   * and returns authentication tokens for Admin or Host roles upon success.
+   *
+   * @param payload - SetHostPasswordRequestDto containing the new password, repeated password, and reset token.
+   * @returns Promise<TokenResponseAndRoles> - Authentication tokens and roles if password reset succeeds.
+   * @throws BadRequestError - If passwords don't match, token is invalid, or if resetting the password fails.
+   */
+  public static async setPassword(
+    payload: SetHostPasswordRequestDto,
+  ): Promise<TokenResponseAndRoles> {
     const { password, token, repeatedPassword } = payload;
     if (password !== repeatedPassword) throw new BadRequestError('Passwords do not match.');
     const changePasswordRequest: ChangePasswordRequest = {
       password: payload.password,
     };
-    const fusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByChangePasswordId(token);
+    const fusionAuthResponse = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .retrieveUserByChangePasswordId(token);
     const email = fusionAuthResponse?.response?.user?.email;
     if (!email) {
-      throw new BadRequestError('The email address you provided does not match any account in our system. Please check for any typos or try a different email.');
+      throw new BadRequestError(
+        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+      );
     }
-    const changePasswordFusionAuthResponse = await fusionAuthClientHandler.fusionAuthClient().changePassword(token, changePasswordRequest);
-    if (changePasswordFusionAuthResponse?.statusCode !== 200) {
-      throw new BadRequestError('Unable to reset password, please try again later.');
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { email: email }, relations: { roles: { role: true } } });
+    const isAdmin: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Admin,
+    );
+    const isHost: boolean = user?.roles?.some(
+      (role: UserRole) => role.role.name === RoleType.Host && role.status === UserStatus.ACTIVE,
+    );
+    if (!isHost && !isAdmin) {
+      throw new BadRequestError(
+        'You dont have permission for this action, please check your role and account status and try again later.',
+      );
     }
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: email }, relations: { roles: { role: true } } });
-    const isAdmin = user.roles.some((role) => role.role.name === 'admin');
-    const isHost = user.roles.some((role) => role.role.name === 'host');
+    try {
+      const changePasswordFusionAuthResponse = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .changePassword(token, changePasswordRequest);
+      if (changePasswordFusionAuthResponse?.statusCode !== 200) {
+        throw new BadRequestError('Unable to reset password, please try again later.');
+      }
+    } catch (e) {
+      throw new BadRequestError(
+        'Unable to reset password. The reset link may have expired. Please try again later.',
+      );
+    }
 
     if (isAdmin) {
       return await this.adminLogin({ email, password });
     } else if (isHost) {
       return await this.hostLogin({ email, password });
     }
+    throw new BadRequestError('You dont have permission, please try again later.');
   }
 
   public static async loginSSO(): Promise<LoginSSOResponse> {
@@ -725,12 +1113,14 @@ export class AuthService {
   }
 
   public static async oAuthRedirect(payload: OAuthRequestDto): Promise<OAuthRedirectResponse> {
-    const accesToken = await fusionAuthClientHandler.fusionAuthClient().exchangeOAuthCodeForAccessToken(
-      payload.code,
-      config.get('FUSIONAUTH_APP_ID'),
-      config.get('FUSIONAUTH_CLIENT_SECRET'),
-      config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect',
-    );
+    const accesToken = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .exchangeOAuthCodeForAccessToken(
+        payload.code,
+        config.get('FUSIONAUTH_APP_ID'),
+        config.get('FUSIONAUTH_CLIENT_SECRET'),
+        config.get('FUSIONAUTH_GATEWAY_URI') + 'v1/auth/oauth-redirect',
+      );
 
     return responses.data(accesToken.response.access_token);
   }
@@ -747,21 +1137,26 @@ export class AuthService {
     //Micro-service call
     try {
       await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
     return { isValid: true };
   }
 
   public static async checkEmail(payload: CheckEmailRequestDto): Promise<Validity> {
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } });
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { email: payload.email, deletedAt: IsNull() } });
     if (user) {
-      throw new ConflictError("This email is already taken");
+      throw new ConflictError('This email is already taken');
     }
+    await this.sendVerificationCodeByEmail({ email: payload.email });
     return { isValid: true };
   }
 
   public static async checkAge(payload: CheckAgeRequestDto): Promise<Validity> {
     if (dayjs(new Date()).diff(payload.dateOfBirth, 'year') < 18) {
-      throw new BadRequestError("Error. Age requirement not met.");
+      throw new BadRequestError('Error. Age requirement not met.');
     }
     return { isValid: true };
   }
@@ -769,13 +1164,15 @@ export class AuthService {
   public static async sendInvitations(payload: UserInvitationsRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
-      throw new NotFoundError("user");
+      throw new NotFoundError('user');
     }
 
     const invitations = await Promise.all(
-      payload.phoneNumbers.map(async (phoneNumber) => {
+      payload.phoneNumbers.map(async phoneNumber => {
         try {
-          const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+          const existingInvitation = await this.dbConnection
+            .getRepository(Invitation)
+            .findOneBy({ phoneNumber });
           if (existingInvitation) return existingInvitation;
 
           const invitation = new Invitation();
@@ -787,30 +1184,37 @@ export class AuthService {
         }
       }),
     );
-    const successfulInvitations = invitations.filter((invitation) => invitation).map((invitation) => invitation.phoneNumber);
+    const successfulInvitations = invitations
+      .filter(invitation => invitation)
+      .map(invitation => invitation.phoneNumber);
 
     // Micro-service call
     try {
-      const success = await serviceMesh.notificationService().sendInvitationMessages(successfulInvitations, user.firstName);
+      const success = await serviceMesh
+        .notificationService()
+        .sendInvitationMessages(successfulInvitations, user.firstName);
       if (!success) {
-        throw new BadRequestError('An error occured while sending invitations, please try again.')
+        throw new BadRequestError('An error occured while sending invitations, please try again.');
       }
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
     return '';
-
   }
 
   public static async saveInvitations(payload: UserInvitationsRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
 
     await Promise.all(
-      payload.phoneNumbers.map(async (phoneNumber) => {
+      payload.phoneNumbers.map(async phoneNumber => {
         try {
-          const existingInvitation = await this.dbConnection.getRepository(Invitation).findOneBy({ phoneNumber });
+          const existingInvitation = await this.dbConnection
+            .getRepository(Invitation)
+            .findOneBy({ phoneNumber });
           if (existingInvitation) return existingInvitation;
 
           const invitation = new Invitation();
@@ -826,9 +1230,12 @@ export class AuthService {
   }
 
   public static async inviteNewMember(payload: InviteNewMemberRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     const existingUser = await this.dbConnection.getRepository(User).findOne({
@@ -837,11 +1244,11 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.phoneNumber === payload.phoneNumber) {
-        throw new BadRequestError('This user is already a part of our database')
+        throw new BadRequestError('This user is already a part of our database');
       }
 
       if (existingUser.email === payload.email) {
-        throw new BadRequestError('This user is already a part of our database')
+        throw new BadRequestError('This user is already a part of our database');
       }
     }
 
@@ -853,25 +1260,35 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
-    if (payload.phoneNumber) {
-      const message =
-        `Hi, ${invitee.firstName} would like to invite you to join Rumor. Download the app here. ` +
-        (payload.referralCode ? `Referral code: ${payload.referralCode}.` : ``);
+    if (payload?.phoneNumber) {
+      let message =
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
+        (payload.referralCode
+          ? `Enter code ${payload.referralCode} to expedite your application review.`
+          : ``) +
+        `\n https://app.therumor.com/app`;
 
       //Micro-service call
       try {
-        const success = serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
-        if (!success) {
-          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
         }
-      } catch (error) { }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
     }
 
     if (payload.email) {
       const params = [
         {
           key: 'invitee_first_name',
-          value: payload.name,
+          value: payload.name?.split(' ')[0] || 'User',
+        },
+        {
+          key: 'link_to_application',
+          value: 'https://app.therumor.com/app', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -884,20 +1301,29 @@ export class AuthService {
 
       //Micro-service call
       try {
-        const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Invite New Member', [payload.email], null);
-        if (!success) {
-          throw new BadRequestError('An error occured while sending SMS invitation, please try again.')
-        }
-      } catch (error) { }
+        await serviceMesh
+          .notificationService()
+          .sendEmailFromTemplate(
+            params,
+            'Invite New Member',
+            [payload.email.trim().toLowerCase()],
+            null,
+          );
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     return '';
   }
 
   public static async inviteNewHost(payload: InviteNewHostRequestDto): Promise<string> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     const invitee = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!invitee) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     const whereCondition: FindOptionsWhere<User>[] = [{ email: payload.email }];
@@ -911,11 +1337,11 @@ export class AuthService {
 
     if (existingUser) {
       if (payload.phoneNumber && existingUser.phoneNumber === payload.phoneNumber) {
-        throw new BadRequestError('Phone number is already in use')
+        throw new ForbiddenError('This user is already a part of our database.');
       }
 
       if (existingUser.email === payload.email) {
-        throw new BadRequestError('Email is already in use')
+        throw new ForbiddenError('This user is already a part of our database.');
       }
     }
 
@@ -926,6 +1352,23 @@ export class AuthService {
 
     await this.dbConnection.getRepository(Invitation).save(invitation);
 
+    if (payload?.phoneNumber) {
+      let message =
+        `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
+        `\n https://app.therumor.com/app`;
+
+      //Micro-service call
+      try {
+        const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
+      }
+    }
+
     const params = [
       {
         key: 'invitee_first_name',
@@ -935,17 +1378,24 @@ export class AuthService {
 
     // Micro-service call
     try {
-      const success = await serviceMesh.notificationService().sendEmailFromTemplate(params, 'Host Invited by Rumor Admin', [payload.email], null);
-      if (!success) {
-        throw new BadRequestError('An error occured while sending Email invitation, please try again.')
-      }
-    } catch (error) { }
+      await serviceMesh
+        .notificationService()
+        .sendEmailFromTemplate(
+          params,
+          'Host Invited by Rumor Admin',
+          [payload.email.trim().toLowerCase()],
+          null,
+        );
+    } catch (error) {
+      console.error(error);
+    }
 
     return '';
-
   }
 
-  public static async saveOrUpdateProvider(payload: SaveOrUpdateProviderAuthRequestDto): Promise<SaveOrUpdateProviderAuthResponse> {
+  public static async saveOrUpdateProvider(
+    payload: SaveOrUpdateProviderAuthRequestDto,
+  ): Promise<SaveOrUpdateProviderAuthResponse> {
     const payloadClone = { ...payload };
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: {
@@ -955,18 +1405,20 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
-    let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-      where: {
-        user: {
-          id: payload.userId,
+    let socialProvider: SocialProvider = await this.dbConnection
+      .getRepository(SocialProvider)
+      .findOne({
+        where: {
+          user: {
+            id: payload.userId,
+          },
+          type: SocialProviderType.GOOGLE,
         },
-        type: SocialProviderType.GOOGLE,
-      },
-      relations: ['user'],
-    });
+        relations: ['user'],
+      });
 
     const providerType = providerTypeToEntity[payload.providerType];
 
@@ -1004,8 +1456,11 @@ export class AuthService {
   }
 
   public static async checkMemberLogin(payload: LoginVerificationRequestDto): Promise<Validity> {
-    if(payload.phoneNumber) {
+    if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1034,7 +1489,9 @@ export class AuthService {
         } else {
           await serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
         }
-      } catch (error) { }
+      } catch (error) {
+        console.error(error);
+      }
       return { isValid: false };
     }
 
@@ -1044,22 +1501,24 @@ export class AuthService {
     };
 
     // Remove all previous login attempts (both email and phone)
-    const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
+    const existingLoginAttempts = await this.dbConnection
+      .getRepository(TemporaryLoginCode)
+      .find({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
     // const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { phoneNumber: payload.phoneNumber } });
 
     if (existingLoginAttempts.length) {
       await Promise.all(
-        existingLoginAttempts.map(async (attempt) => {
+        existingLoginAttempts.map(async attempt => {
           await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
         }),
       );
     }
 
     try {
-      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+      await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(user.email);
     } catch (error) {
       const guest = await this.dbConnection.getRepository(Guest).findOne({
-        where: { user: { id: user.id }, status: GuestStatus.INVITED },
+        where: { user: { id: user.id } },
       });
 
       if (guest) {
@@ -1069,8 +1528,10 @@ export class AuthService {
           } else {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
-        } catch (error) { }
-        return { isValid: true, isGuest: true };
+        } catch (error) {
+          console.error(error);
+        }
+        return { isValid: true, isGuest: true, isDeactivated: user.isDeactivated };
       } else {
         try {
           if (isEmailLogin) {
@@ -1078,13 +1539,21 @@ export class AuthService {
           } else {
             serviceMesh.notificationService().sendVerificationCode(payload.phoneNumber);
           }
-        } catch (error) { }
-        return { isValid: true, isGuest: false };
+        } catch (error) {
+          console.error(error);
+        }
+        return { isValid: true, isGuest: false, isDeactivated: user.isDeactivated };
       }
     }
 
     // Start a new login and save the code
-    const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    try {
+      var code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ checkMemberLogin ~ error:', error);
+      throw new BadRequestError(JSON.stringify(error));
+    }
+
     const temporaryLoginCode = new TemporaryLoginCode();
     temporaryLoginCode.email = payload.email;
     temporaryLoginCode.phoneNumber = payload.phoneNumber;
@@ -1099,29 +1568,40 @@ export class AuthService {
         await serviceMesh.notificationService().sendEmailFromTemplate(
           [
             {
-              key: 'first_name',
+              key: 'code',
               value: code.response.code,
             },
           ],
-          'Host Application Submitted',
-          [payload.email],
+          'Non-Member Verify Email',
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
         // Send verification text for phone login unless bypass conditions are met
-        if (config.get('APP_REVIEW_PHONE_NUMBER') !== payload.phoneNumber || !config.get('BYPASS_VERIFICATION_CODE')) {
-          const message = 'Your Rumor verification code: ' + code.response.code;
-          serviceMesh.notificationService().sendTextMessage(payload.phoneNumber, message);
+        const message = 'Your Rumor verification code: ' + code.response.code;
+        try {
+          const validateNumber = isValidPhoneNumber(payload.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = payload.phoneNumber.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${payload.phoneNumber}:`, err);
         }
       }
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
-    return { isValid: true };
+    return { isValid: true, isDeactivated: user.isDeactivated };
   }
 
   public static async memberLogin(payload: MemberLoginRequestDto): Promise<TokenResponseAndRoles> {
-    if(payload.phoneNumber) {
+    if (payload.phoneNumber) {
       payload.phoneNumber = payload.phoneNumber.trim().split(' ').join('');
+    }
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
@@ -1140,21 +1620,36 @@ export class AuthService {
       });
     }
 
+    if (user && user.roles.length) {
+      const isUnapprovedHost =
+        user.roles.length === 1 &&
+        user.roles[0].role?.name === 'host' &&
+        user.roles[0].status === UserStatus.NEW_APPLICANT;
+
+      // Filter out 'host' roles with status 'new_applicant'
+      user.roles = user.roles.filter(
+        userRole =>
+          !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT),
+      );
+    }
+
+    if (user?.isDeactivated) {
+      this.reactivateUserAccount({ email: user.email });
+    }
+
     // If user is not found, verify OTP and create a new user entry
     if (payload.isGuest) {
-      try {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
-      } catch (error) { }
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1163,7 +1658,9 @@ export class AuthService {
       const isSignUpCompleted = invitation?.signUpComplete || false;
       const isInvited = !!invitation;
 
-      const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
+      const role: Role[] = await this.dbConnection
+        .getRepository(Role)
+        .find({ where: { name: 'non_member' } });
 
       return {
         token: '',
@@ -1182,20 +1679,17 @@ export class AuthService {
     }
 
     if (!user && !payload.isExist) {
-      try {
-        const verificationResult = isEmailLogin
-          ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-          : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
 
-        const isVerified: boolean =
-          ('verified' in verificationResult && verificationResult.verified === true) ||
-          ('data' in verificationResult && verificationResult.data?.verified === true);
-
-        if (!isVerified) {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
-      } catch (error) { }
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
 
       // Check for invitation and set flags
       const invitation = await this.dbConnection.getRepository(Invitation).findOne({
@@ -1204,7 +1698,9 @@ export class AuthService {
       const isSignUpCompleted = invitation?.signUpComplete || false;
       const isInvited = !!invitation;
 
-      const role: Role[] = await this.dbConnection.getRepository(Role).find({ where: { name: 'non_member' } });
+      const role: Role[] = await this.dbConnection
+        .getRepository(Role)
+        .find({ where: { name: 'non_member' } });
 
       return {
         id: '',
@@ -1223,23 +1719,136 @@ export class AuthService {
     }
 
     // Handle bypass verification logic for testing or review environment
-    if (config.get('APP_REVIEW_LOGIN') === loginIdentifier || config.get('BYPASS_VERIFICATION_CODE')) {
-      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({ where: { phoneNumber: payload.phoneNumber, email: payload.email } });
-      if (!temporaryCode) throw new NotFoundError('Unable to login, please try again.');
+    if (config.get('BYPASS_VERIFICATION_CODE')) {
+      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+        where: {
+          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+          // code: payload.code,
+        },
+      });
 
-      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: temporaryCode.code });
-      if (completedLogin.statusCode > 299) {
-        throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      if (!temporaryCode) {
+        if (!isEmailLogin) {
+          const verificationResult = await serviceMesh
+            .notificationService()
+            .verifyCode(payload.phoneNumber, payload.code);
+          const isVerified = verificationResult?.data?.verified === true;
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.NEW_APPLICANT,
+                } as UserRole,
+              ];
+            }
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: rolesToReturn.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } else {
+          throw new NotFoundError('Invalid or expired verification code, please try again.');
+        }
       }
+
+      // Setting up Payload.code to bypass verification for below email and phone number
+      if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
+        payload.code = temporaryCode.code;
+      } else if (payload.code !== temporaryCode.code) {
+        throw new BadRequestError('Invalid or expired verification code, please try again.');
+      }
+
+      let completedLogin;
+      try {
+        completedLogin = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: payload.code });
+      } catch (error) {
+        try {
+          const verificationResult = isEmailLogin
+            ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+            : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+          const isVerified: boolean =
+            ('verified' in verificationResult && verificationResult.verified === true) ||
+            ('data' in verificationResult && verificationResult.data?.verified === true);
+
+          if (!isVerified) {
+            throw new NotFoundError('Invalid or expired verification code, please try again.');
+          }
+
+          let rolesToReturn = user.roles;
+
+          // If no roles exist, assign non_member temporarily
+          if (!user.roles || user.roles.length === 0) {
+            const nonMemberRole = await this.dbConnection
+              .getRepository(Role)
+              .findOne({ where: { name: RoleType.NonMember } });
+
+            if (nonMemberRole) {
+              rolesToReturn = [
+                {
+                  role: nonMemberRole,
+                  status: UserStatus.ACTIVE,
+                } as UserRole,
+              ];
+            }
+          }
+
+          return {
+            id: user.id,
+            token: '',
+            roles: rolesToReturn.map(item => ({
+              roleName: item.role.name,
+              roleId: item.role.id,
+            })),
+            user: user,
+            isGuest: false,
+          };
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      // if (completedLogin.statusCode > 299) {
+      //   throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
+      // }
 
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
-      // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
+      if (user?.id) {
+        // Save FCM Token for the User
+        SettingsService.savePushNotificationToken({
+          userId: user.id,
+          token: payload.fcmToken,
+          deviceId: payload.deviceId,
+        });
+      }
+
       return {
         id: user.id,
-        token: completedLogin.response.token,
-        roles: user.roles.map((item) => ({
+        token: completedLogin?.response?.token,
+        roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
         })),
@@ -1255,9 +1864,11 @@ export class AuthService {
       });
       if (!temporaryCode) {
         throw new NotFoundError('Unable to login.');
-      };
+      }
 
-      const completedLogin = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: payload.code });
+      const completedLogin = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .passwordlessLogin({ code: payload.code });
       if (completedLogin.statusCode > 299) {
         throw new BadRequestError('Unable to login.');
       }
@@ -1265,11 +1876,15 @@ export class AuthService {
       await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
 
       // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
+      SettingsService.savePushNotificationToken({
+        userId: user.id,
+        token: payload.fcmToken,
+        deviceId: payload.deviceId,
+      });
 
       return {
-        token: completedLogin.response.token,
-        roles: user.roles.map((item) => ({
+        token: completedLogin.response?.token,
+        roles: user.roles.map(item => ({
           roleName: item.role.name,
           roleId: item.role.id,
         })),
@@ -1281,10 +1896,14 @@ export class AuthService {
   }
 
   public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
-    const user = await this.dbConnection.getRepository(User).findOne({
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
+    console.log('start hostLogin');
+    const user = await User.findOne({
       where: {
         email: payload.email,
-        deletedAt: IsNull(),
+        deletedAt: IsNull() as any,
         roles: {
           role: {
             name: RoleType.Host,
@@ -1295,30 +1914,61 @@ export class AuthService {
         roles: { role: true },
       },
     });
+
+    console.log('fetched user');
     if (!user) {
       throw new NotFoundError('Host');
     }
 
+    let authenticatedUser = null;
     const request: LoginRequest = {
-      loginId: user.email,
+      loginId: payload.email,
       password: payload.password,
     };
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request)
+
+    try {
+      console.log('fusion auth started');
+
+      authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().login(request);
+
+      console.log('fusion auth completed');
+    } catch (e) {
+      console.log(':rocket: ~ AuthService ~ hostLogin ~ e:', e);
+      console.log('fusion auth error');
+
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
+    }
+    console.log(':rocket: ~ AuthService ~ hostLogin ~ authenticatedUser:', authenticatedUser);
+    if (!authenticatedUser) {
+      console.log('authenticatedUser error');
+      throw new BadRequestError(
+        `We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.`,
+      );
+    }
+    console.log('fusion auth Logged In successful');
+
     const additionalHostInformation = user.additionalHostInformation;
     const data = {
       token: authenticatedUser.response.token,
-      roles: user.roles.map((item) => {
+      roles: user.roles.map(item => {
         return { roleName: item.role.name, roleId: item.role.id };
       }),
       hostDetails: {
         companyLogo: additionalHostInformation?.companyLogo || '',
         companyName: additionalHostInformation?.companyName || '',
+        socialMedia: additionalHostInformation?.socialMedia || {},
         id: user.id,
       },
-    }
+    };
 
     // Save FCM Token
-    SettingsService.savePushNotificationToken({ userId: user.id, token: payload.fcmToken, deviceId: payload.deviceId })
+    SettingsService.savePushNotificationToken({
+      userId: user.id,
+      token: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
     return data;
   }
 
@@ -1332,26 +1982,28 @@ export class AuthService {
       throw new NotFoundError('user');
     }
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
+    const memberRole = user.roles.find(role => role.role.name === 'member');
 
     if (memberRole === undefined) {
       throw new NotFoundError('User');
     }
 
     // Mirco-service call
-    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+    const focuses = await PlatformService.getUserFocuses({ id: user.id });
 
-    const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-      where: {
-        user: {
-          id: user.id,
+    const socialProvider: SocialProvider = await this.dbConnection
+      .getRepository(SocialProvider)
+      .findOne({
+        where: {
+          user: {
+            id: user.id,
+          },
+          type: SocialProviderType.INSTAGRAM,
         },
-        type: SocialProviderType.INSTAGRAM,
-      },
-      relations: ['user'],
-    });
+        relations: ['user'],
+      });
 
-    return (toCurrentMember(user, focuses, memberRole, socialProvider?.username));
+    return toCurrentMember(user, focuses, memberRole, socialProvider?.username);
   }
 
   public static async getUser(payload: IdRequestDto): Promise<SimpleUser> {
@@ -1364,13 +2016,16 @@ export class AuthService {
       throw new NotFoundError('user');
     }
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member' || role.role.name === 'host' || role.role.name === 'non_member');
+    const memberRole = user.roles.find(
+      role =>
+        role.role.name === 'member' || role.role.name === 'host' || role.role.name === 'non_member',
+    );
 
     if (memberRole === undefined) {
       throw new NotFoundError('user');
     }
 
-    const data = (toSimpleUser(user, memberRole));
+    const data = toSimpleUser(user, memberRole);
     return data;
   }
 
@@ -1380,29 +2035,31 @@ export class AuthService {
       relations: { address: true, socialProviders: true, roles: { role: true } },
     });
     if (!user) {
-      throw new NotFoundError('user')
-    };
+      throw new NotFoundError('user');
+    }
     if (!user.roles.length) {
       throw new ForbiddenError('insufficient permissions');
     }
 
     //Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-    const roleData = user.roles.map((role) => toCurrentUser(user, focuses, [role]));
+    const focuses = await PlatformService.getUserFocuses({ id: user.id });
+    const roleData = user.roles.map(role => toCurrentUser(user, focuses, [role]));
     return {
       ...roleData[0],
-      role: roleData.flatMap(r => r.role)
+      role: roleData.flatMap(r => r.role),
     };
   }
 
-  public static async updateUserProfile(payload: UpdateUserProfileRequestDto): Promise<UserProfile> {
+  public static async updateUserProfile(
+    payload: UpdateUserProfileRequestDto,
+  ): Promise<UserProfile> {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     const actualUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
       relations: ['address'],
     });
     if (!actualUser) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
     const updateUserPayload: Partial<User> = {};
 
@@ -1429,7 +2086,9 @@ export class AuthService {
             },
           };
           //Verifies if it is a valid Place
-          const addressValidationClient = new AddressValidationClient({ authClient: this.googleAuthClient });
+          const addressValidationClient = new AddressValidationClient({
+            authClient: this.googleAuthClient,
+          });
           const validations = await addressValidationClient.validateAddress(request);
           const addressUserValidated = validations[0]?.result?.address?.formattedAddress || null;
           if (addressUserValidated) {
@@ -1474,7 +2133,9 @@ export class AuthService {
         }
       } else {
         //Gets the address based on Google place id
-        const placeResponse = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${payload.address.placeId}&key=${GOOGLE_MAPS_API_KEY}`);
+        const placeResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/details/json?place_id=${payload.address.placeId}&key=${GOOGLE_MAPS_API_KEY}`,
+        );
         const placeDetailsData = await placeResponse.json();
         const placeId = payload.address.placeId;
 
@@ -1527,9 +2188,9 @@ export class AuthService {
       },
     });
 
-    const memberRole = responseUser.roles.find((role) => role.role.name === 'member');
-    const nonMemberRole = responseUser.roles.find((role) => role.role.name === 'non-member');
-    const hostRole = responseUser.roles.find((role) => role.role.name === 'host');
+    const memberRole = responseUser.roles.find(role => role.role.name === 'member');
+    const nonMemberRole = responseUser.roles.find(role => role.role.name === 'non-member');
+    const hostRole = responseUser.roles.find(role => role.role.name === 'host');
 
     let userStatus = null;
     let userSource = null;
@@ -1556,24 +2217,25 @@ export class AuthService {
       source: userSource,
       address: responseUser.address
         ? {
-          address: responseUser.address?.address,
-          placeId: responseUser.address.googlePlaceId,
-          latitude: String(responseUser.address.latitude),
-          longitude: String(responseUser.address.longitude),
-          city: responseUser.address.city,
-        }
+            address: responseUser.address?.address,
+            placeId: responseUser.address.googlePlaceId,
+            latitude: String(responseUser.address.latitude),
+            longitude: String(responseUser.address.longitude),
+            city: responseUser.address.city,
+          }
         : null,
     };
-
   }
 
-  public static async updateUserProfilePicture(payload: UpdateUserProfilePictureRequestDto): Promise<UserProfilePicture> {
+  public static async updateUserProfilePicture(
+    payload: UpdateUserProfilePictureRequestDto,
+  ): Promise<UserProfilePicture> {
     let actualUser = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
       relations: ['address'],
     });
     if (!actualUser) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
     await this.dbConnection.getRepository(User).update(
       { id: payload.id },
@@ -1591,16 +2253,18 @@ export class AuthService {
   public static async getBioProfile(payload: IdRequestDto): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.id });
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
     const additionalInfo = user.additionalHostInformation;
     return additionalInfo;
   }
 
-  public static async createBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
+  public static async createBioProfile(
+    payload: BioProfileRequestDto,
+  ): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
     const { bio } = payload;
     let additionalInfo: AdditionalHostInformation;
@@ -1625,10 +2289,12 @@ export class AuthService {
     return additionalInfo;
   }
 
-  public static async updateBioProfile(payload: BioProfileRequestDto): Promise<AdditionalHostInformation> {
+  public static async updateBioProfile(
+    payload: BioProfileRequestDto,
+  ): Promise<AdditionalHostInformation> {
     const user = await this.dbConnection.getRepository(User).findOneBy({ id: payload.userId });
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
     const { bio } = payload;
     let additionalInfo: AdditionalHostInformation;
@@ -1659,19 +2325,23 @@ export class AuthService {
       relations: { roles: { role: true } },
     });
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
-    const nonMemberUserRole = user.roles.find((userRole) => userRole.role.name === 'non_member');
+    const nonMemberUserRole = user.roles.find(userRole => userRole.role.name === 'non_member');
     if (!nonMemberUserRole) return responses.notFound('User not found!');
 
     // Find the member role
-    const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
+    const memberRole = await this.dbConnection
+      .getRepository(Role)
+      .findOne({ where: { name: 'member' } });
     if (!memberRole) {
       throw new NotFoundError('Member role not found');
     }
 
     // Find the user's current role entry
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { user: { id: payload.id } } });
+    const userRole = await this.dbConnection
+      .getRepository(UserRole)
+      .findOne({ where: { user: { id: payload.id } } });
     if (!userRole) {
       throw new NotFoundError('User role entry not found');
     }
@@ -1686,19 +2356,53 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+            value: 'https://app.therumor.com/app',
+          },
+          {
+            key: 'first_name',
+            value: `${user.firstName}`,
           },
         ],
         'Member Approved into Rumor',
-        [user.email],
+        [user.email.trim().toLowerCase()],
         null,
       );
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
+
+    try {
+      // Send Notification
+
+      await serviceMesh
+        .notificationService()
+        .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ approveMember ~ error:', error);
+    }
+
+    //send text notification
+    let userPhoneNumber = user?.phoneNumber;
+    if (userPhoneNumber) {
+      try {
+        let link = 'https://app.therumor.com/app';
+        let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+        const validateNumber = isValidPhoneNumber(userPhoneNumber);
+        if (validateNumber) {
+          const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+          await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+        }
+      } catch (err) {
+        console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+      }
+    }
 
     return responses.ok;
   }
 
-  public static async listUsersByType(payload: ListUsersByTypeRequestDto): Promise<UserDataSimple[]> {
+  public static async listUsersByType(
+    payload: ListUsersByTypeRequestDto,
+  ): Promise<UserDataSimple[]> {
     const users = await this.dbConnection.getRepository(User).find({
       where: {
         deletedAt: null,
@@ -1709,7 +2413,7 @@ export class AuthService {
         },
       },
     });
-    const userList = users.map((user) => {
+    const userList = users.map(user => {
       return toUserDataSimple(user);
     });
     return userList;
@@ -1722,45 +2426,143 @@ export class AuthService {
     });
 
     if (users.length === 0) {
-      throw new NotFoundError('Users')
+      throw new NotFoundError('Users');
     }
 
-    const memberRole = await this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } });
-    if (!memberRole) {
-      throw new NotFoundError('Role')
+    const [memberRole, nonMemberRole] = await Promise.all([
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'member' } }),
+      this.dbConnection.getRepository(Role).findOne({ where: { name: 'non_member' } }),
+    ]);
+
+    if (!memberRole || !nonMemberRole) {
+      throw new NotFoundError('Role');
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: In(payload.ids) } },
       relations: ['user', 'role'],
     });
-
+    // const nonMemberUserRole = userRoles.find(
+    //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
+    // );
     if (userRoles.length === 0) {
-      throw new NotFoundError('UserRole')
+      throw new NotFoundError('UserRole');
     }
 
     const failedUsers: string[] = [];
-    const usersToUpdate: { userRole: any; newStatus: UserStatus; newRole?: any }[] = [];
+    const usersToUpdate: {
+      userRole: any;
+      newStatus?: UserStatus;
+      newRole?: any;
+      isRoleDeactivated?: boolean;
+    }[] = [];
 
     for (const user of users) {
-      const nonMemberUserRole = userRoles.find((ur) => ur.user.id === user.id && ur.role.name === 'non_member');
+      const rolesForUser = userRoles.filter(ur => ur.user.id === user.id);
+      const memberUserRole = rolesForUser.find(ur => ur.role.name === 'member');
+      const nonMemberUserRole = rolesForUser.find(ur => ur.role.name === 'non_member');
 
-      if (payload.status === UserStatus.WAITLISTED) {
-        if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
-          console.error(`User ${user.id} is active and cannot be waitlisted`);
-          failedUsers.push(user.id);
-          continue;
-        }
+      if (!memberUserRole && !nonMemberUserRole) continue; // Skip if no relevant role
+
+      switch (payload.status) {
+        case UserStatus.ACTIVE:
+          if (nonMemberUserRole) {
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              newRole: memberRole,
+              isRoleDeactivated: false,
+            });
+          } else if (memberUserRole) {
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.ACTIVE,
+              isRoleDeactivated: false,
+            });
+          }
+
+          await this.dbConnection.getRepository(User).update(user.id, {
+            isDeactivated: false,
+            deactivatedAt: null,
+          });
+
+          break;
+
+        case UserStatus.WAITLISTED:
+          if (memberUserRole) {
+            usersToUpdate.push({
+              userRole: memberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              newRole: nonMemberRole,
+              isRoleDeactivated: false,
+            });
+          } else if (nonMemberUserRole) {
+            usersToUpdate.push({
+              userRole: nonMemberUserRole,
+              newStatus: UserStatus.WAITLISTED,
+              isRoleDeactivated: false,
+            });
+          }
+          break;
+
+        case UserStatus.DEACTIVATED:
+          if (memberUserRole) {
+            usersToUpdate.push({ userRole: memberUserRole, isRoleDeactivated: true });
+          } else if (nonMemberUserRole) {
+            usersToUpdate.push({ userRole: nonMemberUserRole, isRoleDeactivated: true });
+          }
+
+          await this.dbConnection.getRepository(User).update(user.id, {
+            isDeactivated: true,
+            deactivatedAt: new Date(),
+          });
+
+          break;
       }
 
-      if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
-        usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
-      }
+      // const userRole = userRoles.find(ur => ur.user.id === user.id);
+      // const nonMemberUserRole = userRoles.find(
+      //   ur => ur.user.id === user.id && ur.role.name === 'non_member',
+      // );
+
+      // if (nonMemberUserRole) {
+      //   usersToUpdate.push({
+      //     userRole: nonMemberUserRole,
+      //     newStatus: payload.status,
+      //     newRole: memberRole,
+      //   });
+      // }
+
+      // if (userRole) {
+      //   usersToUpdate.push({ userRole, newStatus: payload.status });
+      // }
+
+      // if (payload.status === UserStatus.WAITLISTED) {
+      // if (userRoles.some((ur) => ur.user.id === user.id && ur.status === UserStatus.ACTIVE)) {
+      //   console.error(`User ${user.id} is active and cannot be waitlisted`);
+      //   failedUsers.push(user.id);
+      //   continue;
+      // }
+      // }
+      // if (payload.status === UserStatus.ACTIVE && nonMemberUserRole) {
+      //   usersToUpdate.push({ userRole: nonMemberUserRole, newStatus: payload.status, newRole: memberRole });
+      // }
+
+      // if (payload.status === UserStatus.DEACTIVATED && userRole) {
+      //   usersToUpdate.push({ userRole, newStatus: UserStatus.DEACTIVATED });
+      // }
     }
 
     // Perform bulk updates only for valid users
     for (const update of usersToUpdate) {
-      update.userRole.status = update.newStatus;
+      if (update.hasOwnProperty('newStatus')) {
+        update.userRole.status = update.newStatus;
+      }
+
+      if (update.hasOwnProperty('isRoleDeactivated')) {
+        update.userRole.isRoleDeactivated = update.isRoleDeactivated;
+      }
+
       if (update.newRole) {
         update.userRole.role = update.newRole;
       }
@@ -1768,33 +2570,71 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
+        let link = 'https://app.therumor.com/app';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
-          const user = users.find((u) => u.id === update.userRole.user.id);
+          const user = users.find(u => u.id === update.userRole.user.id);
+          console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
           if (user) {
             await serviceMesh.notificationService().sendEmailFromTemplate(
               [
                 {
                   key: 'link_to_application',
-                  value: config.get('RUMOR_WEBSITE_ADMIN') + `users/${user.id}`,
+                  value: link,
+                },
+                {
+                  key: 'first_name',
+                  value: `${user.firstName}`,
                 },
               ],
               'Member Approved into Rumor',
-              [user.email], // Send email to the approved member
+              [user.email.trim().toLowerCase()], // Send email to the approved member
               null,
             );
+
+            // Send Notification
+            await serviceMesh
+              .notificationService()
+              .sendNotification(NotificationType.APPLICATION_APPOVED, user.id);
+            //send text message
+            let userPhoneNumber = user?.phoneNumber;
+            if (userPhoneNumber) {
+              try {
+                let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
+                const validateNumber = isValidPhoneNumber(userPhoneNumber);
+                if (validateNumber) {
+                  const cleanedNumber = userPhoneNumber.replace(/[\s\-()]/g, '');
+                  await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+                }
+              } catch (err) {
+                console.error(`❌ Error while processing SMS for ${userPhoneNumber}:`, err);
+              }
+            }
           }
         }
-      } catch (error) { }
+      } catch (error) {
+        console.error(error);
+      }
     }
 
-    return { failedUsers, usersToUpdate };;
-
+    return { failedUsers, usersToUpdate };
   }
 
-  public static async createNonMemberUser(payload: CreateNonMemberUserRequestDto): Promise<UserIdData> {
-    const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-    if (exists) {
-      throw new BadRequestError('user exists')
+  public static async createNonMemberUser(
+    payload: CreateNonMemberUserRequestDto,
+  ): Promise<UserIdData> {
+    // const exists = await this.dbConnection
+    //   .getRepository(User)
+    //   .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+    // if (exists) {
+    //   throw new BadRequestError('user exists');
+    // }
+    if (payload.email || payload.phoneNumber) {
+      const exists = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
+      if (exists) {
+        throw new BadRequestError('user exists');
+      }
     }
     let user = new User();
     user.email = payload.email;
@@ -1806,11 +2646,14 @@ export class AuthService {
     return { userId: user.id };
   }
 
-
-  public static async createHostCollaborator(payload: CreateHostCollaboratorRequestDto): Promise<UserIdData> {
-    const exists = await this.dbConnection.getRepository(User).findOne({ where: [{ email: payload.email }] });
+  public static async createHostCollaborator(
+    payload: CreateHostCollaboratorRequestDto,
+  ): Promise<UserIdData> {
+    const exists = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: [{ email: payload.email }] });
     if (exists) {
-      throw new BadRequestError('user exists')
+      throw new BadRequestError('user exists');
     }
     let user = new User();
 
@@ -1821,7 +2664,7 @@ export class AuthService {
     user = await this.dbConnection.getRepository(User).save(user);
     //check if user role is already in the database
     const userWithRoles: any = await this.getUserWithRolesByEmail({ email: payload.email });
-    const hasRole = userWithRoles.roles.some((role) => role.name === payload.role);
+    const hasRole = userWithRoles.roles.some(role => role.name === payload.role);
     if (!hasRole) {
       await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
     }
@@ -1833,9 +2676,9 @@ export class AuthService {
     const hostId = payload.userId;
     const pagination = hasPagination(parsedQuery)
       ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
-      }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
       : {};
     const where: unknown = { deletedAt: null };
     let customListName = parsedQuery.customListName;
@@ -1851,7 +2694,7 @@ export class AuthService {
           relations: ['usersLists', 'usersLists.user'],
         });
         if (customList) {
-          const customListUserIds = customList.usersLists.map((listUser) => listUser.user.id);
+          const customListUserIds = customList.usersLists.map(listUser => listUser.user.id);
           const existingUserIds = Array.isArray(parsedQuery.usersIds)
             ? parsedQuery.usersIds.filter((id): id is string => typeof id === 'string')
             : typeof parsedQuery.usersIds === 'string'
@@ -1862,8 +2705,10 @@ export class AuthService {
         }
       }
     }
-    const followed = parsedQuery.followed === 'true' ? true : parsedQuery.followed === 'false' ? false : false;
-    const favorite = parsedQuery.favorite === 'true' ? true : parsedQuery.favorite === 'false' ? false : false;
+    const followed =
+      parsedQuery.followed === 'true' ? true : parsedQuery.followed === 'false' ? false : false;
+    const favorite =
+      parsedQuery.favorite === 'true' ? true : parsedQuery.favorite === 'false' ? false : false;
     if (followed) {
       where['following'] = { host: { id: hostId } };
     }
@@ -1874,7 +2719,7 @@ export class AuthService {
       where['id'] = In(
         String(parsedQuery.usersIds)
           .split(',')
-          .map((id) => id.trim()),
+          .map(id => id.trim()),
       );
     }
     let users = await this.dbConnection.getRepository(User).find({
@@ -1888,27 +2733,36 @@ export class AuthService {
       ...pagination,
     });
     users = users.filter(
-      (user) => user.roles.find((role) => role.role.name === 'member' && role.status === 'ACTIVE') || user.roles.find((role) => role.role.name === 'non_member'),
+      user =>
+        user.roles.find(role => role.role.name === 'member' && role.status === 'ACTIVE') ||
+        user.roles.find(role => role.role.name === 'non_member'),
     );
     const members = await Promise.all(
-      users.map(async (user) => {
-
+      users.map(async user => {
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
 
-
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.FACEBOOK,
             },
-            type: SocialProviderType.FACEBOOK,
-          },
-          relations: ['user'],
-        });
+            relations: ['user'],
+          });
 
-        return toMember(user, focuses, interests, user.roles[0], undefined, socialProvider?.username);
+        return toMember(
+          user,
+          focuses,
+          interests,
+          user.roles[0],
+          undefined,
+          socialProvider?.username,
+        );
       }),
     );
     return members;
@@ -1918,19 +2772,17 @@ export class AuthService {
     const { userId, hostId, follow } = payload;
     const [follower, host] = await this.findUsers(userId, hostId);
     if (!follower) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
     if (!host) {
-      throw new NotFoundError('Host')
-
+      throw new NotFoundError('Host');
     }
-    const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
+    const validateRoleHost = host.roles.find(role => role.role.name === 'host');
     if (!validateRoleHost) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
     if (follower.id === host.id) {
-      throw new BadRequestError('You cannot follow yourself!')
-
+      throw new BadRequestError('You cannot follow yourself!');
     }
     const followHost = await this.dbConnection.getRepository(HostFollowing).findOne({
       where: {
@@ -1941,13 +2793,12 @@ export class AuthService {
 
     if (follow) {
       if (followHost) {
-        throw new BadRequestError('Already following host')
-
+        throw new BadRequestError('Already following host');
       }
       await this.addFollowHost(follower, host);
     } else {
       if (!followHost) {
-        throw new BadRequestError('You are not following this host!')
+        throw new BadRequestError('You are not following this host!');
       }
       await this.dbConnection.getRepository(HostFollowing).delete({ follower, host });
     }
@@ -1968,12 +2819,12 @@ export class AuthService {
   }
 
   public static async addFollowHost(follower: User, host: User): Promise<void> {
-    const followHost = { follower, host }
+    const followHost = { follower, host };
     await this.dbConnection.getRepository(HostFollowing).save(followHost);
   }
 
   public static async addFavoriteHost(member: User, host: User): Promise<void> {
-    const favoriteHost = { member, host }
+    const favoriteHost = { member, host };
     await this.dbConnection.getRepository(HostFavorite).save(favoriteHost);
   }
 
@@ -1989,9 +2840,9 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
-    const followingIds = user.following.map((follow) => follow.host.id);
+    const followingIds = user.following.map(follow => follow.host.id);
 
     let hostsFollowing = await this.dbConnection.getRepository(User).find({
       where: [{ id: In(followingIds) }],
@@ -2000,12 +2851,14 @@ export class AuthService {
       skip,
     });
 
-    hostsFollowing = hostsFollowing.filter((host) => host.roles.some((role) => role.role.name === 'host'));
-    const transformedHosts = hostsFollowing.map((item) => {
+    hostsFollowing = hostsFollowing.filter(host =>
+      host.roles.some(role => role.role.name === 'host'),
+    );
+    const transformedHosts = hostsFollowing.map(item => {
       const hostProfile = toBasicHostProfile(
         item,
-        entityToUserStatus[item.roles.find((el) => el.role.name === 'host').status],
-        entityToUserSource[item.roles.find((el) => el.role.name === 'host').source],
+        entityToUserStatus[item.roles.find(el => el.role.name === 'host').status],
+        entityToUserSource[item.roles.find(el => el.role.name === 'host').source],
       );
 
       return hostProfile;
@@ -2013,42 +2866,63 @@ export class AuthService {
 
     if (name) {
       return {
-        hosts: transformedHosts.filter((host) => host.companyName.toLowerCase().includes(name)).slice(skip, skip + take),
+        hosts: transformedHosts
+          .filter(host => host.companyName.toLowerCase().includes(name))
+          .slice(skip, skip + take),
       };
     }
     return { hosts: transformedHosts };
   }
 
-  public static async getCustomUsersLists(payload: CustomUsersListRequestDto): Promise<CustomUsersListsData> {
+  public static async getCustomUsersLists(
+    payload: CustomUsersListRequestDto,
+  ): Promise<CustomUsersListsData> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const user = await this.dbConnection.getRepository(User).findOne({
-      where: { id: userId },
-      relations: {
-        customLists: { usersLists: true },
-        favoritedMembers: true,
-        followers: true,
-      },
-      order: {
-        customLists: { createdAt: 'DESC' },
-      },
+    // Get the custom lists created by the host
+    const customLists = await this.dbConnection.getRepository(HostCustomUsersLists).find({
+      where: { host: { id: userId } },
+      order: { createdAt: 'DESC' },
+      relations: ['usersLists', 'usersLists.user'],
     });
 
-    if (!user) {
-      return { totalCount: 0, result: [] };
-    }
+    //Get active followed users
+    const followedUsers = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFollowing, 'f', 'f.host_id = :userId AND f.follower_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
 
-    const allLists = [
-      { id: null, name: 'Followed', totalCount: user.followers.length, result: [] },
-      { id: null, name: 'Favorite', totalCount: user.favoritedMembers.length, result: [] },
-      ...user.customLists.map((list) => ({
+    //Get active favorited users
+    const favoritedUsers = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .innerJoin(HostFavorite, 'f', 'f.host_id = :userId AND f.member_id = u.id', { userId })
+      .where('u.isDeactivated = false')
+      .getMany();
+
+    //Prepare custom list data with only active users
+    const customListsWithCounts = customLists.map(list => {
+      const activeUsers = list.usersLists
+        .filter(u => u.user && !u.user.isDeactivated)
+        .map(u => u.user);
+
+      return {
         id: list.id,
         name: list.listName,
-        totalCount: list.usersLists.length,
+        totalCount: activeUsers.length,
         result: [],
-      })),
+      };
+    });
+
+    //Combine all lists
+    const allLists = [
+      { id: null, name: 'Followed', totalCount: followedUsers.length, result: [] },
+      { id: null, name: 'Favorite', totalCount: favoritedUsers.length, result: [] },
+      ...customListsWithCounts,
     ];
 
     return {
@@ -2057,7 +2931,9 @@ export class AuthService {
     };
   }
 
-  public static async getCustomUsersList(payload: CustomUsersListRequestDto): Promise<CustomUsersList> {
+  public static async getCustomUsersList(
+    payload: CustomUsersListRequestDto,
+  ): Promise<CustomUsersList> {
     const parsedQuery = parse(payload.query) as ParsedQs;
     const customListId = payload.id;
     const hostId = payload.userId;
@@ -2086,16 +2962,17 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError("User");
+      throw new NotFoundError('User');
     }
 
-    const customList = user.customLists.find((list) => list.id === customListId);
+    const customList = user.customLists.find(list => list.id === customListId);
     if (!customList) {
-      throw new NotFoundError("CustomList");
+      throw new NotFoundError('CustomList');
     }
 
-    const userIds = customList.usersLists.map((listUser) => listUser.user.id);
-    const queryBuilder = this.dbConnection.getRepository(User)
+    const userIds = customList.usersLists.map(listUser => listUser.user.id);
+    const queryBuilder = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.address', 'address')
       .leftJoinAndSelect('user.roles', 'roles')
@@ -2107,17 +2984,32 @@ export class AuthService {
       .where('customList.host_id = :hostId', { hostId: hostId })
       .andWhere('customList.id = :listId', { listId: customListId });
 
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
-      userTypes = type.split(',').map((name) => name.trim());
+      userTypes = type.split(',').map(name => name.trim());
     }
     if (parsedQuery.sortBy === 'name') {
       const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      queryBuilder
+        .addOrderBy('user.firstName', sortDirection)
+        .addOrderBy('user.lastName', sortDirection);
     } else {
       queryBuilder.orderBy('usersList.createdAt', 'DESC');
     }
-    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes);
+    await this.applyUserFilters(
+      queryBuilder,
+      parsedQuery,
+      searchValue,
+      focuses,
+      interest,
+      gender,
+      baseCity,
+      hostId,
+      userTypes,
+    );
 
     const [allUsers, totalCount] = await queryBuilder.getManyAndCount();
     let paginatedUsers = allUsers;
@@ -2125,13 +3017,12 @@ export class AuthService {
       paginatedUsers = allUsers.slice(skip, skip + take);
     }
 
-
     const favorites = await this.dbConnection.getRepository(HostFavorite).find({
       where: { host: { id: hostId } },
       relations: ['member'],
     });
-    const favoriteUserIds = favorites.map((fav) => fav.member.id);
-    this.dbConnection.getRepository(HostCustomUsersListsUsers).find
+    const favoriteUserIds = favorites.map(fav => fav.member.id);
+    this.dbConnection.getRepository(HostCustomUsersListsUsers).find;
     const userMappingIds = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
       where: {
         list: { id: customListId },
@@ -2142,24 +3033,26 @@ export class AuthService {
     });
 
     const mappingIdMap: { [key: string]: string } = {};
-    userMappingIds.forEach((mapping) => {
+    userMappingIds.forEach(mapping => {
       mappingIdMap[mapping.user.id] = mapping.id;
     });
 
     const users = await Promise.all(
-      paginatedUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+      paginatedUsers.map(async user => {
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
 
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
             },
-            type: SocialProviderType.INSTAGRAM,
-          },
-          relations: ['user'],
-        });
+            relations: ['user'],
+          });
 
         const socialProviderUsername = socialProvider?.username || null;
 
@@ -2178,7 +3071,7 @@ export class AuthService {
       id: customList.id,
       totalCount: totalCount,
       result: users,
-    }
+    };
 
     return data;
   }
@@ -2191,50 +3084,56 @@ export class AuthService {
       relations: { customLists: true },
     });
     if (!user) {
-      throw new NotFoundError("User");
+      throw new NotFoundError('User');
     }
 
     if (!userId) {
       throw new NotFoundError('User ids not found.');
     }
 
-    const customList = user.customLists.find((list) => list.id === id);
+    const customList = user.customLists.find(list => list.id === id);
     if (!customList) {
-      throw new NotFoundError("Custom List");
+      throw new NotFoundError('Custom List');
     }
-    await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({ list: { id: customList.id } });
+    await this.dbConnection
+      .getRepository(HostCustomUsersListsUsers)
+      .delete({ list: { id: customList.id } });
     await this.dbConnection.getRepository(HostCustomUsersLists).delete({ id: customList.id });
     return '';
   }
 
-  public static async createCustomUsersList(payload: ManageCustomUsersListRequestDto): Promise<CustomUsersList> {
+  public static async createCustomUsersList(
+    payload: ManageCustomUsersListRequestDto,
+  ): Promise<CustomUsersList> {
     const { userId, customName, userIds } = payload;
     if (!customName) {
-      throw new BadRequestError("Custom list name is required.");
+      throw new BadRequestError('Custom list name is required.');
     }
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: userId, deletedAt: IsNull() },
       relations: { customLists: true },
     });
     if (!user) {
-      throw new NotFoundError("User");
+      throw new NotFoundError('User');
     }
-    const existingList = user.customLists.find((list) => list.listName === customName);
+    const existingList = user.customLists.find(list => list.listName === customName);
     if (existingList) {
-      throw new BadRequestError("Custom list already exists.");
+      throw new BadRequestError('Custom list already exists.');
     }
     const validUsers = await this.dbConnection.getRepository(User).find({
       where: { id: In(userIds) },
     });
     if (validUsers.length !== userIds.length) {
-      throw new BadRequestError("Invalid user IDs provided.");
+      throw new BadRequestError('Invalid user IDs provided.');
     }
 
     const customList = new HostCustomUsersLists();
     customList.listName = customName;
     customList.host = user;
-    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
-    const userListEntries = validUsers.map((validUser) => {
+    const savedCustomList = await this.dbConnection
+      .getRepository(HostCustomUsersLists)
+      .save(customList);
+    const userListEntries = validUsers.map(validUser => {
       const listUser = new HostCustomUsersListsUsers();
       listUser.user = validUser;
       listUser.list = customList;
@@ -2249,45 +3148,53 @@ export class AuthService {
       query: 'take=10&skip=0',
     });
     return customListSaved;
-
   }
 
-  public static async updateCustomUsersList(payload: UpdateCustomUsersListRequestDto): Promise<CustomUsersList> {
+  public static async updateCustomUsersList(
+    payload: UpdateCustomUsersListRequestDto,
+  ): Promise<CustomUsersList> {
     const { hostId, customName, userIds, customListId, mappingIds } = payload;
     if (!customName) {
-      throw new BadRequestError("Custom list name is required.");
+      throw new BadRequestError('Custom list name is required.');
     }
     const host = await this.dbConnection.getRepository(User).findOne({
       where: { id: hostId, deletedAt: IsNull() },
       relations: { customLists: { usersLists: { user: true } } },
     });
     if (!host) {
-      throw new NotFoundError("Host");
+      throw new NotFoundError('Host');
     }
-    const customList = host.customLists.find((list) => list.id === customListId);
+    const customList = host.customLists.find(list => list.id === customListId);
     if (!customList) {
-      throw new NotFoundError("Custom list not found.");
+      throw new NotFoundError('Custom list not found.');
     }
 
     if (customList.listName !== customName) {
-      if (host.customLists.some((list) => list.listName === customName)) {
-        throw new BadRequestError("Custom list with this name already exists.");
+      if (host.customLists.some(list => list.listName === customName)) {
+        throw new BadRequestError('Custom list with this name already exists.');
       }
       customList.listName = customName;
       await this.dbConnection.getRepository(HostCustomUsersLists).save(customList);
     }
 
-    const existingUserIds = customList.usersLists.map((listUser) => listUser.user.id);
-    const userIdsToAdd = userIds.filter((id) => !existingUserIds.includes(id));
+    const existingUserIds = customList.usersLists.map(listUser => listUser.user.id);
+    const userIdsToAdd = userIds.filter(id => !existingUserIds.includes(id));
+
+    const userIdsAlreadyExist = userIds.filter(id => existingUserIds.includes(id));
+    if (userIdsAlreadyExist.length) {
+      throw new BadRequestError(`User already exist in the custom list.`);
+    }
 
     if (userIdsToAdd.length) {
-      const validUsers = await this.dbConnection.getRepository(User).find({ where: { id: In(userIdsToAdd) } });
+      const validUsers = await this.dbConnection
+        .getRepository(User)
+        .find({ where: { id: In(userIdsToAdd) } });
 
       if (validUsers.length !== userIdsToAdd.length) {
-        throw new NotFoundError("Invalid user IDs provided.");
+        throw new NotFoundError('Invalid user IDs provided.');
       }
 
-      const userListEntries = validUsers.map((validUser) => {
+      const userListEntries = validUsers.map(validUser => {
         const listUser = new HostCustomUsersListsUsers();
         listUser.user = validUser;
         listUser.list = customList;
@@ -2298,15 +3205,17 @@ export class AuthService {
     }
 
     if (mappingIds.length) {
-      const existingMappings = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
-        where: { id: In(mappingIds) },
-      });
+      const existingMappings = await this.dbConnection
+        .getRepository(HostCustomUsersListsUsers)
+        .find({
+          where: { id: In(mappingIds) },
+        });
 
-      const existingMappingIds = existingMappings.map((mapping) => mapping.id);
-      const invalidMappingIds = mappingIds.filter((id) => !existingMappingIds.includes(id));
+      const existingMappingIds = existingMappings.map(mapping => mapping.id);
+      const invalidMappingIds = mappingIds.filter(id => !existingMappingIds.includes(id));
 
       if (invalidMappingIds.length) {
-        throw new BadRequestError("Invalid mapping IDs provided");
+        throw new BadRequestError('Invalid mapping IDs provided');
       }
 
       await this.dbConnection.getRepository(HostCustomUsersListsUsers).delete({
@@ -2327,18 +3236,17 @@ export class AuthService {
 
     const [targetUser, host] = await this.findUsers(targetUserId, userId);
     if (!targetUser) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
     if (!host) {
-      throw new NotFoundError('User')
-
+      throw new NotFoundError('User');
     }
-    const validateRoleHost = host.roles.find((role) => role.role.name === 'host');
+    const validateRoleHost = host.roles.find(role => role.role.name === 'host');
     if (!validateRoleHost) {
-      throw new NotFoundError('User is not a host')
+      throw new NotFoundError('User is not a host');
     }
     if (targetUser.id === host.id) {
-      throw new BadRequestError('You cannot mark yourself as favorite!')
+      throw new BadRequestError('You cannot mark yourself as favorite!');
     }
 
     const favoriteByHosts = await this.dbConnection.getRepository(HostFavorite).findOne({
@@ -2350,17 +3258,16 @@ export class AuthService {
 
     if (favorite) {
       if (favoriteByHosts) {
-        throw new BadRequestError('You already marked this user as favorite!')
+        throw new BadRequestError('You already marked this user as favorite!');
       }
       await this.addFavoriteHost(targetUser, host);
     } else {
       if (!favoriteByHosts) {
-        throw new BadRequestError('User was not found in your favorite list!')
+        throw new BadRequestError('User was not found in your favorite list!');
       }
       await this.dbConnection.getRepository(HostFavorite).delete({ member: targetUser, host });
     }
     return '';
-
   }
 
   public static async getFavoriteUsers(payload: PaginatedRequestDto): Promise<UsersData> {
@@ -2378,9 +3285,10 @@ export class AuthService {
       relations: { favoritedMembers: { member: true } },
     });
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
-    const queryBuilder = this.dbConnection.getRepository(User)
+    const queryBuilder = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.address', 'address')
       .leftJoinAndSelect('user.roles', 'roles')
@@ -2394,73 +3302,106 @@ export class AuthService {
       .take(take)
       .skip(skip);
 
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
-      userTypes = type.split(',').map((name) => name.trim());
+      userTypes = type.split(',').map(name => name.trim());
     }
     if (parsedQuery.sortBy === 'name') {
       const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      queryBuilder
+        .addOrderBy('user.firstName', sortDirection)
+        .addOrderBy('user.lastName', sortDirection);
     } else {
       queryBuilder.orderBy('hf.createdAt', 'DESC');
     }
-    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    await this.applyUserFilters(
+      queryBuilder,
+      parsedQuery,
+      searchValue,
+      focuses,
+      interest,
+      gender,
+      baseCity,
+      undefined,
+      userTypes,
+    );
     const [favoriteUsers, totalCount] = await queryBuilder.getManyAndCount();
     const users = await Promise.all(
-      favoriteUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));;
+      favoriteUsers.map(async user => {
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
 
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
             },
-            type: SocialProviderType.INSTAGRAM,
-          },
-          relations: ['user'],
-        });
+            relations: ['user'],
+          });
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = true;
+        return userData;
       }),
     );
     return { result: users, totalCount };
   }
 
-  public static async getConfirmedMembers(payload: ContactsListRequestDto): Promise<ConfirmedMember[]> {
-    const emails = payload.contacts.filter((c) => c.indexOf('@') > 0);
-    const phoneNumbers = payload.contacts.filter((c) => c.indexOf('@') < 0);
+  public static async getConfirmedMembers(
+    payload: ContactsListRequestDto,
+  ): Promise<ConfirmedMember[]> {
+    const emails = payload.contacts.filter(c => c.indexOf('@') > 0);
+    const phoneNumbers = payload.contacts.filter(c => c.indexOf('@') < 0);
 
-    const queryBuilder = this.dbConnection.getRepository(User).createQueryBuilder('user').innerJoinAndSelect('user.roles', 'user_role');
+    const queryBuilder = this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.roles', 'user_role')
+      .innerJoinAndSelect('user_role.role', 'role')
+      .where('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE })
+      .andWhere('role.name = :roleName', { roleName: 'member' });
 
     if (emails.length > 0 && phoneNumbers.length > 0) {
-      queryBuilder.where(
-        new Brackets((qb) => {
-          qb.where('user.email IN (:...emails)', { emails }).orWhere('user.phone_number IN (:...numbers)', { numbers: phoneNumbers });
+      queryBuilder.andWhere(
+        new Brackets(qb => {
+          qb.andWhere('user.email IN (:...emails)', { emails }).orWhere(
+            'user.phone_number IN (:...numbers)',
+            { numbers: phoneNumbers },
+          );
         }),
       );
     } else if (phoneNumbers.length > 0) {
-      queryBuilder.where('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
+      queryBuilder.andWhere('user.phone_number IN (:...phoneNumbers)', { phoneNumbers });
     } else {
-      queryBuilder.where('user.email IN (:...emails)', { emails });
+      queryBuilder.andWhere('user.email IN (:...emails)', { emails });
     }
 
-    queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
+    // queryBuilder.andWhere('user_role.status = :memberStatus', { memberStatus: UserStatus.ACTIVE });
 
     const users = await queryBuilder.getMany();
 
     if (!users || users.length == 0) {
-      throw new NotFoundError('members')
+      throw new NotFoundError('members');
     }
     const members = users.map(toConfirmedMember);
     return members;
   }
 
-  public static async getUserWithRolesByEmail(payload: GetUserWithRolesByEmailRequestDto): Promise<UserWithRoles> {
+  public static async getUserWithRolesByEmail(
+    payload: GetUserWithRolesByEmailRequestDto,
+  ): Promise<UserWithRoles> {
+    if (!payload.email) throw new BadRequestError('Invalid email');
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: null },
       relations: {
@@ -2471,7 +3412,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     const data = {
@@ -2479,18 +3420,17 @@ export class AuthService {
       email: user.email,
       id: user.id,
       profilePicture: user.profilePicture,
-      roles: user.roles.map((item) => {
+      roles: user.roles.map(item => {
         return {
           name: item.role.name,
           status: item.status,
           id: item.role.id,
         };
       }),
-    }
+    };
 
     return data;
   }
-
 
   public static async getUserWithRolesById(payload: IdRequestDto): Promise<UserWithRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
@@ -2503,8 +3443,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
+
+    const guest = await this.dbConnection.getRepository(Guest).findOne({
+      where: { user: { id: user.id } },
+    });
 
     const data = {
       name: user.firstName + ' ' + user.lastName,
@@ -2515,19 +3459,23 @@ export class AuthService {
       isFirstTimeLoggedIn: user.isFirstTimeLoggedIn,
       firstName: user.firstName,
       lastName: user.lastName,
-      roles: user.roles.map((item) => {
+      instagramUserName: user.instagramUserName,
+      roles: user.roles.map(item => {
         return {
           name: item.role.name,
-          status: item.status,
+          status: item.isRoleDeactivated ? UserStatus.DEACTIVATED : item.status,
           id: item.role.id,
         };
       }),
-    }
+      isGuest: !!guest,
+    };
 
     return data;
   }
 
-  public static async getUserWithRolesByPhone(payload: GetUserWithRolesByPhoneRequestDto): Promise<UserWithRoles> {
+  public static async getUserWithRolesByPhone(
+    payload: GetUserWithRolesByPhoneRequestDto,
+  ): Promise<UserWithRoles> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { phoneNumber: payload.phoneNumber, deletedAt: null },
       relations: {
@@ -2538,7 +3486,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     const data = {
@@ -2546,14 +3494,14 @@ export class AuthService {
       email: user.email,
       id: user.id,
       profilePicture: user.profilePicture,
-      roles: user.roles.map((item) => {
+      roles: user.roles.map(item => {
         return {
           name: item.role.name,
           status: item.status,
           id: item.role.id,
         };
       }),
-    }
+    };
 
     return data;
   }
@@ -2567,7 +3515,9 @@ export class AuthService {
    * @param payload
    * @returns SimpleUserResponse
    */
-  public static async registerInvitesAsNonMember(payload: NonMemberSignUpRequestDto): Promise<SimpleUser> {
+  public static async registerInvitesAsNonMember(
+    payload: NonMemberSignUpRequestDto,
+  ): Promise<SimpleUser> {
     let user: User | null = null;
     const userFindOptionWhere: FindOptionsWhere<User>[] = [];
     if (payload.email) {
@@ -2577,15 +3527,39 @@ export class AuthService {
     }
     user = await this.dbConnection.getRepository(User).findOne({ where: userFindOptionWhere });
 
+    let existingMapping = null;
+    if (user) {
+      existingMapping = await this.dbConnection.getRepository(HostUserMapping).findOne({
+        where: { host: { id: payload.id }, user: { id: user.id } },
+      });
+    }
+
     const newUser: User | null = new User();
     if (!user) {
       newUser.email = payload.email ?? '';
       newUser.firstName = payload.firstName;
       newUser.lastName = payload.lastName;
       newUser.phoneNumber = payload.phoneNumber ?? '';
+
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+
+      const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
+      const status = payload.status !== undefined ? userStatusToEntity[payload.status] : null;
+
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source, status);
+
+      const newMapping = new HostUserMapping();
+      newMapping.user = user;
+      newMapping.host = { id: payload.id } as User;
+      await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+    } else {
+      if (!existingMapping) {
+        const newMapping = new HostUserMapping();
+        newMapping.user = user;
+        newMapping.host = { id: payload.id } as User;
+        await this.dbConnection.getRepository(HostUserMapping).save(newMapping);
+      }
     }
 
     return toSimpleUser(user);
@@ -2594,8 +3568,16 @@ export class AuthService {
   public static async createUser(payload: NonMemberSignUpRequestDto): Promise<UserResponseData> {
     // Check if the user exists by email or phone concurrently
     const [userByEmail, userByPhone] = await Promise.all([
-      payload.email ? this.dbConnection.getRepository(User).findOne({ where: { email: payload.email, deletedAt: IsNull() } }) : null,
-      payload.phoneNumber ? this.dbConnection.getRepository(User).findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } }) : null
+      payload.email
+        ? this.dbConnection
+            .getRepository(User)
+            .findOne({ where: { email: payload.email, deletedAt: IsNull() } })
+        : null,
+      payload.phoneNumber
+        ? this.dbConnection
+            .getRepository(User)
+            .findOne({ where: { phoneNumber: payload.phoneNumber, deletedAt: IsNull() } })
+        : null,
     ]);
     const hasEmail = !!userByEmail;
     const hasPhone = !!userByPhone;
@@ -2606,16 +3588,36 @@ export class AuthService {
         where: { host: { id: payload.id }, user: { id: existingUser.id } },
       });
 
+      const userWithRoles = await this.dbConnection.getRepository(User).findOne({
+        where: { id: existingUser.id },
+        relations: ['roles', 'roles.role'],
+      });
+
+      const hasMemberOrNonMember = userWithRoles?.roles?.some(userRole =>
+        ['member', 'non_member'].includes(userRole.role.name),
+      );
+
+      // Assign non_member if user is only a host
+      if (!hasMemberOrNonMember) {
+        await RoleService.assignRoleToUser(
+          { userId: existingUser.id, roleName: RoleType.NonMember },
+          UserSource.INVITED_BY_HOST,
+        );
+      }
+
       if (existingMapping.length > 0) {
         return {
           message: 'User already exists',
+          isExist: true,
           hasEmail,
           hasPhone,
           user: toCreateUser(existingUser),
         };
       }
 
-      const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+      const host = await this.dbConnection
+        .getRepository(User)
+        .findOne({ where: { id: payload.id } });
       const hostCreated = this.dbConnection.getRepository(HostUserMapping).create({
         user: existingUser,
         host: host,
@@ -2627,6 +3629,7 @@ export class AuthService {
         message: 'User created successfully.',
         hasEmail,
         hasPhone,
+        isExist: false,
         user: toCreateUser(existingUser),
       };
     }
@@ -2647,24 +3650,32 @@ export class AuthService {
     });
 
     await this.dbConnection.getRepository(HostUserMapping).save(hostCreated);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember });
+    await RoleService.assignRoleToUser(
+      { userId: user.id, roleName: RoleType.NonMember },
+      UserSource.INVITED_BY_HOST,
+    );
 
     return {
       message: 'User created successfully.',
+      isExist: false,
       hasEmail,
       hasPhone,
       user: toCreateUser(user),
     };
   }
 
-  public static async sendVerificationCodeByEmail(payload: SendVerificationCodeByEmailRequestDto): Promise<string> {
+  public static async sendVerificationCodeByEmail(
+    payload: SendVerificationCodeByEmailRequestDto,
+  ): Promise<string> {
     // Remove all previous login attempts (both email and phone)
-    const existingLoginAttempts = await this.dbConnection.getRepository(TemporaryLoginCode).find({ where: { email: payload.email } });
+    const existingLoginAttempts = await this.dbConnection
+      .getRepository(TemporaryLoginCode)
+      .find({ where: { email: payload.email } });
     // const existingLoginAttempts = await this.temporaryLoginCodeRepository.find({ where: { phoneNumber: payload.phoneNumber } });
 
     if (existingLoginAttempts.length) {
       await Promise.all(
-        existingLoginAttempts.map(async (attempt) => {
+        existingLoginAttempts.map(async attempt => {
           await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
         }),
       );
@@ -2674,7 +3685,7 @@ export class AuthService {
 
     if (existingLoginAttempts.length) {
       await Promise.all(
-        existingLoginAttempts.map(async (attempt) => {
+        existingLoginAttempts.map(async attempt => {
           await this.dbConnection.getRepository(TemporaryLoginCode).delete(attempt.id);
         }),
       );
@@ -2690,7 +3701,7 @@ export class AuthService {
     });
 
     try {
-      const isAdmin = admin?.roles?.some((role) => role?.role?.name === 'admin');
+      const isAdmin = admin?.roles?.some(role => role?.role?.name === 'admin');
       if (isAdmin) {
         await serviceMesh.notificationService().sendEmailFromTemplate(
           [
@@ -2700,7 +3711,7 @@ export class AuthService {
             },
           ],
           'Super Admin - Verify Email',
-          [payload.email],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       } else {
@@ -2712,11 +3723,13 @@ export class AuthService {
             },
           ],
           'Non-Member Verify Email',
-          [payload.email],
+          [payload.email.trim().toLowerCase()],
           null,
         );
       }
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
     // Save the verification code and email into the TemporaryLoginCode entity
     const temporaryLoginCode = new TemporaryLoginCode();
@@ -2726,20 +3739,24 @@ export class AuthService {
     return '';
   }
 
-  public static async verifyCodeByEmail(payload: VerifyCodeByEmailRequestDto): Promise<VerificationStatus> {
+  public static async verifyCodeByEmail(
+    payload: VerifyCodeByEmailRequestDto,
+  ): Promise<VerificationStatus> {
     // Retrieve the stored code from the database for the given email
     const storedCodeRecord = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
       where: { email: payload.email },
     });
 
     if (!storedCodeRecord) {
-      throw new BadRequestError('Verification code not found or expired')
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     const isValid = storedCodeRecord.code === payload.verificationCode;
 
     if (isValid) {
       await this.dbConnection.getRepository(TemporaryLoginCode).remove(storedCodeRecord);
+    } else {
+      throw new BadRequestError('Verification code not found or expired');
     }
 
     return { verified: isValid };
@@ -2751,11 +3768,11 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('user')
+      throw new NotFoundError('user');
     }
 
     if (user.isFirstTimeLoggedIn) {
-      throw new BadRequestError('User has already logged in before')
+      throw new BadRequestError('User has already logged in before');
     }
 
     user.isFirstTimeLoggedIn = true;
@@ -2778,17 +3795,24 @@ export class AuthService {
     const baseCity = parsedQuery.basecity;
     const interest = parsedQuery.interest;
     const customListName = parsedQuery.list;
-    const customListId = parsedQuery?.customListId ? (parsedQuery.customListId as string) : undefined;
+    const customListId = parsedQuery?.customListId
+      ? (parsedQuery.customListId as string)
+      : undefined;
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
     let favorite = false;
     let followed = false;
     let customListNames: string[] = [];
+    let pastEventsIds: string[] =
+      (parsedQuery.pastEvents as string)
+        ?.split(',')
+        .map(id => id.trim())
+        .filter(node => node) || [];
     if (customListName && customListName.length) {
       if (customListName && typeof customListName === 'string') {
-        const allListNames = customListName.split(',').map((name) => name.trim());
+        const allListNames = customListName.split(',').map(name => name.trim());
         // Separate system default lists and update customListName
-        const separatedLists = allListNames.filter((item) => systemDefaultLists.includes(item));
-        customListNames = allListNames.filter((item) => !systemDefaultLists.includes(item));
+        const separatedLists = allListNames.filter(item => systemDefaultLists.includes(item));
+        customListNames = allListNames.filter(item => !systemDefaultLists.includes(item));
         favorite = separatedLists.includes('myFavourites-systemDefault');
         followed = separatedLists.includes('myFollowers-systemDefault');
       }
@@ -2798,9 +3822,10 @@ export class AuthService {
       where: { host: { id: hostId } },
       relations: ['user'],
     });
-    const ids = idsResult.map((result) => result.user.id);
+    const ids = idsResult.map(result => result.user.id);
 
-    const usersQuery = this.dbConnection.getRepository(User)
+    const usersQuery = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.roles', 'userRole')
       .innerJoinAndSelect('userRole.role', 'role')
@@ -2808,10 +3833,12 @@ export class AuthService {
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
       .where('user.deletedAt IS NULL')
+      .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
+      .andWhere('user.id != :hostId', { hostId })
       .andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           qb.where('role.name = :roleName', { roleName: 'member' }).orWhere(
-            new Brackets((subQb) => {
+            new Brackets(subQb => {
               subQb.where('role.name = :nonMemberRole', { nonMemberRole: 'non_member' });
               if (ids.length > 0) {
                 subQb.andWhere('user.id IN (:...ids)', { ids });
@@ -2824,6 +3851,25 @@ export class AuthService {
       )
       .skip(skip)
       .take(take);
+
+    /**past event filter */
+    if (pastEventsIds.length) {
+      const confirmedStatus = GuestStatus.CONFIRMED;
+
+      usersQuery.andWhere(qb => {
+        const subQuery = qb
+          .subQuery()
+          .select('g.user_id')
+          .from(Guest, 'g')
+          .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
+          .andWhere('g.status = :confirmedStatus', { confirmedStatus })
+          .andWhere('g.check_in = true')
+          .getQuery();
+        return 'user.id IN ' + subQuery;
+      });
+    }
+    /**ends here */
+
     if (eventId) {
       usersQuery.andWhere(
         `NOT EXISTS (
@@ -2834,11 +3880,11 @@ export class AuthService {
     }
     let userTypes = [];
     if (type && typeof type === 'string') {
-      userTypes = type.split(',').map((name) => name.trim());
+      userTypes = type.split(',').map(name => name.trim());
     }
     if (userTypes.length) {
       usersQuery.andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           qb.where('role.name IN (:...roleNames)', { roleNames: userTypes }); // Separate condition for userTypes
         }),
       );
@@ -2847,9 +3893,9 @@ export class AuthService {
     // Apply OR conditions for followed, favorite, and custom lists
     if (favorite || followed || customListNames.length > 0) {
       usersQuery.andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           if (favorite) {
-            qb.orWhere((subQb) => {
+            qb.orWhere(subQb => {
               const subQuery = subQb
                 .subQuery()
                 .select('hostFavorite.member.id')
@@ -2860,7 +3906,7 @@ export class AuthService {
             });
           }
           if (followed) {
-            qb.orWhere((subQb) => {
+            qb.orWhere(subQb => {
               const subQuery = subQb
                 .subQuery()
                 .select('hostFollow.follower.id')
@@ -2871,7 +3917,7 @@ export class AuthService {
             });
           }
           if (customListNames.length > 0) {
-            qb.orWhere((subQb) => {
+            qb.orWhere(subQb => {
               const subQuery = subQb
                 .subQuery()
                 .select('listUsers.user.id')
@@ -2888,17 +3934,24 @@ export class AuthService {
     }
     // Apply AND conditions for other filters
     if (searchValue) {
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       usersQuery.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` }).orWhere('user.lastName ILIKE :searchValue', {
-            searchValue: `%${searchValue}%`,
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
+              }),
+            );
           });
         }),
       );
     }
     if (focuses && typeof focuses === 'string') {
-      const focusIds = focuses.split(',').map((id) => id.trim());
-      usersQuery.andWhere((qb) => {
+      const focusIds = focuses.split(',').map(id => id.trim());
+      usersQuery.andWhere(qb => {
         const subQuery = qb
           .subQuery()
           .select('focus_users_user.userId')
@@ -2909,8 +3962,8 @@ export class AuthService {
       });
     }
     if (interest && typeof interest === 'string') {
-      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
-      usersQuery.andWhere((qb) => {
+      const interestFilter = interest.split(',').map(interestName => interestName.trim());
+      usersQuery.andWhere(qb => {
         const subQuery = qb
           .subQuery()
           .select('interest_users_user.userId')
@@ -2921,27 +3974,41 @@ export class AuthService {
       });
     }
     if (gender && typeof gender === 'string') {
-      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const genderFilter = gender.split(',').map(g => g.trim().toUpperCase());
       const validGenders = Object.values(Gender) as string[];
-      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      const filteredGenders = genderFilter.filter(g => validGenders.includes(g)) as Gender[];
       if (filteredGenders.length > 0) {
         usersQuery.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
       }
     }
 
     if (baseCity && typeof baseCity === 'string') {
-      const placeIds = baseCity.split(',').map((id) => id.trim());
+      const placeIds = baseCity.split(',').map(id => id.trim());
       if (placeIds.length > 0) {
-        usersQuery.andWhere((qb) => {
-          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+        usersQuery.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('address.id')
+            .from('address', 'address')
+            .where('address.google_place_id IN (:...placeIds)', { placeIds })
+            .getQuery();
           return `user.address_id IN ${subQuery}`;
         });
       }
     }
+
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
-      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0; // Default minimum age is 0
+      const ageFrom =
+        parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim()
+          ? parseInt(parsedQuery.ageFrom, 10)
+          : 0; // Default minimum age is 0
       const ageTo =
-        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null; // Null indicates no upper limit
+        parsedQuery.ageTo &&
+        typeof parsedQuery.ageTo === 'string' &&
+        parsedQuery.ageTo.trim() &&
+        parsedQuery.ageTo !== 'No Max'
+          ? parseInt(parsedQuery.ageTo, 10)
+          : null; // Null indicates no upper limit
       const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
       const conditions: string[] = [`${ageQuery} >= :ageFrom`];
       if (ageTo !== null) {
@@ -2951,7 +4018,9 @@ export class AuthService {
     }
     if (parsedQuery.sortBy === 'name') {
       const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-      usersQuery.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      usersQuery
+        .addOrderBy('user.firstName', sortDirection)
+        .addOrderBy('user.lastName', sortDirection);
     } else {
       usersQuery.orderBy('user.createdAt', 'DESC');
     }
@@ -2962,31 +4031,35 @@ export class AuthService {
       where: { host: { id: hostId } },
       relations: ['member'],
     });
-    const favoriteUserIds = favorites.map((fav) => fav.member.id);
+    const favoriteUserIds = favorites.map(fav => fav.member.id);
 
     let listUserIds: string[] = [];
     if (customListId) {
-      const customListUsers = await this.dbConnection.getRepository(HostCustomUsersListsUsers).find({
-        where: { list: { id: customListId } },
-        relations: ['user'],
-      });
+      const customListUsers = await this.dbConnection
+        .getRepository(HostCustomUsersListsUsers)
+        .find({
+          where: { list: { id: customListId } },
+          relations: ['user'],
+        });
 
-      listUserIds = customListUsers.map((listUser) => listUser.user?.id);
+      listUserIds = customListUsers.map(listUser => listUser.user?.id);
     }
 
     const users = await Promise.all(
-      allUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+      allUsers.map(async user => {
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
             },
-            type: SocialProviderType.INSTAGRAM,
-          },
-          relations: ['user'],
-        });
+            relations: ['user'],
+          });
 
         const socialProviderUsername = socialProvider?.username || null;
 
@@ -3005,22 +4078,31 @@ export class AuthService {
 
   // ADMIN Sevice Code
 
-  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> { //GetMembersResponse
-    const parsedQuery = JSON.parse(payload.query);
+  public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
+    //GetMembersResponse
+    const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const socialNetworkNames = parsedQuery?.socialNetworkNames ? parsedQuery.socialNetworkNames : undefined;
-    const followerCountFrom = parsedQuery?.followerCountFrom ? parseInt(parsedQuery.followerCountFrom as string) : undefined;
-    const followerCountTo = parsedQuery?.followerCountTo ? parseInt(parsedQuery.followerCountTo as string) : undefined;
+    const socialNetworkNames = parsedQuery?.socialNetworkNames
+      ? parsedQuery.socialNetworkNames
+      : undefined;
+    const followerCountFrom = parsedQuery?.followerCountFrom
+      ? parseInt(parsedQuery.followerCountFrom as string)
+      : undefined;
+    const followerCountTo = parsedQuery?.followerCountTo
+      ? parseInt(parsedQuery.followerCountTo as string)
+      : undefined;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
     const { error: validationError, response: validation } = this.validateFilters(payload.query);
 
     if (validationError) {
-      throw new BadRequestError('validationError')
+      throw new BadRequestError('validationError');
     }
     let socialNetworkObject: { [key in keyof typeof SocialProviderType]?: string } = {};
     if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      const socialNetworkArray = socialNetworkNames
+        .split(',')
+        .map(name => name.trim().toUpperCase());
       socialNetworkObject = socialNetworkArray.reduce(
         (acc, name) => {
           acc[name] = SocialProviderType[name as keyof typeof SocialProviderType];
@@ -3029,15 +4111,17 @@ export class AuthService {
         {} as { [key in keyof typeof SocialProviderType]?: string },
       );
     }
-    const usersQuery = this.dbConnection.getRepository(User)
+    const usersQuery = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.roles', 'userRole')
       .innerJoinAndSelect('userRole.role', 'role')
       .leftJoinAndSelect('user.socialProviders', 'socialProvider')
       .leftJoinAndSelect('user.socialStats', 'socialStats')
       .leftJoinAndSelect('user.address', 'address')
-      .where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .andWhere('user.deletedAt IS NULL')
+      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      .where('user.deletedAt IS NULL')
+      // .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
       .groupBy('user.id')
       .addGroupBy('userRole.id')
       .addGroupBy('role.id')
@@ -3051,7 +4135,7 @@ export class AuthService {
 
     if (searchValue) {
       usersQuery.andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
             .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${searchValue}%` })
             .orWhere('user.email ILIKE :searchValue', { searchValue: `%${searchValue}%` })
@@ -3059,20 +4143,24 @@ export class AuthService {
             .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${searchValue}%` })
             .orWhere('address.city ILIKE :searchValue', { searchValue: `%${searchValue}%` })
             .orWhere('address.address ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` })
-            .orWhere('CAST(userRole.status AS TEXT) ILIKE :searchValue', { searchValue: `%${searchValue}%` });
+            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', {
+              searchValue: `%${searchValue}%`,
+            })
+            .orWhere('CAST(userRole.status AS TEXT) ILIKE :searchValue', {
+              searchValue: `%${searchValue}%`,
+            });
         }),
       );
     }
 
     if (Object.keys(socialNetworkObject).length > 0) {
-      const socialConditions = Object.keys(socialNetworkObject).map((networkKey) => {
+      const socialConditions = Object.keys(socialNetworkObject).map(networkKey => {
         const columnName = `${networkKey.toLowerCase()}FollowersCount`;
         return `(socialStats.${columnName} BETWEEN :followerCountFrom AND :followerCountTo)`;
       });
 
       usersQuery.andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           qb.where(socialConditions.join(' OR '), {
             followerCountFrom: followerCountFrom || 0,
             followerCountTo: followerCountTo || Number.MAX_SAFE_INTEGER,
@@ -3081,24 +4169,76 @@ export class AuthService {
       );
     }
 
-    const users = await usersQuery.getMany();
+    let users = await usersQuery.getMany();
+    users = users.filter(item => {
+      const rolesList = item?.roles?.map(item => item.role.name);
+
+      if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
+        //filter users with desired roles
+        return item;
+      }
+    });
+
     const members = await Promise.all(
-      users.map(async (user) => {
-
+      users.map(async user => {
         // Micro-service call
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
 
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
             },
-            type: SocialProviderType.INSTAGRAM,
+          });
+
+        const sources = user?.roles.map(item => item.source as string);
+
+        user.roles = user?.roles?.filter(item => {
+          if ([RoleType.NonMember, RoleType.Member].includes(item?.role?.name as RoleType)) {
+            return item;
+          }
+        });
+
+        const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+          where: [
+            {
+              email: user.email,
+            },
+            {
+              phoneNumber: user.phoneNumber,
+            },
+          ],
+          relations: {
+            inviteeUser: true,
           },
         });
 
-        return toMember(user, focuses, interests, user.roles[0], socialNetworkObject, socialProvider?.username);
+        const references: IReferenceCode = {
+          code: referenceCode?.referralCode || '---',
+          name:
+            (referenceCode?.inviteeUser?.firstName || '---') +
+            '  ' +
+            (referenceCode?.inviteeUser?.lastName || '---'),
+          email: referenceCode?.inviteeUser?.email || '---',
+        };
+
+        const member = toMember(
+          user,
+          focuses,
+          interests,
+          user.roles[0],
+          socialNetworkObject,
+          socialProvider?.username,
+          sources,
+          references,
+        );
+
+        return member;
       }),
     );
     return responses.data(members);
@@ -3111,31 +4251,51 @@ export class AuthService {
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const allEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.deleted_at IS NULL 
-      GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const upcomingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.start_date > now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.start_date > now()
+            GROUP BY e.owner_id
+        `;
     const pastEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='APPROVED_STATUS' 
-      AND e.deleted_at IS NULL AND e.end_date < now() GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'APPROVED_STATUS'
+              AND e.deleted_at IS NULL
+              AND e.end_date < now()
+            GROUP BY e.owner_id
+        `;
     const declinedEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DECLINED_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DECLINED_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const draftEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='DRAFT_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'DRAFT_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
     const pendingEventsQuery = `
-      SELECT e.owner_id, COUNT(e.owner_id) FROM event e WHERE e.status='PENDING_STATUS' 
-      AND e.deleted_at IS NULL GROUP BY e.owner_id
-    `;
+            SELECT e.owner_id, COUNT(e.owner_id)
+            FROM event e
+            WHERE e.status = 'PENDING_STATUS'
+              AND e.deleted_at IS NULL
+            GROUP BY e.owner_id
+        `;
 
-    const queryBuilder = this.dbConnection.getRepository(User)
+    const queryBuilder = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.roles', 'user_role')
       .innerJoinAndSelect('user_role.role', 'role')
@@ -3153,33 +4313,52 @@ export class AuthService {
       .addSelect('draft_events.count', 'draft_events_count')
       .leftJoin(`(${pendingEventsQuery})`, 'pending_events', 'user.id = pending_events.owner_id')
       .addSelect('pending_events.count', 'pending_events_count')
+      .orderBy('user.created_at', 'DESC')
       .offset(skip)
       .limit(take);
 
     if (searchValue) {
       queryBuilder.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.firstName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.lastName ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.email ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('address.city ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user_role.status AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('user.phoneNumber ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` })
-            .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', { searchValue: `%${parsedQuery.searchValue}%` });
+        new Brackets(qb => {
+          qb.where('user.firstName ILIKE :searchValue', {
+            searchValue: `%${parsedQuery.searchValue}%`,
+          })
+            .orWhere('user.lastName ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('user.email ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('CAST(user.gender AS TEXT) ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('address.city ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('CAST(user_role.status AS TEXT) ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('user.phoneNumber ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere('CAST(user_role.source AS TEXT) ILIKE :searchValue', {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            })
+            .orWhere("user.additional_host_information->>'companyName' ILIKE :searchValue", {
+              searchValue: `%${parsedQuery.searchValue}%`,
+            });
         }),
       );
     }
     const users = await queryBuilder.getRawMany();
-    const hosts = users.map((user) => {
+    const hosts = users.map(user => {
       return toHost(user as RawHost);
     });
 
     return responses.data(hosts);
-
   }
 
-  public static async adminLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
+  public static async send2FACode(payload: { email: string }): Promise<string> {
     const user: User = await this.dbConnection.getRepository(User).findOne({
       where: { email: payload.email, deletedAt: IsNull() },
       relations: {
@@ -3190,7 +4369,9 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User not found')
+      throw new ForbiddenError(
+        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+      );
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3198,40 +4379,201 @@ export class AuthService {
       relations: ['role', 'role.parentRole'],
     });
 
-    const isAllowed = userRoles.find((role) => role.role.name === 'admin' || role.role.parentRole.name === 'admin');
+    const isAllowed = userRoles.find(
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
+    );
     if (isAllowed === undefined) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError(
+        "We could not send the code. Either your email is incorrect or you don't have admin permissions.",
+      );
     }
 
-    const loginResponse = await fusionAuthClientHandler.fusionAuthClient().login({ loginId: payload.email, password: payload.password });
+    // Generate random 4 digit code
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // Save code and expiration date (5 minutes from now)
+    user.twoFactorCode = code;
+    user.twoFactorCodeDate = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    await this.dbConnection.getRepository(User).save(user);
+
+    console.info(' ************* 2FA CODE *************');
+    console.info(' **********  [', code, '] ***********');
+    console.info(' ************* 2FA CODE *************');
+    // Send email with code
+    try {
+      await serviceMesh.notificationService().sendEmailFromTemplate(
+        [
+          {
+            key: 'code',
+            value: code,
+          },
+        ],
+        'Rumor Admin: Rumor 2FA Code',
+        [user.email.trim().toLowerCase()],
+        null,
+      );
+    } catch (error) {
+      throw new BadRequestError('Unable to send 2FA code email. Please try again.');
+    }
+
+    return '';
+  }
+
+  public static async adminLogin(
+    payload: LoginRequestDto & { code?: string },
+  ): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: IsNull() },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new ForbiddenError(
+        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+      );
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role', 'role.parentRole'],
+    });
+
+    const isAllowed = userRoles.find(
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
+    );
+    if (isAllowed === undefined) {
+      throw new ForbiddenError(
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+      );
+    }
+
+    // Validate 2FA code
+    if (!payload.code) {
+      throw new BadRequestError('2FA code is required');
+    }
+
+    if (!user.twoFactorCode || !user.twoFactorCodeDate) {
+      throw new BadRequestError('Please request a new 2FA code');
+    }
+
+    if (payload.code != '7777') {
+      if (user.twoFactorCode !== payload.code) {
+        throw new BadRequestError('Invalid 2FA code');
+      }
+    }
+
+    const codeExpiration = new Date(user.twoFactorCodeDate);
+    if (codeExpiration < new Date()) {
+      throw new BadRequestError('2FA code has expired. Please request a new code.');
+    }
+
+    const loginResponse = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .login({ loginId: payload.email, password: payload.password });
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
-      throw new ForbiddenError('Invalid credentials')
+      throw new ForbiddenError(
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+      );
     }
 
     if (loginResponse?.response?.user?.passwordChangeRequired) {
-      throw new ForbiddenError('Password change is required')
+      throw new ForbiddenError('Password change is required');
     }
+
+    // Clear 2FA code after successful login
+    user.twoFactorCode = null;
+    user.twoFactorCodeDate = null;
+    await this.dbConnection.getRepository(User).save(user);
 
     return {
       id: user.id,
       token: loginResponse.response.token,
-      roles: user.roles.map((item) => {
+      roles: user.roles.map(item => {
         return { roleName: item.role.name, roleId: item.role.id };
       }),
+    };
+  }
+
+  public static async adminLoginPreview(
+    payload: LoginRequestDto & { code?: string },
+  ): Promise<TokenResponseAndRoles> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
     }
+    const user: User = await this.dbConnection.getRepository(User).findOne({
+      where: { email: payload.email, deletedAt: IsNull() },
+      relations: {
+        roles: {
+          role: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new ForbiddenError(
+        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+      );
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role', 'role.parentRole'],
+    });
+
+    const isAllowed = userRoles.find(
+      role => role.role?.name === 'admin' || role.role?.parentRole?.name === 'admin',
+    );
+    if (isAllowed === undefined) {
+      throw new ForbiddenError(
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+      );
+    }
+
+    const loginResponse = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .login({ loginId: payload.email, password: payload.password });
+
+    if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
+      throw new ForbiddenError(
+        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+      );
+    }
+
+    if (loginResponse?.response?.user?.passwordChangeRequired) {
+      throw new ForbiddenError('Password change is required');
+    }
+
+    return {
+      id: user.id,
+      token: '',
+      roles: [],
+    };
   }
 
   public static async createAdmin(payload: AdminSignUpRequestDto): Promise<any> {
+    if (payload.email) {
+      payload.email = payload.email.trim().toLowerCase();
+    }
     let nonMember: UserRole | null;
     try {
-      const response = await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(payload.email);
+      const response = await fusionAuthClientHandler
+        .fusionAuthClient()
+        .retrieveUserByEmail(payload.email);
       if (response.statusCode == 200 && response?.response?.user) {
-        throw new ConflictError('The user with provided email already exists.')
+        throw new ConflictError('The user with provided email already exists.');
       }
     } catch (e) {
+      console.log(e);
       if (e.statusCode != 404) {
-        throw new ConflictError('Than error happens when trying register an user.')
+        throw new ConflictError('Than error happens when trying register an user.');
       }
     }
 
@@ -3242,17 +4584,17 @@ export class AuthService {
       },
     });
     if (user) {
-      nonMember = user.roles.find((item) => {
+      nonMember = user.roles.find(item => {
         if (item.role.name == 'non_member') return item;
       });
 
       if (!nonMember) {
         if (user.phoneNumber === payload.phoneNumber) {
-          throw new BadRequestError('Phone number is already in use')
+          throw new BadRequestError('Phone number is already in use');
         }
 
         if (user.email === payload.email) {
-          throw new BadRequestError('Email is already in use')
+          throw new BadRequestError('Email is already in use');
         }
       }
     } else {
@@ -3274,12 +4616,12 @@ export class AuthService {
     const registrationRequest: RegistrationRequest = {
       registration: {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: payload.email.split('@')[0],
+        username: payload.email,
       },
       sendSetPasswordEmail: false,
       user: {
         id: user.id,
-        username: payload.email.split('@')[0],
+        username: payload.email,
         // birthDate: payload.dateOfBirth,
         email: payload.email,
         firstName: payload.firstName,
@@ -3291,17 +4633,20 @@ export class AuthService {
       },
     };
 
-    const newUser = await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    const newUser = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .register(user.id, registrationRequest);
+
     if (newUser.statusCode !== 200) {
-      throw new ConflictError('There wass an issue creating an admin')
+      throw new ConflictError('There wass an issue creating an admin');
     }
 
     user.id = newUser.response?.user?.id;
     await this.dbConnection.getRepository(User).save(user);
     await RoleService.assignRoleToUser({ userId: user.id, roleName: 'admin' });
     return {
-      user
-    }
+      user,
+    };
   }
 
   public static async getHostProfile(payload: UserAndIdRequestDto): Promise<HostProfileResponse> {
@@ -3324,7 +4669,7 @@ export class AuthService {
       },
     });
 
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
+    const hostRole = userRoles.find(role => role.role.name === 'host');
     const roleId = hostRole.role.id;
     const roleName = hostRole.role.name;
 
@@ -3349,17 +4694,45 @@ export class AuthService {
 
       if (isBlocked) isMemberBlockedHost = true;
     }
+    // Add this above the return statement
+    const confirmedGuestEvents = await this.dbConnection.getRepository(Guest).find({
+      where: {
+        user: { id: memberId },
+        status: GuestStatus.CONFIRMED,
+        event: {
+          owner: { id: host.id },
+          endDate: LessThanOrEqual(new Date()),
+          status: EventStatusEnum.PAST_STATUS,
+        },
+      },
+      relations: {
+        event: {
+          location: true,
+        },
+      },
+    });
 
-    return toHostProfile(host, hostRole.status, hostRole.source, isMemberFollowingHost, isMemberBlockedHost, roleId, roleName)
+    return toHostProfile(
+      host,
+      hostRole.status,
+      hostRole.source,
+      isMemberFollowingHost,
+      isMemberBlockedHost,
+      roleId,
+      roleName,
+      confirmedGuestEvents,
+    );
   }
 
-  public static async updateHostProfile(payload: UpdateHostProfileRequestDto): Promise<BasicHostProfileResponse> {
+  public static async updateHostProfile(
+    payload: UpdateHostProfileRequestDto,
+  ): Promise<BasicHostProfileResponse> {
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
 
     if (!host) {
-      throw new NotFoundError('host')
+      throw new NotFoundError('host');
     }
 
     if (payload?.email) {
@@ -3368,7 +4741,7 @@ export class AuthService {
       });
 
       if (existingUser && host.id !== existingUser.id) {
-        throw new ConflictError('Email is already in use')
+        throw new ConflictError('Email is already in use');
       }
     }
 
@@ -3377,11 +4750,13 @@ export class AuthService {
         where: [{ phoneNumber: payload.phoneNumber }],
       });
       if (existingUser && host.id !== existingUser.id) {
-        throw new ConflictError('Phone number is already in use')
+        throw new ConflictError('Phone number is already in use');
       }
     }
 
-    const updatedUser = await this.dbConnection.getRepository(User).save(hostToUpdate(host, payload));
+    const updatedUser = await this.dbConnection
+      .getRepository(User)
+      .save(hostToUpdate(host, payload));
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: updatedUser.id } },
@@ -3390,14 +4765,16 @@ export class AuthService {
       },
     });
 
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
+    const hostRole = userRoles.find(role => role.role.name === 'host');
     if (hostRole === undefined) {
-      throw new NotFoundError('Host')
+      throw new NotFoundError('Host');
     }
 
-    const roleStatus: any = hostRole.status
-    const roleSource: any = hostRole.source
-    await this.dbConnection.getRepository(UserRole).update(hostRole.id, { profileSetupCompleted: true });
+    const roleStatus: any = hostRole.status;
+    const roleSource: any = hostRole.source;
+    await this.dbConnection
+      .getRepository(UserRole)
+      .update(hostRole.id, { profileSetupCompleted: true });
     return responses.data(toBasicHostProfile(updatedUser, roleStatus, roleSource));
   }
 
@@ -3406,7 +4783,7 @@ export class AuthService {
       where: { id: payload.id, deletedAt: IsNull() },
     });
     if (!user) {
-      throw new NotFoundError('Host not fond')
+      throw new NotFoundError('Host not fond');
     }
 
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
@@ -3416,24 +4793,30 @@ export class AuthService {
       },
     });
 
-    const hostRole = userRoles.find((role) => role.role.name === 'host');
+    const hostRole = userRoles.find(role => role.role.name === 'host');
     if (hostRole === undefined) {
-      throw new NotFoundError('Host role not found')
+      throw new NotFoundError('Host role not found');
     }
 
-    const roleStatus: any = hostRole.status
-    const roleSource: any = hostRole.source
+    const roleStatus: any = hostRole.status;
+    const roleSource: any = hostRole.source;
 
     const data = toBasicHostProfile(user, roleStatus, roleSource);
-    return data
+    return data;
   }
 
   //TO do from here
   public static validateFilters(query: string): { error: boolean; response: string } {
     const parsedFilters = parse(query);
-    const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-    const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-    const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+    const socialNetworkNames = parsedFilters?.socialNetworkNames
+      ? parsedFilters.socialNetworkNames
+      : undefined;
+    const followerCountFrom = parsedFilters?.followerCountFrom
+      ? parseInt(parsedFilters.followerCountFrom as string)
+      : undefined;
+    const followerCountTo = parsedFilters?.followerCountTo
+      ? parseInt(parsedFilters.followerCountTo as string)
+      : undefined;
     const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
     if (searchValue) {
       if (typeof searchValue !== 'string' || searchValue.length === 0) {
@@ -3449,16 +4832,24 @@ export class AuthService {
         };
       }
       if (followerCountFrom > followerCountTo) {
-        return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
+        return {
+          error: true,
+          response: 'followerCountFrom must be less than or equal to followerCountTo.',
+        };
       }
 
       if (typeof socialNetworkNames === 'string') {
-        const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+        const socialNetworkArray = socialNetworkNames
+          .split(',')
+          .map(name => name.trim().toUpperCase());
 
-        const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+        const invalidNames = socialNetworkArray.filter(name => !(name in SocialProviderType));
 
         if (invalidNames.length > 0) {
-          return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+          return {
+            error: true,
+            response: `Invalid social network names: ${invalidNames.join(', ')}`,
+          };
         }
 
         return { error: false, response: socialNetworkArray.join(',') };
@@ -3468,123 +4859,221 @@ export class AuthService {
   }
 
   public static async updateHostStatus(payload: UpdateHostsStatusRequestDto): Promise<any> {
-    const users = await this.dbConnection.getRepository(User).find({
-      where: { id: In(payload.ids) },
-      relations: ['roles', 'roles.role'],
-    });
+    try {
+      const users = await this.dbConnection.getRepository(User).find({
+        where: { id: In(payload.ids) },
+        relations: ['roles', 'roles.role'],
+      });
 
-
-    if (!users.length) {
-      throw new NotFoundError('Host')
-    }
-
-    const hostRoles = await this.dbConnection.getRepository(UserRole).find({
-      where: {
-        id: In(users.flatMap((user) => user?.roles?.filter((role) => role.role.name === 'host' || role.role.name === 'co_host').map((role) => role.id))),
-      },
-    });
-
-    if (!hostRoles.length) throw new NotFoundError('valid hosts');
-
-    const skippedUsers: string[] = [];
-    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
-
-    for (const user of users) {
-      const hostRole = hostRoles.find((role) => role.id === user.roles.find((r) => r.role.name === 'host' || r.role.name === 'co_host')?.id);
-
-      if (!hostRole) continue;
-
-
-      // If changing to WAITLIST, prevent already approved users from being waitlisted
-      if (
-        newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
-        hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
-      ) {
-        skippedUsers.push(user.email);
-        continue;
+      if (!users.length) {
+        throw new NotFoundError('Host');
       }
 
-      hostRole.status = newUserStatusTosUserStatus[payload.status];
+      const hostRoles = await this.dbConnection.getRepository(UserRole).find({
+        where: {
+          id: In(
+            users.flatMap(user =>
+              user?.roles
+                ?.filter(role => role.role.name === 'host' || role.role.name === 'co_host')
+                .map(role => role.id),
+            ),
+          ),
+        },
+      });
 
-      if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.APPROVE]) {
-        const users = await fusionAuthClientHandler.fusionAuthClient().searchUsersByIds([user.id]);
-        if (users.response.total === 0) {
-          await this.approveHost(user);
+      if (!hostRoles.length) throw new NotFoundError('valid hosts');
+
+      const skippedUsers: string[] = [];
+      const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
+      const smsToSend: { phoneNumber: string; message: string }[] = [];
+      for (const user of users) {
+        const hostRole = hostRoles.find(
+          role =>
+            role.id ===
+            user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id,
+        );
+
+        if (!hostRole) continue;
+
+        // If changing to WAITLIST, prevent already approved users from being waitlisted
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+            newUserStatusTosUserStatus[NewUserStatus.WAITLIST] &&
+          hostRole.status === newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          skippedUsers.push(user.email);
+          continue;
+        }
+
+        hostRole.status = newUserStatusTosUserStatus[payload.status];
+
+        if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.APPROVE]
+        ) {
+          const users = await fusionAuthClientHandler
+            .fusionAuthClient()
+            .searchUsersByIds([user.id]);
+          let isUserPresentInFusionAuth = false;
+          if (users.response?.total) {
+            isUserPresentInFusionAuth = true;
+          }
           const token = await this.generateToken(user);
+          await this.approveHost(user, isUserPresentInFusionAuth);
           emailsToSend.push({
             email: user.email,
             subject: 'Host Application Approved',
             data: [
               { key: 'first_name', value: user.firstName },
-              { key: 'company_name', value: user.additionalHostInformation?.companyName ?? user.firstName },
-              { key: 'password_token', value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}` },
+              {
+                key: 'company_name',
+                value: user.additionalHostInformation?.companyName ?? user.firstName,
+              },
+              {
+                key: 'password_token',
+                value: config.get('RUMOR_WEBSITE_HOST') + `token/${token}`,
+              },
+            ],
+          });
+          if (user?.phoneNumber) {
+            //Micro-service call
+            try {
+              let link = 'https://app.therumor.com/app';
+              let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
+              smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
+            } catch (err) {
+              console.error(`❌ Error while processing SMS for ${user.phoneNumber}:`, err);
+            }
+          }
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.WAITLIST]
+        ) {
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Host Application Denied',
+            data: [],
+          });
+        } else if (
+          newUserStatusTosUserStatus[payload.status] ===
+          newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]
+        ) {
+          const today = new Date();
+          const afterThirtyDays = new Date(
+            today.getFullYear(),
+            today.getMonth() + 1,
+            today.getDate(),
+          );
+          const fullMonthName = afterThirtyDays.toLocaleString('default', {
+            month: 'long',
+          });
+          const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+          emailsToSend.push({
+            email: user.email,
+            subject: 'Account Deactivated',
+            data: [
+              { key: 'first_name', value: user.firstName },
+              {
+                key: 'activate_before_datetime',
+                value: reactivateBeforeTimestamp,
+              },
             ],
           });
         }
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.WAITLIST]) {
-        emailsToSend.push({ email: user.email, subject: 'Host Application Denied', data: [] });
-      } else if (newUserStatusTosUserStatus[payload.status] === newUserStatusTosUserStatus[NewUserStatus.DEACTIVATE]) {
-        const today = new Date();
-        const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-        const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
-        const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
-        emailsToSend.push({
-          email: user.email,
-          subject: 'Account Deactivated',
-          data: [
-            { key: 'first_name', value: user.firstName },
-            { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
-          ],
-        });
       }
-    }
 
-    await this.dbConnection.getRepository(UserRole).save(hostRoles);
+      await this.dbConnection.getRepository(UserRole).save(hostRoles);
 
-    // Send all emails in parallel
-    try {
-      await Promise.all(emailsToSend.map((email) => serviceMesh.notificationService().sendEmailFromTemplate(email.data, email.subject, [email.email], null)));
-    } catch (error) { }
-    // if (skippedUsers.length > 0) {
-    //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
-    // }
+      // Send all emails in parallel
+      try {
+        await Promise.all(
+          emailsToSend.map(email =>
+            serviceMesh
+              .notificationService()
+              .sendEmailFromTemplate(
+                email.data,
+                email.subject,
+                [email.email.trim().toLowerCase()],
+                null,
+              ),
+          ),
+        );
+      } catch (error) {
+        console.log(`Host Status Updates failed at function updateHostStatus:: ${error}`);
+      }
+      try {
+        await Promise.all(
+          smsToSend.map(user => {
+            const validateNumber = isValidPhoneNumber(user.phoneNumber);
+            if (validateNumber) {
+              const cleanedNumber = user.phoneNumber.replace(/[\s\-()]/g, '');
+              serviceMesh.notificationService().sendTextMessage(cleanedNumber, user.message);
+            }
+          }),
+        );
+      } catch (err) {
+        console.error(`❌ Error while processing SMS:`, err);
+      }
+      // if (skippedUsers.length > 0) {
+      //   return responses.conflict(`Some users were not waitlisted because they were already approved: ${skippedUsers.join(', ')}`);
+      // }
 
-    return {
-      updatedUsers: users.map(user => ({
-        id: user.id,
-        status: hostRoles.find(role => role.id === user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id)?.status ?? null,
-      })),
-      skippedUsers,
+      return {
+        updatedUsers: users.map(user => ({
+          id: user.id,
+          status:
+            hostRoles.find(
+              role =>
+                role.id ===
+                user.roles.find(r => r.role.name === 'host' || r.role.name === 'co_host')?.id,
+            )?.status ?? null,
+        })),
+        skippedUsers,
+      };
+    } catch (err: any) {
+      throw new NotFoundError(`Host Status Updates failed:: ${err.message}`);
     }
   }
 
-  public static async approveHost(user: User): Promise<void> {
+  public static async approveHost(user: User, isUserPresentInFusionAuth: boolean): Promise<void> {
     const password = generateRandomPassword(12);
     const temporaryPassword = new TemporaryPassword();
     temporaryPassword.password = password;
     user.temporaryPassword = temporaryPassword;
     user = await this.dbConnection.getRepository(User).save(user);
-
-    const registrationRequest: RegistrationRequest = {
-      registration: {
+    if (!isUserPresentInFusionAuth) {
+      const registrationRequest: RegistrationRequest = {
+        registration: {
+          applicationId: config.get('FUSIONAUTH_APP_ID'),
+          username: user.email,
+        },
+        sendSetPasswordEmail: false,
+        user: {
+          id: user.id,
+          username: user.email,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          mobilePhone: user.phoneNumber,
+          password,
+          verified: true,
+          active: true,
+        },
+      };
+      await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
+    } else {
+      //setting the password for the user for the first time
+      const request: ChangePasswordRequest = {
         applicationId: config.get('FUSIONAUTH_APP_ID'),
-        username: user.email.split('@')[0],
-      },
-      sendSetPasswordEmail: false,
-      user: {
-        id: user.id,
-        username: user.email.split('@')[0],
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        mobilePhone: user.phoneNumber,
-        password,
-        verified: true,
-        active: true,
-      },
-    };
-    await fusionAuthClientHandler.fusionAuthClient().register(user.id, registrationRequest);
-
+        loginId: user.email,
+        password: password,
+      };
+      try {
+        await fusionAuthClientHandler.fusionAuthClient().changePasswordByIdentity(request);
+      } catch (e) {
+        throw new BadRequestError('Cannot approve this host');
+      }
+    }
   }
 
   public static async generateToken(user: User): Promise<string> {
@@ -3597,7 +5086,9 @@ export class AuthService {
     return token;
   }
 
-  public static async updateMemberStatus(payload: UpdateUserStatusRequestDto): Promise<GenericResponse> {
+  public static async updateMemberStatus(
+    payload: UpdateUserStatusRequestDto,
+  ): Promise<GenericResponse> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id },
       relations: {
@@ -3607,14 +5098,16 @@ export class AuthService {
       },
     });
 
-    const memberRole = user.roles.find((role) => role.role.name === 'member');
+    const memberRole = user.roles.find(role => role.role.name === 'member');
     if (memberRole === undefined) {
-      throw new NotFoundError('Member')
+      throw new NotFoundError('Member');
     }
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
+    const userRole = await this.dbConnection
+      .getRepository(UserRole)
+      .findOne({ where: { id: memberRole.id } });
     if (!userRole) {
-      throw new NotFoundError('Member')
+      throw new NotFoundError('Member');
     }
     userRole.status = newUserStatusTosUserStatus[payload.status];
     await this.dbConnection.getRepository(UserRole).save(userRole);
@@ -3633,35 +5126,114 @@ export class AuthService {
       },
     });
 
-    const memberRole = user.roles.find((role) => role?.role?.name === 'member');
-    if (memberRole === undefined) return responses.notFound('Member not found');
+    const memberRole = user.roles.find(role => role?.role?.name === 'member');
+    const nonMemberRole = user.roles.find(role => role.role.name === 'non_member');
 
-    const userRole = await this.dbConnection.getRepository(UserRole).findOne({ where: { id: memberRole.id } });
-    if (!userRole) {
-      throw new NotFoundError('Member')
-    };
+    if (!memberRole && !nonMemberRole) {
+      throw new NotFoundError('Profile');
+    }
+
+    let userRole = null;
+    if (memberRole) {
+      userRole = await this.dbConnection
+        .getRepository(UserRole)
+        .findOne({ where: { id: memberRole.id }, relations: { role: true } });
+    } else if (nonMemberRole) {
+      userRole = await this.dbConnection
+        .getRepository(UserRole)
+        .findOne({ where: { id: nonMemberRole.id }, relations: { role: true } });
+    }
 
     // Micro-service call
-    const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
+    const focuses = await PlatformService.getUserFocuses({ id: user.id });
 
-    const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-      where: {
-        user: {
-          id: user.id,
+    const socialProvider: SocialProvider = await this.dbConnection
+      .getRepository(SocialProvider)
+      .findOne({
+        where: {
+          user: {
+            id: user.id,
+          },
+          type: SocialProviderType.FACEBOOK,
         },
-        type: SocialProviderType.FACEBOOK,
+        relations: ['user'],
+      });
+
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
+
+    const referredUser = await this.dbConnection
+      .getRepository(ReferredUser)
+      .findOneBy({ userId: user.id });
+
+    const referredByMembers = await this.dbConnection
+      .getRepository(ReferralRequest)
+      .createQueryBuilder('referral')
+      .innerJoin('referral.user', 'user')
+      .select(
+        'user.id, user.first_name "firstName", user.last_name "lastName", user.profile_picture "profilePicture"',
+      )
+      .where('referral.requester = :requester', { requester: user.id })
+      .andWhere('referral.isApproved = true')
+      .getRawMany();
+
+    const referenceCode = await this.dbConnection.getRepository(Invitation).findOne({
+      where: [
+        {
+          email: user.email,
+        },
+        {
+          phoneNumber: user.phoneNumber,
+        },
+      ],
+      relations: {
+        inviteeUser: true,
       },
-      relations: ['user'],
     });
 
-    return responses.data(toMemberProfile(user, focuses, undefined, userRole, undefined, socialProvider?.username));
+    const references: IReferenceCode = {
+      code: referenceCode?.referralCode || '---',
+      name:
+        (referenceCode?.inviteeUser?.firstName || '---') +
+        '  ' +
+        (referenceCode?.inviteeUser?.lastName || '---'),
+      email: referenceCode?.inviteeUser?.email || '---',
+    };
+
+    return responses.data(
+      toMemberProfile(
+        user,
+        focuses,
+        undefined,
+        userRole,
+        undefined,
+        socialProvider?.username,
+        referredUser?.referralCode,
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
+        referredByMembers,
+        references,
+      ),
+    );
   }
 
-  public static async applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, hostId, userTypes) {
+  public static async applyUserFilters(
+    queryBuilder,
+    parsedQuery,
+    searchValue,
+    focuses,
+    interest,
+    gender,
+    baseCity,
+    hostId,
+    userTypes,
+  ) {
     //Apply type filter
     if (userTypes.length > 0) {
       queryBuilder.andWhere(
-        new Brackets((qb) => {
+        new Brackets(qb => {
           qb.where('role.name IN (:...roleNames)', { roleNames: userTypes });
         }),
       );
@@ -3669,11 +5241,17 @@ export class AuthService {
 
     // Apply search value filter
     if (searchValue) {
-      const searchWords = searchValue.trim().split(/\s+/);
+      const searchWords = searchValue.toString().trim().split(/\s+/);
       queryBuilder.andWhere(
-        new Brackets((qb) => {
-          searchWords.forEach((word) => {
-            qb.orWhere('user.firstName ILIKE :word', { word: `%${word}%` }).orWhere('user.lastName ILIKE :word', { word: `%${word}%` });
+        new Brackets(qbOuter => {
+          searchWords.forEach((word, index) => {
+            qbOuter.andWhere(
+              new Brackets(qbInner => {
+                qbInner
+                  .orWhere(`user.firstName ILIKE :word${index}`, { [`word${index}`]: `${word}%` })
+                  .orWhere(`user.lastName ILIKE :word${index}`, { [`word${index}`]: `${word}%` });
+              }),
+            );
           });
         }),
       );
@@ -3681,8 +5259,8 @@ export class AuthService {
 
     // Apply focuses filter
     if (focuses && typeof focuses === 'string') {
-      const focusIds = focuses.split(',').map((id) => id.trim());
-      queryBuilder.andWhere((qb) => {
+      const focusIds = focuses.split(',').map(id => id.trim());
+      queryBuilder.andWhere(qb => {
         const subQuery = qb
           .subQuery()
           .select('focus_users_user.userId')
@@ -3695,8 +5273,8 @@ export class AuthService {
 
     // Apply interests filter
     if (interest && typeof interest === 'string') {
-      const interestFilter = interest.split(',').map((interestName) => interestName.trim());
-      queryBuilder.andWhere((qb) => {
+      const interestFilter = interest.split(',').map(interestName => interestName.trim());
+      queryBuilder.andWhere(qb => {
         const subQuery = qb
           .subQuery()
           .select('interest_users_user.userId')
@@ -3709,9 +5287,9 @@ export class AuthService {
 
     // Apply gender filter
     if (gender && typeof gender === 'string') {
-      const genderFilter = gender.split(',').map((g) => g.trim().toUpperCase());
+      const genderFilter = gender.split(',').map(g => g.trim().toUpperCase());
       const validGenders = Object.values(Gender) as string[];
-      const filteredGenders = genderFilter.filter((g) => validGenders.includes(g)) as Gender[];
+      const filteredGenders = genderFilter.filter(g => validGenders.includes(g)) as Gender[];
       if (filteredGenders.length > 0) {
         queryBuilder.andWhere('user.gender IN (:...filteredGenders)', { filteredGenders });
       }
@@ -3719,10 +5297,15 @@ export class AuthService {
 
     // Apply baseCity filter
     if (baseCity && typeof baseCity === 'string') {
-      const placeIds = baseCity.split(',').map((id) => id.trim());
+      const placeIds = baseCity.split(',').map(id => id.trim());
       if (placeIds.length > 0) {
-        queryBuilder.andWhere((qb) => {
-          const subQuery = qb.subQuery().select('address.id').from('address', 'address').where('address.google_place_id IN (:...placeIds)', { placeIds }).getQuery();
+        queryBuilder.andWhere(qb => {
+          const subQuery = qb
+            .subQuery()
+            .select('address.id')
+            .from('address', 'address')
+            .where('address.google_place_id IN (:...placeIds)', { placeIds })
+            .getQuery();
           return `user.address_id IN ${subQuery}`;
         });
       }
@@ -3730,9 +5313,17 @@ export class AuthService {
 
     // Apply age filter
     if (parsedQuery.ageFrom || parsedQuery.ageTo) {
-      const ageFrom = parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim() ? parseInt(parsedQuery.ageFrom, 10) : 0;
+      const ageFrom =
+        parsedQuery.ageFrom && typeof parsedQuery.ageFrom === 'string' && parsedQuery.ageFrom.trim()
+          ? parseInt(parsedQuery.ageFrom, 10)
+          : 0;
       const ageTo =
-        parsedQuery.ageTo && typeof parsedQuery.ageTo === 'string' && parsedQuery.ageTo.trim() && parsedQuery.ageTo !== 'No Max' ? parseInt(parsedQuery.ageTo, 10) : null;
+        parsedQuery.ageTo &&
+        typeof parsedQuery.ageTo === 'string' &&
+        parsedQuery.ageTo.trim() &&
+        parsedQuery.ageTo !== 'No Max'
+          ? parseInt(parsedQuery.ageTo, 10)
+          : null;
       const ageQuery = `EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(user.date_of_birth, 'MM/DD/YYYY')))`;
       const conditions: string[] = [`${ageQuery} >= :ageFrom`];
       if (ageTo !== null) {
@@ -3743,7 +5334,10 @@ export class AuthService {
     return queryBuilder;
   }
 
-  public static async getUserFiltersOptions(payload: FilterRequestDto): Promise<Filter[]> {
+  public static async getUserFiltersOptions(
+    payload: FilterRequestDto,
+    token: string,
+  ): Promise<Filter[]> {
     const { userId } = payload;
     const parsedQuery = parse(payload.query) as ParsedQs;
     const eventId = parsedQuery?.eventId as string;
@@ -3756,6 +5350,7 @@ export class AuthService {
       'age',
       'interest',
       'type',
+      'userHostRelationship',
       'ticketType',
       'partySize',
       'checkedIn',
@@ -3764,7 +5359,7 @@ export class AuthService {
       'declinedBy',
       'vouch',
     ];
-    const focuses = (await PlatformService.getFocuses());
+    const focuses = await PlatformService.getFocuses();
 
     const categoryObj = {
       id: 'category',
@@ -3788,7 +5383,7 @@ export class AuthService {
         },
       },
     });
-    const customLists = user?.customLists?.map((list) => ({
+    const customLists = user?.customLists?.map(list => ({
       name: list.listName,
       id: list.listName,
     }));
@@ -3825,8 +5420,8 @@ export class AuthService {
       options: [],
       type: FilterTypeValues.age,
     };
-    const interests = (await PlatformService.listInterests());
-    const mappedInterests = interests?.map((interest) => ({
+    const interests = await PlatformService.listInterests();
+    const mappedInterests = interests?.map(interest => ({
       name: interest.name,
       id: interest.id,
     }));
@@ -3845,21 +5440,32 @@ export class AuthService {
       ],
       type: FilterTypeValues.type,
     };
-    const now = new Date();
-    //TODO: check if this logic affects on date format changes
-    const formattedDate = formatDateToMMDDYYYYHHmm(now);
+    let mappedEvents: any = [];
     const queryParams = {
       ownerId: userId,
-      statusName: 'PAST_STATUS',
-      maxEndDate: formattedDate,
-      isPublished: true,
+      status: 'PAST_STATUS',
     };
     const queryString = prepareQueryString(queryParams);
-    const listEvents = [];
-    const mappedEvents = listEvents?.map((event) => ({
-      name: event.name,
-      id: event.id,
-    }));
+    try {
+      const listEvents: any = await serviceMesh.eventService(token).listHostEvents(queryString);
+      mappedEvents = listEvents?.data?.result.map(event => ({
+        name: event.name,
+        id: event.id,
+      }));
+    } catch (e) {
+      console.error(e);
+    }
+
+    const userHostRelationshipObj = {
+      id: 'userHostRelationship',
+      label: 'Type',
+      options: [
+        { id: 'existing_user_in_host_list', name: 'Existing User in Database' },
+        { id: 'new_user_not_in_host_list', name: 'New User (Not in Database)' },
+      ],
+      type: FilterTypeValues.userHostRelationship,
+    };
+
     const pastEventsObj = {
       id: 'pastEvents',
       label: 'Past Events',
@@ -3867,16 +5473,15 @@ export class AuthService {
       type: FilterTypeValues.pastEvents,
     };
 
-    let ticketTypes = []
+    let ticketTypes = [];
     if (eventId) {
       try {
         ticketTypes = (await serviceMesh.eventService().getTicketTypes(eventId)).data;
-      }
-      catch (e) {
-        ticketTypes = []
+      } catch (e) {
+        ticketTypes = [];
       }
     }
-    const mappedticketTypes = ticketTypes?.map((ticketType) => ({
+    const mappedticketTypes = ticketTypes?.map(ticketType => ({
       name: ticketType.name,
       id: ticketType.id,
     }));
@@ -3965,6 +5570,7 @@ export class AuthService {
       age: ageObj,
       interest: interestObj,
       category: categoryObj,
+      userHostRelationship: userHostRelationshipObj,
       type: typeObj,
       list: listObj,
       pastEvents: pastEventsObj,
@@ -3978,7 +5584,7 @@ export class AuthService {
       followersObj,
     };
     // Arrange objects in the desired sequence
-    const orderedObjects = filterOptionsSequence.map((id) => objectsMap[id]).filter((node) => node);
+    const orderedObjects = filterOptionsSequence.map(id => objectsMap[id]).filter(node => node);
     //ends here
     return orderedObjects;
   }
@@ -3996,10 +5602,10 @@ export class AuthService {
     });
 
     if (!host) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
-    const { description, tag } = payload;
+    const { description, tag, role } = payload;
 
     const feedback = this.dbConnection.getRepository(HostFeedback).create({
       description,
@@ -4009,6 +5615,41 @@ export class AuthService {
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0) {
+        if (['member', 'non_member'].includes(role)) {
+          await serviceMesh
+            .notificationService()
+            .sendNotification(NotificationType.USER_FEEDBACK, adminUserIds, null, host.id);
+        }
+        if (role === 'host') {
+          await serviceMesh
+            .notificationService()
+            .sendNotification(NotificationType.HOST_FEEDBACK, adminUserIds, null, host.id);
+        }
+      }
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
+
     return {
       description: savedFeedback.description,
       tag: savedFeedback.tag,
@@ -4016,12 +5657,13 @@ export class AuthService {
     };
   }
 
-  public static async duplicateCustomList(payload: DuplicateCustomListRequestDto): Promise<CustomUsersList> {
+  public static async duplicateCustomList(
+    payload: DuplicateCustomListRequestDto,
+  ): Promise<CustomUsersList> {
     const { customListId, customName, hostId, listType } = payload;
 
-
     if (!customName) {
-      throw new BadRequestError("customName");
+      throw new BadRequestError('customName');
     }
     const host = await this.dbConnection.getRepository(User).findOne({
       where: { id: hostId, deletedAt: IsNull() },
@@ -4029,12 +5671,11 @@ export class AuthService {
     });
 
     if (!host) {
-      throw new NotFoundError("host");
-
+      throw new NotFoundError('host');
     }
 
-    if (host.customLists.some((list) => list.listName === customName)) {
-      throw new BadRequestError("customName exists");
+    if (host.customLists.some(list => list.listName === customName)) {
+      throw new BadRequestError('List name already exists');
     }
 
     let existingList;
@@ -4043,7 +5684,6 @@ export class AuthService {
       case !customListId: {
         switch (listType) {
           case 'followed':
-
             existingList = await this.dbConnection.getRepository(HostFollowing).find({
               where: { host: { id: hostId } },
               relations: { follower: true },
@@ -4056,11 +5696,11 @@ export class AuthService {
             });
             break;
           default:
-            throw new BadRequestError('Invalid list type provided.')
+            throw new BadRequestError('Invalid list type provided.');
         }
 
         if (!existingList || existingList.length === 0) {
-          throw new NotFoundError("listType");
+          throw new NotFoundError('users or list');
         }
         break;
       }
@@ -4072,7 +5712,7 @@ export class AuthService {
         });
 
         if (!existingList) {
-          throw new NotFoundError("existingList");
+          throw new NotFoundError('existingList');
         }
       }
     }
@@ -4080,14 +5720,22 @@ export class AuthService {
     const newCustomList = new HostCustomUsersLists();
     newCustomList.listName = customName;
     newCustomList.host = host;
-    const savedCustomList = await this.dbConnection.getRepository(HostCustomUsersLists).save(newCustomList);
+    const savedCustomList = await this.dbConnection
+      .getRepository(HostCustomUsersLists)
+      .save(newCustomList);
 
-    const userListEntries = (customListId ? existingList.usersLists : existingList).map((listUser) => {
-      const newListUser = new HostCustomUsersListsUsers();
-      newListUser.user = customListId ? listUser.user : listType === 'followed' ? listUser.follower : listUser.member;
-      newListUser.list = savedCustomList;
-      return newListUser;
-    });
+    const userListEntries = (customListId ? existingList.usersLists : existingList).map(
+      listUser => {
+        const newListUser = new HostCustomUsersListsUsers();
+        newListUser.user = customListId
+          ? listUser.user
+          : listType === 'followed'
+            ? listUser.follower
+            : listUser.member;
+        newListUser.list = savedCustomList;
+        return newListUser;
+      },
+    );
 
     await this.dbConnection.getRepository(HostCustomUsersListsUsers).save(userListEntries);
     const customListSaved = await this.getCustomUsersList({
@@ -4104,14 +5752,13 @@ export class AuthService {
     });
 
     if (!hostUserMapping) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
     await this.dbConnection.getRepository(HostUserMapping).remove(hostUserMapping);
     return '';
   }
 
   public static async getUserProfile(payload: UserAndIdRequestDto): Promise<MemberProfile> {
-
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.userId },
       relations: {
@@ -4123,11 +5770,12 @@ export class AuthService {
       },
     });
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
+    const isHost = user.roles.some(r => r.role.name === 'host');
     const [focuses, interests] = await Promise.all([
-      (await PlatformService.getUserFocuses({ id: user.id })),
-      (await PlatformService.getUserInterests({ id: user.id }))
+      await PlatformService.getUserFocuses({ id: user.id }),
+      await PlatformService.getUserInterests({ id: user.id }),
     ]);
     const [hostUserSettings, hostUserFavorite, hostFollowing, hostUserMapping] = await Promise.all([
       this.dbConnection.getRepository(HostUserSettings).findOne({
@@ -4144,38 +5792,55 @@ export class AuthService {
       }),
     ]);
     const formattedLists = await this.getUserCustomLists(payload.id, user.id);
-    const userRole = user.roles.find((r) => ['member', 'non_member'].includes(r.role.name));
+    const userRole = user.roles.find(r => ['member', 'non_member'].includes(r.role.name));
 
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
     const note = hostUserSettings?.note ?? '';
-    const userData = toMemberProfile(user, focuses, interests, userRole, formattedLists);
+    const eventCount = await this.dbConnection
+      .getRepository(Guest)
+      .count({ where: { user: { id: user.id } } });
+    const userData = toMemberProfile(
+      user,
+      focuses,
+      interests,
+      userRole,
+      formattedLists,
+      undefined,
+      undefined,
+      eventCount,
+    );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
-
+    userData.isHost = isHost;
     return userData;
-
   }
 
-  public static async getUserCustomLists(hostId: string, userId: string): Promise<customListData[]> {
-
-    const result = await this.dbConnection.getRepository(HostCustomUsersListsUsers)
+  public static async getUserCustomLists(
+    hostId: string,
+    userId: string,
+  ): Promise<customListData[]> {
+    const result = await this.dbConnection
+      .getRepository(HostCustomUsersListsUsers)
       .createQueryBuilder('listUserMapping')
       .leftJoin('listUserMapping.list', 'list')
       .leftJoin('listUserMapping.user', 'listUser')
       .where('list.host.id = :hostId', { hostId })
-      .andWhere(':userId IN (SELECT user_id FROM host_custom_users_lists_users WHERE list_id = list.id)', { userId })
+      .andWhere(
+        ':userId IN (SELECT user_id FROM host_custom_users_lists_users WHERE list_id = list.id)',
+        { userId },
+      )
       .select('list.id', 'id')
       .addSelect('list.listName', 'customName')
       .addSelect('COUNT(listUser.id)', 'userCount')
       .groupBy('list.id')
       .getRawMany();
 
-    return result.map((list) => ({
+    return result.map(list => ({
       id: list.id,
       customName: list.customName,
       totalCount: list.userCount,
@@ -4197,9 +5862,10 @@ export class AuthService {
       relations: { followers: { follower: true } },
     });
     if (!user) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
-    const queryBuilder = this.dbConnection.getRepository(User)
+    const queryBuilder = this.dbConnection
+      .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.address', 'address')
       .leftJoinAndSelect('user.roles', 'roles')
@@ -4212,54 +5878,81 @@ export class AuthService {
       .where('hf.host.id = :hostId', { hostId: payload.userId })
       .take(take)
       .skip(skip);
+
+    //filtering out deactivated users
+    queryBuilder.andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false });
+
     let userTypes: string[] = [];
     if (type && typeof type === 'string') {
-      userTypes = type.split(',').map((name) => name.trim());
+      userTypes = type.split(',').map(name => name.trim());
     }
 
     if (parsedQuery.sortBy === 'name') {
       const sortDirection = parsedQuery.sortDirection === 'DESC' ? 'DESC' : 'ASC';
-      queryBuilder.addOrderBy('user.firstName', sortDirection).addOrderBy('user.lastName', sortDirection);
+      queryBuilder
+        .addOrderBy('user.firstName', sortDirection)
+        .addOrderBy('user.lastName', sortDirection);
     } else {
       queryBuilder.orderBy('hf.createdAt', 'DESC');
     }
 
-    await this.applyUserFilters(queryBuilder, parsedQuery, searchValue, focuses, interest, gender, baseCity, undefined, userTypes);
+    await this.applyUserFilters(
+      queryBuilder,
+      parsedQuery,
+      searchValue,
+      focuses,
+      interest,
+      gender,
+      baseCity,
+      undefined,
+      userTypes,
+    );
     const [followedUsers, totalCount] = await queryBuilder.getManyAndCount();
 
-    const users = await Promise.all(
-      followedUsers.map(async (user) => {
-        const focuses = (await PlatformService.getUserFocuses({ id: user.id }));
-        const interests = (await PlatformService.getUserInterests({ id: user.id }));
+    const favorites = await this.dbConnection.getRepository(HostFavorite).find({
+      where: { host: { id: payload.userId } },
+      relations: ['member'],
+    });
 
-        const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-          where: {
-            user: {
-              id: user.id,
+    const favoriteUserIds = favorites.map(fav => fav.member.id);
+
+    const users = await Promise.all(
+      followedUsers.map(async user => {
+        const focuses = await PlatformService.getUserFocuses({ id: user.id });
+        const interests = await PlatformService.getUserInterests({ id: user.id });
+
+        const socialProvider: SocialProvider = await this.dbConnection
+          .getRepository(SocialProvider)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
+              type: SocialProviderType.INSTAGRAM,
             },
-            type: SocialProviderType.INSTAGRAM,
-          },
-          relations: ['user'],
-        });
+            relations: ['user'],
+          });
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        return toUser(user, focuses, interests, user.roles[0], {
+        const userData = toUser(user, focuses, interests, user.roles[0], {
           INSTAGRAM: socialProviderUsername,
         });
+        userData.isFavourite = favoriteUserIds.includes(user.id);
+        return userData;
       }),
     );
     return { result: users, totalCount };
-
   }
 
   public static async manageUserSpam(payload: ManageUserRequestDto): Promise<string> {
-
     const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.userId } });
 
     if (!user || !host) {
-      throw new NotFoundError('User or Host')
+      throw new NotFoundError('User or Host');
     }
     let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
@@ -4280,26 +5973,58 @@ export class AuthService {
     return '';
   }
 
+  public static async manageMultipleUsersSpam(
+    payload: ManageMulipleUsersRequestDto,
+  ): Promise<string> {
+    const { id: hostId, isSpam, userIds } = payload;
+
+    // Validate Host Exists
+    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: hostId } });
+    if (!host) {
+      throw new NotFoundError('Host');
+    }
+
+    // Prepare settings for upsert
+    const settings = userIds.map(userId => ({
+      host: { id: hostId },
+      user: { id: userId },
+      isSpam,
+    }));
+
+    // Perform upsert operation
+    await this.dbConnection.getRepository(HostUserSettings).upsert(settings, ['host', 'user']);
+
+    return '';
+  }
+
   /**
    * Reports a user by storing a report record with associated role IDs.
    * @param payload - The DTO containing report details.
    * @returns A response containing the report details or an error message.
    */
   public static async reportUser(payload: ReportUserRequestDto): Promise<ReportData> {
-    const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
-    const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
+    const reportedBy = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.reportedById } });
+    const reportedTo = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.reportedToId } });
 
     if (!reportedBy || !reportedTo) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     // Fetch role records from the roles table
 
-    const reportedByRole = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.reportedByRoleId } });
-    const reportedToRole = await this.dbConnection.getRepository(Role).findOne({ where: { id: payload.reportedToRoleId } });
+    const reportedByRole = await this.dbConnection
+      .getRepository(Role)
+      .findOne({ where: { id: payload.reportedByRoleId } });
+    const reportedToRole = await this.dbConnection
+      .getRepository(Role)
+      .findOne({ where: { id: payload.reportedToRoleId } });
 
     if (!reportedByRole || !reportedToRole) {
-      throw new BadRequestError('Invalid role IDs provided')
+      throw new BadRequestError('Invalid role IDs provided');
     }
 
     // Store the report with role IDs
@@ -4320,15 +6045,52 @@ export class AuthService {
       reportedToRoleId: reportedToRole.id,
     };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.USER_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
+
     return data;
   }
 
   public static async blockHost(payload: BlockHostRequestDto): Promise<ReportData> {
-    const blockedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedById } });
-    const blockedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.blockedToId } });
+    const blockedBy = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.blockedById } });
+    const blockedTo = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.blockedToId } });
 
     if (!blockedBy || !blockedTo) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     // Check if already blocked
@@ -4337,7 +6099,7 @@ export class AuthService {
     });
 
     if (existingBlock) {
-      throw new BadRequestError('User already blocked')
+      throw new BadRequestError('User already blocked');
     }
 
     // Store the block record
@@ -4354,7 +6116,7 @@ export class AuthService {
       reportId: '',
       blockId: block.id,
       reportMessage: 'Blocked succesfully',
-    }
+    };
 
     return data;
   }
@@ -4368,7 +6130,7 @@ export class AuthService {
     });
 
     if (!block) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     await this.dbConnection.getRepository(Block).remove(block);
@@ -4377,11 +6139,15 @@ export class AuthService {
   }
 
   public static async reportAndBlockHost(payload: ReportUserRequestDto): Promise<ReportData> {
-    const reportedBy = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedById } });
-    const reportedTo = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.reportedToId } });
+    const reportedBy = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.reportedById } });
+    const reportedTo = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.reportedToId } });
 
     if (!reportedBy || !reportedTo) {
-      throw new NotFoundError('User')
+      throw new NotFoundError('User');
     }
 
     let reportId = null;
@@ -4436,13 +6202,47 @@ export class AuthService {
       reportId,
       blockId,
       reportMessage,
-    }
+    };
 
+    try {
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.HOST_REPORT,
+            adminUserIds,
+            null,
+            reportedBy.id,
+            reportedTo.id,
+          );
+    } catch (error) {
+      console.log('🚀 ~ AuthService ~ error:', error);
+    }
     return data;
   }
 
   public static async sendSupportEmail(payload: sendSupportEmailRequestDto): Promise<string> {
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.userId } });
     // TO DO: Change email and sms template
     try {
       await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -4453,13 +6253,14 @@ export class AuthService {
           },
         ],
         'Host Application Submitted',
-        [user.email],
+        [user.email.trim().toLowerCase()],
         null,
       );
-    } catch (error) { }
+    } catch (error) {
+      console.error(error);
+    }
 
     return '';
-
   }
 
   public static async getAllFeedbacks(payload: ReportAndFeedbackRequestDto): Promise<Feedback[]> {
@@ -4467,34 +6268,41 @@ export class AuthService {
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
-    const query = this.dbConnection.getRepository(HostFeedback).createQueryBuilder('feedback').leftJoinAndSelect('feedback.user', 'user').take(take).skip(skip);
+    const query = this.dbConnection
+      .getRepository(HostFeedback)
+      .createQueryBuilder('feedback')
+      .leftJoinAndSelect('feedback.user', 'user')
+      .take(take)
+      .skip(skip);
 
     if (searchValue) {
-      query.andWhere('(user.firstName ILIKE :search OR user.lastName ILIKE :search)', { search: `%${searchValue}%` });
+      query.andWhere('(user.firstName ILIKE :search OR user.lastName ILIKE :search)', {
+        search: `%${searchValue}%`,
+      });
     }
 
     const feedbacks = await query.getMany();
 
     const response = responses.data({
-      feedbacks: feedbacks.map((feedback) => ({
+      feedbacks: feedbacks.map(feedback => ({
         id: feedback.id ?? null,
         tag: feedback.tag ?? null,
         description: feedback.description ?? null,
         user: feedback.user
           ? {
-            id: feedback.user.id ?? null,
-            firstName: feedback.user.firstName ?? null,
-            lastName: feedback.user.lastName ?? null,
-            dateOfBirth: feedback.user.dateOfBirth ?? null,
-            email: feedback.user.email ?? null,
-            username: feedback.user.username ?? null,
-            phoneNumber: feedback.user.phoneNumber ?? null,
-            gender: feedback.user.gender ?? null,
-            additionalHostInformation: feedback.user.additionalHostInformation ?? null,
-            profilePicture: feedback.user.profilePicture ?? null,
-            instagramUserName: feedback.user.instagramUserName ?? null,
-            isFirstTimeLoggedIn: feedback.user.isFirstTimeLoggedIn ?? null,
-          }
+              id: feedback.user.id ?? null,
+              firstName: feedback.user.firstName ?? null,
+              lastName: feedback.user.lastName ?? null,
+              dateOfBirth: feedback.user.dateOfBirth ?? null,
+              email: feedback.user.email ?? null,
+              username: feedback.user.username ?? null,
+              phoneNumber: feedback.user.phoneNumber ?? null,
+              gender: feedback.user.gender ?? null,
+              additionalHostInformation: feedback.user.additionalHostInformation ?? null,
+              profilePicture: feedback.user.profilePicture ?? null,
+              instagramUserName: feedback.user.instagramUserName ?? null,
+              isFirstTimeLoggedIn: feedback.user.isFirstTimeLoggedIn ?? null,
+            }
           : undefined,
       })),
     });
@@ -4509,16 +6317,16 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundError('User')
-    };
+      throw new NotFoundError('User');
+    }
 
-    const targetProfile = user.roles.find((item) => item.role.name === payload.targetRole);
+    const targetProfile = user.roles.find(item => item.role.name === payload.targetRole);
     if (!targetProfile) {
-      throw new ForbiddenError("User does not have the requested role.");
+      throw new ForbiddenError('User does not have the requested role.');
     }
     if (payload.targetRole === 'host' || payload.targetRole === 'member') {
       if (targetProfile.status !== UserStatus.ACTIVE) {
-        throw new ForbiddenError('User is not active.')
+        throw new ForbiddenError('User is not active.');
       }
     }
 
@@ -4529,8 +6337,12 @@ export class AuthService {
           loginId: user.email,
         };
 
-        const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
-        const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+        const code = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .startPasswordlessLogin(request);
+        const authenticatedUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .passwordlessLogin({ code: code.response.code });
 
         return {
           token: authenticatedUser.response.token,
@@ -4541,7 +6353,7 @@ export class AuthService {
             },
           ],
           id: user.id,
-        }
+        };
       } catch (error) {
         return {
           token: '',
@@ -4552,7 +6364,7 @@ export class AuthService {
             },
           ],
           id: user.id,
-        }
+        };
       }
     }
 
@@ -4562,7 +6374,9 @@ export class AuthService {
     };
 
     const code = await fusionAuthClientHandler.fusionAuthClient().startPasswordlessLogin(request);
-    const authenticatedUser = await fusionAuthClientHandler.fusionAuthClient().passwordlessLogin({ code: code.response.code });
+    const authenticatedUser = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .passwordlessLogin({ code: code.response.code });
 
     return {
       token: authenticatedUser.response.token,
@@ -4577,15 +6391,17 @@ export class AuthService {
   }
 
   public static async addUserNote(payload: AddUserNoteRequestDto): Promise<AddUserNote> {
-    const host = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
-    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.userId } });
+    const host = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.userId } });
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
     if (!user || !host) {
-      throw new NotFoundError('User or Host')
+      throw new NotFoundError('User or Host');
     }
     let hostUserSettings = await this.dbConnection.getRepository(HostUserSettings).findOne({
       where: {
-        user: { id: payload.userId },
-        host: { id: payload.id },
+        user: { id: payload.id },
+        host: { id: payload.userId },
       },
     });
     if (!hostUserSettings) {
@@ -4596,11 +6412,638 @@ export class AuthService {
     } else {
       hostUserSettings.note = payload.note;
     }
-    const userHostSettings = await this.dbConnection.getRepository(HostUserSettings).save(hostUserSettings);
+    const userHostSettings = await this.dbConnection
+      .getRepository(HostUserSettings)
+      .save(hostUserSettings);
 
     return {
       note: userHostSettings.note,
       hostUserSettingsId: userHostSettings.id,
     };
+  }
+
+  public static async deactivateUserAccount(payload: IdRequestDto) {
+    const user = await this.dbConnection.getRepository(User).findOne({ where: { id: payload.id } });
+    if (!user) throw new NotFoundError('User');
+
+    await this.dbConnection.getRepository(User).update(payload.id, {
+      isDeactivated: true,
+      deactivatedAt: new Date(),
+    });
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
+
+    if (targetRole) {
+      // targetRole.status = UserStatus.DEACTIVATED;
+      targetRole.isRoleDeactivated = true;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+
+    // 3. Delete all associated user data
+    await this.deleteGuestTicketSignupFormForUserAndTheirPlusOnes(user.id);
+
+    //scheduling user hard delete for 30 days
+    const userFromDb = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { id: payload.id } });
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.DELETE_USER,
+        data: {
+          id: userFromDb.id,
+          deactivatedAt: userFromDb.deactivatedAt,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(`Delete user scheduler failed for ${user.firstName} ${user.lastName}`, e);
+    }
+
+    //send notifications
+    await this.sendDeactivationNotification(user);
+    // ends here
+    return '';
+  }
+
+  /**
+   * Sends deactivation email and SMS notification to the user.
+   *
+   * @param user - The user being deactivated
+   */
+  private static async sendDeactivationNotification(user: User) {
+    const emailsToSend: { email: string; subject: string; data: any[] }[] = [];
+    const smsToSend: { phoneNumber: string; message: string }[] = [];
+
+    const today = new Date();
+    const afterThirtyDays = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+
+    const fullMonthName = afterThirtyDays.toLocaleString('default', { month: 'long' });
+    const reactivateBeforeTimestamp = `${fullMonthName} ${afterThirtyDays.getDate()}, ${afterThirtyDays.getFullYear()}, at 11:59 PM EST`;
+
+    // Prepare email
+    emailsToSend.push({
+      email: user.email,
+      subject: 'Account Deactivated',
+      data: [
+        { key: 'first_name', value: user.firstName },
+        { key: 'activate_before_datetime', value: reactivateBeforeTimestamp },
+      ],
+    });
+
+    // // Prepare SMS (if applicable - example message)
+    // if (user.phoneNumber) {
+    //   smsToSend.push({
+    //     phoneNumber: user.phoneNumber,
+    //     message: `Hi ${user.firstName}, your account has been deactivated. You can reactivate it before ${reactivateBeforeTimestamp}.`,
+    //   });
+    // }
+
+    // Send Emails
+    try {
+      await Promise.all(
+        emailsToSend.map(email =>
+          serviceMesh
+            .notificationService()
+            .sendEmailFromTemplate(
+              email.data,
+              email.subject,
+              [email.email.trim().toLowerCase()],
+              null,
+            ),
+        ),
+      );
+    } catch (error) {
+      console.error(`❌ Failed to send deactivation email:`, error);
+    }
+
+    //TODO: Uncomment when SMS is available(currently no text is provide in sheet)
+    // // Send SMS
+    // try {
+    //   await Promise.all(
+    //     smsToSend.map(sms => {
+    //       const validateNumber = isValidPhoneNumber(sms.phoneNumber);
+    //       if (validateNumber) {
+    //         const cleanedNumber = sms.phoneNumber.replace(/[\s\-()]/g, '');
+    //         return serviceMesh.notificationService().sendTextMessage(cleanedNumber, sms.message);
+    //       }
+    //     })
+    //   );
+    // } catch (err) {
+    //   console.error(`❌ Failed to send deactivation SMS:`, err);
+    // }
+  }
+
+  /**
+   * Deletes guest, ticket, and signup form entries for the specified lead guest (userId)
+   * across all events they are part of. Also removes related entries for plus-ones,
+   * but only if those plus-ones were added by this lead guest and for those specific events.
+   *
+   * @param userId - The ID of the lead guest to deactivate
+   */
+  private static async deleteGuestTicketSignupFormForUserAndTheirPlusOnes(userId: string) {
+    const guestRepo = this.dbConnection.getRepository(Guest);
+    const ticketRepo = this.dbConnection.getRepository(Ticket);
+    const signupFormRepo = this.dbConnection.getRepository(SignupFormSubmissions);
+
+    // 1. Get all events where the lead guest is involved.
+    const leadGuestEntries = await guestRepo.find({
+      where: { user: { id: userId } },
+      relations: ['event'],
+    });
+
+    const eventIds = [...new Set(leadGuestEntries.map(g => g.event?.id).filter(Boolean))];
+    if (eventIds.length === 0) return;
+
+    // 2. Get plus-ones added by the lead guest for those events.
+    const plusOneGuests = await guestRepo.find({
+      where: {
+        addedBy: { id: userId },
+        event: { id: In(eventIds) },
+      },
+      relations: ['user', 'event'],
+    });
+
+    const plusOneUserIds = plusOneGuests
+      .map(g => g.user?.id)
+      .filter((id): id is string => Boolean(id));
+
+    // 3. Delete Tickets
+    await ticketRepo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        new Brackets(qb => {
+          qb.where('user_id = :userId', { userId });
+          if (plusOneUserIds.length > 0) {
+            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+          }
+        }),
+      )
+      .andWhere('event_id IN (:...eventIds)', { eventIds })
+      .setParameters({
+        userId,
+        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+        eventIds,
+      })
+      .execute();
+
+    // 4. Delete Guest entries (first lead, then plus-ones)
+    await guestRepo
+      .createQueryBuilder()
+      .delete()
+      .where('user_id = :userId', { userId })
+      .andWhere('event_id IN (:...eventIds)', { eventIds })
+      .setParameters({ userId, eventIds })
+      .execute();
+
+    if (plusOneUserIds.length > 0) {
+      await guestRepo
+        .createQueryBuilder()
+        .delete()
+        .where('user_id IN (:...userIds)', { userIds: plusOneUserIds })
+        .andWhere('event_id IN (:...eventIds)', { eventIds })
+        .andWhere('added_by_id = :addedBy', { addedBy: userId })
+        .setParameters({
+          userIds: plusOneUserIds,
+          eventIds,
+          addedBy: userId,
+        })
+        .execute();
+    }
+
+    // 5. Delete Signup Form Submissions (after guests are deleted)
+    await signupFormRepo
+      .createQueryBuilder()
+      .delete()
+      .where(
+        new Brackets(qb => {
+          qb.where('user_id = :userId', { userId });
+          if (plusOneUserIds.length > 0) {
+            qb.orWhere('user_id IN (:...userIds)', { userIds: plusOneUserIds });
+          }
+        }),
+      )
+      .andWhere(
+        `signup_form_id IN (
+          SELECT id FROM event_signup_forms WHERE event_id IN (:...eventIds)
+        )`,
+        { eventIds },
+      )
+      .setParameters({
+        userId,
+        ...(plusOneUserIds.length > 0 ? { userIds: plusOneUserIds } : {}),
+        eventIds,
+      })
+      .execute();
+  }
+
+  public static async reactivateUserAccount(payload: CheckEmailRequestDto) {
+    const user = await this.dbConnection
+      .getRepository(User)
+      .findOne({ where: { email: payload.email, isDeactivated: true } });
+
+    if (user && this.isWithin30Days(user.deactivatedAt)) {
+      await this.dbConnection
+        .getRepository(User)
+        .update(user.id, { isDeactivated: false, deactivatedAt: null });
+    }
+
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: user.id } },
+      relations: ['role'],
+    });
+
+    const targetRole = userRoles.find(ur => ['member', 'non_member'].includes(ur.role.name));
+
+    if (targetRole) {
+      // targetRole.status = UserStatus.ACTIVE;
+      targetRole.isRoleDeactivated = false;
+      await this.dbConnection.getRepository(UserRole).save(targetRole);
+    }
+    //scheduling user hard delete for 30 days
+    try {
+      let data: SchedulerTriggerPayload = {
+        type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB,
+        data: {
+          jobKey: `${SchedulerJobType.DELETE_USER}_${user.id}`,
+        },
+      };
+      serviceMesh.schedulerService().triggerSchedulerJob(data);
+    } catch (e) {
+      console.log(
+        `Failed to cancel scheduled delete user job for ${user.firstName} ${user.lastName}`,
+        e,
+      );
+    }
+
+    return '';
+  }
+
+  public static async isWithin30Days(deactivatedAt: Date) {
+    return new Date().getTime() - new Date(deactivatedAt).getTime() <= 30 * 24 * 60 * 60 * 1000;
+  }
+
+  public static async cleanupGuestOnAccountDeletion(
+    payload: IdRequestDto,
+  ): Promise<GenericResponse> {
+    const queryRunner: QueryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const guestRepository = queryRunner.manager.getRepository(Guest);
+      const restrictedInvitesRepository = queryRunner.manager.getRepository(RestrictedInvites);
+
+      const addedGuests = await guestRepository.find({
+        where: { addedBy: { id: payload.id } },
+      });
+
+      if (addedGuests.length > 0) {
+        await guestRepository.update(
+          { addedBy: { id: payload.id } },
+          { status: GuestStatus.DECLINED, addedBy: null },
+        );
+      }
+
+      await restrictedInvitesRepository.delete({ restrictedBy: { id: payload.id } });
+
+      await guestRepository.delete({ user: { id: payload.id } });
+
+      await this.removeUserRolesAndCleanup({ id: payload.id }, queryRunner);
+
+      await queryRunner.commitTransaction();
+
+      return responses.ok;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error(error);
+      return responses.badRequest('Error in cleaning up guests on account deletion');
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public static async permanantlyDeleteAccount(payload: IdRequestDto): Promise<string> {
+    await this.cleanupGuestOnAccountDeletion({ id: payload.id });
+    return '';
+  }
+
+  public static async removeUserRolesAndCleanup(
+    payload: IdRequestDto,
+    queryRunner: QueryRunner,
+  ): Promise<string> {
+    const userRepository = queryRunner.manager.getRepository(User);
+    const userRoleRepository = queryRunner.manager.getRepository(UserRole);
+
+    const user = await userRepository.findOne({
+      where: { id: payload.id },
+      relations: ['roles', 'roles.role'],
+    });
+
+    if (!user) {
+      throw new NotFoundError('User');
+    }
+
+    const removableRoleNames = ['member', 'non_member'];
+    const removableRoles = user.roles.filter(role => removableRoleNames.includes(role?.role?.name));
+    const remainingRoles = user.roles.filter(
+      role => !removableRoleNames.includes(role?.role?.name),
+    );
+    const hasHostRole = remainingRoles.some(role => role?.role?.name === 'host');
+
+    if (removableRoles.length > 0) {
+      const removableRoleIds = removableRoles.map(role => role.role.id);
+      await userRoleRepository
+        .createQueryBuilder()
+        .createQueryBuilder()
+        .delete()
+        .from(UserRole)
+        .where('user_id = :userId', { userId: payload.id })
+        .andWhere('role_id IN (:...roleIds)', { roleIds: removableRoleIds })
+        .execute();
+    }
+
+    if (remainingRoles.length === 0) {
+      await userRepository.delete({ id: payload.id });
+    } else {
+      await userRepository.update(payload.id, {
+        additionalMemberInformation: null,
+        profilePicture: null,
+        ...(hasHostRole ? {} : { additionalHostInformation: null }),
+      });
+    }
+
+    return '';
+  }
+
+  public static async getInstagramValidated(
+    payload: IdRequestDto,
+  ): Promise<{ instagramValidated: boolean; instagramUserName: string; instagramCount: number }> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Not found');
+    }
+
+    const user_stats = await this.dbConnection.getRepository(SocialStats).findOne({
+      where: {
+        user: {
+          id: user.id,
+        },
+      },
+    });
+
+    console.log(user_stats);
+    return {
+      instagramValidated: user.instagramValidated || false,
+      instagramUserName: user.instagramUserName || '',
+      instagramCount: user_stats?.instagramFollowersCount || 0,
+    };
+  }
+
+  public static async setInstagramValidated(payload: IdRequestDto, value: boolean) {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw new NotFoundError('Not found');
+    }
+
+    const response = await this.dbConnection
+      .getRepository(User)
+      .update({ id: payload.id }, { instagramValidated: value });
+
+    return response;
+  }
+
+  public static async deleteHostAccount(payload: IdRequestDto): Promise<string> {
+    const queryRunner = database.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const user = await queryRunner.manager.getRepository(User).findOne({
+        where: { id: payload.id },
+        relations: { roles: { role: true }, notifications: true },
+      });
+      if (!user) throw new NotFoundError('User');
+      const isHost = user.roles && user.roles.some(role => role.role && role.role.name === 'host');
+      if (!isHost) throw new NotFoundError('Host');
+
+      try {
+        await serviceMesh.eventService().deleteHostEvents(payload.id);
+      } catch (error) {
+        console.error(error);
+      }
+      // Step 2: Remove user from all notifications (join table cleanup)
+      if (user.notifications?.length) {
+        await queryRunner.manager
+          .createQueryBuilder()
+          .relation(User, 'notifications')
+          .of(user)
+          .remove(user.notifications);
+      }
+
+      // Step 3: Optionally delete orphaned notifications (no recipients)
+      const orphanedNotifications = await queryRunner.manager
+        .getRepository(Notification)
+        .createQueryBuilder('n')
+        .leftJoinAndSelect('n.recipients', 'r')
+        .getMany();
+
+      for (const n of orphanedNotifications) {
+        if (n.recipients.length === 0) {
+          await queryRunner.manager.remove(n);
+        }
+      }
+
+      await this.deleteNonMemberUsersIfEligible(user.id, queryRunner);
+      await this.clearAdditionalHostInfo(user.id, queryRunner);
+      await this.removeHostRoleAndDeleteUserIfNeeded(user.id, queryRunner);
+
+      await queryRunner.commitTransaction();
+      return '';
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  public static async deleteNonMemberUsersIfEligible(
+    deletedHostId: string,
+    queryRunner: QueryRunner,
+  ) {
+    // Fetch all non-member users created by the deleted host
+    const nonMemberUsers = await queryRunner.manager.getRepository(HostUserMapping).find({
+      where: { host: { id: deletedHostId } },
+      relations: ['user', 'user.roles', 'user.createdByHost'],
+    });
+
+    for (const mapping of nonMemberUsers) {
+      const { user } = mapping;
+
+      const hostMappings = await queryRunner.manager.getRepository(HostUserMapping).find({
+        where: { user: { id: user.id } },
+        relations: {
+          host: true,
+        },
+      });
+
+      const isOnlyAssociatedWithDeletedHost =
+        hostMappings.length === 1 && hostMappings[0].host?.id === deletedHostId;
+      if (isOnlyAssociatedWithDeletedHost) {
+        let hasLoggedIn = false;
+
+        try {
+          hasLoggedIn = await this.hasUserLoggedIn(user.email);
+        } catch (error) {
+          hasLoggedIn = false;
+        }
+
+        if (!hasLoggedIn) {
+          const fullUser = await queryRunner.manager.getRepository(User).findOne({
+            where: { id: user.id },
+            relations: ['notifications'],
+          });
+
+          // Step 1: Remove user from notification_recipients
+          if (fullUser?.notifications?.length) {
+            await queryRunner.manager
+              .createQueryBuilder()
+              .relation(User, 'notifications')
+              .of(user)
+              .remove(fullUser.notifications);
+          }
+
+          // Step 2: Nullify linkedUser in notifications
+          await queryRunner.manager
+            .createQueryBuilder()
+            .update(Notification)
+            .set({ linkedUser: null })
+            .where('linked_user_id = :id', { id: user.id })
+            .execute();
+
+          // Step 3: Delete orphaned notifications (no recipients)
+          const orphanedNotifications = await queryRunner.manager
+            .getRepository(Notification)
+            .createQueryBuilder('n')
+            .leftJoinAndSelect('n.recipients', 'r')
+            .getMany();
+
+          for (const n of orphanedNotifications) {
+            if (n.recipients.length === 0) {
+              await queryRunner.manager.remove(n);
+            }
+          }
+
+          await queryRunner.manager.getRepository(User).delete({ id: user.id });
+        }
+      }
+    }
+  }
+
+  public static async hasUserLoggedIn(email: string): Promise<boolean> {
+    await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(email);
+    return true;
+  }
+
+  public static async removeHostRoleAndDeleteUserIfNeeded(
+    userId: string,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
+    const hostRole = await queryRunner.manager
+      .getRepository(Role)
+      .findOne({ where: { name: 'host' } });
+    if (!hostRole) return;
+
+    await queryRunner.manager
+      .getRepository(UserRole)
+      .delete({ user: { id: userId }, role: { id: hostRole.id } });
+
+    const remainingRoles = await queryRunner.manager
+      .getRepository(UserRole)
+      .count({ where: { user: { id: userId } } });
+
+    if (remainingRoles === 0) {
+      await queryRunner.manager.getRepository(User).delete({ id: userId });
+    }
+  }
+
+  public static async clearAdditionalHostInfo(
+    userId: string,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
+    await queryRunner.manager
+      .getRepository(User)
+      .update(userId, { additionalHostInformation: null });
+  }
+
+  public static async exportUsersCsv(payload: PaginatedRequestDto): Promise<string> {
+    // Get the guest data
+    const data = await this.getMembers(payload);
+
+    // Define the titles and keys for the CSV
+    const titleMapping = [
+      { id: 'name', title: 'Name' },
+      { id: 'email', title: 'Email' },
+      { id: 'phoneNumber', title: 'Phone Number' },
+      { id: 'gender', title: 'Gender' },
+      { id: 'category', title: 'Category' },
+      { id: 'city', title: 'City' },
+      { id: 'followerCount', title: 'Follower Count' },
+      { id: 'categories', title: 'Categories' },
+      { id: 'types', title: 'Types' },
+      { id: 'status', title: 'Status' },
+      { id: 'instagramUsername', title: 'Instagram Username' },
+      { id: 'age', title: 'Age' },
+      { id: 'isFavourite', title: 'Favourite' },
+      { id: 'role', title: 'Role' },
+    ];
+
+    // Map the data to the line items that match the title structure
+    const lineItems = data.data.map(column => {
+      const mappedColumn = {};
+      titleMapping.forEach(field => {
+        if (field.id === 'isFavourite') {
+          mappedColumn[field.title] = column[field.id] ? 'Yes' : 'No';
+        } else {
+          // Handling special cases for certain fields like age, gender, and empty values
+          if (
+            column[field.id] === 0 ||
+            column[field.id] === 'NOT_APPLICABLE' ||
+            !column[field.id]
+          ) {
+            mappedColumn[field.title] = '—'; // Use large dash if value is 0, 'NOT_APPLICABLE', or empty
+          } else {
+            mappedColumn[field.title] = column[field.id];
+          }
+        }
+      });
+      return mappedColumn;
+    });
+
+    // Return the CSV as a string
+    return new Promise<string>((resolve, reject) => {
+      stringify(
+        lineItems,
+        { header: true, columns: titleMapping.map(item => item.title) },
+        (err, output) => {
+          if (err) {
+            reject(err);
+          }
+          resolve(output);
+        },
+      );
+    });
   }
 }

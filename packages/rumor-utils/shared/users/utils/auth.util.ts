@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { HostSignUpRequestDto, MemberAddressDto, MemberSignUpRequestDto } from '../dtos/auth.dto';
-import { Address } from '../entities/address.entity'; '../users/entities/address.entity';
+import { Address } from '../entities/address.entity';
+('../users/entities/address.entity');
 import { User } from '../entities/user.entity';
 import { genderToEntity } from '../mappers/auth.mapper';
 import { UpdateHostProfileRequestDto } from '../dtos/admin.dto';
@@ -19,8 +20,10 @@ export const newMember = (payload: MemberSignUpRequestDto, address: Address): Us
   return user;
 };
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const newAddress = async (payload: MemberAddressDto, placeLocation: any): Promise<Address> => {
+export const newAddress = async (
+  payload: MemberAddressDto,
+  placeLocation: any,
+): Promise<Address> => {
   const address = new Address();
   if (placeLocation) {
     const geoLocation = placeLocation?.results[0]?.geometry?.location;
@@ -69,12 +72,30 @@ export const hostToUpdate = (host: User, payload: UpdateHostProfileRequestDto): 
     eventsPerYear: payload.eventsPerYear || host.additionalHostInformation?.eventsPerYear,
     bio: payload.bio || host.additionalHostInformation?.bio,
     socialMedia: {
-      instagram: payload.socialMedia.instagram !== undefined ? payload.socialMedia.instagram : host.additionalHostInformation?.socialMedia?.instagram,
-      tiktok: payload.socialMedia.tiktok !== undefined ? payload.socialMedia.tiktok : host.additionalHostInformation?.socialMedia?.tiktok,
-      linkedin: payload.socialMedia.linkedin !== undefined ? payload.socialMedia.linkedin : host.additionalHostInformation?.socialMedia?.linkedin,
-      youtube: payload.socialMedia.youtube !== undefined ? payload.socialMedia.youtube : host.additionalHostInformation?.socialMedia?.youtube,
-      facebook: payload.socialMedia.facebook !== undefined ? payload.socialMedia.facebook : host.additionalHostInformation?.socialMedia?.facebook,
-      x: payload.socialMedia.x !== undefined ? payload.socialMedia.x : host.additionalHostInformation?.socialMedia?.x,
+      instagram:
+        payload.socialMedia.instagram !== undefined
+          ? payload.socialMedia.instagram
+          : host.additionalHostInformation?.socialMedia?.instagram,
+      tiktok:
+        payload.socialMedia.tiktok !== undefined
+          ? payload.socialMedia.tiktok
+          : host.additionalHostInformation?.socialMedia?.tiktok,
+      linkedin:
+        payload.socialMedia.linkedin !== undefined
+          ? payload.socialMedia.linkedin
+          : host.additionalHostInformation?.socialMedia?.linkedin,
+      youtube:
+        payload.socialMedia.youtube !== undefined
+          ? payload.socialMedia.youtube
+          : host.additionalHostInformation?.socialMedia?.youtube,
+      facebook:
+        payload.socialMedia.facebook !== undefined
+          ? payload.socialMedia.facebook
+          : host.additionalHostInformation?.socialMedia?.facebook,
+      x:
+        payload.socialMedia.x !== undefined
+          ? payload.socialMedia.x
+          : host.additionalHostInformation?.socialMedia?.x,
     },
   };
   return host;
@@ -101,7 +122,11 @@ export const generateCodeVerifier = (length: number = 128): string => {
 // Generates a code challenge using SHA-256
 export const generateCodeChallenge = (codeVerifier: string): string => {
   const hash = createHash('sha256').update(codeVerifier).digest();
-  const base64Url = hash.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const base64Url = hash
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
   return base64Url;
 };
 
@@ -154,7 +179,8 @@ export const isWithinTimeRange = (
 };
 
 export const generateRandomPassword = (length: number): string => {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?';
+  const charset =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?';
   let password = '';
   for (let i = 0, n = charset.length; i < length; ++i) {
     password += charset.charAt(Math.floor(Math.random() * n));

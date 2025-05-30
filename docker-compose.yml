@@ -4,8 +4,8 @@ services:
   users:
     container_name: rumour-users-service
     build:
-      context: .  
-      dockerfile: apps/users/Dockerfile  
+      context: .
+      dockerfile: apps/users/Dockerfile
     env_file:
       - env/api.env
     volumes:
@@ -13,7 +13,7 @@ services:
       - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8000:8000"
-    command: npm run dev  
+    command: npm run dev
     depends_on:
       rumor-db:
         condition: service_healthy
@@ -21,12 +21,12 @@ services:
   events:
     container_name: rumour-events-service
     build:
-      context: .  
-      dockerfile: apps/events/Dockerfile 
+      context: .
+      dockerfile: apps/events/Dockerfile
     env_file:
       - env/api.env
     volumes:
-      - ./apps/events/src:/app/src 
+      - ./apps/events/src:/app/src
       - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8001:8001"
@@ -38,8 +38,8 @@ services:
   notifications:
     container_name: rumour-notifications-service
     build:
-      context: .  
-      dockerfile: apps/notifications/Dockerfile  
+      context: .
+      dockerfile: apps/notifications/Dockerfile
     env_file:
       - env/api.env
     volumes:
@@ -47,7 +47,24 @@ services:
       - ./packages/rumor-utils:/app/packages/rumor-utils
     ports:
       - "8002:8002"
-    command: npm run dev  
+    command: npm run dev
+    depends_on:
+      rumor-db:
+        condition: service_healthy
+
+  scheduler:
+    container_name: rumour-scheduler-service
+    build:
+      context: .
+      dockerfile: apps/scheduler/Dockerfile
+    env_file:
+      - env/api.env
+    volumes:
+      - ./apps/scheduler/src:/app/src
+      - ./packages/rumor-utils:/app/packages/rumor-utils
+    ports:
+      - "8003:8003"
+    command: npm run dev
     depends_on:
       rumor-db:
         condition: service_healthy

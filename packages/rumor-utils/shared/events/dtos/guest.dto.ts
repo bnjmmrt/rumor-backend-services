@@ -1,4 +1,15 @@
-import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested, IsEnum } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
 import {
   AddGuestsRequest,
   GuestsRequest,
@@ -16,7 +27,7 @@ import {
   ManageGuestsRequest,
 } from '../grpc/events/events.pb';
 import { Type } from 'class-transformer';
-import { AnswersData, GuestStatus } from '../grpc/events/general.pb';
+import { AnswersData, GuestStatus, UserSource, UserStatus } from '../grpc/events/general.pb';
 
 export class ManageGuestsRequestDto implements ManageGuestsRequest {
   @IsUUID()
@@ -275,6 +286,10 @@ export class AcceptEventInvitationRequestDto {
   @IsUUID()
   @IsNotEmpty()
   userId: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  limitOnePlus: number;
 }
 export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsUUID()
@@ -300,6 +315,14 @@ export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsString()
   @IsOptional()
   email?: string;
+
+  @IsEnum(UserSource)
+  @IsOptional()
+  source?: UserSource;
+
+  @IsEnum(UserStatus)
+  @IsOptional()
+  status?: UserStatus;
 }
 
 export class InvitedGuestsRequestDto {
@@ -324,7 +347,7 @@ export class BulkUploadGuestsRequestDto implements BulkUploadGuestsRequest {
 
   @IsBoolean()
   @IsOptional()
-  isUploadUser?: boolean
+  isUploadUser?: boolean;
 }
 
 export class FetchBulkGuestsRequestDto implements FetchBulkGuestsRequest {

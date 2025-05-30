@@ -21,7 +21,7 @@
 //   ) => Promise<TwilioModuleOptions> | TwilioModuleOptions;
 // }
 
-import { RequestClientOptions } from "twilio/lib/rest/Twilio";
+import { RequestClientOptions } from 'twilio/lib/rest/Twilio';
 
 /**
  * Represents Twilio module options
@@ -48,4 +48,3 @@ export interface TwilioModuleAsyncOptions {
   useExisting?: new (...args: any[]) => TwilioOptionsFactory;
   useFactory?: (...args: any[]) => Promise<TwilioModuleOptions> | TwilioModuleOptions;
 }
-

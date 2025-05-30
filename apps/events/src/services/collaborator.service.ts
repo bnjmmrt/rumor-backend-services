@@ -1,19 +1,40 @@
-import { CreateCollaboratorDto, RequestByIdDto, UpdateCollaboratorDto } from 'rumor-utils/shared/events/dtos';
-import { CollaboratorResponse, CollaboratorRoles, CollaboratorRolesResponse, CollaboratorsResponse, GetDefaultRoleConfigByRoleResponse } from 'rumor-utils/shared/events/grpc/events/events.pb';
+import {
+  CreateCollaboratorDto,
+  RequestByIdDto,
+  UpdateCollaboratorDto,
+} from 'rumor-utils/shared/events/dtos';
+import {
+  CollaboratorResponse,
+  CollaboratorRoles,
+  CollaboratorRolesResponse,
+  CollaboratorsResponse,
+  GetDefaultRoleConfigByRoleResponse,
+} from 'rumor-utils/shared/events/grpc/events/events.pb';
 import { responses } from '../common/responses';
 import { IsNull, Repository } from 'typeorm';
-import { Collaborator, Event, TicketType, User, DefaultRoleSettings } from 'rumor-utils/shared/events/entities';
-import { collaboratorRoleToEntity, toCollaborator } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
+import {
+  Collaborator,
+  Event,
+  TicketType,
+  User,
+  DefaultRoleSettings,
+} from 'rumor-utils/shared/events/entities';
+import {
+  collaboratorRoleToEntity,
+  toCollaborator,
+} from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { GetDefaultRoleConfigByRoleRequestDto } from 'rumor-utils/shared/events/dtos/collaborator.dto';
 import { DataRoleDefault, Role } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import database from '../database'
+import database from '../database';
 import { BadRequestError } from 'rumor-utils/errors';
 
 export class CollaboratorService {
   public static dbConnection = database;
 
-  public static async createCollaborator(payload: CreateCollaboratorDto): Promise<CollaboratorResponse> {
+  public static async createCollaborator(
+    payload: CreateCollaboratorDto,
+  ): Promise<CollaboratorResponse> {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: {
@@ -44,9 +65,14 @@ export class CollaboratorService {
       for (const item of userExists.roles) {
         if (item.name == collaboratorRoleToEntity[payload.role]) hasHostRole = true;
       }
-      if (!hasHostRole) await serviceMesh.userService().assignRoleToUser(userExists.id, collaboratorRoleToEntity[payload.role]);
+      if (!hasHostRole)
+        await serviceMesh
+          .userService()
+          .assignRoleToUser(userExists.id, collaboratorRoleToEntity[payload.role]);
 
-      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
+      const role: Partial<Role> = (
+        await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])
+      ).data;
       const user: Partial<User> = { id: userExists.id };
       const collaborator = new Collaborator();
       collaborator.displayName = payload.displayName;
@@ -57,8 +83,10 @@ export class CollaboratorService {
       collaborator.user = user;
 
       collaborator.limitInvitationsNumber = payload.limitInvitationsNumber;
-      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: '1' } });
-      if (ticketTypeExists) collaborator.ticketType = { id: "1" };
+      const ticketTypeExists = await this.dbConnection
+        .getRepository(TicketType)
+        .findOne({ where: { id: '1' } });
+      if (ticketTypeExists) collaborator.ticketType = { id: '1' };
 
       collaborator.editEventDetailsSettings = payload.editEventDetailsSettings;
       collaborator.inviteGuestsToEvent = payload.inviteGuestsToEvent;
@@ -85,7 +113,9 @@ export class CollaboratorService {
     }
   }
 
-  public static async updateCollaborator(payload: UpdateCollaboratorDto): Promise<CollaboratorResponse> {
+  public static async updateCollaborator(
+    payload: UpdateCollaboratorDto,
+  ): Promise<CollaboratorResponse> {
     try {
       const collaborator = await this.dbConnection.getRepository(Collaborator).findOne({
         where: {
@@ -116,7 +146,9 @@ export class CollaboratorService {
       }
 
       const user: Partial<User> = { id: userExists.id };
-      const role: Partial<Role> = (await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])).data;
+      const role: Partial<Role> = (
+        await serviceMesh.userService().getRoleByName(collaboratorRoleToEntity[payload.role])
+      ).data;
 
       collaborator.displayName = payload.displayName;
       collaborator.displayNameListEvent = payload.displayNameListEvent;
@@ -138,7 +170,9 @@ export class CollaboratorService {
       collaborator.generateEventReports = payload.generateEventReports;
 
       collaborator.limitInvitationsNumber = payload.limitInvitationsNumber;
-      const ticketTypeExists = await this.dbConnection.getRepository(TicketType).findOne({ where: { id: '1' } });
+      const ticketTypeExists = await this.dbConnection
+        .getRepository(TicketType)
+        .findOne({ where: { id: '1' } });
       if (ticketTypeExists) collaborator.ticketType = { id: '1' };
 
       const result = await this.dbConnection.getRepository(Collaborator).save(collaborator);
@@ -200,7 +234,7 @@ export class CollaboratorService {
         relations: { user: true, role: true, ticketType: true },
       });
       return responses.data(
-        collaborators.map((item) => {
+        collaborators.map(item => {
           return toCollaborator(item);
         }),
       );
@@ -209,8 +243,9 @@ export class CollaboratorService {
     }
   }
 
-  public static async getDefaultRoleConfigByRole(payload: GetDefaultRoleConfigByRoleRequestDto): Promise<DataRoleDefault> {
-
+  public static async getDefaultRoleConfigByRole(
+    payload: GetDefaultRoleConfigByRoleRequestDto,
+  ): Promise<DataRoleDefault> {
     let response;
     if (payload.roleId) {
       response = await this.dbConnection.getRepository(DefaultRoleSettings).findOne({
@@ -246,32 +281,37 @@ export class CollaboratorService {
       generateEventReports: response.generateEventReports,
       roleName: response?.role?.name || '',
       roleId: response?.role?.id || '',
-    }
+    };
   }
 
   /**
-  * Fetches and returns default collaborator roles.
-  * - Queries the repository with `role` relations to get role settings.
-  * - Extracts and formats roles into an array of `{ id, name }`.
-  * - Returns a bad request if no roles are found or an error occurs.
-  *
-  * Error Handling:
-  * - Logs the error and returns a bad request if an exception occurs.
-  */
+   * Fetches and returns default collaborator roles.
+   * - Queries the repository with `role` relations to get role settings.
+   * - Extracts and formats roles into an array of `{ id, name }`.
+   * - Returns a bad request if no roles are found or an error occurs.
+   *
+   * Error Handling:
+   * - Logs the error and returns a bad request if an exception occurs.
+   */
   public static async getCollaboratorRoles(): Promise<CollaboratorRoles[]> {
     const response = await this.dbConnection.getRepository(DefaultRoleSettings).find({
       relations: ['role'],
+      where: {
+        role: {
+          isActive: true, // Ensure only active roles are retrieved
+        },
+      },
     });
     if (!response || response.length === 0) {
       throw new BadRequestError('Error at get default config');
     }
     const roles = response
-      .map((setting) => setting.role)
-      .filter((role) => !!role)
-      .map((role) => ({
+      .map(setting => setting.role)
+      .filter(role => !!role)
+      .map(role => ({
         id: role.id,
         name: role.name,
       }));
-    return roles
+    return roles;
   }
 }

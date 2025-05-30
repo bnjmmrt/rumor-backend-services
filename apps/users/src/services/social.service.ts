@@ -1,6 +1,6 @@
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses.common';
-import database  from '../database';
+import database from '../database';
 import config from '../config';
 
 import {
@@ -61,12 +61,12 @@ import { XAuthSession } from 'rumor-utils/shared/users/entities/xauthsession.ent
 import { SocialProvider } from 'rumor-utils/shared/users/entities/social-provider.entity';
 import { SocialStats } from 'rumor-utils/shared/users/entities/social-stats.entity';
 
-
 export class SocialService {
-
   public static dbConnection = database;
 
-  static async getFacebookAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
+  static async getFacebookAuthUrl(
+    payload: GetMetaAuthUrlRequestDto,
+  ): Promise<GetMetaAuthUrlResponse> {
     try {
       let userId: string | null = null;
       if (payload.userId && payload.userId != '') {
@@ -85,8 +85,8 @@ export class SocialService {
 
       const [REDIRECT_URI, CLIENT_ID, SCOPE] = [
         encodeURIComponent(this.getFacebookRedirect(payload.platform)),
-       config.get('FACEBOOK_APP_ID'),
-       config.get('FACEBOOK_SCOPE'),
+        config.get('FACEBOOK_APP_ID'),
+        config.get('FACEBOOK_SCOPE'),
       ];
 
       let authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${CLIENT_ID}&scope=${SCOPE}&redirect_uri=${REDIRECT_URI}`;
@@ -101,7 +101,9 @@ export class SocialService {
   }
 
   // Facebook
-  public static async facebookAuthCallback(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
+  public static async facebookAuthCallback(
+    payload: MetaAuthCallbackRequestDto,
+  ): Promise<MetaAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -114,15 +116,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.FACEBOOK,
           },
-          type: SocialProviderType.FACEBOOK,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -162,7 +166,9 @@ export class SocialService {
     }
   }
 
-  public static async setFacebookAuthToken(payload: SetMetaAuthTokenRequestDto): Promise<SetMetaAuthTokenResponse> {
+  public static async setFacebookAuthToken(
+    payload: SetMetaAuthTokenRequestDto,
+  ): Promise<SetMetaAuthTokenResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -175,15 +181,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.FACEBOOK,
           },
-          type: SocialProviderType.FACEBOOK,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = await this.dbConnection.getRepository(SocialProvider).create({
@@ -228,7 +236,9 @@ export class SocialService {
     }
   }
 
-  public static async getFacebookAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
+  public static async getFacebookAuthData(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetMetaAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -241,15 +251,17 @@ export class SocialService {
         return responses.notFound('Verify user exists ans is active');
       }
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.FACEBOOK,
           },
-          type: SocialProviderType.FACEBOOK,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         return responses.notFound('Social provider info not found');
@@ -274,15 +286,20 @@ export class SocialService {
 
   public static getFacebookRedirect(platform: 'ios' | 'android'): string {
     const redirectURI =
-      platform === 'ios' ?config.get('FACEBOOK_IOS_REDIRECT_URI') :config.get('FACEBOOK_ANDROID_REDIRECT_URI');
+      platform === 'ios'
+        ? config.get('FACEBOOK_IOS_REDIRECT_URI')
+        : config.get('FACEBOOK_ANDROID_REDIRECT_URI');
     return redirectURI;
   }
 
-  public static async getFacebookShortLivedToken(code: string, platform: 'ios' | 'android'): Promise<FacebookTokenResponse> {
+  public static async getFacebookShortLivedToken(
+    code: string,
+    platform: 'ios' | 'android',
+  ): Promise<FacebookTokenResponse> {
     try {
       const [FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, REDIRECT_URI] = [
-       config.get('FACEBOOK_APP_ID'),
-       config.get('FACEBOOK_APP_SECRET'),
+        config.get('FACEBOOK_APP_ID'),
+        config.get('FACEBOOK_APP_SECRET'),
         encodeURIComponent(SocialService.getFacebookRedirect(platform)),
       ];
 
@@ -296,9 +313,14 @@ export class SocialService {
     }
   }
 
-  public static async getFacebookLongLivedToken(accessToken: string): Promise<FacebookTokenResponse> {
+  public static async getFacebookLongLivedToken(
+    accessToken: string,
+  ): Promise<FacebookTokenResponse> {
     try {
-      const [FACEBOOK_APP_ID, FACEBOOK_APP_SECRET] = [config.get('FACEBOOK_APP_ID'),config.get('FACEBOOK_APP_SECRET')];
+      const [FACEBOOK_APP_ID, FACEBOOK_APP_SECRET] = [
+        config.get('FACEBOOK_APP_ID'),
+        config.get('FACEBOOK_APP_SECRET'),
+      ];
 
       const LongLivedTokenUrl = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${FACEBOOK_APP_ID}&client_secret=${FACEBOOK_APP_SECRET}&grant_type=fb_exchange_token&fb_exchange_token=${accessToken}`;
       const tokenResponse = await axios.get(LongLivedTokenUrl);
@@ -336,17 +358,26 @@ export class SocialService {
    * @param platform
    * @returns
    */
-  public static async getFacebookData(userId: string, code: string, platform: 'ios' | 'android'): Promise<SocialProvider | null> {
+  public static async getFacebookData(
+    userId: string,
+    code: string,
+    platform: 'ios' | 'android',
+  ): Promise<SocialProvider | null> {
     try {
       let socialProvider = this.dbConnection.getRepository(SocialProvider).create({
         type: SocialProviderType.FACEBOOK,
       });
 
-      const shortLivedAccessToken: FacebookTokenResponse = await this.getFacebookShortLivedToken(code, platform);
+      const shortLivedAccessToken: FacebookTokenResponse = await this.getFacebookShortLivedToken(
+        code,
+        platform,
+      );
       if (!shortLivedAccessToken) return null;
 
       socialProvider.token = shortLivedAccessToken.access_token;
-      const longLivedAccessToken: FacebookTokenResponse = await this.getFacebookLongLivedToken(shortLivedAccessToken.access_token);
+      const longLivedAccessToken: FacebookTokenResponse = await this.getFacebookLongLivedToken(
+        shortLivedAccessToken.access_token,
+      );
       socialProvider.longLivedToken = longLivedAccessToken.access_token;
       socialProvider.expirationToken = longLivedAccessToken.expires_in;
       socialProvider = await socialProvider.save();
@@ -371,7 +402,9 @@ export class SocialService {
   }
 
   // Instagram
-  public static async getInstagramUser(payload: InstagramUserRequestDto): Promise<InstagramUserResponse> {
+  public static async getInstagramUser(
+    payload: InstagramUserRequestDto,
+  ): Promise<InstagramUserResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -382,15 +415,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify that user already exists');
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.INSTAGRAM,
           },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) return responses.notFound('Instagram provider not configured');
 
@@ -400,7 +435,9 @@ export class SocialService {
     }
   }
 
-  public static async setInstagramUser(payload: InstagramUserRequestDto): Promise<InstagramUserResponse> {
+  public static async setInstagramUser(
+    payload: InstagramUserRequestDto,
+  ): Promise<InstagramUserResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -411,15 +448,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify that user already exists');
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.INSTAGRAM,
           },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -436,7 +475,9 @@ export class SocialService {
     }
   }
 
-  public static async getInstagramAuthUrl(payload: GetMetaAuthUrlRequestDto): Promise<GetMetaAuthUrlResponse> {
+  public static async getInstagramAuthUrl(
+    payload: GetMetaAuthUrlRequestDto,
+  ): Promise<GetMetaAuthUrlResponse> {
     try {
       let userId: string | null = null;
       if (payload.userId && payload.userId != '') {
@@ -454,9 +495,11 @@ export class SocialService {
       }
 
       const redirect =
-        payload.platform === 'ios' ?config.get('INSTAGRAM_IOS_REDIRECT_URI') :config.get('INSTAGRAM_ANDROID_REDIRECT_URI');
+        payload.platform === 'ios'
+          ? config.get('INSTAGRAM_IOS_REDIRECT_URI')
+          : config.get('INSTAGRAM_ANDROID_REDIRECT_URI');
       const APP_ID = encodeURIComponent(config.get('INSTAGRAM_APP_ID'));
-      const scope =config.get('INSTAGRAM_SCOPE');
+      const scope = config.get('INSTAGRAM_SCOPE');
       let uri: string;
       if (userId) {
         uri = `https://api.instagram.com/oauth/authorize?client_id=${APP_ID}&redirect_uri=${redirect}&scope=${scope}&response_type=code&state=${userId}`;
@@ -469,7 +512,9 @@ export class SocialService {
     }
   }
 
-  public static async instagramAuthCallback(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
+  public static async instagramAuthCallback(
+    payload: MetaAuthCallbackRequestDto,
+  ): Promise<MetaAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -482,15 +527,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.INSTAGRAM,
           },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
           user: user,
@@ -498,13 +545,13 @@ export class SocialService {
         });
       }
       const redirectURIs = {
-        ios:config.get('INSTAGRAM_IOS_REDIRECT_URI'),
-        android:config.get('INSTAGRAM_ANDROID_REDIRECT_URI'),
+        ios: config.get('INSTAGRAM_IOS_REDIRECT_URI'),
+        android: config.get('INSTAGRAM_ANDROID_REDIRECT_URI'),
       };
 
       const redirect = redirectURIs[payload.platform];
-      const client_id =config.get('INSTAGRAM_APP_ID');
-      const client_secret =config.get('INSTAGRAM_APP_SECRET');
+      const client_id = config.get('INSTAGRAM_APP_ID');
+      const client_secret = config.get('INSTAGRAM_APP_SECRET');
 
       const tokenResponse = await axios.post(
         'https://api.instagram.com/oauth/access_token',
@@ -547,15 +594,17 @@ export class SocialService {
     }
   }
 
-  public static async instagramRedirect(payload: MetaAuthCallbackRequestDto): Promise<MetaAuthCallbackResponse> {
+  public static async instagramRedirect(
+    payload: MetaAuthCallbackRequestDto,
+  ): Promise<MetaAuthCallbackResponse> {
     try {
       const tokenResponse = await axios.post(
         'https://api.instagram.com/oauth/access_token',
         querystring.stringify({
-          client_id:config.get('INSTAGRAM_APP_ID'),
-          client_secret:config.get('INSTAGRAM_APP_SECRET'),
+          client_id: config.get('INSTAGRAM_APP_ID'),
+          client_secret: config.get('INSTAGRAM_APP_SECRET'),
           grant_type: 'authorization_code',
-          redirect_uri:config.get('INSTAGRAM_REDIRECT_URI'),
+          redirect_uri: config.get('INSTAGRAM_REDIRECT_URI'),
           code: payload.code,
         }),
       );
@@ -570,7 +619,9 @@ export class SocialService {
     }
   }
 
-  public static async setInstagramAuthToken(payload: SetMetaAuthTokenRequestDto): Promise<SetMetaAuthTokenResponse> {
+  public static async setInstagramAuthToken(
+    payload: SetMetaAuthTokenRequestDto,
+  ): Promise<SetMetaAuthTokenResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -583,15 +634,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.INSTAGRAM,
           },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -643,7 +696,9 @@ export class SocialService {
     }
   }
 
-  public static async getInstagramAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
+  public static async getInstagramAuthData(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetMetaAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -656,15 +711,17 @@ export class SocialService {
         return responses.notFound('Verify user exists and is active');
       }
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.INSTAGRAM,
           },
-          type: SocialProviderType.INSTAGRAM,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         return responses.notFound('Social provider info not found');
@@ -690,7 +747,11 @@ export class SocialService {
     }
   }
 
-  public static async getInstagramData(userId: string, code: string, platform: 'ios' | 'android'): Promise<SocialProvider | null> {
+  public static async getInstagramData(
+    userId: string,
+    code: string,
+    platform: 'ios' | 'android',
+  ): Promise<SocialProvider | null> {
     try {
       let socialProvider = this.dbConnection.getRepository(SocialProvider).create({
         type: SocialProviderType.INSTAGRAM,
@@ -738,7 +799,9 @@ export class SocialService {
       });
 
       if (!socialStats) {
-        socialStats = await this.dbConnection.getRepository(SocialStats).save({ user: { id: userId } });
+        socialStats = await this.dbConnection
+          .getRepository(SocialStats)
+          .save({ user: { id: userId } });
       }
 
       socialStats.instagramFollowersCount = followerCount;
@@ -752,17 +815,22 @@ export class SocialService {
     }
   }
 
-  public static async getInstagramShortLivedToken(code: string, platform: 'ios' | 'android'): Promise<InstagramTokenResponse | null> {
+  public static async getInstagramShortLivedToken(
+    code: string,
+    platform: 'ios' | 'android',
+  ): Promise<InstagramTokenResponse | null> {
     try {
       const tokenResponse = await axios.post(
         'https://api.instagram.com/oauth/access_token',
         querystring.stringify(
           {
-            client_id:config.get('INSTAGRAM_APP_ID'),
-            client_secret:config.get('INSTAGRAM_APP_SECRET'),
+            client_id: config.get('INSTAGRAM_APP_ID'),
+            client_secret: config.get('INSTAGRAM_APP_SECRET'),
             grant_type: 'authorization_code',
             redirect_uri:
-              platform === 'ios' ?config.get('INSTAGRAM_IOS_REDIRECT_URI') :config.get('INSTAGRAM_ANDROID_REDIRECT_URI'),
+              platform === 'ios'
+                ? config.get('INSTAGRAM_IOS_REDIRECT_URI')
+                : config.get('INSTAGRAM_ANDROID_REDIRECT_URI'),
             code,
           },
           null,
@@ -779,13 +847,15 @@ export class SocialService {
     }
   }
 
-  public static async getInstagramProfile(username: string): Promise<InstagAPIUserProfileResponse | null> {
+  public static async getInstagramProfile(
+    username: string,
+  ): Promise<InstagAPIUserProfileResponse | null> {
     try {
       const options = {
         method: 'GET',
         url: `https://api.instagapi.com/userinfo/${username}`,
         headers: {
-          'X-InstagAPI-Key':config.get('INSTAG_API_KEY'),
+          'X-InstagAPI-Key': config.get('INSTAG_API_KEY'),
         },
       };
       const response = await axios.request(options);
@@ -797,7 +867,9 @@ export class SocialService {
   }
 
   // Google
-  public static async getGoogleAuthData(payload: UserIdAuthRequestDto): Promise<GetMetaAuthDataResponse> {
+  public static async getGoogleAuthData(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetMetaAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -810,15 +882,17 @@ export class SocialService {
         return responses.notFound('Verify user exists and is active');
       }
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.GOOGLE,
           },
-          type: SocialProviderType.GOOGLE,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         return responses.notFound('Social provider info not found');
@@ -844,7 +918,9 @@ export class SocialService {
     }
   }
 
-  public static async getGoogleAuthUrl(payload: UserIdAuthRequestDto): Promise<GetGoogleAuthUrlResponse> {
+  public static async getGoogleAuthUrl(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetGoogleAuthUrlResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -857,10 +933,10 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      const REDIRECT_URI =config.get('GOOGLE_REDIRECT_URI');
-      const CLIENT_ID =config.get('GOOGLE_CLIENT_ID');
+      const REDIRECT_URI = config.get('GOOGLE_REDIRECT_URI');
+      const CLIENT_ID = config.get('GOOGLE_CLIENT_ID');
 
-      const scope =config.get('GOOGLE_SCOPE').split(',').join(' ');
+      const scope = config.get('GOOGLE_SCOPE').split(',').join(' ');
 
       const params = new URLSearchParams({
         client_id: CLIENT_ID,
@@ -879,7 +955,9 @@ export class SocialService {
     }
   }
 
-  public static async googleAuthCallback(payload: GoogleAuthCallbackRequestDto): Promise<GoogleAuthCallbackResponse> {
+  public static async googleAuthCallback(
+    payload: GoogleAuthCallbackRequestDto,
+  ): Promise<GoogleAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -892,15 +970,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.GOOGLE,
           },
-          type: SocialProviderType.GOOGLE,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -923,9 +1003,9 @@ export class SocialService {
         });
       }
 
-      const redirect =config.get('GOOGLE_REDIRECT_URI');
-      const client_id =config.get('GOOGLE_CLIENT_ID');
-      const client_secret =config.get('GOOGLE_CLIENT_SECRET');
+      const redirect = config.get('GOOGLE_REDIRECT_URI');
+      const client_id = config.get('GOOGLE_CLIENT_ID');
+      const client_secret = config.get('GOOGLE_CLIENT_SECRET');
 
       const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
         code: payload.code,
@@ -941,11 +1021,14 @@ export class SocialService {
       socialProvider.refreshToken = tokenStructure.refresh_token;
       socialProvider.expirationToken = tokenStructure.expires_in;
       socialProvider = await socialProvider.save();
-      const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
-        headers: {
-          Authorization: `Bearer ${tokenStructure.access_token}`,
+      const userInfoResponse = await axios.get(
+        'https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
+        {
+          headers: {
+            Authorization: `Bearer ${tokenStructure.access_token}`,
+          },
         },
-      });
+      );
       const userGoogle = userInfoResponse.data;
 
       socialProvider.email = userGoogle?.email;
@@ -955,11 +1038,14 @@ export class SocialService {
       socialProvider = await this.dbConnection.getRepository(SocialProvider).save(socialProvider);
 
       //Get Youtube susbcribers
-      const userStatsResponse = await axios.get('https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true', {
-        headers: {
-          Authorization: `Bearer ${tokenStructure.access_token}`,
+      const userStatsResponse = await axios.get(
+        'https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true',
+        {
+          headers: {
+            Authorization: `Bearer ${tokenStructure.access_token}`,
+          },
         },
-      });
+      );
 
       const userStats = userStatsResponse?.data?.items || [];
 
@@ -974,12 +1060,16 @@ export class SocialService {
 
       return responses.data(socialProvider.token);
     } catch (err) {
-      return responses.badRequest('An error occurs when tries to changes code for token in google auth');
+      return responses.badRequest(
+        'An error occurs when tries to changes code for token in google auth',
+      );
     }
   }
 
   // LinkedIn
-  public static async getLinkedInAuthUrl(payload: LinkedInUserIdAuthRequestDto): Promise<GetLinkedInAuthUrlResponse> {
+  public static async getLinkedInAuthUrl(
+    payload: LinkedInUserIdAuthRequestDto,
+  ): Promise<GetLinkedInAuthUrlResponse> {
     try {
       let userId: string | null = null;
       if (payload.userId && payload.userId != '') {
@@ -998,8 +1088,8 @@ export class SocialService {
 
       const [REDIRECT_URI, CLIENT_ID, scope] = [
         this.getLinkedRedirect(payload.platform),
-       config.get('LINKEDIN_CLIENT_ID'),
-       config.get('LINKEDIN_SCOPE'),
+        config.get('LINKEDIN_CLIENT_ID'),
+        config.get('LINKEDIN_SCOPE'),
       ];
 
       let authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${scope}`;
@@ -1013,7 +1103,9 @@ export class SocialService {
     }
   }
 
-  public static async linkedInAuthCallback(payload: LinkedInAuthCallbackRequestDto): Promise<LinkedInAuthCallbackResponse> {
+  public static async linkedInAuthCallback(
+    payload: LinkedInAuthCallbackRequestDto,
+  ): Promise<LinkedInAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1026,15 +1118,17 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.LINKEDIN,
           },
-          type: SocialProviderType.LINKEDIN,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -1043,9 +1137,9 @@ export class SocialService {
         });
       }
 
-      const LINKEDIN_REDIRECT_URL =config.get('LINKEDIN_REDIRECT_URL');
-      const LINKEDIN_CLIENT_ID =config.get('LINKEDIN_CLIENT_ID');
-      const LINKEDIN_CLIENT_SECRET =config.get('LINKEDIN_CLIENT_SECRET');
+      const LINKEDIN_REDIRECT_URL = config.get('LINKEDIN_REDIRECT_URL');
+      const LINKEDIN_CLIENT_ID = config.get('LINKEDIN_CLIENT_ID');
+      const LINKEDIN_CLIENT_SECRET = config.get('LINKEDIN_CLIENT_SECRET');
 
       const tokenResponse = await axios.post(
         'https://www.linkedin.com/oauth/v2/accessToken',
@@ -1084,7 +1178,9 @@ export class SocialService {
     }
   }
 
-  public static async getLinkedInAuthData(payload: UserIdAuthRequestDto): Promise<GetLinkedInAuthDataResponse> {
+  public static async getLinkedInAuthData(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetLinkedInAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1097,15 +1193,17 @@ export class SocialService {
         return responses.notFound('Verify user exists and is active');
       }
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.LINKEDIN,
           },
-          type: SocialProviderType.LINKEDIN,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         return responses.notFound('Error when tries to get information from linkedin auth data');
@@ -1133,16 +1231,21 @@ export class SocialService {
 
   public static getLinkedRedirect(platform: 'ios' | 'android'): string {
     const redirectURI =
-      platform === 'ios' ?config.get('LINKEDIN_IOS_REDIRECT_URI') :config.get('LINKEDIN_ANDROID_REDIRECT_URI');
+      platform === 'ios'
+        ? config.get('LINKEDIN_IOS_REDIRECT_URI')
+        : config.get('LINKEDIN_ANDROID_REDIRECT_URI');
     return redirectURI;
   }
 
-  public static async getLinkedInAccessToken(authorizationCode: string, platform: 'ios' | 'android'): Promise<LinkedInTokenResponse> {
+  public static async getLinkedInAccessToken(
+    authorizationCode: string,
+    platform: 'ios' | 'android',
+  ): Promise<LinkedInTokenResponse> {
     try {
       const [LINKEDIN_REDIRECT_URL, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET] = [
         this.getLinkedRedirect(platform),
-       config.get('LINKEDIN_CLIENT_ID'),
-       config.get('LINKEDIN_CLIENT_SECRET'),
+        config.get('LINKEDIN_CLIENT_ID'),
+        config.get('LINKEDIN_CLIENT_SECRET'),
       ];
 
       const tokenResponse = await axios.post(
@@ -1196,16 +1299,25 @@ export class SocialService {
    * @param platform
    * @returns
    */
-  public static async getLinkedInData(userId: string, code: string, platform: 'ios' | 'android'): Promise<SocialProvider | null> {
+  public static async getLinkedInData(
+    userId: string,
+    code: string,
+    platform: 'ios' | 'android',
+  ): Promise<SocialProvider | null> {
     try {
       const socialProvider = this.dbConnection.getRepository(SocialProvider).create({
         type: SocialProviderType.LINKEDIN,
       });
 
-      const linkedInAccessToken: LinkedInTokenResponse = await this.getLinkedInAccessToken(code, platform);
+      const linkedInAccessToken: LinkedInTokenResponse = await this.getLinkedInAccessToken(
+        code,
+        platform,
+      );
       if (!linkedInAccessToken) return null;
 
-      const linkedInUserInfo: LinkedInUserInfoResponse = await this.getLinkedInUserInfo(linkedInAccessToken.access_token);
+      const linkedInUserInfo: LinkedInUserInfoResponse = await this.getLinkedInUserInfo(
+        linkedInAccessToken.access_token,
+      );
 
       socialProvider.token = linkedInAccessToken.access_token;
       socialProvider.expirationToken = linkedInAccessToken.expires_in;
@@ -1224,7 +1336,9 @@ export class SocialService {
   }
 
   // TikTok
-  public static async getTiktokAuthUrl(payload: UserIdAuthRequestDto): Promise<GetTiktokAuthUrlResponse> {
+  public static async getTiktokAuthUrl(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetTiktokAuthUrlResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1235,9 +1349,9 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      const REDIRECT_URI =config.get('TIKTOK_REDIRECT_URL');
-      const TIKTOK_CLIENT_KEY =config.get('TIKTOK_CLIENT_KEY');
-      const TIKTOK_SCOPE =config.get('TIKTOK_SCOPE');
+      const REDIRECT_URI = config.get('TIKTOK_REDIRECT_URL');
+      const TIKTOK_CLIENT_KEY = config.get('TIKTOK_CLIENT_KEY');
+      const TIKTOK_SCOPE = config.get('TIKTOK_SCOPE');
 
       let authUrl = 'https://www.tiktok.com/v2/auth/authorize/';
       authUrl += '?client_key=' + TIKTOK_CLIENT_KEY;
@@ -1253,7 +1367,9 @@ export class SocialService {
     }
   }
 
-  public static async tiktokAuthCallback(payload: TiktokAuthCallbackRequestDto): Promise<TiktokAuthCallbackResponse> {
+  public static async tiktokAuthCallback(
+    payload: TiktokAuthCallbackRequestDto,
+  ): Promise<TiktokAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1264,15 +1380,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.TIKTOK,
           },
-          type: SocialProviderType.TIKTOK,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -1281,9 +1399,9 @@ export class SocialService {
         });
       }
 
-      const TIKTOK_APP_SECRET =config.get('TIKTOK_APP_SECRET');
-      const TIKTOK_CLIENT_KEY =config.get('TIKTOK_CLIENT_KEY');
-      const redirect =config.get('TIKTOK_REDIRECT_URL');
+      const TIKTOK_APP_SECRET = config.get('TIKTOK_APP_SECRET');
+      const TIKTOK_CLIENT_KEY = config.get('TIKTOK_CLIENT_KEY');
+      const redirect = config.get('TIKTOK_REDIRECT_URL');
 
       const tokenResponse = await axios.post(
         'https://open.tiktokapis.com/v2/oauth/token/',
@@ -1310,13 +1428,15 @@ export class SocialService {
         socialProvider = await this.dbConnection.getRepository(SocialProvider).save(socialProvider);
 
         const followerCount: number = await this.getTiktokFollowerCount(socialProvider.token);
-        let socialStats: SocialStats | null = await this.dbConnection.getRepository(SocialStats).findOne({
-          where: {
-            user: {
-              id: user.id,
+        let socialStats: SocialStats | null = await this.dbConnection
+          .getRepository(SocialStats)
+          .findOne({
+            where: {
+              user: {
+                id: user.id,
+              },
             },
-          },
-        });
+          });
 
         if (!socialStats) {
           socialStats = this.dbConnection.getRepository(SocialStats).create({
@@ -1335,7 +1455,9 @@ export class SocialService {
     }
   }
 
-  public static async getTiktokAuthData(payload: UserIdAuthRequestDto): Promise<GetTiktokAuthDataResponse> {
+  public static async getTiktokAuthData(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetTiktokAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1346,15 +1468,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.TIKTOK,
           },
-          type: SocialProviderType.TIKTOK,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) return responses.notFound('Social provider info not found');
       const providerType = entityToProviderType[socialProvider.type];
@@ -1374,7 +1498,9 @@ export class SocialService {
 
       return responses.data(resp);
     } catch (err) {
-      return responses.badRequest('An error occurs when tries to get user data tiktok form  database');
+      return responses.badRequest(
+        'An error occurs when tries to get user data tiktok form  database',
+      );
     }
   }
 
@@ -1421,16 +1547,18 @@ export class SocialService {
         return responses.notFound('Verify user exists');
       }
 
-      const REDIRECT_URI =config.get('X_REDIRECT_URL');
-      const CLIENT_ID =config.get('X_CLIENT_ID');
+      const REDIRECT_URI = config.get('X_REDIRECT_URL');
+      const CLIENT_ID = config.get('X_CLIENT_ID');
 
-      const scope =config.get('X_SCOPE').split(',').join(' ');
+      const scope = config.get('X_SCOPE').split(',').join(' ');
 
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = generateCodeChallenge(codeVerifier);
 
       //delete any previous unused code verifier
-      await this.dbConnection.getRepository(XAuthSession).softDelete({ userId: user.id, deletedAt: IsNull() });
+      await this.dbConnection
+        .getRepository(XAuthSession)
+        .softDelete({ userId: user.id, deletedAt: IsNull() });
       //persist to use in the next X request
       await this.dbConnection.getRepository(XAuthSession).save({ userId: user.id, codeVerifier });
 
@@ -1452,7 +1580,9 @@ export class SocialService {
     }
   }
 
-  public static async xAuthCallback(payload: XAuthCallbackRequestDto): Promise<XAuthCallbackResponse> {
+  public static async xAuthCallback(
+    payload: XAuthCallbackRequestDto,
+  ): Promise<XAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1463,15 +1593,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.X,
           },
-          type: SocialProviderType.X,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -1494,8 +1626,8 @@ export class SocialService {
         });
       }
 
-      const X_CLIENT_ID =config.get('X_CLIENT_ID');
-      const X_REDIRECT_URL =config.get('X_REDIRECT_URL');
+      const X_CLIENT_ID = config.get('X_CLIENT_ID');
+      const X_REDIRECT_URL = config.get('X_REDIRECT_URL');
 
       const xAuthSession = await this.dbConnection.getRepository(XAuthSession).findOne({
         where: {
@@ -1525,11 +1657,14 @@ export class SocialService {
       if (data) {
         const { access_token, refresh_token } = data;
 
-        const profileResponse = await axios.get('https://api.twitter.com/2/users/me?user.fields=profile_image_url,public_metrics', {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
+        const profileResponse = await axios.get(
+          'https://api.twitter.com/2/users/me?user.fields=profile_image_url,public_metrics',
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+            },
           },
-        });
+        );
 
         const profile = profileResponse.data.data;
 
@@ -1566,15 +1701,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.X,
           },
-          type: SocialProviderType.X,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) return responses.notFound('Social provider info not found');
       const providerType = entityToProviderType[socialProvider.type];
@@ -1600,7 +1737,9 @@ export class SocialService {
 
   // Snapchat
 
-  public static async getSnapchatAuthUrl(payload: UserIdAuthRequestDto): Promise<GetSnapchatAuthUrlResponse> {
+  public static async getSnapchatAuthUrl(
+    payload: UserIdAuthRequestDto,
+  ): Promise<GetSnapchatAuthUrlResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1611,9 +1750,9 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      const REDIRECT_URI =config.get('SNAPCHAT_REDIRECT_URL');
-      const SNAPCHAT_CLIENT_ID =config.get('SNAPCHAT_CLIENT_ID');
-      const scope =config.get('SNAPCHAT_SCOPE').split(',').join(' ');
+      const REDIRECT_URI = config.get('SNAPCHAT_REDIRECT_URL');
+      const SNAPCHAT_CLIENT_ID = config.get('SNAPCHAT_CLIENT_ID');
+      const scope = config.get('SNAPCHAT_SCOPE').split(',').join(' ');
       const params = new URLSearchParams({
         client_id: SNAPCHAT_CLIENT_ID,
         redirect_uri: REDIRECT_URI,
@@ -1629,7 +1768,9 @@ export class SocialService {
     }
   }
 
-  public static async snapchatAuthCallback(payload: SnapchatAuthCallbackRequestDto): Promise<SnapchatAuthCallbackResponse> {
+  public static async snapchatAuthCallback(
+    payload: SnapchatAuthCallbackRequestDto,
+  ): Promise<SnapchatAuthCallbackResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1640,15 +1781,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      let socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: user.id,
+      let socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: user.id,
+            },
+            type: SocialProviderType.SNAPCHAT,
           },
-          type: SocialProviderType.SNAPCHAT,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) {
         socialProvider = this.dbConnection.getRepository(SocialProvider).create({
@@ -1657,9 +1800,9 @@ export class SocialService {
         });
       }
 
-      const SNAPCHAT_CLIENT_SECRET =config.get('SNAPCHAT_CLIENT_SECRET');
-      const SNAPCHAT_CLIENT_ID =config.get('SNAPCHAT_CLIENT_ID');
-      const SNAPCHAT_REDIRECT_URL =config.get('SNAPCHAT_REDIRECT_URL');
+      const SNAPCHAT_CLIENT_SECRET = config.get('SNAPCHAT_CLIENT_SECRET');
+      const SNAPCHAT_CLIENT_ID = config.get('SNAPCHAT_CLIENT_ID');
+      const SNAPCHAT_REDIRECT_URL = config.get('SNAPCHAT_REDIRECT_URL');
       const params = {
         grant_type: 'authorization_code',
         code: payload.code,
@@ -1668,13 +1811,17 @@ export class SocialService {
       };
       const authorizationHeader = `${SNAPCHAT_CLIENT_ID}:${SNAPCHAT_CLIENT_SECRET}`;
 
-      const tokenResponse = await axios.post('https://accounts.snapchat.com/accounts/oauth2/token', null, {
-        params,
-        headers: {
-          Authorization: `Basic ${Buffer.from(authorizationHeader).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+      const tokenResponse = await axios.post(
+        'https://accounts.snapchat.com/accounts/oauth2/token',
+        null,
+        {
+          params,
+          headers: {
+            Authorization: `Basic ${Buffer.from(authorizationHeader).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
         },
-      });
+      );
       const { access_token, expires_in, refresh_token } = tokenResponse.data;
       const profileResponse = await axios({
         method: 'post',
@@ -1702,7 +1849,9 @@ export class SocialService {
     }
   }
 
-  public static async getSnapchatAuthData(payload: GetSnapchatAuthDataRequestDto): Promise<GetSnapchatAuthDataResponse> {
+  public static async getSnapchatAuthData(
+    payload: GetSnapchatAuthDataRequestDto,
+  ): Promise<GetSnapchatAuthDataResponse> {
     try {
       const user: User = await this.dbConnection.getRepository(User).findOne({
         where: {
@@ -1713,15 +1862,17 @@ export class SocialService {
 
       if (!user) return responses.notFound('Verify user exists and is active');
 
-      const socialProvider: SocialProvider = await this.dbConnection.getRepository(SocialProvider).findOne({
-        where: {
-          user: {
-            id: payload.userId,
+      const socialProvider: SocialProvider = await this.dbConnection
+        .getRepository(SocialProvider)
+        .findOne({
+          where: {
+            user: {
+              id: payload.userId,
+            },
+            type: SocialProviderType.SNAPCHAT,
           },
-          type: SocialProviderType.SNAPCHAT,
-        },
-        relations: ['user'],
-      });
+          relations: ['user'],
+        });
 
       if (!socialProvider) return responses.notFound('Social provider info not found');
       const providerType = entityToProviderType[socialProvider.type];
@@ -1741,11 +1892,15 @@ export class SocialService {
 
       return responses.data(resp);
     } catch (err) {
-      return responses.badRequest('An error occurs when tries to get user data snapchat form  database');
+      return responses.badRequest(
+        'An error occurs when tries to get user data snapchat form  database',
+      );
     }
   }
 
-  public static async syncSocialStats(userId: UserIdAuthRequestDto): Promise<SocialMediaStatsResponse> {
+  public static async syncSocialStats(
+    userId: UserIdAuthRequestDto,
+  ): Promise<SocialMediaStatsResponse> {
     try {
       const socialProvider = await this.dbConnection.getRepository(SocialProvider).find({
         where: {
@@ -1756,7 +1911,7 @@ export class SocialService {
       });
       if (socialProvider && socialProvider.length > 0) {
         const result = await Promise.all(
-          socialProvider.map(async (provider) => {
+          socialProvider.map(async provider => {
             if (provider.type === SocialProviderType.INSTAGRAM) {
               const profile = await this.getInstagramProfile(provider.username);
               return {
@@ -1767,13 +1922,14 @@ export class SocialService {
               // TODO: Implement sync for other social media followers count
               return {
                 socialProviderType: provider.type as unknown as ProviderType,
-                followersCount: await this.dbConnection.getRepository(SocialStats)
+                followersCount: await this.dbConnection
+                  .getRepository(SocialStats)
                   .findOne({
                     where: {
                       user: { id: userId.userId },
                     },
                   })
-                  .then((stats) => {
+                  .then(stats => {
                     if (provider.type === SocialProviderType.GOOGLE) {
                       return stats?.youtubeFollowersCount;
                     } else {
@@ -1786,7 +1942,7 @@ export class SocialService {
         );
 
         await Promise.all(
-          result.map(async (stat) => {
+          result.map(async stat => {
             const updateData = {};
             switch (stat.socialProviderType) {
               case ProviderType.FACEBOOK:
@@ -1813,7 +1969,9 @@ export class SocialService {
               default:
                 break;
             }
-            await this.dbConnection.getRepository(SocialStats).update({ user: { id: userId.userId } }, updateData);
+            await this.dbConnection
+              .getRepository(SocialStats)
+              .update({ user: { id: userId.userId } }, updateData);
           }),
         );
         return responses.data(result);

@@ -2,7 +2,7 @@ const config = {
   parameters: [],
   secrets: [
     {
-      remoteKey: "/local/dev",
+      remoteKey: '/local/dev',
     },
   ],
   values: {
@@ -12,10 +12,10 @@ const config = {
     POSTGRES_DATABASE: process.env.POSTGRES_DATABASE,
     POSTGRES_PORT: process.env.POSTGRES_PORT,
     POSTGRES_HOST: process.env.POSTGRES_HOST,
-    USERS_SERVICE_BASE_URL: "http://users:8000/users/v1",
-    EVENTS_SERVICE_BASE_URL: "http://events:8001/events/v1",
-    NOTIFICATIONS_SERVICE_BASE_URL:
-      "http://notifications:8002/notifications/v1",
+    USERS_SERVICE_BASE_URL: 'http://users:8000/users/v1',
+    EVENTS_SERVICE_BASE_URL: 'http://events:8001/events/v1',
+    NOTIFICATIONS_SERVICE_BASE_URL: 'http://notifications:8002/notifications/v1',
+    SCHEDULER_SERVICE_BASE_URL: 'http://scheduler:8003/scheduler/v1',
   },
 };
 

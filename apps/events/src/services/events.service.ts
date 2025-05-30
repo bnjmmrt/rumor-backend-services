@@ -24,41 +24,129 @@ import {
 import {
   AddressValidationRequest,
   AddressValidationResponse,
-  EventAgeLimitResponse, EventLocationResponse,
+  EventAgeLimitResponse,
+  EventLocationResponse,
   EventLocationsResponse,
   EventResponse,
   EventsResponse,
   EventTypeResponse,
-  EventTypesData, GetFeaturedEventsResponse,
+  EventTypesData,
+  GetFeaturedEventsResponse,
   GuestCountByStatuses,
-  ListEventsFeedResponse, ListEventUsedTicketsResponse, PaginatedEventsResponse
+  ListEventsFeedResponse,
+  ListEventUsedTicketsResponse,
+  PaginatedEventsResponse,
 } from 'rumor-utils/shared/events/grpc/events/events.pb';
-import { DataSource, ILike, In, IsNull, LessThanOrEqual, MoreThanOrEqual, QueryRunner } from 'typeorm';
+import {
+  DataSource,
+  FindOptionsOrder,
+  ILike,
+  In,
+  IsNull,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  QueryRunner,
+} from 'typeorm';
 import { parse } from 'qs';
 import { hasPagination } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { RequestByIdDto, UserAndIdRequestDto } from 'rumor-utils/shared/events/dtos/shared.dto';
 import { normalizeCatalogName } from '../common/helpers';
-import { EventLocation, AdmissionType, EventAgeLimit, Guest, User, EventTypes, Event, Ticket, EventSignupForms, Talent, TicketType, Collaborator, QuizQuestion } from '../../packages/rumor-utils/shared/entities';
+import {
+  EventLocation,
+  AdmissionType,
+  EventAgeLimit,
+  Guest,
+  User,
+  EventTypes,
+  Event,
+  Ticket,
+  EventSignupForms,
+  Talent,
+  TicketType,
+  Collaborator,
+  QuizQuestion,
+  UserRole,
+} from '../../packages/rumor-utils/shared/entities';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
-import { getCityNameFromAddressComponents, hasEventDateOrLocationChanged, isValidEventStatus, validateEventDates } from '../utils/event.utils';
-import { EventLocationInterface, EventStatusEnum, GuestStatus, HostsFollowedByGuestInterface, TicketStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
+import {
+  getCityNameFromAddressComponents,
+  hasEventDateOrLocationChanged,
+  isValidEventStatus,
+  validateEventDates,
+  extractDate,
+} from '../utils/event.utils';
+import {
+  EventLocationInterface,
+  EventStatusEnum,
+  GuestStatus,
+  HostsFollowedByGuestInterface,
+  TicketStatusEnum,
+} from 'rumor-utils/shared/events/interfaces/event.interface';
 import { haversineDistance } from 'rumor-utils/utils/utils';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 // import { collaboratorRoleToEntity } from 'rumor-utils/shared/events/mappers/collaborator.mapper';
 // import { JwtService } from '@nestjs/jwt';
+import * as dayjs from 'dayjs'; // Import dayjs as a namespace
 import { generateToken, verifyToken } from 'rumor-utils/jwt';
-import { EventStatus, EventTypeData, FeaturedEvent, GenerateTicketForGuestData, ToggleGuestCheckStatusData } from 'rumor-utils/shared/events/grpc/events/general.pb';
-import { entityToTicketStatus, ticketStatusToEntity, toTicketData } from 'rumor-utils/shared/events/mappers/guest.mapper';
+import {
+  EventStatus,
+  EventTypeData,
+  FeaturedEvent,
+  GenerateTicketForGuestData,
+  ToggleGuestCheckStatusData,
+} from 'rumor-utils/shared/events/grpc/events/general.pb';
+import {
+  entityToTicketStatus,
+  ticketStatusToEntity,
+  toTicketData,
+} from 'rumor-utils/shared/events/mappers/guest.mapper';
 import database from '../database';
 import { EventData } from '../../packages/rumor-utils/shared/events/grpc/events/general.pb';
-import { CreateCollaboratorDto, CreateTalentRequestDto, CreateTicketTypeRequestDto, UpdateCollaboratorDto, UpdateTalentRequestDto, UpdateTicketTypeRequestDto } from 'packages/rumor-utils/shared/events/dtos';
-import { CreateQuizQuestionRequestDto, UpdateQuizQuestionRequestDto } from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
+import {
+  CreateCollaboratorDto,
+  CreateTalentRequestDto,
+  CreateTicketTypeRequestDto,
+  UpdateCollaboratorDto,
+  UpdateTalentRequestDto,
+  UpdateTicketTypeRequestDto,
+} from 'packages/rumor-utils/shared/events/dtos';
+import {
+  CreateQuizQuestionRequestDto,
+  UpdateQuizQuestionRequestDto,
+} from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
 import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role.pb';
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
 
-import { BadRequestError, ConflictError, NotFoundError } from 'rumor-utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from 'rumor-utils/errors';
+import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
+import {
+  sendEventCancellation,
+  sendEventUpdation,
+  sendEventRejection,
+  sendEventPublishedApproval,
+  sendEventPrePublishApproval,
+  sendEventReminder,
+} from '../utils/emails.utils';
+import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+
+import { DeleteEventInterface } from '../interfaces/delete-event.interface';
+import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+
+import {
+  CsvUploadRecords,
+  FeaturedEventSection,
+} from '../../packages/rumor-utils/shared/events/entities';
+import { sendSmsNotification } from '../utils/sms.utils';
+import { RoleType } from 'rumor-utils/shared/users/interfaces/auth.interface';
+import {
+  SchedulerJobType,
+  SchedulerTriggerPayload,
+} from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { generateBranchLink } from '../utils/branch.utils';
+import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
 
 const responses = {
   conflict: (message: string) => ({
@@ -96,45 +184,50 @@ const responses = {
 
 export class EventsService {
   public static dbConnection = database;
-  public static googleAddressClient = new GoogleAddressClient()
+  public static googleAddressClient = new GoogleAddressClient();
 
   public static googleAuthClient = new GoogleAuthJWT();
   public static dataSource: DataSource;
+
   constructor() {
     const GOOGLE_MAPS_API_KEY = config.get('GOOGLE_MAPS_API_KEY');
     EventsService.googleAuthClient.fromAPIKey(GOOGLE_MAPS_API_KEY);
   }
 
-  public static filterLocationsByDistance(currentLat: number, currentLng: number, locations: EventLocationInterface[]): EventLocationInterface[] {
+  public static filterLocationsByDistance(
+    currentLat: number,
+    currentLng: number,
+    locations: EventLocationInterface[],
+  ): EventLocationInterface[] {
     const maxDistance = 50; //50 miles
 
-    return locations.filter((location) => {
+    return locations.filter(location => {
       const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);
       return distance <= maxDistance;
     });
   }
 
   public static async listEventStatus(): Promise<string[]> {
-    const eventsStatus: string[] = Object.keys(EventStatus).filter((key) => isNaN(Number(key)));
-    return eventsStatus
-
+    const eventsStatus: string[] = Object.keys(EventStatus).filter(key => isNaN(Number(key)));
+    return eventsStatus;
   }
 
-  public static async createEventType(payload: CreateEventTypeRequestDto): Promise<EventTypeData | undefined> {
+  public static async createEventType(
+    payload: CreateEventTypeRequestDto,
+  ): Promise<EventTypeData | undefined> {
     try {
       const item = new EventTypes();
       item.name = normalizeCatalogName(payload.name);
       const existingItem = await this.dbConnection.getRepository(EventTypes).findOne({
         where: {
           name: item.name,
-          createdAt: IsNull(),
         },
       });
       if (existingItem) throw new ConflictError('Event type with the same name already exists');
       item.description = payload.description;
       item.enabled = payload.enabled;
       const created = await this.dbConnection.getRepository(EventTypes).save(item);
-      return created
+      return created;
     } catch (err) {
       throw new BadRequestError('Error at create item for EventTypes');
     }
@@ -144,35 +237,42 @@ export class EventsService {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
-      }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
       : {};
-    const [eventTypes, total] = await this.dbConnection.getRepository(EventTypes).findAndCount({ ...pagination });
+    const [eventTypes, total] = await this.dbConnection.getRepository(EventTypes).findAndCount({
+      ...pagination,
+      order: { name: 'ASC' },
+    });
     return {
       items: eventTypes,
       total,
-    }
+    };
   }
 
   public static async getEventType(payload: RequestByIdDto): Promise<EventTypeData> {
-    const eventTypes = await this.dbConnection.getRepository(EventTypes).findOne({ where: { id: payload.id } });
+    const eventTypes = await this.dbConnection
+      .getRepository(EventTypes)
+      .findOne({ where: { id: payload.id } });
     if (!eventTypes) {
       throw new NotFoundError('Item EventTypes  not found');
     }
-    return eventTypes
+    return eventTypes;
   }
 
   public static async deleteEventType(payload: RequestByIdDto): Promise<string> {
     const result = await this.dbConnection.getRepository(EventTypes).delete(payload.id);
     if (result.affected === 0) {
       // throw new NotFoundError('Item of EventTypes not found');
-      throw new NotFoundError('Item of EventTypes not found')
+      throw new NotFoundError('Item of EventTypes not found');
     }
-    return ''
+    return '';
   }
 
-  public static async updateEventType(payload: UpdateEventTypeRequestDto): Promise<EventTypeResponse> {
+  public static async updateEventType(
+    payload: UpdateEventTypeRequestDto,
+  ): Promise<EventTypeResponse> {
     if (payload.name) payload.name = normalizeCatalogName(payload.name);
     const existingItem = await this.dbConnection.getRepository(EventTypes).findOne({
       where: {
@@ -231,6 +331,9 @@ export class EventsService {
       // Save event within the transaction
       const createdEvent = await queryRunner.manager.save(event);
 
+      // Generate and update Branch link now that the event has an ID
+      await this.generateAndUpdateBranchLink(createdEvent.id, createdEvent.name, queryRunner);
+
       // Save associated data (ticket types, talents, collaborators, quiz questions)
       await this.saveAssociatedData(payload, createdEvent.id, queryRunner);
 
@@ -240,14 +343,60 @@ export class EventsService {
       if (!fullEvent) {
         throw new Error('Failed to get created event.');
       }
+
+      //schedule event for cancelled status if not approved
+      if (event.endDate) {
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or Cancel scheduler failed for ${event.name}`, e);
+        }
+      }
+      //ends here
+
       // Fetch and return the created event with all relations
       //send email to admin for new event creation
       try {
         await this.sendEmailToAdminOnCreateEvent(fullEvent.data);
-      }
-      catch (e) {
+      } catch (e) {
         //TODO: here if fails we can resend email to admin
       }
+
+      const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+        where: {
+          deletedAt: IsNull(),
+          roles: {
+            role: {
+              name: 'admin',
+            },
+          },
+        },
+        relations: {
+          roles: {
+            role: true,
+          },
+        },
+      });
+
+      const adminUserIds = adminUsers.map(user => user.id);
+
+      if (adminUserIds.length > 0)
+        await serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_SUBMITTED,
+            adminUserIds,
+            createdEvent.id,
+            payload.ownerId,
+          );
+
       return fullEvent;
     } catch (error) {
       // Rollback transaction in case of an error
@@ -260,7 +409,6 @@ export class EventsService {
     }
   }
 
-
   private static async sendEmailToAdminOnCreateEvent(event: EventData) {
     const { id: eventId, owner } = event;
     const redirectPath = `events/event-details?id=${eventId}`;
@@ -268,11 +416,12 @@ export class EventsService {
       [
         {
           key: 'host',
-          value: owner?.firstName && owner?.lastName ? `${owner.firstName} ${owner.lastName}` : 'Host',
+          value:
+            owner?.firstName && owner?.lastName ? `${owner.firstName} ${owner.lastName}` : 'Host',
         },
         {
           key: 'event_url',
-          value: config.get('RUMOR_WEBSITE_ADMIN') + `${redirectPath}`,
+          value: config.get('RUMOR_WEBSITE_ADMIN') + `/${redirectPath}`,
         },
       ],
       'Super Admin - New Event Submission',
@@ -311,18 +460,28 @@ export class EventsService {
     event.showLocation = payload.showLocation;
 
     if (payload.eventTypeId) {
-      event.eventType = await this.dbConnection.getRepository(EventTypes).findOne({ where: { id: payload.eventTypeId } });
+      event.eventType = await this.dbConnection
+        .getRepository(EventTypes)
+        .findOne({ where: { id: payload.eventTypeId } });
     }
     if (payload.ageLimitId) {
-      event.ageLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({ where: { id: payload.ageLimitId } });
+      event.ageLimit = await this.dbConnection
+        .getRepository(EventAgeLimit)
+        .findOne({ where: { id: payload.ageLimitId } });
     }
     if (payload.admissionTypeId) {
-      event.admissionType = await this.dbConnection.getRepository(AdmissionType).findOne({ where: { id: payload.admissionTypeId } });
+      event.admissionType = await this.dbConnection
+        .getRepository(AdmissionType)
+        .findOne({ where: { id: payload.admissionTypeId } });
     }
     return event;
   }
 
-  private static async saveAssociatedData(payload: CreateEventRequestDto, eventId: string, queryRunner: QueryRunner): Promise<void> {
+  private static async saveAssociatedData(
+    payload: CreateEventRequestDto,
+    eventId: string,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     if (payload.ticketTypes && payload.ticketTypes.length > 0) {
       await this.insertTicketTypesForEvent(payload.ticketTypes, eventId, queryRunner);
     }
@@ -343,7 +502,8 @@ export class EventsService {
   }
 
   private static async getEventWithAllRelations(eventId: string): Promise<Event> {
-    const event = await this.dbConnection.getRepository(Event)
+    const event = await this.dbConnection
+      .getRepository(Event)
       .createQueryBuilder('event')
       .leftJoinAndSelect('event.owner', 'owner')
       .leftJoinAndSelect('event.ageLimit', 'ageLimit')
@@ -365,13 +525,61 @@ export class EventsService {
   }
 
   /**
+   * Generates and updates the Branch link for an event after it has been saved and has an ID.
+   *
+   * @param eventId - The ID of the saved event.
+   * @param eventName - The name of the event for the marketing title.
+   * @param queryRunner - The query runner to handle the transaction.
+   * @returns The generated Branch link.
+   */
+  private static async generateAndUpdateBranchLink(
+    eventId: string,
+    eventName: string,
+    queryRunner: QueryRunner,
+  ): Promise<string> {
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${eventId}`;
+    const deepLinkPath = `events/event-details?id=${eventId}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${eventName}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    await queryRunner.manager.update(Event, { id: eventId }, { branchLink });
+
+    return branchLink;
+  }
+
+  /**
    * Saves the event location to the database within the given transaction.
    *
    * @param eventLocationPayload - The event location details from the payload.
    * @param queryRunner - The query runner to handle the transaction.
    * @returns The saved EventLocation entity.
    */
-  private static async saveEventLocation(eventLocationPayload: EventLocationDto, queryRunner: QueryRunner): Promise<EventLocation> {
+  private static async saveEventLocation(
+    eventLocationPayload: EventLocationDto,
+    queryRunner: QueryRunner,
+  ): Promise<EventLocation> {
+    if (
+      !eventLocationPayload.location ||
+      !eventLocationPayload.placeId ||
+      !eventLocationPayload.city ||
+      !eventLocationPayload.latitude ||
+      !eventLocationPayload.longitude
+    ) {
+      throw new Error('Invalid location data');
+    }
     // Create a new EventLocation entity from the payload
     const eventLocation = this.dbConnection.getRepository(EventLocation).create({
       location: eventLocationPayload.location,
@@ -392,10 +600,14 @@ export class EventsService {
    * @param eventId - The ID of the event to associate the ticket types with
    * @param queryRunner - The query runner to execute the bulk insert in a transaction
    */
-  private static async insertTicketTypesForEvent(ticketTypes: CreateTicketTypeRequestDto[], eventId: string, queryRunner: QueryRunner): Promise<void> {
+  private static async insertTicketTypesForEvent(
+    ticketTypes: CreateTicketTypeRequestDto[],
+    eventId: string,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     try {
       // Normalize and prepare ticket type names
-      const ticketNames = ticketTypes.map((ticket) => normalizeCatalogName(ticket.name));
+      const ticketNames = ticketTypes.map(ticket => ticket.name?.trim());
 
       // Fetch existing ticket types for the event
       const existingTicketTypes = await queryRunner.manager.find(TicketType, {
@@ -403,11 +615,13 @@ export class EventsService {
       });
 
       // Convert existing ticket types to a Set for quick lookup
-      const existingTicketNames = new Set(existingTicketTypes.map((ticket) => normalizeCatalogName(ticket.name)));
-      const ticketTypeInsertData = ticketTypes.map((ticketTypePayload) => {
-        const name = normalizeCatalogName(ticketTypePayload.name);
+      const existingTicketNames = new Set(existingTicketTypes.map(ticket => ticket.name?.trim()));
+      const ticketTypeInsertData = ticketTypes.map(ticketTypePayload => {
+        const name = ticketTypePayload.name?.trim();
         if (existingTicketNames.has(name)) {
-          throw new Error(`Ticket type with name "${ticketTypePayload.name}" already exists for this event.`);
+          throw new Error(
+            `Ticket type with name "${ticketTypePayload.name}" already exists for this event.`,
+          );
         }
         return {
           name,
@@ -417,7 +631,12 @@ export class EventsService {
         };
       });
       // Bulk insert ticket types using query runner
-      await queryRunner.manager.createQueryBuilder().insert().into(TicketType).values(ticketTypeInsertData).execute();
+      await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(TicketType)
+        .values(ticketTypeInsertData)
+        .execute();
     } catch (error) {
       // this.logger.error('Error while inserting ticket types for event', error?.message);
       throw new Error(`Error inserting ticket types. ${error?.message}`);
@@ -433,7 +652,11 @@ export class EventsService {
    * @param eventId - The ID of the event to associate the talents with.
    * @throws {Error} If any error occurs during the process, the transaction is rolled back.
    */
-  public static async insertTalentsWithTransaction(talentsDto: CreateTalentRequestDto[], queryRunner: QueryRunner, eventId: string): Promise<void> {
+  public static async insertTalentsWithTransaction(
+    talentsDto: CreateTalentRequestDto[],
+    queryRunner: QueryRunner,
+    eventId: string,
+  ): Promise<void> {
     try {
       // Check if talents array is empty; skip processing if it is.
       if (!talentsDto || talentsDto.length === 0) {
@@ -442,7 +665,7 @@ export class EventsService {
       }
 
       // Prepare talent entities for bulk insertion.
-      const talents = talentsDto.map((talentDto) => {
+      const talents = talentsDto.map(talentDto => {
         const talent = new Talent();
         talent.name = talentDto.name;
         talent.description = talentDto.description;
@@ -482,18 +705,24 @@ export class EventsService {
       }
 
       // Verify that the event exists.
-      const event = await queryRunner.manager.findOne(Event, { where: { id: eventId } });
+      const event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+      });
       if (!event) {
         throw new Error(`Event with ID ${eventId} does not exist.`);
       }
       // Fetch all required roles in a single call BEFORE the loop
-      const roleNames = collaboratorsDto.map((c) => c.role);
+      const roleNames = collaboratorsDto.map(c => c.role);
       if (roleNames.length === 0) {
         throw new Error('No valid roles found for collaborators.');
       }
       const uniqueRoleNames = [...new Set(roleNames)]; // Remove duplicates
-      const roles = await Promise.all(uniqueRoleNames.map(async (role) => (await serviceMesh.userService().getRoleByName(role))?.data));
-      const validRoles = roles.filter((role) => role !== null);
+      const roles = await Promise.all(
+        uniqueRoleNames.map(
+          async role => (await serviceMesh.userService().getRoleByName(role))?.data,
+        ),
+      );
+      const validRoles = roles.filter(role => role !== null);
       if (validRoles.length === 0) {
         throw new Error('Failed to fetch collaborator roles.');
       }
@@ -505,19 +734,31 @@ export class EventsService {
         where: { event: { id: eventId } },
         relations: ['ticketType', 'user'],
       });
+      //Validate duplicate collaborators
+      const existingEmails = new Set(existingCollaborators.map(collab => collab.user.email));
+
+      for (const { email } of collaboratorsDto) {
+        if (existingEmails.has(email)) {
+          throw new BadRequestError(`Duplicate collaborator found: ${email}`);
+        }
+      }
+      //ends here
 
       // Create a Set to track existing (userId, eventId, ticketTypeId) combinations
-      const existingCollaboratorSet = new Set(existingCollaborators.map((c) => `${c.user.id}-${eventId}-${c.ticketType?.id ?? 'NULL'}`));
+      const existingCollaboratorSet = new Set(
+        existingCollaborators.map(c => `${c.user.id}-${eventId}-${c.ticketType?.id ?? 'NULL'}`),
+      );
 
       const collaboratorsToInsert = [];
       for (const collaboratorDto of collaboratorsDto) {
         // Ensure the user exists or create a user with the collaborator role.
-        let user: any = null
+        let user: any = null;
         try {
-          let response = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email));
+          let response = await serviceMesh
+            .userService()
+            .getUserWithRolesByEmail(collaboratorDto.email);
           user = response?.data;
-        } catch (e) {
-        }
+        } catch (e) {}
         const roleEntity = roleMap.get(collaboratorDto.role);
         if (!roleEntity) {
           throw new Error(`Failed to get collaborator role data for ${collaboratorDto.role}.`);
@@ -525,14 +766,21 @@ export class EventsService {
         // Check if the role should be a collaborator's role only
         if (!user) {
           try {
-            await serviceMesh.userService().createHostCollaborator(collaboratorDto.email, undefined, undefined, undefined, roleEntity?.name);
-            user = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email))?.data;
-          } catch (e) {
-
-          }
+            await serviceMesh
+              .userService()
+              .createHostCollaborator(
+                collaboratorDto.email,
+                undefined,
+                undefined,
+                undefined,
+                roleEntity?.name,
+              );
+            user = (await serviceMesh.userService().getUserWithRolesByEmail(collaboratorDto.email))
+              ?.data;
+          } catch (e) {}
         }
         // Assign role to user if not already assigned.
-        const hasRole = user.roles.some((role) => role.name === roleEntity.name);
+        const hasRole = user.roles.some(role => role.name === roleEntity.name);
         if (!hasRole) {
           await serviceMesh.userService().assignRoleToUser(user.id, roleEntity.name);
         }
@@ -547,7 +795,7 @@ export class EventsService {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = normalizeCatalogName(ticket.name);
+          const ticketName = ticket.name?.trim();
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
               name: ticketName,
@@ -557,13 +805,24 @@ export class EventsService {
           });
 
           if (!ticketType) {
-            throw new NotFoundError(`Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`);
+            throw new NotFoundError(
+              `Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`,
+            );
           }
 
           const key = `${user.id}-${eventId}-${ticketType.id}`;
           if (!existingCollaboratorSet.has(key)) {
             existingCollaboratorSet.add(key);
-            collaboratorsToInsert.push(createCollaboratorEntity(user.id, event, roleEntity, collaboratorDto, ticketType, ticket));
+            collaboratorsToInsert.push(
+              createCollaboratorEntity(
+                user.id,
+                event,
+                roleEntity,
+                collaboratorDto,
+                ticketType,
+                ticket,
+              ),
+            );
           }
         }
 
@@ -573,7 +832,9 @@ export class EventsService {
           const key = `${user.id}-${eventId}-NULL`;
           if (!existingCollaboratorSet.has(key)) {
             existingCollaboratorSet.add(key);
-            collaboratorsToInsert.push(createCollaboratorEntity(user.id, event, roleEntity, collaboratorDto, null));
+            collaboratorsToInsert.push(
+              createCollaboratorEntity(user.id, event, roleEntity, collaboratorDto, null),
+            );
           }
           continue;
         }
@@ -588,7 +849,6 @@ export class EventsService {
     }
   }
 
-
   /**
    * Bulk inserts quiz questions associated with an event under a transaction.
    * Rolls back the transaction if any error occurs.
@@ -598,7 +858,11 @@ export class EventsService {
    * @param eventId - The ID of the event to associate the quiz questions with.
    * @throws {Error} If any error occurs during the process, the transaction is rolled back.
    */
-  public static async insertQuizQuestionsWithTransaction(quizQuestionsDto: CreateQuizQuestionRequestDto[], queryRunner: QueryRunner, eventId: string): Promise<void> {
+  public static async insertQuizQuestionsWithTransaction(
+    quizQuestionsDto: CreateQuizQuestionRequestDto[],
+    queryRunner: QueryRunner,
+    eventId: string,
+  ): Promise<void> {
     try {
       // Check if quiz questions array is empty; skip processing if it is.
       if (!quizQuestionsDto || quizQuestionsDto.length === 0) {
@@ -607,13 +871,15 @@ export class EventsService {
       }
 
       // Verify that the event exists.
-      const event = await queryRunner.manager.findOne(Event, { where: { id: eventId } });
+      const event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+      });
       if (!event) {
         throw new Error(`Event with ID ${eventId} does not exist.`);
       }
 
       // Prepare quiz question entities for bulk insertion.
-      const quizQuestions = quizQuestionsDto.map((quizQuestionDto) => {
+      const quizQuestions = quizQuestionsDto.map(quizQuestionDto => {
         const quizQuestion = new QuizQuestion();
         quizQuestion.question = quizQuestionDto.question;
         quizQuestion.required = quizQuestionDto.required ?? false; // Default to false if not provided.
@@ -631,17 +897,28 @@ export class EventsService {
     }
   }
 
-  public static async listEvents(payload: QueryRequestDto): Promise<EventsResponse | ListEventsFeedResponse> {
+  public static async listEvents(
+    payload: QueryRequestDto,
+  ): Promise<EventsResponse | ListEventsFeedResponse> {
     return this.getEvents(payload, true, false, true);
   }
 
-  public static async listEventsFeed(payload: QueryRequestDto): Promise<EventsResponse | ListEventsFeedResponse> {
+  public static async listEventsFeed(
+    payload: QueryRequestDto,
+  ): Promise<EventsResponse | ListEventsFeedResponse> {
     return this.getEvents(payload, false, true, false);
   }
 
-  public static async getFeaturedEvents(payload: QueryRequestDto): Promise<GetFeaturedEventsResponse> {
-    const events: EventsResponse = (await this.getEvents(payload, false, true, true)) as EventsResponse;
-    const filteredEvents = events.data.filter((event) => event.featuredEventSection !== null);
+  public static async getFeaturedEvents(
+    payload: QueryRequestDto,
+  ): Promise<GetFeaturedEventsResponse> {
+    const events: EventsResponse = (await this.getEvents(
+      payload,
+      false,
+      true,
+      true,
+    )) as EventsResponse;
+    const filteredEvents = events.data.filter(event => event.featuredEventSection !== null);
     if (!filteredEvents.length) return responses.data([]);
 
     const grouped = filteredEvents.reduce((acc, event) => {
@@ -649,7 +926,7 @@ export class EventsService {
       const sectionName = event.featuredEventSection.name;
       const sectionIndex = event.featuredEventSection.index;
 
-      let section = acc.find((s) => s.id === sectionId);
+      let section = acc.find(s => s.id === sectionId);
       if (!section) {
         section = {
           id: sectionId,
@@ -676,9 +953,9 @@ export class EventsService {
     const parsedQuery = JSON.parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
-      }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
       : {};
 
     const andConditions = [];
@@ -705,7 +982,7 @@ export class EventsService {
             relations: ['location'],
           });
 
-          const locationsToFind: EventLocationInterface[] = eventsNear.map((item) => {
+          const locationsToFind: EventLocationInterface[] = eventsNear.map(item => {
             return {
               lat: Number(item?.location?.latitude || 0),
               long: Number(item?.location?.longitude || 0),
@@ -715,7 +992,7 @@ export class EventsService {
           });
 
           const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
-          const locationsWhere = locations.map((item) => item.id_event);
+          const locationsWhere = locations.map(item => item.id_event);
 
           if (locationsWhere.length > 0) {
             return { id: In(locationsWhere) };
@@ -724,7 +1001,10 @@ export class EventsService {
         return null;
       };
 
-      const locationCondition = await addLocationCondition(Number(parsedQuery.longitude), Number(parsedQuery.latitude));
+      const locationCondition = await addLocationCondition(
+        Number(parsedQuery.longitude),
+        Number(parsedQuery.latitude),
+      );
       if (!locationCondition) {
         return responses.data([]);
       }
@@ -733,29 +1013,40 @@ export class EventsService {
 
     // AND conditions
 
-    let isPrivate = parsedQuery.isPrivate === 'true' ? true : parsedQuery.isPrivate === 'false' ? false : false;
+    let isPrivate =
+      parsedQuery.isPrivate === 'true' ? true : parsedQuery.isPrivate === 'false' ? false : false;
     if (fromFeed) isPrivate = false;
 
     let status: EventStatus[];
     if (parsedQuery.statusName) {
       const statusArray = String(parsedQuery.statusName)
         .split(',')
-        .map((status) => status.trim());
-      const invalidStatuses = statusArray.filter((status) => !isValidEventStatus(status));
+        .map(status => status.trim());
+      const invalidStatuses = statusArray.filter(status => !isValidEventStatus(status));
       if (invalidStatuses.length > 0) {
         throw new BadRequestError(`Invalid status values: ${invalidStatuses.join(', ')}`);
       }
-      status = statusArray.map((item) => item as unknown as EventStatus);
+      status = statusArray.map(item => item as unknown as EventStatus);
     }
 
     if (fromFeed) {
       addCondition(fromFeed && { isPublished: true }, 'AND');
     } else {
-      addCondition(parsedQuery.isPublished && { isPublished: Boolean(parsedQuery.isPublished) }, 'AND');
+      addCondition(
+        parsedQuery.isPublished && {
+          isPublished: Boolean(parsedQuery.isPublished),
+        },
+        'AND',
+      );
     }
     addCondition(parsedQuery.ownerId && { owner: { id: parsedQuery.ownerId } }, 'AND');
     addCondition(parsedQuery.eventTypeId && { eventType: { id: parsedQuery.eventTypeId } }, 'AND');
-    addCondition(parsedQuery.eventTypeName && { eventType: { name: parsedQuery.eventTypeName } }, 'AND');
+    addCondition(
+      parsedQuery.eventTypeName && {
+        eventType: { name: parsedQuery.eventTypeName },
+      },
+      'AND',
+    );
 
     addCondition(
       parsedQuery.eventTypeId && {
@@ -763,7 +1054,7 @@ export class EventsService {
           id: In(
             String(parsedQuery.eventTypeId)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
@@ -775,20 +1066,60 @@ export class EventsService {
           name: In(
             String(parsedQuery.ticketTypeNames)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
       'AND',
     );
-    addCondition(parsedQuery.maxStartDate && { startDate: LessThanOrEqual(new Date(String(parsedQuery.maxStartDate))) }, 'AND');
-    addCondition(parsedQuery.minStartDate && { startDate: MoreThanOrEqual(new Date(String(parsedQuery.minStartDate))) }, 'AND');
-    addCondition(parsedQuery.minEndDate && { endDate: MoreThanOrEqual(new Date(String(parsedQuery.minEndDate))) }, 'AND');
-    addCondition(parsedQuery.maxEndDate && { endDate: LessThanOrEqual(new Date(String(parsedQuery.maxEndDate))) }, 'AND');
-    addCondition(parsedQuery.minAgeLimit && { ageLimit: { minAge: MoreThanOrEqual(parsedQuery.minAgeLimit) } }, 'AND');
-    addCondition(parsedQuery.maxAgeLimit && { ageLimit: { maxAge: LessThanOrEqual(parsedQuery.maxAgeLimit) } }, 'AND');
-    addCondition(parsedQuery.ageLimitName && { ageLimit: { name: ILike(parsedQuery.ageLimitName) } }, 'AND');
-    addCondition(parsedQuery.ageLimitDescription && { ageLimit: { description: ILike(parsedQuery.ageLimitDescription) } }, 'AND');
+    addCondition(
+      parsedQuery.maxStartDate && {
+        startDate: LessThanOrEqual(new Date(String(parsedQuery.maxStartDate))),
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.minStartDate && {
+        startDate: MoreThanOrEqual(new Date(String(parsedQuery.minStartDate))),
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.minEndDate && {
+        endDate: MoreThanOrEqual(new Date(String(parsedQuery.minEndDate))),
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.maxEndDate && {
+        endDate: LessThanOrEqual(new Date(String(parsedQuery.maxEndDate))),
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.minAgeLimit && {
+        ageLimit: { minAge: MoreThanOrEqual(parsedQuery.minAgeLimit) },
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.maxAgeLimit && {
+        ageLimit: { maxAge: LessThanOrEqual(parsedQuery.maxAgeLimit) },
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.ageLimitName && {
+        ageLimit: { name: ILike(parsedQuery.ageLimitName) },
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.ageLimitDescription && {
+        ageLimit: { description: ILike(parsedQuery.ageLimitDescription) },
+      },
+      'AND',
+    );
     addCondition(parsedQuery.ageLimitId && { ageLimit: { id: parsedQuery.ageLimitId } }, 'AND');
     addCondition(
       parsedQuery.collaboratorIds && {
@@ -796,21 +1127,31 @@ export class EventsService {
           id: In(
             String(parsedQuery.collaboratorIds)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
       'AND',
     );
-    addCondition(parsedQuery.findByOwnerEmail && { owner: { email: ILike(`%${parsedQuery.findByOwnerEmail}%`) } }, 'AND');
-    addCondition(parsedQuery.findByOwnerName && { owner: { firstName: ILike(`%${parsedQuery.findByOwnerName}%`) } }, 'AND');
+    addCondition(
+      parsedQuery.findByOwnerEmail && {
+        owner: { email: ILike(`%${parsedQuery.findByOwnerEmail}%`) },
+      },
+      'AND',
+    );
+    addCondition(
+      parsedQuery.findByOwnerName && {
+        owner: { firstName: ILike(`%${parsedQuery.findByOwnerName}%`) },
+      },
+      'AND',
+    );
     addCondition(
       parsedQuery.ticketTypeIds && {
         ticketTypes: {
           id: In(
             String(parsedQuery.ticketTypeIds)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
@@ -822,7 +1163,7 @@ export class EventsService {
           name: In(
             String(parsedQuery.ticketTypeNames)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
@@ -834,7 +1175,7 @@ export class EventsService {
           id: In(
             String(parsedQuery.talentIds)
               .split(',')
-              .map((id) => id.trim()),
+              .map(id => id.trim()),
           ),
         },
       },
@@ -848,13 +1189,16 @@ export class EventsService {
     );
 
     // Combine AND and OR conditions
-    const whereClause = andConditions.length > 0 ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {}) : {};
+    const whereClause =
+      andConditions.length > 0
+        ? andConditions.reduce((acc, cond) => ({ ...acc, ...cond }), {})
+        : {};
 
     const eventsPrefiltered = await this.dbConnection.getRepository(Event).find({
       where: whereClause,
     });
 
-    const eventsPrefilteredIds = eventsPrefiltered.map((item) => item.id);
+    const eventsPrefilteredIds = eventsPrefiltered.map(item => item.id);
     const filter = { id: In(eventsPrefilteredIds) };
 
     // OR conditions
@@ -862,19 +1206,33 @@ export class EventsService {
       orConditions.push(
         {
           ...filter,
-          collaborators: { name: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
+          collaborators: {
+            name: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`),
+          },
         },
         {
           ...filter,
-          collaborators: { email: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`) },
+          collaborators: {
+            email: ILike(`%${parsedQuery.findByCollaboratorLikeNameOrEmail}%`),
+          },
         },
       );
     }
 
     if (parsedQuery.findByTalentsLikeNameOrEmail) {
       orConditions.push(
-        { ...filter, talents: { name: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
-        { ...filter, talents: { email: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`) } },
+        {
+          ...filter,
+          talents: {
+            name: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`),
+          },
+        },
+        {
+          ...filter,
+          talents: {
+            email: ILike(`%${parsedQuery.findByTalentsLikeNameOrEmail}%`),
+          },
+        },
       );
     }
 
@@ -888,15 +1246,28 @@ export class EventsService {
       );
     }
 
-    const order = parsedQuery.sortBy
+    const order: FindOptionsOrder<Event> = parsedQuery.sortBy
       ? {
-        [String(parsedQuery.sortBy)]: String(parsedQuery.order || 'ASC').toUpperCase(),
-      }
-      : undefined;
+          [String(parsedQuery.sortBy)]:
+            parsedQuery.order?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC',
+        }
+      : { createdAt: 'DESC' };
 
-    let relations = includeRelations
-      ? ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions', 'ageLimit']
-      : ['owner', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'ageLimit'];
+    const baseRelations = [
+      'owner',
+      'admissionType',
+      'location',
+      'eventType',
+      'talents',
+      'ticketTypes',
+      'collaborators',
+      'collaborators.user',
+      'collaborators.role',
+      'collaborators.ticketType',
+      'ageLimit',
+    ];
+
+    let relations = includeRelations ? [...baseRelations, 'quizQuestions'] : baseRelations;
 
     if (includeFeaturedEventSection) {
       relations = [...relations, 'featuredEventSection'];
@@ -912,8 +1283,12 @@ export class EventsService {
     });
 
     if (status && status.length > 0) {
-      events = events.filter((event) => {
-        if (status.includes(EventStatus[formatEventStatus(event) as unknown as keyof typeof EventStatus])) {
+      events = events.filter(event => {
+        if (
+          status.includes(
+            EventStatus[formatEventStatus(event) as unknown as keyof typeof EventStatus],
+          )
+        ) {
           return event;
         }
       });
@@ -926,8 +1301,8 @@ export class EventsService {
       const searchValueLower = searchValue.toLowerCase();
 
       const eventsFiltered = events
-        .map((item) => toEvent(item, null))
-        .filter((event) => {
+        .map(item => toEvent(item, null))
+        .filter(event => {
           const eventStatusString = event.status.toLowerCase() ?? '';
           return (
             event.name?.toLowerCase().includes(searchValueLower) ||
@@ -943,9 +1318,18 @@ export class EventsService {
             event.admissionType?.name?.toLowerCase().includes(searchValueLower) ||
             event.admissionType?.description?.toLowerCase().includes(searchValueLower) ||
             eventStatusString.includes(searchValueLower) ||
-            (event.talents?.length > 0 && event.talents.some((talent) => talent?.name?.toLowerCase().includes(searchValueLower))) ||
-            (event.ticketTypes?.length > 0 && event.ticketTypes.some((ticketType) => ticketType?.name?.toLowerCase().includes(searchValueLower))) ||
-            (event.collaborators?.length > 0 && event.collaborators.some((collaborator) => collaborator?.name?.toLowerCase().includes(searchValueLower)))
+            (event.talents?.length > 0 &&
+              event.talents.some(talent =>
+                talent?.name?.toLowerCase().includes(searchValueLower),
+              )) ||
+            (event.ticketTypes?.length > 0 &&
+              event.ticketTypes.some(ticketType =>
+                ticketType?.name?.toLowerCase().includes(searchValueLower),
+              )) ||
+            (event.collaborators?.length > 0 &&
+              event.collaborators.some(collaborator =>
+                collaborator?.name?.toLowerCase().includes(searchValueLower),
+              ))
           );
         });
 
@@ -958,7 +1342,9 @@ export class EventsService {
       }
       return responses.data(paginatedEvents);
     } else {
-      return responses.data(events.map((item) => toEvent(item, null)));
+      const mappedEvents = events.map(item => toEvent(item, null));
+
+      return responses.data(mappedEvents);
     }
   }
 
@@ -966,15 +1352,17 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
-
-    const [totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
+    const userRoles = await this.dbConnection.getRepository(UserRole).find({
+      where: { user: { id: payload.userId } },
+      relations: { role: true },
+    });
+    const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+    if (!isAdmin && event.owner.id !== payload.userId) {
+      throw new ForbiddenError('Permission denied: You can only access events you host.');
+    }
+    const [totalConfirmedGuests, totalCheckedInGuests, allGuests] = await Promise.all([
       // Count total confirmed guests for the event.
-      this.dbConnection.getRepository(Guest).count({
-        where: {
-          event: { id: payload.id },
-          status: GuestStatus.CONFIRMED,
-        },
-      }),
+      this.getTotalConfirmedGuests(payload.id, event.owner?.id),
 
       // Count total guests who have checked in.
       this.dbConnection.getRepository(Guest).count({
@@ -984,20 +1372,111 @@ export class EventsService {
           status: GuestStatus.CONFIRMED,
         },
       }),
+
+      // Count total guests who wats to be in event
+      this.dbConnection.getRepository(Guest).count({
+        where: {
+          event: { id: payload.id },
+        },
+      }),
     ]);
-    return toEvent(event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
+    return toEvent(event, totalCheckedInGuests, allGuests, undefined, totalConfirmedGuests);
   }
 
-  public static async deleteEvent(payload: RequestByIdDto): Promise<string> {
-    const event = await this.dbConnection.getRepository(Event).findOne({ where: { id: payload.id, deletedAt: null } });
+  public static async deleteEvent(payload: DeleteEventInterface): Promise<string> {
+    let event: Event;
+
+    if (payload.fromAdmin) {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+          'eventAnnouncements',
+        ],
+      });
+    } else {
+      event = await this.dbConnection.getRepository(Event).findOne({
+        where: { id: payload.id, owner: { id: payload.userId } },
+        relations: [
+          'quizQuestions',
+          'collaborators',
+          'ticketTypes',
+          'talents',
+          'tickets',
+          'guests',
+          'restrictedInvites',
+          'featuredEventSection',
+          'csvUploads',
+          'signupForms',
+          'notifications',
+          'quizQuestions.answers',
+          'eventAnnouncements',
+        ],
+      });
+    }
+
     if (!event) throw new NotFoundError('Event was not found!');
-    if (event.status !== EventStatusEnum.PENDING_STATUS && event.status !== EventStatusEnum.DRAFT_STATUS) throw new ConflictError('Cannot delete an approved event');
-    await this.dbConnection.getRepository(Event).softDelete(event.id);
+    const isEventApprovedAndNotEnded =
+      event.status === EventStatusEnum.APPROVED_STATUS && dayjs(event.endDate).isAfter(dayjs());
+    if (isEventApprovedAndNotEnded) {
+      throw new ConflictError('Cannot delete an approved event that has not ended');
+    }
+
+    // Get associated sponsorship opportunities and their dependencies
+    const sponsorshipOpportunityRepo = this.dbConnection.getRepository(SponsorshipOpportunity);
+    const sponsorshipOpportunities = await sponsorshipOpportunityRepo.find({
+      where: { event: { id: event.id } },
+      relations: ['targetSponsors', 'inquiries'], // Include relations that have cascade soft-remove
+    });
+
+    // First set event_id to null for all sponsorship opportunities
+    await sponsorshipOpportunityRepo
+      .createQueryBuilder()
+      .update(SponsorshipOpportunity)
+      .set({ event: null })
+      .where('event.id = :eventId', { eventId: event.id })
+      .execute();
+
+    // Then perform the soft remove
+    await sponsorshipOpportunityRepo.softRemove(sponsorshipOpportunities);
+
+    const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
+      where: { event: { id: event.id } },
+      relations: ['uploadedUsers'],
+    });
+
+    // Set uploadedViaCsv to null for users associated with these CSV records
+    const userRepo = this.dbConnection.getRepository(User);
+    for (const csvUpload of csvUploads) {
+      if (csvUpload.uploadedUsers.length > 0) {
+        await userRepo
+          .createQueryBuilder()
+          .update(User)
+          .set({ uploadedViaCsv: null })
+          .where('uploadedViaCsv.id = :csvUploadId', { csvUploadId: csvUpload.id })
+          .execute();
+      }
+    }
+    await this.dbConnection.getRepository(Event).remove(event);
     return;
   }
 
-
-  private static async updateAssociatedData(payload: UpdateEventRequestDto, event: Event, queryRunner: QueryRunner): Promise<void> {
+  private static async updateAssociatedData(
+    payload: UpdateEventRequestDto,
+    event: Event,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     if (payload.ticketTypes && payload.ticketTypes.length > 0) {
       await this.updateTicketTypesForEvent(payload.ticketTypes, event, queryRunner);
     }
@@ -1012,7 +1491,11 @@ export class EventsService {
     }
   }
 
-  public static async updateTalentsWithTransaction(event: Event, talentsDto: UpdateTalentRequestDto[], queryRunner: QueryRunner): Promise<void> {
+  public static async updateTalentsWithTransaction(
+    event: Event,
+    talentsDto: UpdateTalentRequestDto[],
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     try {
       const eventId = event.id;
       if (!talentsDto || talentsDto.length === 0) {
@@ -1068,14 +1551,22 @@ export class EventsService {
 
       // Step 3: Bulk Delete
       if (deleteIds.length > 0) {
-        await queryRunner.manager.delete(Talent, { id: In(deleteIds), event: { id: eventId } });
+        await queryRunner.manager.delete(Talent, {
+          id: In(deleteIds),
+          event: { id: eventId },
+        });
       }
     } catch (error) {
       // this.logger.error(`Error updating talents: ${error.message}`);
       throw new Error(`Error updating talents: ${error.message}`);
     }
   }
-  private static async updateCollaboratorsWithTransaction(collaborators: UpdateCollaboratorDto[], event: Event, queryRunner: QueryRunner): Promise<void> {
+
+  private static async updateCollaboratorsWithTransaction(
+    collaborators: UpdateCollaboratorDto[],
+    event: Event,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     try {
       const eventId = event.id;
       if (!collaborators || collaborators.length === 0) {
@@ -1084,13 +1575,13 @@ export class EventsService {
       }
 
       // Step 1: Validate that there are no duplicate emails in create/update actions
-      await this.validateCollaboratorEmails(collaborators);
+      await this.validateCollaboratorEmails(collaborators, event);
 
       // Step 2: Process existing collaborators (update/delete)
       await this.processExistingCollaborators(collaborators, event, queryRunner);
 
       // Step 3: Process new collaborators
-      const newCollaborators = collaborators.filter((c) => c.action === 'create');
+      const newCollaborators = collaborators.filter(c => c.action === 'create');
       if (newCollaborators.length > 0) {
         await this.insertCollaboratorsWithTransaction(newCollaborators, queryRunner, eventId);
       }
@@ -1102,11 +1593,17 @@ export class EventsService {
   /**
    * Ensures no duplicate emails exist in 'create' or 'update' actions.
    */
-  private static validateCollaboratorEmails(collaborators: UpdateCollaboratorDto[]): void {
+  private static validateCollaboratorEmails(
+    collaborators: UpdateCollaboratorDto[],
+    event: Event,
+  ): void {
     const emailSet = new Set<string>();
 
     for (const collaborator of collaborators) {
       if (collaborator.action === 'create' || collaborator.action === 'update') {
+        if (event.owner?.email === collaborator.email) {
+          throw new BadRequestError('Owner is already a collaborator');
+        }
         if (emailSet.has(collaborator.email)) {
           throw new Error(`Duplicate email detected: ${collaborator.email}`);
         }
@@ -1118,27 +1615,40 @@ export class EventsService {
   /**
    * Processes updates and deletions for existing collaborators.
    */
-  private static async processExistingCollaborators(collaborators: UpdateCollaboratorDto[], event: Event, queryRunner: QueryRunner): Promise<void> {
+  private static async processExistingCollaborators(
+    collaborators: UpdateCollaboratorDto[],
+    event: Event,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     const eventId = event.id;
     //  Get TicketType IDs that are being deleted (avoid duplicate deletions)
-    const deleteIdsSet = new Set(event.ticketTypes.filter((t: UpdateTicketTypeRequestDto) => t.action === 'delete').map((t) => t.id));
+    const deleteIdsSet = new Set(
+      event.ticketTypes
+        .filter((t: Partial<UpdateTicketTypeRequestDto>) => t.action === 'delete')
+        .map(t => t.id),
+    );
     // Handle collaborator deletions
-    const deleteUserIds = collaborators.filter((c) => c.action === 'delete').map((c) => c.id);
+    const deleteUserIds = collaborators.filter(c => c.action === 'delete').map(c => c.id);
     if (deleteUserIds.length > 0) {
       await queryRunner.manager.delete(Collaborator, {
         user: { id: In(deleteUserIds) },
         event: { id: eventId },
       });
     }
-    let users = []
+    let users = [];
     // const rolesTofind = collaborators.map(c => roleMap.get(collaboratorRoleToEntity[c.role]).name);
     try {
-      users = (await Promise.all(collaborators.map(async (c) => (await serviceMesh.userService().getUserWithRolesByEmail(c.email))?.data))).filter((node) => node);
-    }
-    catch (e) {
-
-    }
-    const roleNames = collaborators.map((c) => c.role);
+      const userDataFromDb = await Promise.allSettled(
+        collaborators.map(
+          async c => (await serviceMesh.userService().getUserWithRolesByEmail(c.email))?.data,
+        ),
+      );
+      // Filter only fulfilled results and extract the values
+      users = userDataFromDb
+        .filter(result => result.status === 'fulfilled')
+        .map(result => (result as PromiseFulfilledResult<any>).value); // Ensure TypeScript understands this
+    } catch (e) {}
+    const roleNames = collaborators.map(c => c.role);
     if (roleNames.length === 0) {
       throw new Error('No valid roles found for collaborators.');
     }
@@ -1149,62 +1659,77 @@ export class EventsService {
     const userMap = new Map(users.map((user: any) => [user?.email, user]));
     // const roles = await Promise.all(uniqueRoleNames.map(role => this.authClient.getRoleByName(role)));
     // Fetch roles one by one from Auth Service
-    let roles = null
+    let roles = null;
     try {
-      roles = await Promise.all(uniqueRoleNames.map(async (role: any) => (await serviceMesh.userService().getRoleByName(role))?.data));  //TODO: need to fix this getRoleByName(role)
-    }
-    catch (e) {
-
-    }
-    const validRoles = roles?.filter((role) => role !== null);
+      roles = await Promise.all(
+        uniqueRoleNames.map(
+          async (role: any) => (await serviceMesh.userService().getRoleByName(role))?.data,
+        ),
+      ); //TODO: need to fix this getRoleByName(role)
+    } catch (e) {}
+    const validRoles = roles?.filter(role => role !== null);
     const roleMap: any = new Map(validRoles?.map((role: any) => [role.name, role]));
     // Fetch existing collaborators for the event (including roles)
     const existingCollaboratorsData = await queryRunner.manager.find(Collaborator, {
       where: { event: { id: eventId } },
       relations: ['ticketType', 'user', 'role'],
     });
-    const existingCollaboratorMap = new Map(existingCollaboratorsData.map((c) => [c.user?.id, c]));
+    const existingCollaboratorMap = new Map(existingCollaboratorsData.map(c => [c.user?.id, c]));
 
     // Process collaborator updates
     const updateCollaborators = [];
     const collaboratorsToInsert = [];
-    for (const collaborator of collaborators.filter((c) => c.action === 'update')) {
+    for (const collaborator of collaborators.filter(c => c.action === 'update')) {
       if (!collaborator.id) {
         throw new Error(`Collaborator ID is required for update action.`);
       }
       let user: any = userMap.get(collaborator.email.trim());
       let isEmailUpdate = false;
       const existingCollaborator = existingCollaboratorMap.get(collaborator.id);
-      isEmailUpdate = existingCollaborator && existingCollaborator.user.email.trim().toLowerCase() !== collaborator.email.trim().toLowerCase();
+      isEmailUpdate =
+        existingCollaborator &&
+        existingCollaborator.user.email.trim().toLowerCase() !==
+          collaborator.email.trim().toLowerCase();
 
       const currentRoleId = existingCollaborator?.role?.id ?? null;
       if (!user || isEmailUpdate) {
         // Remove old collaborator records and insert a new one
-        await queryRunner.manager.delete(Collaborator, { user: { id: collaborator.id }, event: { id: eventId } });
+        await queryRunner.manager.delete(Collaborator, {
+          user: { id: collaborator.id },
+          event: { id: eventId },
+        });
         const roleEntity: any = roleMap.get(collaborator.role);
         if (!roleEntity) {
           throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
         }
         if (!user) {
-          await serviceMesh.userService().createHostCollaborator(collaborator.email, undefined, undefined, undefined, roleEntity?.name);
+          await serviceMesh
+            .userService()
+            .createHostCollaborator(
+              collaborator.email,
+              undefined,
+              undefined,
+              undefined,
+              roleEntity?.name,
+            );
         }
         try {
-          user = (await serviceMesh.userService().getUserWithRolesByEmail(collaborator.email))?.data;
-        }
-        catch (e) {
-        }
+          user = (await serviceMesh.userService().getUserWithRolesByEmail(collaborator.email))
+            ?.data;
+        } catch (e) {}
         userMap.set(collaborator.email, user);
 
         //update collaboartor
         const tickets = collaborator.tickets;
         // Process tickets for the collaborator.
+        let updatedCollabSet = new Set();
         for (const ticket of tickets) {
           //should not insert for deleted tickets
           if (ticket.action === 'delete') {
             continue;
           }
           // Normalize the ticket name and find the corresponding TicketType entity.
-          const ticketName = normalizeCatalogName(ticket.name);
+          const ticketName = ticket.name?.trim();
 
           const ticketType = await queryRunner.manager.findOne(TicketType, {
             where: {
@@ -1214,9 +1739,24 @@ export class EventsService {
             },
           });
           if (!ticketType) {
-            throw new Error(`Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`);
+            throw new Error(
+              `Ticket type with name "${ticket.name}" not found for event ID ${eventId}.`,
+            );
           }
-          collaboratorsToInsert.push(createCollaboratorEntity(user.id, event, roleEntity, collaborator, ticketType, ticket));
+          const collaboratorKey = `${user.id}-${ticketType?.id}-${eventId}`;
+          if (!updatedCollabSet.has(collaboratorKey)) {
+            collaboratorsToInsert.push(
+              createCollaboratorEntity(
+                user.id,
+                event,
+                roleEntity,
+                collaborator,
+                ticketType,
+                ticket,
+              ),
+            );
+          }
+          updatedCollabSet.add(collaboratorKey);
         }
         //TODO: if no tickets the also it should do entry with null tickettype id
       }
@@ -1225,26 +1765,36 @@ export class EventsService {
       if (!roleEntity) {
         throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
       }
-      if (!roleEntity) throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
+      if (!roleEntity)
+        throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
       //  Check if role has changed
       const newRoleId = roleEntity.id;
       const roleChanged = currentRoleId !== newRoleId;
       if (roleChanged) {
-        await queryRunner.manager.update(Collaborator, { user: { id: user.id }, event: { id: eventId } }, { role: roleEntity });
+        await queryRunner.manager.update(
+          Collaborator,
+          { user: { id: user.id }, event: { id: eventId } },
+          { role: roleEntity },
+        );
       }
 
       // Assign role to user if not already assigned.
-      const hasRole = user.roles.some((role) => role.name === roleEntity.name);
+      const hasRole = user.roles.some(role => role.name === roleEntity.name);
 
       if (!hasRole) {
         await serviceMesh.userService().assignRoleToUser(user.id, roleEntity?.name);
         updateCollaborators.push({ user, collaborator });
       }
 
-      const collaboratorIds = new Set(updateCollaborators.map((c) => c.collaborator.id));
+      const collaboratorIds = new Set(updateCollaborators.map(c => c.collaborator.id));
       let isTicketUpdate = false;
       for (const ticket of collaborator.tickets) {
-        if ((ticket.action === 'delete' || ticket.action === 'update' || ticket.action === 'create') && !isEmailUpdate) {
+        if (
+          (ticket.action === 'delete' ||
+            ticket.action === 'update' ||
+            ticket.action === 'create') &&
+          !isEmailUpdate
+        ) {
           isTicketUpdate = true;
         }
       }
@@ -1262,27 +1812,33 @@ export class EventsService {
 
       // Fetch required TicketTypes in bulk
       const ticketNames = updateCollaborators.flatMap(({ collaborator }) =>
-        collaborator.tickets.filter((ticket) => ticket.action === 'create').map((ticket) => normalizeCatalogName(ticket.name)),
+        collaborator.tickets
+          .filter(ticket => ticket.action === 'create')
+          .map(ticket => ticket.name?.trim()),
       );
       const ticketTypes = await queryRunner.manager.find(TicketType, {
         where: { name: In(ticketNames), event: { id: eventId } },
       });
 
-      const ticketTypeMap = new Map(ticketTypes.map((ticket) => [normalizeCatalogName(ticket.name), ticket]));
+      const ticketTypeMap = new Map(ticketTypes.map(ticket => [ticket.name?.trim(), ticket]));
       // Process ticket updates
       const collaboratorsToSave = [];
 
       // Fetch existing collaborators for the given event and user IDs
       const existingCollaborators = await queryRunner.manager.find(Collaborator, {
         where: {
-          user: { id: In(updateCollaborators.map((c) => c.user.id)) },
+          user: { id: In(updateCollaborators.map(c => c.user.id)) },
           event: { id: eventId },
         },
         relations: ['ticketType', 'user'],
       });
 
       // Convert existing collaborators to a Set for quick lookup
-      const existingCollaboratorSet = new Set(existingCollaborators.map((collab) => `${collab.user?.id}-${collab.ticketType?.id || 'NULL'}-${eventId}`));
+      const existingCollaboratorSet = new Set(
+        existingCollaborators.map(
+          collab => `${collab.user?.id}-${collab.ticketType?.id || 'NULL'}-${eventId}`,
+        ),
+      );
       for (const { user, collaborator } of updateCollaborators) {
         for (const ticket of collaborator.tickets) {
           if (ticket.action === 'delete') {
@@ -1301,18 +1857,34 @@ export class EventsService {
             }
             await queryRunner.manager.update(
               Collaborator,
-              { user: { id: user.id }, event: { id: eventId }, ticketType: { id: ticket.id }, role: { id: roleEntity.id } },
+              {
+                user: { id: user.id },
+                event: { id: eventId },
+                ticketType: { id: ticket.id },
+                role: { id: roleEntity.id },
+              },
               { limitInvitationsNumber: ticket.limitInvitationsNumber },
             );
           } else if (ticket.action === 'create') {
-            const ticketName = normalizeCatalogName(ticket.name);
+            const ticketName = ticket.name?.trim();
             const ticketType = ticketTypeMap.get(ticketName);
-            if (!ticketType) throw new Error(`Ticket type ${ticket.name} not found.`);
+            if (!ticketType) {
+              throw new Error(`Ticket type ${ticket.name} not found.`);
+            }
             // Check if a collaborator already exists
             const collaboratorKey = `${user.id}-${ticketType?.id}-${eventId}`;
 
             if (!existingCollaboratorSet.has(collaboratorKey)) {
-              collaboratorsToSave.push(createCollaboratorEntity(user.id, event, roleEntity, collaborator, ticketType, ticket));
+              collaboratorsToSave.push(
+                createCollaboratorEntity(
+                  user.id,
+                  event,
+                  roleEntity,
+                  collaborator,
+                  ticketType,
+                  ticket,
+                ),
+              );
               existingCollaboratorSet.add(collaboratorKey);
             }
           }
@@ -1330,7 +1902,12 @@ export class EventsService {
     }
   }
 
-  private static async updateCollaboratorBasicInfo(eventId: string, userId: string, collaboratorDto: UpdateCollaboratorDto, queryRunner: QueryRunner): Promise<void> {
+  private static async updateCollaboratorBasicInfo(
+    eventId: string,
+    userId: string,
+    collaboratorDto: UpdateCollaboratorDto,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     await queryRunner.manager.update(
       Collaborator,
       { event: { id: eventId }, user: { id: userId } },
@@ -1342,7 +1919,12 @@ export class EventsService {
     );
   }
 
-  private static async updateCollaboratorPermissions(eventId: string, userId: string, collaboratorDto: UpdateCollaboratorDto, queryRunner: QueryRunner): Promise<void> {
+  private static async updateCollaboratorPermissions(
+    eventId: string,
+    userId: string,
+    collaboratorDto: UpdateCollaboratorDto,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     await queryRunner.manager.update(
       Collaborator,
       { event: { id: eventId }, user: { id: userId } },
@@ -1377,13 +1959,13 @@ export class EventsService {
     // Fetch existing collaborators for the given event and user IDs
     const existingCollaborators = await queryRunner.manager.find(Collaborator, {
       where: {
-        user: { id: In(updateCollaborators.map((c) => c.user.id)) },
+        user: { id: In(updateCollaborators.map(c => c.user.id)) },
         event: { id: eventId },
       },
       relations: ['ticketType', 'user'],
     });
     // Create a set of existing user IDs for quick lookup
-    const existingUserIds = new Set(existingCollaborators.map((collab) => collab.user.id));
+    const existingUserIds = new Set(existingCollaborators.map(collab => collab.user.id));
 
     // Find collaborators that are in updateCollaborators but not in existingCollaborators
     const collabWhichIsNotInExistingCollab = [];
@@ -1393,18 +1975,25 @@ export class EventsService {
       }
     }
     // Convert existing collaborators to a Set for quick lookup
-    const existingCollaboratorSet = new Set(existingCollaborators.map((collab) => `${collab.user?.id}-${eventId}-${collab.ticketType?.id || 'NULL'}`));
+    const existingCollaboratorSet = new Set(
+      existingCollaborators.map(
+        collab => `${collab.user?.id}-${eventId}-${collab.ticketType?.id || 'NULL'}`,
+      ),
+    );
     for (const { user, collaborator } of collabWhichIsNotInExistingCollab) {
       const roleEntity = roleMap.get(collaborator.role);
       if (!roleEntity) {
         throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
       }
-      if (!roleEntity) throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
+      if (!roleEntity)
+        throw new Error(`Failed to get collaborator role data for ${collaborator.role}.`);
 
       const key = `${user.id}-${eventId}-NULL`;
       if (!existingCollaboratorSet.has(key)) {
         existingCollaboratorSet.add(key);
-        collaboratorsToInsert.push(createCollaboratorEntity(user.id, event, roleEntity, collaborator, null));
+        collaboratorsToInsert.push(
+          createCollaboratorEntity(user.id, event, roleEntity, collaborator, null),
+        );
       }
     }
     if (collaboratorsToInsert.length > 0) {
@@ -1412,7 +2001,11 @@ export class EventsService {
     }
   }
 
-  private static async updateTicketTypesForEvent(ticketTypesDto: UpdateTicketTypeRequestDto[], event: Event, queryRunner: QueryRunner): Promise<void> {
+  private static async updateTicketTypesForEvent(
+    ticketTypesDto: UpdateTicketTypeRequestDto[],
+    event: Event,
+    queryRunner: QueryRunner,
+  ): Promise<void> {
     try {
       if (!ticketTypesDto || ticketTypesDto.length === 0) {
         // this.logger.log('No ticket types to process.');
@@ -1420,11 +2013,16 @@ export class EventsService {
       }
       const eventId = event.id;
       let createTickets: CreateTicketTypeRequestDto[] = [];
-      const updateTickets: { id: string; data: Partial<UpdateTicketTypeRequestDto> }[] = [];
+      const updateTickets: {
+        id: string;
+        data: Partial<UpdateTicketTypeRequestDto>;
+      }[] = [];
       let deleteIds: string[] = [];
       const reassignMap: { oldId: string; newId?: string; newName?: string }[] = [];
       // Collect IDs of tickets that are being deleted
-      const deleteIdsSet = new Set(ticketTypesDto.filter((t) => t.action === 'delete').map((t) => t.id));
+      const deleteIdsSet = new Set(
+        ticketTypesDto.filter(t => t.action === 'delete').map(t => t.id),
+      );
 
       //  FIRST: Process Reassignments & Updates Before Creating New Tickets
       for (const ticket of ticketTypesDto) {
@@ -1433,12 +2031,16 @@ export class EventsService {
         if (ticket.action === 'delete' && ticket.reassignTo?.id) {
           // Check if the reassigned ticket is also being deleted
           if (deleteIdsSet.has(ticket.reassignTo.id)) {
-            const reassignedTicket = ticketTypesDto.find((t) => t.id === ticket.reassignTo.id);
+            const reassignedTicket = ticketTypesDto.find(t => t.id === ticket.reassignTo.id);
 
             // If the reassigned ticket is also being deleted but has no further reassignment, it's invalid
             if (!reassignedTicket?.reassignTo?.id && !reassignedTicket?.reassignTo?.name) {
               throw new BadRequestError(
-                `Invalid reassignment: Ticket "${ticket.name}" is being deleted and reassigned to "${ticket.reassignTo?.name || 'other ticket'}", which is also being deleted.`,
+                `Invalid reassignment: Ticket "${
+                  ticket.name
+                }" is being deleted and reassigned to "${
+                  ticket.reassignTo?.name || 'other ticket'
+                }", which is also being deleted.`,
               );
             }
           }
@@ -1452,22 +2054,30 @@ export class EventsService {
           updateTickets.push({
             id: ticket.id,
             data: {
-              name: normalizeCatalogName(ticket.name),
+              name: ticket.name?.trim(),
               description: ticket.description,
               capacity: ticket.capacity || 0,
             },
           });
         } else if (ticket.action === 'delete') {
           if (!ticket.id) {
-            throw new BadRequestError(`Ticket with name "${ticket.name}" is missing an ID for deletion.`);
+            throw new BadRequestError(
+              `Ticket with name "${ticket.name}" is missing an ID for deletion.`,
+            );
           }
           if (ticket.reassignTo) {
             if (ticket.reassignTo.id) {
               //  Case 1: Reassign to an existing ticket type
-              reassignMap.push({ oldId: ticket.id, newId: ticket.reassignTo.id });
+              reassignMap.push({
+                oldId: ticket.id,
+                newId: ticket.reassignTo.id,
+              });
             } else if (ticket.reassignTo.name) {
               //  Case 2: Reassign to a new ticket (instead of creating, update old one)
-              reassignMap.push({ oldId: ticket.id, newName: ticket.reassignTo.name });
+              reassignMap.push({
+                oldId: ticket.id,
+                newName: ticket.reassignTo.name,
+              });
               continue; //  No need to delete; just rename
             }
           }
@@ -1477,10 +2087,19 @@ export class EventsService {
         }
       }
       // STEP 2: Handle Reassignments Before Deleting Anything
-      const { reassignedNames, ticketsIdsAfterBeingReassigned } = await this.handleReassignments(reassignMap, ticketTypesDto, eventId, queryRunner);
-      deleteIds = [...deleteIds, ...ticketsIdsAfterBeingReassigned]
+      const { reassignedNames, ticketsIdsAfterBeingReassigned } = await this.handleReassignments(
+        reassignMap,
+        ticketTypesDto,
+        eventId,
+        queryRunner,
+      );
+      deleteIds = [...deleteIds, ...ticketsIdsAfterBeingReassigned];
       //check if deleteIds contains the guest associated with it (it should not delete without reassigning)
-      const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(deleteIds, eventId, queryRunner);   //TODO: check this after taking pull from dev-temp
+      const hasAssignedGuests = await GuestService.hasGuestsAssignedToTicketTypes(
+        deleteIds,
+        eventId,
+        queryRunner,
+      ); //TODO: check this after taking pull from dev-temp
       if (hasAssignedGuests) {
         throw new BadRequestError('Cannot delete ticket types as they are assigned to guests.');
       }
@@ -1508,7 +2127,7 @@ export class EventsService {
 
       //  STEP 4: Finally, insert NEW ticket types (only those not involved in reassignment)
       //  Remove reassigned tickets from createTickets to prevent duplicate insertion
-      createTickets = createTickets.filter((ticket) => !reassignedNames.has(ticket.name));
+      createTickets = createTickets.filter(ticket => !reassignedNames.has(ticket.name));
 
       if (createTickets.length > 0) {
         await this.insertTicketTypesForEvent(createTickets, eventId, queryRunner);
@@ -1516,7 +2135,15 @@ export class EventsService {
 
       //  STEP 5: Bulk update for normal updates
       if (updateTickets.length > 0) {
-        await Promise.all(updateTickets.map((ticket) => queryRunner.manager.update(TicketType, { id: ticket.id, event: { id: eventId } }, ticket.data)));
+        await Promise.all(
+          updateTickets.map(ticket =>
+            queryRunner.manager.update(
+              TicketType,
+              { id: ticket.id, event: { id: eventId } },
+              ticket.data,
+            ),
+          ),
+        );
       }
     } catch (error) {
       // this.logger.error(`Error updating ticket types: ${error.message}`);
@@ -1528,8 +2155,11 @@ export class EventsService {
     reassignMap: { oldId: string; newId?: string; newName?: string }[],
     ticketTypesDto: UpdateTicketTypeRequestDto[],
     eventId: string,
-    queryRunner: QueryRunner
-  ): Promise<{ reassignedNames: Set<string>; ticketsIdsAfterBeingReassigned: string[] }> {
+    queryRunner: QueryRunner,
+  ): Promise<{
+    reassignedNames: Set<string>;
+    ticketsIdsAfterBeingReassigned: string[];
+  }> {
     const reassignedNames = new Set<string>(); // Track reassigned ticket names
     const deleteIds: string[] = []; // Store IDs that should be deleted
     const reassignmentGroups = new Map<string, string[]>(); // Maps newName -> [oldIds]
@@ -1542,21 +2172,30 @@ export class EventsService {
             .createQueryBuilder()
             .update(Guest)
             .set({ ticketType: { id: reassignment.newId } })
-            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .where({
+              ticketType: { id: reassignment.oldId },
+              event: { id: eventId },
+            })
             .execute(),
 
           queryRunner.manager
             .createQueryBuilder()
             .update(Ticket)
             .set({ ticketType: { id: reassignment.newId } })
-            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .where({
+              ticketType: { id: reassignment.oldId },
+              event: { id: eventId },
+            })
             .execute(),
 
           queryRunner.manager
             .createQueryBuilder()
             .update(Collaborator)
             .set({ ticketType: { id: reassignment.newId } })
-            .where({ ticketType: { id: reassignment.oldId }, event: { id: eventId } })
+            .where({
+              ticketType: { id: reassignment.oldId },
+              event: { id: eventId },
+            })
             .execute(),
         ]);
       } else if (reassignment.newName) {
@@ -1572,18 +2211,20 @@ export class EventsService {
 
       // Find the corresponding create ticket
       const matchingTicket = ticketTypesDto.find(
-        (ticket) => ticket.name === newName && ticket.action === 'create'
+        ticket => ticket.name === newName && ticket.action === 'create',
       );
       if (!matchingTicket) {
         const availableCreateNames = ticketTypesDto
-          .filter((ticket) => ticket.action === 'create')
-          .map((ticket) => `"${ticket.name}"`)
+          .filter(ticket => ticket.action === 'create')
+          .map(ticket => `"${ticket.name}"`)
           .join(', ');
-
+        //TODO: add here name instead of oldId
         throw new Error(
-          `Invalid reassignment: Ticket(s) [${oldIds.join(', ')}] were set to be reassigned to "${newName}",  //TODO: add here name instead of oldId
+          `Invalid reassignment: Ticket(s) [${oldIds.join(
+            ', ',
+          )}] were set to be reassigned to "${newName}", 
   but no matching ticket with this name was found. 
-  Available tickets are: [${availableCreateNames}]`
+  Available tickets are: [${availableCreateNames}]`,
         );
       }
 
@@ -1592,57 +2233,61 @@ export class EventsService {
         TicketType,
         { id: primaryOldId, event: { id: eventId } },
         {
-          name: normalizeCatalogName(matchingTicket.name),
+          name: matchingTicket.name?.trim(),
           description: matchingTicket.description,
           capacity: matchingTicket.capacity || 0,
-        }
+        },
       );
 
       // Reassign all related data to primaryOldId
       await Promise.all(
-        oldIds.map((oldId) =>
+        oldIds.map(oldId =>
           queryRunner.manager
             .createQueryBuilder()
             .update(Guest)
             .set({ ticketType: { id: primaryOldId } })
             .where({ ticketType: { id: oldId }, event: { id: eventId } })
-            .execute()
-        )
+            .execute(),
+        ),
       );
 
       await Promise.all(
-        oldIds.map((oldId) =>
+        oldIds.map(oldId =>
           queryRunner.manager
             .createQueryBuilder()
             .update(Ticket)
             .set({ ticketType: { id: primaryOldId } })
             .where({ ticketType: { id: oldId }, event: { id: eventId } })
-            .execute()
-        )
+            .execute(),
+        ),
       );
 
       await Promise.all(
-        oldIds.map((oldId) =>
+        oldIds.map(oldId =>
           queryRunner.manager
             .createQueryBuilder()
             .update(Collaborator)
             .set({ ticketType: { id: primaryOldId } })
             .where({ ticketType: { id: oldId }, event: { id: eventId } })
-            .execute()
-        )
+            .execute(),
+        ),
       );
 
       // Track reassigned ticket name to prevent duplicate creation
       reassignedNames.add(matchingTicket.name);
       // Remove other old ticket IDs except the primary one
-      const redundantDeletes = oldIds.filter((id) => id !== primaryOldId);
+      const redundantDeletes = oldIds.filter(id => id !== primaryOldId);
       deleteIds.push(...redundantDeletes);
     }
 
     return { reassignedNames, ticketsIdsAfterBeingReassigned: deleteIds };
   }
 
-  public static async updateQuizQuestionsWithTransaction(quizQuestionsDto: UpdateQuizQuestionRequestDto[], queryRunner: QueryRunner, event: Event): Promise<void> {
+  public static async updateQuizQuestionsWithTransaction(
+    quizQuestionsDto: UpdateQuizQuestionRequestDto[],
+    queryRunner: QueryRunner,
+    event: Event,
+  ): Promise<void> {
     const eventId = event.id;
     try {
       if (!quizQuestionsDto || quizQuestionsDto.length === 0) {
@@ -1651,7 +2296,10 @@ export class EventsService {
       }
 
       const createQuestions: UpdateQuizQuestionRequestDto[] = [];
-      const updateQuestions: { id: string; data: UpdateQuizQuestionRequestDto }[] = [];
+      const updateQuestions: {
+        id: string;
+        data: UpdateQuizQuestionRequestDto;
+      }[] = [];
       const deleteIds: string[] = [];
 
       // Single Loop to Categorize Actions
@@ -1680,7 +2328,7 @@ export class EventsService {
       // Bulk Update (Parallel Execution)
       if (updateQuestions.length > 0) {
         await Promise.all(
-          updateQuestions.map((q) =>
+          updateQuestions.map(q =>
             queryRunner.manager.update(
               QuizQuestion,
               { id: q.id, event: { id: eventId } }, // Ensuring event ID matches
@@ -1692,7 +2340,10 @@ export class EventsService {
 
       // Bulk Delete (Only If IDs Exist)
       if (deleteIds.length > 0) {
-        await queryRunner.manager.delete(QuizQuestion, { id: In(deleteIds), event: { id: eventId } });
+        await queryRunner.manager.delete(QuizQuestion, {
+          id: In(deleteIds),
+          event: { id: eventId },
+        });
       }
     } catch (error) {
       // this.logger.error(`Error updating quiz questions: ${error.message}`);
@@ -1700,20 +2351,40 @@ export class EventsService {
     }
   }
 
-
-  public static async updateEvent(payload: UpdateEventRequestDto): Promise<EventData> {
-    const eventId = payload.id;
+  public static async updateEvent(
+    payload: UpdateEventRequestDto,
+    eventId: string,
+  ): Promise<EventData> {
     if (!eventId) throw new BadRequestError('Event ID is required');
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
+    //Imp Note: backend is expecting publish date should come everytime from frontend if not then set to null
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: payload.id, deletedAt: IsNull() },
-        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
+        where: { id: eventId, deletedAt: IsNull() },
+        relations: [
+          'owner',
+          'ageLimit',
+          'admissionType',
+          'location',
+          'eventType',
+          'talents',
+          'ticketTypes',
+          'collaborators',
+          'quizQuestions',
+        ],
+      });
+      if (!event) throw new NotFoundError('Item of Event not found');
+      const userRoles = await UserRole.find({
+        where: { user: { id: payload.ownerId } },
+        relations: { role: true },
       });
 
+      const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
+      if (!isAdmin && event.owner?.id !== payload.ownerId) {
+        throw new ForbiddenError('You are not authorized to update this event');
+      }
       const eventCopy = JSON.parse(JSON.stringify(event));
       /**date validations */
       if (!payload.startDate) {
@@ -1733,7 +2404,6 @@ export class EventsService {
       }
       /**date validations ends here */
 
-      if (!event) throw new NotFoundError('Item of Event not found');
       const eventStatusFromClient = EventStatusEnum[payload.status as keyof typeof EventStatusEnum];
       const eventCurrentStatus = event.status;
 
@@ -1753,8 +2423,19 @@ export class EventsService {
       if (payload.endDate) {
         event.endDate = new Date(payload.endDate);
       }
-      if (event.publishDate != undefined || event.publishDate !== null) {
-        event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+      if (payload.publishDate != undefined || payload.publishDate !== null) {
+        //if publish date is not in payload still this condition is true
+        if (event.status == EventStatusEnum.APPROVED_STATUS) {
+          if (payload.publishDate) {
+            event.publishDate = new Date(payload.publishDate);
+          } else {
+            event.publishDate = null;
+            event.isPublished = true;
+            //TODO: if removed publish date then need to remove its scheduler
+          }
+        } else {
+          event.publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
+        }
       }
       if (payload.timeZone) {
         event.timeZone = payload.timeZone;
@@ -1777,7 +2458,7 @@ export class EventsService {
       if (payload.imageCover) {
         event.imageCover = payload.imageCover;
       }
-      if (payload.furtherInstructions) {
+      if (payload.furtherInstructions !== undefined) {
         event.furtherInstructions = payload.furtherInstructions;
       }
       if (payload.showLocation !== undefined) {
@@ -1828,7 +2509,10 @@ export class EventsService {
        * case1: if event status is Draft_status and payload status is also Draft_status   -> no need to change event status
        * case 2: if event status was in draft and payload status is in PENDING_status -> means event is submit for approval
        */
-      if (eventCurrentStatus === EventStatusEnum.DRAFT_STATUS && eventStatusFromClient === EventStatusEnum.PENDING_STATUS) {
+      if (
+        eventCurrentStatus === EventStatusEnum.DRAFT_STATUS &&
+        eventStatusFromClient === EventStatusEnum.PENDING_STATUS
+      ) {
         event.status = EventStatusEnum.PENDING_STATUS;
       }
       //ends here
@@ -1844,33 +2528,160 @@ export class EventsService {
         let updatedDateAndLocation = {
           startDate: payload.startDate,
           endDate: payload.endDate,
-          eventLocation: payload.eventLocation
-        }
-        eventDateOrLocationComparisionResponse = await hasEventDateOrLocationChanged(updatedDateAndLocation, eventCopy);
+          eventLocation: payload.eventLocation,
+        };
+        eventDateOrLocationComparisionResponse = await hasEventDateOrLocationChanged(
+          updatedDateAndLocation,
+          eventCopy,
+        );
       }
 
       //ends here
       await queryRunner.commitTransaction();
+
+      //handle event scheduling
+      let eventFromDb: Event = await queryRunner.manager.findOne(Event, {
+        where: { id: eventId },
+        relations: {
+          location: true,
+        },
+      });
+      if (eventFromDb && eventFromDb.status === EventStatusEnum.APPROVED_STATUS) {
+        if (
+          !eventFromDb.isPublished &&
+          eventFromDb.publishDate &&
+          new Date(eventFromDb.publishDate)?.getTime() !==
+            new Date(eventCopy.publishDate)?.getTime()
+        ) {
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.PUBLISH_EVENT,
+              data: {
+                id: eventFromDb.id,
+                publishDate: eventFromDb.publishDate,
+              },
+            };
+            serviceMesh.schedulerService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`Publish date scheduler failed for ${eventFromDb.name}`, e);
+          }
+        }
+        //update scheduler if event start date has been change
+        if (
+          eventFromDb?.startDate &&
+          new Date(eventFromDb.startDate)?.getTime() !== new Date(eventCopy.startDate)?.getTime()
+        ) {
+          try {
+            let data: SchedulerTriggerPayload = {
+              type: SchedulerJobType.REMINDER_EVENT,
+              data: {
+                id: eventFromDb.id,
+                startDate: eventFromDb.startDate,
+                name: eventFromDb.name,
+              },
+            };
+            serviceMesh.schedulerService().triggerSchedulerJob(data);
+          } catch (e) {
+            console.log(`remainder scheduler failed for ${eventFromDb.name}`, e);
+          }
+        }
+      }
+      if (
+        (eventFromDb.status === EventStatusEnum.PENDING_STATUS ||
+          eventFromDb.status === EventStatusEnum.APPROVED_STATUS) &&
+        eventFromDb?.endDate &&
+        new Date(eventFromDb.endDate)?.getTime() !== new Date(eventCopy.endDate)?.getTime()
+      ) {
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: eventFromDb.id,
+              endDate: eventFromDb.endDate,
+            },
+          };
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Past or cancel scheduler failed for ${eventFromDb.name}`, e);
+        }
+      }
+      //ends here
+      //ends here
+
       /**
        * only if event is approved (upcoming -> (prepublish and publish))
        * send email notification if date, time, location is updated
        * send email only after successful commit & only if relevant details changed
        */
-      if (eventDateOrLocationComparisionResponse.changed && eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
+      if (
+        eventDateOrLocationComparisionResponse.changed &&
+        eventCurrentStatus === EventStatusEnum.APPROVED_STATUS
+      ) {
         try {
-          const guestStatuses: GuestStatus[] = [GuestStatus.APPLIED, GuestStatus.CONFIRMED, GuestStatus.REVIEW, GuestStatus.DECLINED, GuestStatus.INVITED];
-          await this.notifyGuestsOnDateOrLocationChange({ eventPayload: payload, eventId, guestStatuses, event, existingLocation });
+          const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
+          await this.notifyGuestsOnDateOrLocationChange({
+            eventPayload: payload,
+            eventId,
+            guestStatuses,
+            event,
+            existingLocation,
+          });
         } catch (emailError) {
           // this.logger.warn(`Failed to send update email: ${emailError.message}`);
           // Email failure does NOT rollback the DB update
         }
       }
+
+      try {
+        if (eventCurrentStatus === EventStatusEnum.APPROVED_STATUS) {
+          const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
+            where: {
+              deletedAt: IsNull(),
+              roles: {
+                role: {
+                  name: 'admin',
+                },
+              },
+            },
+            relations: {
+              roles: {
+                role: true,
+              },
+            },
+          });
+
+          const adminUserIds = adminUsers.map(user => user.id);
+
+          if (adminUserIds.length > 0)
+            await serviceMesh
+              .notificationService()
+              .sendNotification(
+                NotificationType.EVENT_EDITED,
+                adminUserIds,
+                event.id,
+                event.owner.id,
+              );
+        }
+      } catch (error) {
+        console.log('🚀 ~ EventsService ~ error:', error);
+      }
+
       /**ends here */
       const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
         where: { id: event.id },
-        relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'collaborators', 'quizQuestions'],
+        relations: [
+          'owner',
+          'ageLimit',
+          'admissionType',
+          'location',
+          'eventType',
+          'talents',
+          'ticketTypes',
+          'collaborators',
+          'quizQuestions',
+        ],
       });
-      return toEvent(updatedEvent, null)
+      return toEvent(updatedEvent, null);
     } catch (error) {
       // Rollback transaction in case of an error
       await queryRunner.rollbackTransaction();
@@ -1880,6 +2691,80 @@ export class EventsService {
       // Release the query runner
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Sends event reminder emails to all eligible guests 24 hours before the event.
+   *
+   * This function retrieves all guests associated with the event whose statuses
+   * indicate they are still participating (`INVITED`, `CONFIRMED`, `APPLIED`).
+   * It then prepares and sends email reminders to those guests.
+   *
+   * @param {Event} event - The event for which reminders need to be sent.
+   * @returns {Promise<void>} - A promise that resolves once all emails have been processed.
+   */
+  public static async sendEventRemindersToAllGuests(eventId: string): Promise<void> {
+    const event: Event = await Event.findOne({
+      where: { id: eventId },
+      relations: { location: true },
+    });
+    const guestStatuses: GuestStatus[] = [GuestStatus.CONFIRMED];
+    const guests = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .leftJoinAndSelect('guest.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .where('guest.event = :eventId', { eventId: event.id })
+      .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
+      .getMany();
+    if (!guests.length) return;
+    const emailPromises = guests
+      .map(guest => {
+        if (guest?.user?.email) {
+          const mailPayload = {
+            eventName: event.name || 'Event',
+            imageFlyer: event.imageFlyer,
+            eventDate: event.startDate,
+            location: event.location?.location,
+            city: event.location?.city,
+            branchLink: event.branchLink,
+          };
+          return sendEventReminder(
+            mailPayload,
+            guest.user.email,
+            guest.user.id,
+            event.id,
+            event.timeZone,
+          );
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    await Promise.allSettled(emailPromises);
+    const smsPromises = guests
+      .map(guest => {
+        if (guest?.user?.phoneNumber) {
+          const { hour, minutes, period }: any = extractDate(event?.startDate, event.timeZone);
+          let textMessage = '';
+          const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.Member);
+          if (role?.role?.name === RoleType.Member) {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow at ${hour}:${minutes} ${period}.`;
+          } else {
+            textMessage = `Just a reminder, you are scheduled to attend ${event?.name || 'Event'} tomorrow.`;
+          }
+          return sendSmsNotification({
+            phoneNumber: guest.user.phoneNumber,
+            textMessage,
+          });
+        }
+        // If no phone number, return undefined
+        return undefined;
+      })
+      .filter(Boolean);
+
+    await Promise.allSettled(smsPromises);
   }
 
   /**
@@ -1894,13 +2779,13 @@ export class EventsService {
     eventId,
     guestStatuses,
     event,
-    existingLocation
+    existingLocation,
   }: {
     eventPayload: UpdateEventRequestDto;
     eventId: string;
     guestStatuses: GuestStatus[];
     event: Event;
-    existingLocation: EventLocation
+    existingLocation: EventLocation;
   }): Promise<void> {
     if (!guestStatuses.length) {
       // this.logger.warn('No statuses provided for guest filtering.');
@@ -1913,7 +2798,7 @@ export class EventsService {
     }
 
     // Process notifications in parallel
-    const notificationPromises = guests.map(async (guest) => {
+    const notificationPromises = guests.map(async guest => {
       const guestName = guest.user?.firstName || 'Guest';
       const eventName = event.name || event?.name || 'Event';
       const eventStartDate = event.startDate || event?.startDate || 'TBD';
@@ -1924,57 +2809,43 @@ export class EventsService {
       const message = `Hi ${guestName}, the details for ${eventName} have changed. It will now take place on ${eventStartDate} at ${eventLocation}. Please check for more details.`;
 
       if (guest.user?.email) {
-        // TODO: Change email and sms template
-        const mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate(
-          [
-            {
-              key: 'custom_message',
-              value: message,
-            },
-            {
-              key: 'event_name',
-              value: eventName,
-            },
-            {
-              key: 'image_url',
-              value: event.imageFlyer,
-            },
-            {
-              key: 'time',
-              value: eventStartDate,
-            },
-            {
-              key: 'location',
-              value: eventLocation,
-            },
-          ],
-          'Event Info Updated',
-          [guest.user.email],
-          null,
-          // this.logger,
+        const createMailPayload = {
+          eventName,
+          imageFlyer: event.imageFlyer,
+          eventDate: event.startDate,
+          location: event.location.location,
+          city: event.location.city,
+          branchLink: event.branchLink,
+        };
+        sendEventUpdation(
+          createMailPayload,
+          guest.user.email,
+          guest.user.id,
+          event.id,
+          event.timeZone,
         );
-
-        if (!mailServiceResponse) {
-          // this.logger.warn(`Failed to send mail for event date/location to ${guestName}`);
-        }
       } else if (guest.user?.phoneNumber) {
         // Send SMS notification
-        const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, message);
-
-        if (!success) {
-          // this.logger.warn(`Failed to send SMS  for event date/location to guest ${guestName}`);
+        try {
+          const validateNumber = isValidPhoneNumber(guest.user.phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = guest.user.phoneNumber.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
         }
-      } else {
-        // Log if no contact details exist
-        // this.logger.warn(`No contact details available for ${guestName}, skipping notification for event date/location .`);
       }
     });
     await Promise.allSettled(notificationPromises);
-    // this.logger.log(`Notifications sent for event ${eventId}`);
   }
 
-  public static async validateAddress(payload: AddressValidationRequest): Promise<AddressValidationResponse> {
-    const addressvalidationClient = new AddressValidationClient({ authClient: this.googleAuthClient });
+  public static async validateAddress(
+    payload: AddressValidationRequest,
+  ): Promise<AddressValidationResponse> {
+    const addressvalidationClient = new AddressValidationClient({
+      authClient: this.googleAuthClient,
+    });
 
     const request = {
       address: {
@@ -2000,13 +2871,14 @@ export class EventsService {
     return responses.data(response);
   }
 
-  public static async createEventLocation(payload: EventLocationDto): Promise<EventLocationResponse> {
+  public static async createEventLocation(
+    payload: EventLocationDto,
+  ): Promise<EventLocationResponse> {
     let dataResp: EventLocation;
     let placeId = payload.placeId;
 
     if (!placeId) {
-      const placeResponse =
-        await GoogleAddressClient.findPlaceFromText(payload.location);
+      const placeResponse = await GoogleAddressClient.findPlaceFromText(payload.location);
       placeId = placeResponse.candidates[0]?.place_id;
 
       if (placeId) {
@@ -2044,7 +2916,9 @@ export class EventsService {
     return responses.data({ ...dataResp, placeId });
   }
 
-  public static async updateEventLocation(payload: UpdateEventLocationRequestDto): Promise<EventLocationResponse> {
+  public static async updateEventLocation(
+    payload: UpdateEventLocationRequestDto,
+  ): Promise<EventLocationResponse> {
     let dataResp: EventLocation = await this.dbConnection.getRepository(EventLocation).findOne({
       where: { id: payload.id, deletedAt: null },
     });
@@ -2059,7 +2933,9 @@ export class EventsService {
           addressLines: [payload.location],
         },
       };
-      const addressValidationClient = new AddressValidationClient({ authClient: this.googleAuthClient });
+      const addressValidationClient = new AddressValidationClient({
+        authClient: this.googleAuthClient,
+      });
       const validations = await addressValidationClient.validateAddress(request);
       const addressUserValidated = validations[0]?.result?.address?.formattedAddress || null;
 
@@ -2114,7 +2990,10 @@ export class EventsService {
     });
     if (!eventLocation) throw new NotFoundError('Location not found!');
 
-    return responses.data({ ...eventLocation, placeId: eventLocation.googlePlaceId });
+    return responses.data({
+      ...eventLocation,
+      placeId: eventLocation.googlePlaceId,
+    });
   }
 
   public static async deleteEventLocation(payload: RequestByIdDto): Promise<string> {
@@ -2122,20 +3001,26 @@ export class EventsService {
       where: { id: payload.id, deletedAt: null },
     });
     if (!eventLocation) throw new NotFoundError('Location not found!');
-    await this.dbConnection.getRepository(EventLocation).update({ id: payload.id }, { deletedAt: new Date() });
+    await this.dbConnection
+      .getRepository(EventLocation)
+      .update({ id: payload.id }, { deletedAt: new Date() });
     return;
   }
 
-  public static async listEventLocations(payload: QueryRequestDto): Promise<EventLocationsResponse> {
+  public static async listEventLocations(
+    payload: QueryRequestDto,
+  ): Promise<EventLocationsResponse> {
     const parsedQuery = parse(payload.query);
     const pagination = hasPagination(parsedQuery)
       ? {
-        take: parseInt(parsedQuery.take),
-        skip: parseInt(parsedQuery.skip),
-      }
+          take: parseInt(parsedQuery.take),
+          skip: parseInt(parsedQuery.skip),
+        }
       : {};
 
-    const eventsLocation = await this.dbConnection.getRepository(EventLocation).find({ ...pagination });
+    const eventsLocation = await this.dbConnection
+      .getRepository(EventLocation)
+      .find({ ...pagination });
 
     return responses.data(eventsLocation);
   }
@@ -2148,12 +3033,16 @@ export class EventsService {
       minAge: payload.minAge,
       enabled: true,
     });
-    const savedAgeLimitResp = await this.dbConnection.getRepository(EventAgeLimit).save(savedAgeLimit);
+    const savedAgeLimitResp = await this.dbConnection
+      .getRepository(EventAgeLimit)
+      .save(savedAgeLimit);
 
-    return savedAgeLimitResp
+    return savedAgeLimitResp;
   }
 
-  public static async updateEventAgeLimit(payload: UpdateEventAgeLimitRequestDto): Promise<EventAgeLimitResponse> {
+  public static async updateEventAgeLimit(
+    payload: UpdateEventAgeLimitRequestDto,
+  ): Promise<EventAgeLimitResponse> {
     let response: EventAgeLimitResponse;
 
     const { id, name, description, minAge, maxAge, enabled } = payload;
@@ -2180,14 +3069,12 @@ export class EventsService {
   }
 
   public static async getEventAgeLimit(payload: RequestByIdDto): Promise<EventAgeLimit> {
-
     const eventAgeLimit = await this.dbConnection.getRepository(EventAgeLimit).findOne({
       where: { id: payload.id, deletedAt: null },
     });
     if (!eventAgeLimit) throw new NotFoundError('Age limit not found!');
 
-    return eventAgeLimit
-
+    return eventAgeLimit;
   }
 
   public static async deleteEventAgeLimit(payload: RequestByIdDto): Promise<string> {
@@ -2195,21 +3082,51 @@ export class EventsService {
       where: { id: payload.id, deletedAt: null },
     });
     if (!eventAgeLimit) throw new NotFoundError('Age limit not found!');
-    await this.dbConnection.getRepository(EventAgeLimit).update({ id: payload.id }, { deletedAt: new Date() });
-    return ''
+    await this.dbConnection
+      .getRepository(EventAgeLimit)
+      .update({ id: payload.id }, { deletedAt: new Date() });
+    return '';
   }
 
   public static async listEventAgeLimits(): Promise<EventAgeLimit[]> {
     const eventAgeLimits = await this.dbConnection.getRepository(EventAgeLimit).find();
-    return eventAgeLimits
+    return eventAgeLimits;
   }
 
   public static async publishEvent(eventId: string): Promise<EventResponse> {
-
-    // this.logger.log(`Attempting to publish event with ID: ${eventId}`);
-    const updateResult = await this.dbConnection.getRepository(Event).update(eventId, { isPublished: true });
-    // this.logger.log(`Update result: ${JSON.stringify(updateResult)}`);
-    // TODO: Add functionality send notifications
+    await this.dbConnection.getRepository(Event).update({ id: eventId }, { isPublished: true });
+    const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId },
+      relations: [
+        'owner',
+        'admissionType',
+        'location',
+        'eventType',
+        'guests',
+        'ticketTypes',
+        'ageLimit',
+      ],
+    });
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
+    });
+    if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
+      const createPayload = {
+        eventDate: updatedEvent.startDate,
+        eventName: updatedEvent.name,
+        imageFlyer: updatedEvent.imageFlyer,
+        location: updatedEvent.location.location,
+        city: updatedEvent.location.city,
+        branchLink: updatedEvent.branchLink,
+      };
+      sendEventPublishedApproval({
+        mailComponents: createPayload,
+        email: updatedEvent.owner.email,
+        companyName: host.additionalHostInformation.companyName,
+        eventId: updatedEvent.id,
+        timeZone: updatedEvent.timeZone,
+      });
+    }
     return;
   }
 
@@ -2223,10 +3140,28 @@ export class EventsService {
       order: {
         startDate: 'DESC',
       },
-      relations: ['owner', 'admissionType', 'location', 'eventType', 'guests', 'ticketTypes', 'ageLimit'],
+      relations: [
+        'owner',
+        'admissionType',
+        'location',
+        'eventType',
+        'guests',
+        'ticketTypes',
+        'ageLimit',
+      ],
     });
-    const upcomingEvents = events.filter((event) => formatEventStatus(event) === EventStatus.UPCOMING_STATUS);
-    return responses.data(upcomingEvents.map((item) => toEvent(item, null, item.guests.filter((guest) => guest.status === GuestStatus.CONFIRMED).length)));
+    const upcomingEvents = events.filter(
+      event => formatEventStatus(event) === EventStatus.UPCOMING_STATUS,
+    );
+    return responses.data(
+      upcomingEvents.map(item =>
+        toEvent(
+          item,
+          null,
+          item.guests.filter(guest => guest.status === GuestStatus.CONFIRMED).length,
+        ),
+      ),
+    );
   }
 
   public static async duplicateEvent(payload: RequestByIdDto): Promise<EventResponse> {
@@ -2266,23 +3201,52 @@ export class EventsService {
     newEvent.ticketTypes = event.ticketTypes;
     newEvent.collaborators = event.collaborators;
     newEvent.quizQuestions = event.quizQuestions;
+
+    // Save the duplicated event first to get an ID
     const createdEvent = await this.dbConnection.getRepository(Event).save(newEvent);
+
+    // Generate a new Branch link for the duplicated event
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${createdEvent.id}`;
+    const deepLinkPath = `events/event-details?id=${createdEvent.id}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${createdEvent.name}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    createdEvent.branchLink = branchLink;
+    await this.dbConnection.getRepository(Event).save(createdEvent);
+
     return responses.data(toEvent(createdEvent, null));
   }
 
+  //TODO: this api is being used
   public static async publishPendingEvents(): Promise<string> {
     const now = new Date();
     const status = EventStatusEnum.APPROVED_STATUS;
-    const eventsPendingPublish = await this.dbConnection.getRepository(Event)
+    const eventsPendingPublish = await this.dbConnection
+      .getRepository(Event)
       .createQueryBuilder('event')
-      .where('(event.isPublished = :isPublished OR event.isPublished IS NULL)', { isPublished: false })
+      .where('(event.isPublished = :isPublished OR event.isPublished IS NULL)', {
+        isPublished: false,
+      })
       .andWhere('event.status = :status', { status })
       .andWhere('event.publishDate IS NOT NULL')
       .andWhere('event.publishDate <= :now', { now })
       .getMany();
     if (eventsPendingPublish.length > 0) {
       await Promise.all(
-        eventsPendingPublish.map((event) => {
+        eventsPendingPublish.map(event => {
           this.publishEvent(event.id);
         }),
       );
@@ -2290,6 +3254,7 @@ export class EventsService {
     return;
   }
 
+  //this is not being used anywhere
   public static validateEventUpdate(
     event: Event,
     payload: UpdateEventRequestDto,
@@ -2301,38 +3266,91 @@ export class EventsService {
       if (!payload.status || payload.status === EventStatusEnum.APPROVED_STATUS) {
         return {
           validate: false,
-          message: 'The event is APPROVED or event PUBLISHED and cannot be modified unless the status is changed to a different value.',
+          message:
+            'The event is APPROVED or event PUBLISHED and cannot be modified unless the status is changed to a different value.',
         };
       }
     }
-    if (event.status !== EventStatusEnum.APPROVED_STATUS && payload.status === EventStatusEnum.CANCELLED_STATUS) {
-      return { validate: false, message: 'The event cannot be CANCELLED at this time.' };
+    if (
+      event.status !== EventStatusEnum.APPROVED_STATUS &&
+      payload.status === EventStatusEnum.CANCELLED_STATUS
+    ) {
+      return {
+        validate: false,
+        message: 'The event cannot be CANCELLED at this time.',
+      };
     }
 
     const publishDate = payload.publishDate ? new Date(payload.publishDate) : null;
     const startDate = event.startDate ? new Date(event.startDate) : null;
 
     if (publishDate && startDate && publishDate > startDate) {
-      return { validate: false, message: 'Publish date cannot be after the start date.' };
+      return {
+        validate: false,
+        message: 'Publish date cannot be after the start date.',
+      };
     }
 
     return { validate: true, message: null };
   }
 
-  public static async manualEventStatusUpdate(payload: ManualEventStatusUpdateRequestDto): Promise<EventResponse> {
+  public static async manualEventStatusUpdate(
+    payload: ManualEventStatusUpdateRequestDto,
+  ): Promise<EventResponse> {
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.eventId, deletedAt: IsNull() },
     });
     if (!event) throw new NotFoundError('Event not found');
     const status = EventStatus[payload.status as keyof typeof EventStatus];
     if (!status) throw new BadRequestError('Invalid status');
-    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus]) return responses.conflict('Event is already in the selected status');
+    if (formatEventStatus(event) === EventStatus[payload.status as keyof typeof EventStatus])
+      return responses.conflict('Event is already in the selected status');
     if (payload.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       event.status = EventStatusEnum.APPROVED_STATUS;
-      if (event.publishDate) {
-        event.isPublished = new Date(event.publishDate) <= new Date();
-      } else {
+      if (!event.publishDate) {
         event.isPublished = true;
+      } else {
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PUBLISH_EVENT,
+            data: {
+              id: event.id,
+              publishDate: event.publishDate,
+            },
+          };
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
+      }
+      if (event.endDate) {
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.PAST_OR_CANCEL_EVENT,
+            data: {
+              id: event.id,
+              endDate: event.endDate,
+            },
+          };
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Publish date scheduler failed for ${event.name}`, e);
+        }
+      }
+      if (event?.startDate) {
+        try {
+          let data: SchedulerTriggerPayload = {
+            type: SchedulerJobType.REMINDER_EVENT,
+            data: {
+              id: event.id,
+              startDate: event.startDate,
+              name: event.name,
+            },
+          };
+          serviceMesh.schedulerService().triggerSchedulerJob(data);
+        } catch (e) {
+          console.log(`Reminder scheduler failed for ${event.name}`, e);
+        }
       }
     } else if (payload.status === EventStatus[EventStatus.REJECTED_STATUS]) {
       event.status = EventStatusEnum.REJECTED_STATUS;
@@ -2344,7 +3362,103 @@ export class EventsService {
     await this.dbConnection.getRepository(Event).save(event);
     const updatedEvent = await this.dbConnection.getRepository(Event).findOne({
       where: { id: event.id },
+      relations: [
+        'owner',
+        'admissionType',
+        'location',
+        'eventType',
+        'guests',
+        'ticketTypes',
+        'ageLimit',
+      ],
     });
+    const host = await this.dbConnection.getRepository(User).findOne({
+      where: { id: updatedEvent.owner.id, deletedAt: IsNull() },
+    });
+    if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
+      //send text notification
+      if (updatedEvent?.owner?.phoneNumber) {
+        let link = updatedEvent.branchLink || 'https://app.therumor.com/app';
+        let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
+        //Micro-service call
+        let number = updatedEvent?.owner?.phoneNumber;
+        try {
+          const validateNumber = isValidPhoneNumber(number);
+          if (validateNumber) {
+            const cleanedNumber = number.replace(/[\s\-()]/g, '');
+            await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.error(`❌ Error while processing SMS for ${number}:`, err);
+        }
+      }
+      if (updatedEvent.isPublished) {
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
+        };
+        sendEventPublishedApproval({
+          mailComponents: createPayload,
+          email: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          timeZone: updatedEvent.timeZone,
+        });
+        // Send Push Notification
+        try {
+          serviceMesh
+            .notificationService()
+            .sendNotification(
+              NotificationType.EVENT_APPROVED,
+              updatedEvent.owner.id,
+              updatedEvent.id,
+            );
+        } catch (err) {}
+      } else {
+        const createPayload = {
+          eventDate: updatedEvent.startDate,
+          eventName: updatedEvent.name,
+          imageFlyer: updatedEvent.imageFlyer,
+          location: updatedEvent.location.location,
+          city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
+        };
+        sendEventPrePublishApproval({
+          createPayload,
+          ownerEmail: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          publishDate: updatedEvent.publishDate,
+          timeZone: updatedEvent.timeZone,
+        });
+        try {
+          //Send Push Notifications
+          serviceMesh
+            .notificationService()
+            .sendNotification(
+              NotificationType.EVENT_SUBMISSION_APPROVED,
+              updatedEvent.owner.id,
+              updatedEvent.id,
+            );
+        } catch (error) {
+          console.log('🚀 ~ EventsService ~ error:', error);
+        }
+      }
+    } else if (
+      [EventStatus[EventStatus.REJECTED_STATUS], EventStatus[EventStatus.DECLINED_STATUS]].includes(
+        updatedEvent.status,
+      )
+    ) {
+      sendEventRejection(
+        updatedEvent.name,
+        host?.additionalHostInformation?.companyName || host?.firstName,
+        updatedEvent.owner.email,
+      );
+    }
     return responses.data(toEvent(updatedEvent, null));
   }
 
@@ -2354,7 +3468,16 @@ export class EventsService {
         id: payload.id,
         isPrivate: false, // Only fetch public events (isPrivate === false)
       },
-      relations: ['owner', 'ageLimit', 'admissionType', 'location', 'eventType', 'talents', 'ticketTypes', 'quizQuestions'],
+      relations: [
+        'owner',
+        'ageLimit',
+        'admissionType',
+        'location',
+        'eventType',
+        'talents',
+        'ticketTypes',
+        'quizQuestions',
+      ],
     });
 
     if (!event) throw new NotFoundError('Public event not found.');
@@ -2367,7 +3490,7 @@ export class EventsService {
       relations: { user: true },
     });
 
-    return toEvent(event, undefined, undefined, guest)
+    return toEvent(event, undefined, undefined, guest);
   }
 
   public static async publishEventById(payload: RequestByIdDto): Promise<string> {
@@ -2375,20 +3498,25 @@ export class EventsService {
       where: { id: payload.id, deletedAt: IsNull() },
     });
     if (!event) throw new NotFoundError('Event not found');
-    if (event.status !== EventStatusEnum.APPROVED_STATUS) throw new ConflictError('Event must be approved before publishing');
+    if (event.status !== EventStatusEnum.APPROVED_STATUS)
+      throw new ConflictError('Event must be approved before publishing');
     if (event.isPublished) throw new ConflictError('Event is already published');
     await this.publishEvent(event.id);
     return;
   }
 
-  public static async generateTicketForGuest(payload: RequestByIdDto): Promise<GenerateTicketForGuestData> {
+  public static async generateTicketForGuest(
+    payload: RequestByIdDto,
+  ): Promise<GenerateTicketForGuestData> {
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id, status: GuestStatus.CONFIRMED },
       relations: { event: true, user: true, ticketType: true },
     });
     if (!guest) throw new BadRequestError('Not valid guest, guest must be confirmed');
 
-    let hasTicket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+    let hasTicket = await this.dbConnection
+      .getRepository(Ticket)
+      .findOne({ where: { guest: { id: guest.id } } });
     if (!hasTicket) {
       const newTicket = await this.dbConnection.getRepository(Ticket).create({
         ticketType: guest.ticketType,
@@ -2399,7 +3527,9 @@ export class EventsService {
       });
 
       await this.dbConnection.getRepository(Ticket).save(newTicket);
-      hasTicket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+      hasTicket = await this.dbConnection
+        .getRepository(Ticket)
+        .findOne({ where: { guest: { id: guest.id } } });
     }
 
     if (guest && guest?.event?.useQr) {
@@ -2410,22 +3540,30 @@ export class EventsService {
       };
       const secret = config.get('JWT_SECRET');
 
-      const token = generateToken(tokenPayload, secret)//this.jwtService.sign(tokenPayload);
+      const token = generateToken(tokenPayload, secret); //this.jwtService.sign(tokenPayload);
 
       return {
         guestId: guest.id,
-        ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
+        ticketStatus: hasTicket.status ?? undefined,
+        ticketTypeId: guest.ticketType.id ?? undefined,
+        ticketDescription: guest.ticketType.description ?? undefined,
+        ticketType: guest.ticketType.name ?? undefined,
+        guestNote: guest.privateGuestNote ?? undefined,
         jwtToken: token,
         eventQr: guest?.event?.useQr || false,
-      }
+      };
     }
 
     return {
       guestId: guest.id,
-      ticketStatus: entityToTicketStatus[TicketStatusEnum.TICKET_GENERATED],
+      ticketStatus: hasTicket.status ?? undefined,
+      ticketTypeId: guest.ticketType.id ?? undefined,
+      ticketType: guest.ticketType.name ?? undefined,
+      ticketDescription: guest.ticketType.description ?? undefined,
+      guestNote: guest.privateGuestNote ?? undefined,
       jwtToken: 'N/A',
       eventQr: guest?.event?.useQr || false,
-    }
+    };
   }
 
   /**
@@ -2440,7 +3578,9 @@ export class EventsService {
    * @param {ValidateTicketForGuestRequestDto} payload - Contains the ticket token for validation.
    * @returns {Promise<GenerateTicketForGuestData>} - Response with updated ticket and guest details.
    */
-  public static async validateTicketForGuest(payload: ValidateTicketForGuestRequestDto): Promise<GenerateTicketForGuestData> {
+  public static async validateTicketForGuest(
+    payload: ValidateTicketForGuestRequestDto,
+  ): Promise<GenerateTicketForGuestData> {
     // Step 1: Decode and verify the ticket token
     const secret = config.get('JWT_SECRET');
     const decodedToken = await verifyToken(payload.ticketToken, secret);
@@ -2449,7 +3589,8 @@ export class EventsService {
     if (!decodedToken) {
       throw new BadRequestError('Invalid ticket token');
     }
-    if (payload.eventId !== decodedToken.eventId) throw new BadRequestError('Event does not match with the guests tickets Event')
+    if (payload.eventId !== decodedToken.eventId)
+      throw new BadRequestError('Event does not match with the guests tickets Event');
     // Step 2: Fetch the ticket details from the database
     const ticket = await this.dbConnection.getRepository(Ticket).findOne({
       where: { id: decodedToken.ticket },
@@ -2457,7 +3598,10 @@ export class EventsService {
     });
 
     // Step 3: Validate ticket existence and status
-    if (!ticket || [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+    if (
+      !ticket ||
+      [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)
+    ) {
       throw new BadRequestError('Ticket not found or is cancelled or expired');
     }
 
@@ -2473,11 +3617,14 @@ export class EventsService {
     }
 
     // Step 5: Determine guest check-in status and update the status accordingly
-    if (guest.checkIn && ticket.status === TicketStatusEnum.TICKET_USED) throw new BadRequestError('Guest is already checked-in and ticket is already used');
+    if (guest.checkIn && ticket.status === TicketStatusEnum.TICKET_USED)
+      throw new BadRequestError('Guest is already checked-in and ticket is already used');
     // Step 6: If ticket is still in 'Generated' state, mark it as 'Used'
     if (!guest.checkIn) {
       if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
-        await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+        await this.dbConnection
+          .getRepository(Ticket)
+          .update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
       }
       await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: true });
     }
@@ -2490,13 +3637,15 @@ export class EventsService {
     // Step 8: Return the final response with updated details
     return {
       guestId: guest.id,
-      ticketStatus: entityToTicketStatus[updatedTicket?.status ?? TicketStatusEnum.TICKET_USED], // Fetch dynamically
+      ticketStatus: updatedTicket?.status ?? undefined, // Fetch dynamically
       eventQr: guest.event.useQr, // Return event QR usage flag
       checkInStatus: true,
-    }
+    };
   }
 
-  public static async listEventUsedTickets(payload: RequestByIdDto): Promise<ListEventUsedTicketsResponse> {
+  public static async listEventUsedTickets(
+    payload: RequestByIdDto,
+  ): Promise<ListEventUsedTicketsResponse> {
     const tickets = await this.dbConnection.getRepository(Ticket).find({
       where: {
         status: TicketStatusEnum.TICKET_USED,
@@ -2509,7 +3658,7 @@ export class EventsService {
       },
     });
     return responses.data(
-      tickets.map((item) => {
+      tickets.map(item => {
         return toTicketData(item);
       }),
     );
@@ -2517,7 +3666,9 @@ export class EventsService {
 
   public static async updateTicket(payload: UpdateTicketRequestDto): Promise<string> {
     try {
-      const findTicket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: payload.guestId } } });
+      const findTicket = await this.dbConnection
+        .getRepository(Ticket)
+        .findOne({ where: { guest: { id: payload.guestId } } });
       findTicket.status = ticketStatusToEntity[payload.ticketStatus];
       return;
     } catch (err) {
@@ -2525,48 +3676,44 @@ export class EventsService {
     }
   }
 
-  public static async addEventToFeaturedSection(payload: AddEventToFeaturedSectionDto): Promise<string> {
+  public static async addEventToFeaturedSection(
+    payload: AddEventToFeaturedSectionDto,
+  ): Promise<string> {
     try {
       const event = await this.dbConnection.getRepository(Event).findOne({
         where: { id: payload.eventId },
-        relations: {
-          featuredEventSection: true,
-        },
       });
 
       if (!event) throw new NotFoundError('Event was not found');
 
       if (!payload.featuredSectionId) {
         event.featuredEventSection = null;
-        await this.dbConnection.getRepository(Event).save(event);
       } else {
-        const featuredEventSection = //await serviceMesh.getFeaturedEventSection(config.get('API_BASE_URL'),payload.featuredSectionId);
-          //if (!featuredEventSection) throw new NotFoundError('Featured event section was not found');
-
-          //event.featuredEventSection = { id: featuredEventSection.id } as FeaturedEventSection;
-          await this.dbConnection.getRepository(Event).save(event);
+        event.featuredEventSection = { id: payload.featuredSectionId } as FeaturedEventSection;
       }
 
-      return;
+      await this.dbConnection.getRepository(Event).save(event);
+
+      return 'Featured event saved successfully';
     } catch (err) {
-      throw new BadRequestError('Error at publish event by id');
+      throw new BadRequestError('Error saving featured event');
     }
   }
 
   /**
-* Cancels an event and notifies all relevant users via email or SMS.
-*
-* Steps:
-* 1. Fetch event details along with its owner and collaborators.
-* 2. Validate that the event exists and is in the approved state.
-* 3. Ensure that the requestor is the event owner.
-* 4. Collect unique collaborators and fetch guests with specific statuses.
-* 5. If no guests or collaborators exist, cancel the event immediately.
-* 6. Notify all relevant users via email or SMS.
-* 7. If all notification attempts fail, do not update the event status.
-* 8. Commit the transaction if at least one notification is successful.
-*/
-  public static async cancelEventAndNotify(payload: CancelEventAndNotifyRequestDto): Promise<string> {
+   * Cancels an event and notifies all relevant users via email or SMS.
+   *
+   * Steps:
+   * 1. Fetch event details along with its owner and collaborators.
+   * 2. Validate that the event exists and is in the approved state.
+   * 3. Ensure that the requestor is the event owner.
+   * 4. Collect unique collaborators and fetch guests with specific statuses.
+   * 5. If no guests or collaborators exist, cancel the event immediately.
+   * 6. Notify all relevant users via email or SMS.
+   * 7. If all notification attempts fail, do not update the event status.
+   * 8. Commit the transaction if at least one notification is successful.
+   */
+  public static async cancelEventAndNotify(payload: CancelEventInterface): Promise<string> {
     const queryRunner: QueryRunner = database.connection.createQueryRunner();
 
     await queryRunner.connect();
@@ -2574,7 +3721,8 @@ export class EventsService {
     try {
       const eventId = payload.eventId;
       // Step 1: Fetch Event
-      const event = await this.dbConnection.getRepository(Event)
+      const event = await this.dbConnection
+        .getRepository(Event)
         .createQueryBuilder('event')
         .leftJoinAndSelect('event.owner', 'owner')
         .leftJoinAndSelect('event.collaborators', 'collaborators')
@@ -2586,11 +3734,14 @@ export class EventsService {
       if (!event) {
         throw new NotFoundError('Event not found');
       }
-      if (event.status !== EventStatusEnum.APPROVED_STATUS) {
-        throw new Error('It is not approved event.');
-      }
 
-      if (event.owner.id !== payload.ownerId) {
+      const validStatuses = [EventStatusEnum.APPROVED_STATUS, EventStatusEnum.UPCOMING_STATUS];
+
+      if (!validStatuses.includes(event.status)) {
+        throw new Error('Event is not approved.');
+      }
+      // Permitir cancelar si es admin o propietario
+      if (!payload.fromAdmin && event.owner.id !== payload.ownerId) {
         throw new Error('cannot cancel the event, The user is not the owner of the event');
       }
       // Step 2: Collect unique collaborators
@@ -2614,13 +3765,33 @@ export class EventsService {
       );
       // Step 3: Fetch guests with specified statuses
 
-      const guestStatuses: GuestStatus[] = [GuestStatus.INVITED, GuestStatus.CONFIRMED, GuestStatus.APPLIED];
+      const guestStatuses: GuestStatus[] = [
+        GuestStatus.INVITED,
+        GuestStatus.CONFIRMED,
+        GuestStatus.APPLIED,
+      ];
       //using query to find guests
-      const guests = await this.dbConnection.getRepository(Guest)
+      const guests: any = await this.dbConnection
+        .getRepository(Guest)
         .createQueryBuilder('guest')
         .leftJoinAndSelect('guest.user', 'user')
         .leftJoinAndSelect('guest.event', 'event')
-        .select(['guest.id', 'user.email', 'user.phoneNumber', 'user.firstName', 'event.name', 'event.startDate', 'event.endDate', 'event.location'])
+        .leftJoinAndSelect('user.roles', 'roles')
+        .leftJoinAndSelect('roles.role', 'role')
+        .select([
+          'guest.id',
+          'user.id',
+          'user.email',
+          'user.phoneNumber',
+          'user.firstName',
+          'event.name',
+          'event.startDate',
+          'event.endDate',
+          'event.location',
+          'roles.id',
+          'role.id',
+          'role.name',
+        ])
         .where({ event: { id: eventId } })
         .andWhere('guest.status IN (:...guestStatuses)', { guestStatuses })
         .getMany();
@@ -2631,90 +3802,96 @@ export class EventsService {
       if (guestsAndCollaborators.length === 0) {
         event.status = EventStatusEnum.CANCELLED_STATUS;
         await queryRunner.manager.save(event);
-        // update signup form to make form unpublished 
-        await this.makeEventSignupFormUnpublished(eventId)
-        //ends here 
+        // update signup form to make form unpublished
+        await this.makeEventSignupFormUnpublished(eventId);
+        //ends here
         await queryRunner.commitTransaction();
-        return
+        return;
       }
       let notificationSuccess = false;
       // Step 5: Process notifications in parallel
-      const notificationPromises = guestsAndCollaborators.map(async (guest) => {
+      const notificationPromises = guestsAndCollaborators.map(async guest => {
         const guestName = guest.user?.firstName || 'Guest';
 
-        const mobileNotificationMessage = `Hi ${guestName},\n${eventName} has been canceled.`;
         const message = payload.customMessage;
+        let mobileNotificationMessage = `Hi ${guestName}, ${eventName} has been canceled.\n${message} \nWe apologive for any inconvenience. If you have any questions or concerns please contact us at support@therumor.com.`;
+        // ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
         try {
           if (guest.user?.email) {
             // Send email notification
-            let mailServiceResponse = await serviceMesh.notificationService().sendEmailFromTemplate([
-              {
-                key: 'first_name',
-                value: guestName,
-              },
-              {
-                key: 'event_name',
-                value: eventName,
-              },
-              {
-                key: 'custom_message',
-                value: message,
-              },
-              {
-                key: 'image_url',
-                value: event.imageFlyer,
-              },
-              {
-                key: 'time',
-                value: event.startDate,
-              },
-              {
-                key: 'location',
-                value: `${event.location.location}, ${event.location.city}`,
-              },
-              {
-                key: 'host_name',
-                value: event.owner?.additionalHostInformation?.companyName || 'Host',
-              },
-            ],
-              'Event Cancelation Notification',
-              [guest.user.email],
-              null,)
+            const createPayload = {
+              eventDate: event.startDate || new Date(),
+              eventName,
+              imageFlyer: event.imageFlyer || ' ',
+              location: event.location.location || ' ',
+              city: event.location.city || ' ',
+              hostName:
+                event.owner?.additionalHostInformation?.companyName || event.owner.email || '',
+              branchLink: event.branchLink,
+            };
+            let mailServiceResponse = sendEventCancellation(
+              createPayload,
+              guest.user.email,
+              guestName,
+              message,
+              event.timeZone,
+            );
+
             if (mailServiceResponse) {
               notificationSuccess = true;
             }
-          } else if (guest.user?.phoneNumber) {
-            // Send SMS notification
-            const success = await serviceMesh.notificationService().sendTextMessage(guest.user.phoneNumber, `${mobileNotificationMessage} \n${message}`);
-            if (success) {
-              notificationSuccess = true;
-            }
-          } else {
-            // Log if no contact details exist
-            // this.logger.warn(`No contact details available for ${guestName || 'guest'}, skipping notification for event.`);
           }
-        }
-        catch (error) {
+          if (guest.user?.phoneNumber) {
+            // Send SMS notification
+            try {
+              const role = guest?.user?.roles.find(role => role?.role?.name === RoleType.NonMember);
+              if (role?.role?.name === RoleType.NonMember) {
+                mobileNotificationMessage = `Hi ${guest?.user?.firstName || 'Guest'}, ${event?.name} has been canceled.\n${message}\nIf you have any questions or concerns, please reach out to ${event.owner?.additionalHostInformation?.companyName} directly in the app chat.`;
+              }
+              //send text message
+              const success = sendSmsNotification({
+                phoneNumber: guest.user?.phoneNumber,
+                textMessage: mobileNotificationMessage,
+              }); /** status: Tested and working fine */
+              if (success) {
+                notificationSuccess = true;
+              }
+            } catch (err) {
+              console.log(`❌ Error while processing SMS for ${guest.user.phoneNumber}:`, err);
+            }
+          }
+        } catch (error) {
           // this.logger.error(`Error sending notification to ${guestName || 'guest'} for event:`, error);
         }
       });
       // Step 6: Commit Transaction if Everything is Successful
       event.status = EventStatusEnum.CANCELLED_STATUS;
       await queryRunner.manager.save(event);
-      // update signup form to make form unpublished 
-      await this.makeEventSignupFormUnpublished(eventId)
-      //ends here 
+      // update signup form to make form unpublished
+      await this.makeEventSignupFormUnpublished(eventId);
+      //ends here
       await queryRunner.commitTransaction();
 
       //step 7: resolve notification promices
-      //TODO: in separate ticket need to handle If mail sent fails then we need to implement notification fn with scheduler, that will take care of resend.
       let resolvedPromices = await Promise.allSettled(notificationPromises);
+
+      try {
+        const notificationRecipients = guests.map((data: Guest) => data.user.id);
+        serviceMesh
+          .notificationService()
+          .sendNotification(
+            NotificationType.EVENT_CANCELLED,
+            notificationRecipients,
+            eventId,
+            event.owner.id,
+          );
+      } catch (err) {}
 
       if (!notificationSuccess) {
         // await queryRunner.rollbackTransaction();
         // throw new Error('Failed to notify all users. Event cancellation aborted.');
       }
-      return
+      return;
     } catch (error) {
       // Rollback transaction on failure
       await queryRunner.rollbackTransaction();
@@ -2725,49 +3902,50 @@ export class EventsService {
   }
 
   public static async makeEventSignupFormUnpublished(eventId: string): Promise<any> {
-    return await this.dbConnection.getRepository(EventSignupForms)
-      .update(
-        { event: { id: eventId } },
-        { isPublished: false, isActive: false }
-      );
+    return await this.dbConnection
+      .getRepository(EventSignupForms)
+      .update({ event: { id: eventId } }, { isPublished: false, isActive: false });
   }
 
   /**
- * Functionality for get host events.
- * Logic:
- *    1. Get all events for provided user id.
- *    2. Filter events by status.
- *    3. Search events by event name.
- * @param payload
- * @returns EventsResponse
- */
+   * Functionality for get host events.
+   * Logic:
+   *    1. Get all events for provided user id.
+   *    2. Filter events by status.
+   *    3. Search events by event name.
+   * @param payload
+   * @returns EventsResponse
+   */
   public static async listHostEvents(payload: ListHostEventsDto): Promise<PaginatedEventsResponse> {
     const { userId } = payload;
-    const parsedQuery = JSON.parse(payload.query)
+    const parsedQuery = JSON.parse(payload.query);
     const currentTime = new Date().toISOString();
 
     // Check and set pagination if available
     const pagination: { take?: number; skip?: number } = hasPagination(parsedQuery)
       ? {
-        take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
-        skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
-      }
+          take: parsedQuery.take ? parseInt(parsedQuery.take) : undefined,
+          skip: parsedQuery.skip ? parseInt(parsedQuery.skip) : undefined,
+        }
       : {};
 
     // Create the base query
-    const query = this.dbConnection.getRepository(Event)
+    const query = this.dbConnection
+      .getRepository(Event)
       .createQueryBuilder('event')
       .leftJoinAndSelect('event.owner', 'owner')
       .leftJoinAndSelect('event.collaborators', 'collaborators')
       .leftJoinAndSelect('collaborators.user', 'user')
       .leftJoinAndSelect('collaborators.role', 'role')
       .leftJoin('event.guests', 'guest') // Ensure guests are linked to event
-      .where('(owner.id = :userId OR collaborators.user.id = :userId)', { userId })
-      .loadRelationCountAndMap('event.confirmedGuestCount', 'event.guests', 'confirmedGuest', (qb) =>
-        qb.where('confirmedGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
-      )
-      .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', (qb) =>
-        qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED }),
+      // .where("(owner.id = :userId OR collaborators.user.id = :userId)", { //TODO:this should be enable when we have approved collaborator
+      .where('(owner.id = :userId)', {
+        userId,
+      })
+      .loadRelationCountAndMap('event.checkedInGuestCount', 'event.guests', 'checkedInGuest', qb =>
+        qb.where('checkedInGuest.check_in = true').andWhere('checkedInGuest.status = :confirmed', {
+          confirmed: GuestStatus.CONFIRMED,
+        }),
       );
 
     let status: EventStatusEnum | undefined;
@@ -2775,35 +3953,56 @@ export class EventsService {
       status = parsedQuery.status as EventStatusEnum; // Casting to EventStatusEnum
     }
     // Check if status is one of the specified values (DRAFT_STATUS, PENDING_STATUS, DECLINED_STATUS, CANCELLED_STATUS)
-    const validStatuses = [EventStatusEnum.DRAFT_STATUS, EventStatusEnum.PENDING_STATUS, EventStatusEnum.DECLINED_STATUS, EventStatusEnum.CANCELLED_STATUS];
+    const validStatuses = [
+      EventStatusEnum.DRAFT_STATUS,
+      EventStatusEnum.PENDING_STATUS,
+      EventStatusEnum.DECLINED_STATUS,
+      EventStatusEnum.CANCELLED_STATUS,
+    ];
 
     if (status && validStatuses.includes(status)) {
       // Apply the status filter directly for the specified status values
       query.andWhere('event.status = :status', { status });
-    } else if (status === EventStatusEnum.UPCOMING_STATUS || status === EventStatusEnum.PAST_STATUS) {
-      // Filter for approved events first
+    } else if (status === EventStatusEnum.UPCOMING_STATUS) {
       query.andWhere('event.status = :approvedStatus', {
         approvedStatus: EventStatusEnum.APPROVED_STATUS,
       });
-
-      // Add specific date filtering based on the requested status
-      if (status === EventStatusEnum.UPCOMING_STATUS) {
-        query.andWhere('event.end_date > :currentTime', { currentTime });
-      } else if (status === EventStatusEnum.PAST_STATUS) {
-        query.andWhere('event.end_date < :currentTime', { currentTime });
-      }
+      query.andWhere('event.end_date > :currentTime', { currentTime });
+    } else if (status === EventStatusEnum.PAST_STATUS) {
+      query.andWhere('event.status = :pastStatus', {
+        pastStatus: EventStatusEnum.PAST_STATUS,
+      });
+      query.andWhere('event.end_date < :currentTime', { currentTime });
     }
-
-    // Apply pagination if necessary
-    if (pagination.take > 0) query.take(pagination.take);
-    if (pagination.skip > 0) query.skip(pagination.skip);
 
     // Add eventName filter if provided
     if (parsedQuery.eventName) {
       const decodedEventName = decodeURIComponent(parsedQuery.eventName as string); // Decode URL-encoded string
       const eventName = decodedEventName.replace(/\s+/g, ' ').trim(); // Normalize spaces
-      query.andWhere('event.name ILIKE :eventName', { eventName: `%${eventName}%` });
+      query.andWhere('event.name ILIKE :eventName', {
+        eventName: `%${eventName}%`,
+      });
     }
+
+    // Apply dynamic sorting
+    const sortableFields = ['startDate', 'endDate', 'publishDate', 'name', 'createdAt'];
+    const sortField = parsedQuery.sortBy;
+    const sortOrder =
+      typeof parsedQuery.order === 'string'
+        ? parsedQuery.order.toUpperCase() === 'DESC'
+          ? 'DESC'
+          : 'ASC'
+        : 'ASC';
+
+    if (status === EventStatusEnum.PAST_STATUS) {
+      query.orderBy('event.endDate', 'DESC');
+    } else if (sortField && sortableFields.includes(sortField)) {
+      query.orderBy(`event.${sortField}`, sortOrder as 'ASC' | 'DESC');
+    }
+
+    // Apply pagination if necessary
+    if (pagination.take > 0) query.take(pagination.take);
+    if (pagination.skip > 0) query.skip(pagination.skip);
 
     const totalCount = await query.getCount();
     const events = await query.getMany();
@@ -2811,15 +4010,66 @@ export class EventsService {
       checkedInGuestCount: string;
       confirmedGuestCount: string;
     };
-    const formattedEvents: EventData[] = (events as EventWithGuestCounts[]).map((event: EventWithGuestCounts) => {
-      const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
-      const totalConfirmedGuests = parseInt(event.confirmedGuestCount) || 0;
-      return toEvent(event as Event, totalCheckedInGuests, undefined, undefined, totalConfirmedGuests);
-    });
+    const formattedEvents: EventData[] = await Promise.all(
+      (events as EventWithGuestCounts[]).map(async (event: EventWithGuestCounts) => {
+        const totalCheckedInGuests = parseInt(event.checkedInGuestCount) || 0;
+        const totalConfirmedGuests = await this.getTotalConfirmedGuests(event.id, userId);
+        return toEvent(
+          event as Event,
+          totalCheckedInGuests,
+          undefined,
+          undefined,
+          totalConfirmedGuests,
+        );
+      }),
+    );
     return {
       result: formattedEvents,
       totalCount,
-    }
+    };
+  }
+
+  public static async getHostEventCountByStatus(payload: RequestByIdDto): Promise<{
+    approvedStatus: number;
+    draftStatus: number;
+    pendingStatus: number;
+    cancelledStatus: number;
+    pastStatus: number;
+    rejectedStatus: number;
+  }> {
+    const { id: userId } = payload;
+    const queryResult = await this.dbConnection
+      .getRepository(Event)
+      .createQueryBuilder('event')
+      .leftJoin('event.owner', 'owner')
+      .select([
+        'COUNT(*) FILTER (WHERE event.status = :approved AND event."end_date" > NOW()) AS "approvedStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :draft) AS "draftStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :pending) AS "pendingStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :cancelled) AS "cancelledStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :past AND event."end_date" < NOW()) AS "pastStatus"',
+        'COUNT(*) FILTER (WHERE event.status = :rejected) AS "rejectedStatus"',
+      ])
+      .where('event.owner_id = :userId', { userId })
+      .setParameters({
+        approved: EventStatusEnum.APPROVED_STATUS,
+        draft: EventStatusEnum.DRAFT_STATUS,
+        pending: EventStatusEnum.PENDING_STATUS,
+        cancelled: EventStatusEnum.CANCELLED_STATUS,
+        past: EventStatusEnum.PAST_STATUS,
+        rejected: EventStatusEnum.REJECTED_STATUS,
+      })
+      .getRawOne();
+    return (
+      queryResult || {
+        approvedStatus: 0,
+        draftStatus: 0,
+        pendingStatus: 0,
+        cancelledStatus: 0,
+        pastStatus: 0,
+        rejectedStatus: 0,
+      }
+    );
   }
 
   public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventData> {
@@ -2841,7 +4091,7 @@ export class EventsService {
       }
 
       let hostUserIds = [];
-      event.collaborators.forEach((collab) => {
+      event.collaborators.forEach(collab => {
         if (collab?.user?.id && !hostUserIds.includes(collab?.user?.id)) {
           hostUserIds.push(collab?.user?.id);
         }
@@ -2850,36 +4100,38 @@ export class EventsService {
       let followedByGuest: HostsFollowedByGuestInterface[] = [];
       const guestUserId = payload.userId; // Guest's userId
       followedByGuest = await this.getGuestFollowingHosts(guestUserId, hostUserIds);
-      return toEvent(event, undefined, undefined, guest, undefined, followedByGuest, guestUserId)
-    }
-    catch (err) {
+      return toEvent(event, undefined, undefined, guest, undefined, followedByGuest, guestUserId);
+    } catch (err) {
       // this.logger.error('Error in getEventByInvitedUserId:', err);
       throw new BadRequestError('Error retrieving event details');
     }
   }
 
   /**
-  * Toggles the check-in status of a guest for an event.
-  *
-  * - Fetches the guest and associated event.
-  * - Validates the guest's ticket status.
-  * - Updates the ticket status if needed.
-  * - Sets the check-in status based on the payload.
-  * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
-  * - Returns updated check-in status, ticket status, and total guest counts.
-  *
-  * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
-  * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
-  */
-  public static async toggleGuestCheckStatus(payload: ToggleGuestCheckStatusRequestDto): Promise<ToggleGuestCheckStatusData> {
+   * Toggles the check-in status of a guest for an event.
+   *
+   * - Fetches the guest and associated event.
+   * - Validates the guest's ticket status.
+   * - Updates the ticket status if needed.
+   * - Sets the check-in status based on the payload.
+   * - Fetches updated guest check-in status, ticket status, and counts in a single Promise.all().
+   * - Returns updated check-in status, ticket status, and total guest counts.
+   *
+   * @param {ToggleGuestCheckStatusRequestDto} payload - Contains the guest ID and check-in flag.
+   * @returns {Promise<ToggleGuestCheckStatusResponse>} - Response with updated guest details.
+   */
+  public static async toggleGuestCheckStatus(
+    payload: ToggleGuestCheckStatusRequestDto,
+  ): Promise<ToggleGuestCheckStatusData> {
     // Step 1: Fetch guest details along with associated event.
     const guest = await this.dbConnection.getRepository(Guest).findOne({
       where: { id: payload.id },
-      relations: ['user', 'event'], // Load related user and event details.
+      relations: ['user', 'event', 'event.owner'], // Load related user and event details.
     });
 
     // If guest does not exist, return an error response.
     if (!guest) throw new BadRequestError('Guest not found');
+    if (guest.status !== GuestStatus.CONFIRMED) throw new BadRequestError('Guest is not confirmed');
 
     // Step 2: Fetch the guest's ticket details dynamically.
     let ticket = await this.dbConnection.getRepository(Ticket).findOne({
@@ -2899,48 +4151,59 @@ export class EventsService {
       });
 
       await this.dbConnection.getRepository(Ticket).save(newTicket);
-      ticket = await this.dbConnection.getRepository(Ticket).findOne({ where: { guest: { id: guest.id } } });
+      ticket = await this.dbConnection
+        .getRepository(Ticket)
+        .findOne({ where: { guest: { id: guest.id } } });
     }
 
     // If the ticket is canceled, or expired, return an error response.
-    if ([TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)) {
+    if (
+      [TicketStatusEnum.TICKET_CANCELED, TicketStatusEnum.TICKET_EXPIRED].includes(ticket.status)
+    ) {
       throw new BadRequestError('Ticket is cancelled or expired');
     }
     // Step 3: Update ticket status if it's currently "Generated".
     if (ticket.status === TicketStatusEnum.TICKET_GENERATED) {
-      await this.dbConnection.getRepository(Ticket).update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
+      await this.dbConnection
+        .getRepository(Ticket)
+        .update({ id: ticket.id }, { status: TicketStatusEnum.TICKET_USED });
     }
 
     // Step 4: Update guest check-in status based on the payload.
     if (guest.checkIn !== payload.checkIn) {
-      await this.dbConnection.getRepository(Guest).update({ id: guest.id }, { checkIn: payload.checkIn });
-    } else throw new BadRequestError('Check-in value is not valid, Guest already in checked-in or checked-out state');
+      await this.dbConnection
+        .getRepository(Guest)
+        .update({ id: guest.id }, { checkIn: payload.checkIn });
+    } else
+      throw new BadRequestError(
+        'Check-in value is not valid, Guest already in checked-in or checked-out state',
+      );
 
     // Step 5: Fetch updated guest check-in status, ticket status, and total guest counts in parallel.
-    const [updatedGuest, updatedTicket, totalConfirmedGuests, totalCheckedInGuests] = await Promise.all([
-      // Fetch updated guest check-in status.
-      this.dbConnection.getRepository(Guest).findOne({ where: { id: guest.id }, select: ['checkIn'] }),
+    const [updatedGuest, updatedTicket, totalConfirmedGuests, totalCheckedInGuests] =
+      await Promise.all([
+        // Fetch updated guest check-in status.
+        this.dbConnection
+          .getRepository(Guest)
+          .findOne({ where: { id: guest.id }, select: ['checkIn'] }),
 
-      // Fetch updated ticket status.
-      this.dbConnection.getRepository(Ticket).findOne({ where: { id: ticket.id }, select: ['status'] }),
+        // Fetch updated ticket status.
+        this.dbConnection
+          .getRepository(Ticket)
+          .findOne({ where: { id: ticket.id }, select: ['status'] }),
 
-      // Count total confirmed guests for the event.
-      this.dbConnection.getRepository(Guest).count({
-        where: {
-          event: { id: guest.event.id },
-          status: GuestStatus.CONFIRMED,
-        },
-      }),
+        // Count total confirmed guests for the event.
+        this.getTotalConfirmedGuests(guest.event.id, guest.event?.owner?.id),
 
-      // Count total guests who have checked in.
-      this.dbConnection.getRepository(Guest).count({
-        where: {
-          event: { id: guest.event.id },
-          checkIn: true,
-          status: GuestStatus.CONFIRMED,
-        },
-      }),
-    ]);
+        // Count total guests who have checked in.
+        this.dbConnection.getRepository(Guest).count({
+          where: {
+            event: { id: guest.event.id },
+            checkIn: true,
+            status: GuestStatus.CONFIRMED,
+          },
+        }),
+      ]);
 
     // Step 6: Return the updated guest details, ticket status, and guest counts.
     return {
@@ -2952,22 +4215,42 @@ export class EventsService {
     };
   }
 
+  private static async getTotalConfirmedGuests(eventId: string, userId: string): Promise<number> {
+    const { confirmed_count } = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select('SUM(COALESCE(guest.max_additional_guests, 0) + 1)', 'confirmed_count')
+      .where('guest.status = :confirmed', { confirmed: GuestStatus.CONFIRMED })
+      .andWhere('guest.event_id = :eventId', { eventId })
+      .andWhere('guest.added_by_id = :userId', { userId })
+      .andWhere(
+        `guest.user_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE )`,
+      )
+      .getRawOne();
+
+    return Number(confirmed_count || 0);
+  }
 
   /**
- * Retrieves a list of hosts that a guest is following within a specific event.
- *
- * @param guestUserId - The ID of the guest user whose follow status needs to be checked.
- * @param eventId - The ID of the event in which the guest is participating.
- * @param userIds - An array of user IDs to check if they are followed by the guest.
- * @returns An object containing an array of followed host details (followerId and hostId).
- */
-  public static async getGuestFollowingHosts(memberUserId: string, userIds: string[]): Promise<HostsFollowedByGuestInterface[]> {
+   * Retrieves a list of hosts that a guest is following within a specific event.
+   *
+   * @param guestUserId - The ID of the guest user whose follow status needs to be checked.
+   * @param eventId - The ID of the event in which the guest is participating.
+   * @param userIds - An array of user IDs to check if they are followed by the guest.
+   * @returns An object containing an array of followed host details (followerId and hostId).
+   */
+  public static async getGuestFollowingHosts(
+    memberUserId: string,
+    userIds: string[],
+  ): Promise<HostsFollowedByGuestInterface[]> {
     try {
       // If no user IDs are provided, return an empty array
       if (!userIds.length) {
         return [];
       }
-      const followings = (await this.dbConnection.getRepository(User)
+      const followings = (await this.dbConnection
+        .getRepository(User)
         .createQueryBuilder('user')
         .innerJoin('host_following', 'hf', 'hf.follower_id = user.id')
         .where('user.id = :memberUserId', { memberUserId })
@@ -2985,6 +4268,7 @@ export class EventsService {
       return [];
     }
   }
+
   // public static async getEventByInvitedUserId(payload: UserAndIdRequestDto): Promise<EventResponse> {
   //   try {
   //     if (!payload.id || !payload.userId) {
@@ -3021,13 +4305,16 @@ export class EventsService {
   //   }
   // }
 
-  public static async getGuestCountForGuestStatuses(payload: UserAndIdRequestDto): Promise<GuestCountByStatuses> {
+  public static async getGuestCountForGuestStatuses(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
     const { id: eventId, userId } = payload;
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: eventId, owner: { id: userId } },
     });
     if (!event) throw new NotFoundError('Event not found');
-    const guestCounts = await this.dbConnection.getRepository(Guest)
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
       .createQueryBuilder('guest')
       .select([
         `COUNT(CASE WHEN guest.status = :invited THEN 1 END) AS invitedCount`,
@@ -3037,8 +4324,9 @@ export class EventsService {
         `COUNT(CASE WHEN guest.status = :draft THEN 1 END) AS draftedCount`,
         `COUNT(guest.id) AS totalCount`,
       ])
-      .where('guest.event_id = :eventId', {
+      .where('(guest.event_id = :eventId)', {
         eventId,
+        userId,
         invited: GuestStatus.INVITED,
         requested: GuestStatus.APPLIED,
         confirmed: GuestStatus.CONFIRMED,
@@ -3055,6 +4343,98 @@ export class EventsService {
       declinedCount: parseInt(guestCounts.declinedcount) || 0,
       draftedCount: parseInt(guestCounts.draftedcount) || 0,
       totalCount: parseInt(guestCounts.totalcount) || 0,
+    };
+  }
+
+  //Get guests count by sum of party size
+  public static async getGuestCountsByStatus(
+    payload: UserAndIdRequestDto,
+  ): Promise<GuestCountByStatuses> {
+    const { id: eventId, userId } = payload;
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: eventId, owner: { id: userId } },
+    });
+    if (!event) throw new NotFoundError('Event not found');
+    const guestCounts = await this.dbConnection
+      .getRepository(Guest)
+      .createQueryBuilder('guest')
+      .select([
+        `SUM(CASE WHEN guest.status = :invited AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS invitedCount`,
+        `SUM(CASE WHEN guest.status = :requested AND guest.event_id = :eventId AND guest.added_by_id IS NULL AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS requestedCount`,
+        `SUM(CASE WHEN guest.status = :confirmed AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS confirmedCount`,
+        `SUM(CASE WHEN (guest.status = :declined OR guest.status = :refused) AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS declinedCount`,
+        `SUM(CASE WHEN guest.status = :draft AND guest.event_id = :eventId AND guest.added_by_id = :userId AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS draftedCount`,
+        `SUM(CASE WHEN guest.event_id = :eventId AND (guest.added_by_id = :userId OR guest.status = :requested) AND guest.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM "user" u WHERE u.id = guest.user_id AND u."isDeactivated" = FALSE) THEN COALESCE(guest.max_additional_guests, 0) + 1 ELSE 0 END) AS totalCount`,
+      ])
+      .setParameters({
+        eventId,
+        userId,
+        invited: GuestStatus.INVITED,
+        requested: GuestStatus.APPLIED,
+        confirmed: GuestStatus.CONFIRMED,
+        declined: GuestStatus.DECLINED,
+        refused: GuestStatus.REFUSED,
+        draft: GuestStatus.DRAFT,
+      })
+      .getRawOne();
+
+    return {
+      invitedCount: parseInt(guestCounts.invitedcount) || 0,
+      confirmedCount: parseInt(guestCounts.confirmedcount) || 0,
+      requestedCount: parseInt(guestCounts.requestedcount) || 0,
+      declinedCount: parseInt(guestCounts.declinedcount) || 0,
+      draftedCount: parseInt(guestCounts.draftedcount) || 0,
+      totalCount: parseInt(guestCounts.totalcount) || 0,
+    };
+  }
+
+  public static async deleteHostEvents(payload: IdRequestDto): Promise<any> {
+    try {
+      const listHostEventsPayload: ListHostEventsDto = {
+        userId: payload.id,
+        query: '{}',
+      };
+
+      const eventsResponse = await this.listHostEvents(listHostEventsPayload);
+
+      if (!eventsResponse || !eventsResponse.result) {
+        throw new NotFoundError('Events');
+      }
+
+      const events = eventsResponse.result;
+      // Step 2: Cancel all APPROVED events
+      const eventsToCancel = events.filter(event =>
+        [
+          EventStatusEnum.APPROVED_STATUS,
+          EventStatusEnum.SCHEDULED_STATUS,
+          EventStatusEnum.UPCOMING_STATUS,
+        ].includes(event.status),
+      );
+
+      for (const event of eventsToCancel) {
+        const cancelPayload: CancelEventAndNotifyRequestDto = {
+          ownerId: payload.id,
+          eventId: event.id,
+          customMessage: 'This event has been canceled as the host is no longer available.',
+        };
+        await this.cancelEventAndNotify(cancelPayload);
+      }
+
+      // Step 3: Delete all events (regardless of status)
+      // NOTE: This method is kepr for deleting events in the loop and also if there is any failure in any relations
+      // for (const event of events) {
+      //   const deletePayload: UserAndIdRequestDto = { userId: payload.id, id: event.id };
+      //   await this.deleteEvent(deletePayload);
+      // }
+
+      const eventIds = events.map(event => event.id);
+
+      if (eventIds.length > 0) {
+        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
+      }
+      return responses.ok;
+    } catch (error) {
+      console.log(error);
     }
   }
 }

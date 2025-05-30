@@ -13,7 +13,8 @@
     "typeorm:up": "npm run typeorm  -- -d ./src/database/data-source.ts  migration:run",
     "typeorm:generate-migration": "npm run typeorm -- migration:generate -d ./src/database/data-source.ts ./src/migrations/$npm_config_name",
     "typeorm:down": "npm run typeorm  -- -d ./src/database/data-source.ts migration:revert",
-    "typeorm:show": "npm run typeorm migration:show"
+    "typeorm:show": "npm run typeorm migration:show",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",
@@ -25,6 +26,7 @@
     "@fusionauth/typescript-client": "^1.50.0",
     "@googlemaps/addressvalidation": "^2.4.0",
     "@sendgrid/mail": "^8.1.3",
+    "@types/multer": "^1.4.12",
     "@types/qrcode": "^1.5.5",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.5.1",
@@ -34,6 +36,7 @@
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
+    "csv-stringify": "^6.5.2",
     "csv-writer": "^1.6.0",
     "dayjs": "^1.11.10",
     "dotenv": "^16.4.7",
@@ -64,6 +67,7 @@
     "@types/node": "^22.10.7",
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.9",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }

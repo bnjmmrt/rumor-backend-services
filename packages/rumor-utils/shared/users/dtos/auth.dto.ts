@@ -1,4 +1,16 @@
-import { IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 import {
   CheckAgeRequest,
@@ -48,10 +60,10 @@ import {
   CreateHostCollaboratorRequest,
 } from '../grpc/auth/auth.pb';
 import { Type } from 'class-transformer';
-import { NewUserStatus, PaginatedRequest, ProviderType } from '../grpc/auth/shared.pb';
+import { NewUserStatus, PaginatedRequest, ProviderType, UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { IsPasswordMatch, IsStrongPassword } from '../../../decorators';
 import { Tag } from '../interfaces/auth.interface';
-import { UserStatus } from '../interfaces/shared.interface';
+import { UserStatus as UserStatusI } from '../interfaces/shared.interface';
 
 export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsString()
@@ -70,7 +82,8 @@ export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsNotEmpty()
   dateOfBirth: string;
   @IsStrongPassword({
-    message: 'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
+    message:
+      'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
   })
   @IsNotEmpty()
   password: string;
@@ -89,12 +102,18 @@ export class LoginRequestDto implements LoginRequest {
   @IsString()
   @IsOptional()
   deviceId?: string;
+  @IsString()
+  @IsOptional()
+  code?: string;
 }
 
 export class ValidateRequestDto implements ValidateRequest {
   @IsString()
   @IsNotEmpty()
   token: string;
+  @IsString()
+  @IsOptional()
+  requester?: string;
 }
 
 export class ForgotPasswordRequestDto implements ForgotPasswordRequest {
@@ -205,6 +224,9 @@ export class MemberSignUpRequestDto implements MemberSignUpRequest {
   @IsString()
   @IsOptional()
   instagramUserName?: string;
+  @IsBoolean()
+  @IsOptional()
+  instagramValidated?: boolean;
   @IsString()
   @IsOptional()
   profilePicture?: string;
@@ -356,6 +378,9 @@ export class MemberLoginRequestDto implements MemberLoginRequest {
   @IsString()
   @IsOptional()
   deviceId?: string;
+
+  @IsOptional()
+  isDeactivated: boolean;
 }
 
 export class UpdateUserProfilePictureRequestDto implements UpdateUserProfilePictureRequest {
@@ -397,6 +422,9 @@ export class UpdateUserProfileRequestDto implements UpdateUserProfileRequest {
   @IsUUID('4', { each: true })
   @IsNotEmpty()
   focusIds: string[];
+  @IsBoolean()
+  @IsOptional()
+  instagramValidated?: boolean;
 }
 
 export class BioProfileRequestDto implements BioProfileRequest {
@@ -427,6 +455,9 @@ export class CreateNonMemberUserRequestDto implements CreateNonMemberUserRequest
   @IsString()
   @IsOptional()
   lastName?: string;
+  @IsString()
+  @IsOptional()
+  eventId?: string;
 }
 
 export class CreateHostCollaboratorRequestDto implements CreateHostCollaboratorRequest {
@@ -551,7 +582,7 @@ export class UpdateUserStatusRequestDto implements UpdateUserStatusRequest {
   status: NewUserStatus;
 }
 
-export class UpdateHostsStatusRequestDto  {
+export class UpdateHostsStatusRequestDto {
   @IsUUID()
   @IsNotEmpty()
   ids: string[];
@@ -571,7 +602,8 @@ export class SetHostPasswordRequestDto implements SetHostPasswordRequest {
   @IsNotEmpty()
   token: string;
   @IsStrongPassword({
-    message: 'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
+    message:
+      'Password must be at least 8 characters long and include at least 1 number, 1 uppercase letter, 1 lowercase letter, and 1 special character.',
   })
   @IsNotEmpty()
   password: string;
@@ -581,6 +613,16 @@ export class SetHostPasswordRequestDto implements SetHostPasswordRequest {
 }
 
 export class UpdateHostPasswordRequestDto implements UpdateHostPasswordRequest {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  newPassword: string;
+}
+
+export class UpdateAdminPasswordRequestDto implements UpdateHostPasswordRequest {
   @IsUUID()
   @IsNotEmpty()
   id: string;
@@ -629,6 +671,14 @@ export class NonMemberSignUpRequestDto implements CreateNonMemberUserRequest {
   @IsString()
   @IsOptional()
   id: string;
+
+  @IsEnum(UserSource)
+  @IsOptional()
+  source?: UserSource;
+
+  @IsEnum(UserStatus)
+  @IsOptional()
+  status?: UserStatus;
 }
 
 export class VerifyCodeRequestDto {
@@ -639,7 +689,7 @@ export class VerifyCodeRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  verificationCode: string;
+  code: string;
 }
 
 export class HostFeedbackRequestDto implements HostFeedbackRequest {
@@ -654,6 +704,10 @@ export class HostFeedbackRequestDto implements HostFeedbackRequest {
   @IsString()
   @IsNotEmpty()
   tag: Tag;
+
+  @IsString()
+  @IsOptional()
+  role: string;
 }
 
 export class SendVerificationCodeByEmailRequestDto implements SendVerificationCodeByEmailRequest {
@@ -714,6 +768,20 @@ export class ManageUserRequestDto implements AddHostUserSettingsRequest {
 
   @IsBoolean()
   isSpam: boolean;
+}
+
+export class ManageMulipleUsersRequestDto {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
+  @IsBoolean()
+  isSpam: boolean;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsNotEmpty()
+  userIds: string[];
 }
 
 export class ReportUserRequestDto implements ReportRequest {
@@ -797,7 +865,7 @@ export class UpdateUsersStatusDto {
   ids: string[];
 
   @IsNotEmpty()
-  status: UserStatus;
+  status: UserStatusI;
 }
 
 export class SwitchProfileDto {
@@ -808,4 +876,11 @@ export class SwitchProfileDto {
   @IsString()
   @IsNotEmpty()
   targetRole: string;
+}
+
+export class Send2FACodeDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsEmail()
+  email: string;
 }

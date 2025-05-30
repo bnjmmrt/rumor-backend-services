@@ -12,6 +12,9 @@ export class HostCustomUsersLists extends RumorBaseEntity {
   @JoinColumn({ name: 'host_id' })
   host: User;
 
-  @OneToMany(() => HostCustomUsersListsUsers, (listUsers) => listUsers.list, { cascade: true })
+  @OneToMany(() => HostCustomUsersListsUsers, listUsers => listUsers.list, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   usersLists: HostCustomUsersListsUsers[];
 }

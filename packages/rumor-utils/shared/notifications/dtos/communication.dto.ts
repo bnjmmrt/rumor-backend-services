@@ -50,7 +50,7 @@ export class VerifyCodeRequestDto implements VerifyCodeRequest {
   phoneNumber: string;
   @IsString()
   @IsNotEmpty()
-  verificationCode: string;
+  code: string;
 }
 
 export class SendInvitationMessagesRequestDto implements SendInvitationMessagesRequest {

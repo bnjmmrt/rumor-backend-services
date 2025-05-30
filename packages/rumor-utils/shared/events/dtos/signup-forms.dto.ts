@@ -6,12 +6,9 @@ import {
   IsString,
   IsUUID,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
-import {
-  CreateSignupFormRequest,
-  ISignupFormQuestionsRequest,
-} from "../grpc/events/general.pb";
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateSignupFormRequest, ISignupFormQuestionsRequest } from '../grpc/events/general.pb';
 
 export class CreateSignupFormDto implements CreateSignupFormRequest {
   @IsOptional()
@@ -59,6 +56,12 @@ export class QuestionsDto implements ISignupFormQuestionsRequest {
   @IsString()
   @IsOptional()
   value: string;
+
+  @IsBoolean()
+  hasToggle: boolean;
+
+  @IsBoolean()
+  isToggled: boolean;
 }
 
 export class SignupFormAnswersDto implements ISignupFormQuestionsRequest {

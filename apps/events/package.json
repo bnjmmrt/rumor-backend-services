@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npx tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "author": "shivam@techalchemy.com",
   "license": "ISC",
@@ -26,10 +27,11 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "compression": "^1.7.4",
-    "csv-parser": "^3.2.0",
-    "csv-writer": "^1.6.0",
     "cors": "^2.8.5",
-    "dayjs": "^1.11.10",
+    "csv-parser": "^3.2.0",
+    "csv-stringify": "^6.5.2",
+    "csv-writer": "^1.6.0",
+    "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-http-context": "^1.2.4",
@@ -56,6 +58,7 @@
     "@types/node": "^22.10.7",
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.9",
+    "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }

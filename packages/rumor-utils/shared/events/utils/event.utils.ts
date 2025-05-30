@@ -22,9 +22,9 @@ interface AddressComponent {
   types: string[];
 }
 
-
-
-export const getCityNameFromAddressComponents = (addressComponents: AddressComponent[]): string | undefined => {
+export const getCityNameFromAddressComponents = (
+  addressComponents: AddressComponent[],
+): string | undefined => {
   for (const component of addressComponents) {
     if (component.types.includes('locality')) {
       return component.long_name;
@@ -52,9 +52,15 @@ export const isValidUserGender = (gender: string): boolean => {
 
 export const validateFilters = (query: string): { error: boolean; response: string } => {
   const parsedFilters = parse(query);
-  const socialNetworkNames = parsedFilters?.socialNetworkNames ? parsedFilters.socialNetworkNames : undefined;
-  const followerCountFrom = parsedFilters?.followerCountFrom ? parseInt(parsedFilters.followerCountFrom as string) : undefined;
-  const followerCountTo = parsedFilters?.followerCountTo ? parseInt(parsedFilters.followerCountTo as string) : undefined;
+  const socialNetworkNames = parsedFilters?.socialNetworkNames
+    ? parsedFilters.socialNetworkNames
+    : undefined;
+  const followerCountFrom = parsedFilters?.followerCountFrom
+    ? parseInt(parsedFilters.followerCountFrom as string)
+    : undefined;
+  const followerCountTo = parsedFilters?.followerCountTo
+    ? parseInt(parsedFilters.followerCountTo as string)
+    : undefined;
   const searchValue = parsedFilters?.searchValue ? parsedFilters.searchValue : undefined;
   if (searchValue) {
     if (typeof searchValue !== 'string' || searchValue.length === 0) {
@@ -70,16 +76,24 @@ export const validateFilters = (query: string): { error: boolean; response: stri
       };
     }
     if (followerCountFrom > followerCountTo) {
-      return { error: true, response: 'followerCountFrom must be less than or equal to followerCountTo.' };
+      return {
+        error: true,
+        response: 'followerCountFrom must be less than or equal to followerCountTo.',
+      };
     }
 
     if (typeof socialNetworkNames === 'string') {
-      const socialNetworkArray = socialNetworkNames.split(',').map((name) => name.trim().toUpperCase());
+      const socialNetworkArray = socialNetworkNames
+        .split(',')
+        .map(name => name.trim().toUpperCase());
 
-      const invalidNames = socialNetworkArray.filter((name) => !(name in SocialProviderType));
+      const invalidNames = socialNetworkArray.filter(name => !(name in SocialProviderType));
 
       if (invalidNames.length > 0) {
-        return { error: true, response: `Invalid social network names: ${invalidNames.join(', ')}` };
+        return {
+          error: true,
+          response: `Invalid social network names: ${invalidNames.join(', ')}`,
+        };
       }
 
       return { error: false, response: socialNetworkArray.join(',') };
@@ -94,7 +108,9 @@ export const validateFilters = (query: string): { error: boolean; response: stri
  * @param {CreateEventRequestDto} payload - The event data containing startDate, endDate, and optionally publishDate.
  * @returns {{ error: boolean; response?: string }} - Returns an error flag and an optional error message.
  */
-export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventRequestDto): { error: boolean; response?: string } => {
+export const validateEventDates = (
+  payload: CreateEventRequestDto | UpdateEventRequestDto,
+): { error: boolean; response?: string } => {
   const currentDate = new Date();
   if (!payload.startDate || !isUtcDate(payload.startDate)) {
     return { error: true, response: 'Start Date must be valid and in UTC standard' };
@@ -124,7 +140,10 @@ export const validateEventDates = (payload: CreateEventRequestDto | UpdateEventR
   }
 
   // Ensure the end date is later than the start date
-  if (!payload.endDate || new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()) {
+  if (
+    !payload.endDate ||
+    new Date(payload.endDate).getTime() <= new Date(payload.startDate).getTime()
+  ) {
     return { error: true, response: 'End date must be later than the start date.' };
   }
   return { error: false }; // No errors found
@@ -182,7 +201,10 @@ export const isUtcDate = (dateString: string): boolean => {
  * @param existingEvent - The existing event details stored in the database.
  * @returns An object indicating whether changes exist and specifying which fields changed.
  */
-export function hasEventDateOrLocationChanged(newEvent: UpdateEventRequestDto, existingEvent: Event): { changed: boolean; changes: string[] } {
+export function hasEventDateOrLocationChanged(
+  newEvent: UpdateEventRequestDto,
+  existingEvent: Event,
+): { changed: boolean; changes: string[] } {
   const changes: string[] = [];
 
   /**
@@ -226,4 +248,19 @@ export function hasEventDateOrLocationChanged(newEvent: UpdateEventRequestDto, e
     changes.push('eventLocation');
   }
   return { changed: changes.length > 0, changes };
+}
+
+/**
+ * Converts a given UTC date to epoch time (milliseconds) based on the provided server time zone.
+ * @param date - The UTC date to convert.
+ * @param timeZone - The target time zone for conversion.
+ * @returns The epoch time in milliseconds.
+ */
+export function convertToEpoch(date: Date): number {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    throw new Error('Invalid date object provided');
+  }
+
+  // Convert UTC date to the target time zone and get epoch time
+  return new Date(date.toLocaleString('en-US')).getTime();
 }

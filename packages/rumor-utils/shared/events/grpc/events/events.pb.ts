@@ -5,7 +5,7 @@
 // source: grpc/events/events.proto
 
 /* eslint-disable */
-import { Observable } from "rxjs";
+import { Observable } from 'rxjs';
 import {
   AdmissionType,
   AnswersData,
@@ -34,6 +34,7 @@ import {
   QuizQuestion,
   ReassignTo,
   RoleCollaboratorEnum,
+  SimpleGuestEventData,
   SimpleUser,
   Talent,
   TicketStatus,
@@ -41,13 +42,13 @@ import {
   ToggleGuestCheckStatusData,
   UserAttendee,
   UserEventInviteesDataList,
-} from "./general.pb";
+} from './general.pb';
 
-export const protobufPackage = "events";
+export const protobufPackage = 'events';
+import { CollaboratorRoles as CollaboratorRolesInterface } from '../../interfaces/event.interface';
 
 /** Empty Request */
-export interface EmptyRequest {
-}
+export interface EmptyRequest {}
 
 /** Request by Id */
 export interface RequestById {
@@ -109,7 +110,7 @@ export interface AdmissionTypesResponse {
 /** Create Ticket Types */
 export interface CreateTicketTypeRequest {
   name: string;
-  description: string;
+  description?: string | undefined;
   capacity?: number | undefined;
   eventId?: string | undefined;
 }
@@ -118,11 +119,11 @@ export interface CreateTicketTypeRequest {
 export interface UpdateTicketTypeRequest {
   id?: string | undefined;
   name: string;
-  description: string;
-  capacity: number;
+  description?: string;
+  capacity?: number;
   enabled?: boolean | undefined;
   eventId?: string | undefined;
-  action?: string | undefined;
+  action: string;
   reassignTo?: ReassignTo | undefined;
 }
 
@@ -145,7 +146,7 @@ export interface CreateTalentRequest {
   contact?: string | undefined;
   socialNetwork?: string | undefined;
   description?: string | undefined;
-  imageKeyUrl?: string | undefined;
+  imageKeyUrl: string;
   eventId?: string | undefined;
 }
 
@@ -156,7 +157,7 @@ export interface UpdateTalentRequest {
   contact?: string | undefined;
   socialNetwork?: string | undefined;
   description?: string | undefined;
-  imageKeyUrl?: string | undefined;
+  imageKeyUrl: string;
   enabled?: boolean | undefined;
   eventId?: string | undefined;
   action?: string | undefined;
@@ -242,23 +243,23 @@ export interface QuizQuestionsResponse {
 /** Create Event */
 export interface CreateEventRequest {
   name: string;
-  description?: string | undefined;
+  description: string;
   enabled?: boolean | undefined;
-  startDate?: string | undefined;
-  endDate?: string | undefined;
+  startDate: string;
+  endDate: string;
   limitOnePlus?: number | undefined;
   ageLimitId?: string | undefined;
   rsvpDeadline?: string | undefined;
-  useQr?: boolean | undefined;
-  imageFlyer?: string | undefined;
+  useQr: boolean;
+  imageFlyer: string;
   imageCover?: string | undefined;
-  eventTypeId?: string | undefined;
-  eventLocation?: EventLocation | undefined;
+  eventTypeId: string;
+  eventLocation: EventLocation;
   furtherInstructions?: string | undefined;
   showLocation?: boolean | undefined;
   admissionTypeId?: string | undefined;
-  status?: string | undefined;
-  ownerId?: string | undefined;
+  status: string;
+  ownerId: string;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   capacity?: number | undefined;
@@ -266,12 +267,12 @@ export interface CreateEventRequest {
   talents: CreateTalentRequest[];
   collaborators: CreateCollaboratorRequest[];
   quizQuestions: CreateQuizQuestionRequest[];
-  timeZone?: string | undefined;
+  timeZone: string;
 }
 
 /** Update Event */
 export interface UpdateEventRequest {
-  id: string;
+  // id: string;
   name?: string | undefined;
   description?: string | undefined;
   enabled?: boolean | undefined;
@@ -333,7 +334,7 @@ export interface CreateCollaboratorRequest {
   displayName?: string | undefined;
   displayNameListEvent: boolean;
   limitInvitations: boolean;
-  role: RoleCollaboratorEnum;
+  role: CollaboratorRolesInterface;
   editEventDetailsSettings: boolean;
   inviteGuestsToEvent: boolean;
   addGuestsToDrafts: boolean;
@@ -353,24 +354,24 @@ export interface CreateCollaboratorRequest {
 /** Update Collaborator */
 export interface UpdateCollaboratorRequest {
   id?: string | undefined;
-  email?: string | undefined;
-  role?: RoleCollaboratorEnum | undefined;
+  email: string | undefined;
+  role: CollaboratorRolesInterface;
   displayName?: string | undefined;
-  displayNameListEvent?: boolean | undefined;
-  limitInvitations?: boolean | undefined;
+  displayNameListEvent: boolean | undefined;
+  limitInvitations: boolean | undefined;
   eventId?: string | undefined;
-  editEventDetailsSettings?: boolean | undefined;
-  inviteGuestsToEvent?: boolean | undefined;
-  addGuestsToDrafts?: boolean | undefined;
-  chatWithAllGuests?: boolean | undefined;
-  chatWithGuestsByCollaborator?: boolean | undefined;
-  viewFullGuestList?: boolean | undefined;
-  manageInAppRsvpRequests?: boolean | undefined;
-  manageDedicatedSignUpForm?: boolean | undefined;
-  postAnnouncementsToAllGuests?: boolean | undefined;
-  postAnnouncementsByCollaborator?: boolean | undefined;
-  checkInGuests?: boolean | undefined;
-  generateEventReports?: boolean | undefined;
+  editEventDetailsSettings: boolean | undefined;
+  inviteGuestsToEvent: boolean | undefined;
+  addGuestsToDrafts: boolean | undefined;
+  chatWithAllGuests: boolean | undefined;
+  chatWithGuestsByCollaborator: boolean | undefined;
+  viewFullGuestList: boolean | undefined;
+  manageInAppRsvpRequests: boolean | undefined;
+  manageDedicatedSignUpForm: boolean | undefined;
+  postAnnouncementsToAllGuests: boolean | undefined;
+  postAnnouncementsByCollaborator: boolean | undefined;
+  checkInGuests: boolean | undefined;
+  generateEventReports: boolean | undefined;
   limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   action?: string | undefined;
@@ -493,6 +494,7 @@ export interface GuestsResponse {
 export interface Guests {
   result: Guest[];
   totalCount: number;
+  isExist?: boolean | undefined;
 }
 
 export interface GuestsQueryRequest {
@@ -602,7 +604,13 @@ export interface ListEventGuestsResponse {
   error?: Error | undefined;
   data: PaginatedGuestEventsResponse | undefined;
 }
-
+export interface SimpleGuestEventsResponse {
+  upcoming: SimpleGuestEventData[];
+  past: SimpleGuestEventData[];
+  invited: SimpleGuestEventData[];
+  requested: SimpleGuestEventData[];
+  totalEvents: number;
+}
 export interface PaginatedGuestEventsResponse {
   result: GuestEventData[];
   totalCount: number;
@@ -819,8 +827,16 @@ export interface GuestCountByStatuses {
   draftedCount: number;
   totalCount: number;
 }
+export interface HostEventsCountByStatusResponse {
+  approvedStatus: number;
+  draftStatus: number;
+  pendingStatus: number;
+  cancelledStatus: number;
+  pastStatus: number;
+  rejectedStatus: number;
+}
 
-export const EVENTS_PACKAGE_NAME = "events";
+export const EVENTS_PACKAGE_NAME = 'events';
 
 export interface EventsServiceClient {
   /** Get Event Status List */
@@ -925,7 +941,9 @@ export interface EventsServiceClient {
 
   cancelEventAndNotify(request: CancelEventAndNotifyRequest): Observable<GenericResponse>;
 
-  getEventAttendeeCountByTicketType(request: GetAttendeeCountRequest): Observable<GetAttendeeCountResponse>;
+  getEventAttendeeCountByTicketType(
+    request: GetAttendeeCountRequest,
+  ): Observable<GetAttendeeCountResponse>;
 
   /** Collaborators */
 
@@ -1001,11 +1019,15 @@ export interface EventsServiceClient {
 
   /** Get user Event Invitees */
 
-  getUserEventInvitees(request: ListUsersEventInviteesRequest): Observable<ListUsersEventInviteesResponse>;
+  getUserEventInvitees(
+    request: ListUsersEventInviteesRequest,
+  ): Observable<ListUsersEventInviteesResponse>;
 
   /** List Event Invitees */
 
-  listEventInvitees(request: ListUsersEventInviteesRequest): Observable<ListUsersEventInviteesResponse>;
+  listEventInvitees(
+    request: ListUsersEventInviteesRequest,
+  ): Observable<ListUsersEventInviteesResponse>;
 
   /** Quiz answers */
 
@@ -1059,9 +1081,13 @@ export interface EventsServiceClient {
 
   generateTicketForGuest(request: RequestById): Observable<GenerateTicketForGuestResponse>;
 
-  validateTicketForGuest(request: ValidateTicketForGuestRequest): Observable<GenerateTicketForGuestResponse>;
+  validateTicketForGuest(
+    request: ValidateTicketForGuestRequest,
+  ): Observable<GenerateTicketForGuestResponse>;
 
-  toggleGuestCheckStatus(request: ToggleGuestCheckStatusRequest): Observable<ToggleGuestCheckStatusResponse>;
+  toggleGuestCheckStatus(
+    request: ToggleGuestCheckStatusRequest,
+  ): Observable<ToggleGuestCheckStatusResponse>;
 
   listEventUsedTickets(request: RequestById): Observable<ListEventUsedTicketsResponse>;
 
@@ -1073,7 +1099,10 @@ export interface EventsServiceController {
 
   listEventStatus(
     request: EmptyRequest,
-  ): Promise<ListEventStatusResponse> | Observable<ListEventStatusResponse> | ListEventStatusResponse;
+  ):
+    | Promise<ListEventStatusResponse>
+    | Observable<ListEventStatusResponse>
+    | ListEventStatusResponse;
 
   /** Admission Types */
 
@@ -1121,15 +1150,25 @@ export interface EventsServiceController {
 
   /** Talents */
 
-  createTalent(request: CreateTalentRequest): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
+  createTalent(
+    request: CreateTalentRequest,
+  ): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
 
-  updateTalent(request: UpdateTalentRequest): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
+  updateTalent(
+    request: UpdateTalentRequest,
+  ): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
 
-  deleteTalent(request: RequestById): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
+  deleteTalent(
+    request: RequestById,
+  ): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
 
-  getTalent(request: RequestById): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
+  getTalent(
+    request: RequestById,
+  ): Promise<TalentResponse> | Observable<TalentResponse> | TalentResponse;
 
-  getAllTalent(request: EmptyRequest): Promise<TalentsResponse> | Observable<TalentsResponse> | TalentsResponse;
+  getAllTalent(
+    request: EmptyRequest,
+  ): Promise<TalentsResponse> | Observable<TalentsResponse> | TalentsResponse;
 
   /** Event types Services */
 
@@ -1141,9 +1180,13 @@ export interface EventsServiceController {
     request: UpdateEventTypeRequest,
   ): Promise<EventTypeResponse> | Observable<EventTypeResponse> | EventTypeResponse;
 
-  getEventType(request: RequestById): Promise<EventTypeResponse> | Observable<EventTypeResponse> | EventTypeResponse;
+  getEventType(
+    request: RequestById,
+  ): Promise<EventTypeResponse> | Observable<EventTypeResponse> | EventTypeResponse;
 
-  deleteEventType(request: RequestById): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteEventType(
+    request: RequestById,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   listEventTypes(
     request: QueryRequest,
@@ -1169,21 +1212,33 @@ export interface EventsServiceController {
 
   /** Event */
 
-  createEvent(request: CreateEventRequest): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
+  createEvent(
+    request: CreateEventRequest,
+  ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
-  updateEvent(request: UpdateEventRequest): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
+  updateEvent(
+    request: UpdateEventRequest,
+  ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
-  getEvent(request: UserAndIdRequest): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
+  getEvent(
+    request: UserAndIdRequest,
+  ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
-  getPublicEvent(request: UserAndIdRequest): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
+  getPublicEvent(
+    request: UserAndIdRequest,
+  ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
   getEventByInvitedUserId(
     request: UserAndIdRequest,
   ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
-  deleteEvent(request: UserAndIdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteEvent(
+    request: UserAndIdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  listEvents(request: QueryRequest): Promise<EventsResponse> | Observable<EventsResponse> | EventsResponse;
+  listEvents(
+    request: QueryRequest,
+  ): Promise<EventsResponse> | Observable<EventsResponse> | EventsResponse;
 
   listEventsFeed(
     request: QueryRequest,
@@ -1191,27 +1246,41 @@ export interface EventsServiceController {
 
   getFeaturedEvents(
     request: QueryRequest,
-  ): Promise<GetFeaturedEventsResponse> | Observable<GetFeaturedEventsResponse> | GetFeaturedEventsResponse;
+  ):
+    | Promise<GetFeaturedEventsResponse>
+    | Observable<GetFeaturedEventsResponse>
+    | GetFeaturedEventsResponse;
 
   validateAddress(
     request: AddressValidationRequest,
-  ): Promise<AddressValidationResponse> | Observable<AddressValidationResponse> | AddressValidationResponse;
+  ):
+    | Promise<AddressValidationResponse>
+    | Observable<AddressValidationResponse>
+    | AddressValidationResponse;
 
   getUpcomingEvents(
     request: EmptyRequest,
   ): Promise<ListEventsFeedResponse> | Observable<ListEventsFeedResponse> | ListEventsFeedResponse;
 
-  duplicateEvent(request: RequestById): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
+  duplicateEvent(
+    request: RequestById,
+  ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
   manualEventStatusUpdate(
     request: UpdateEventStatusRequest,
   ): Promise<EventResponse> | Observable<EventResponse> | EventResponse;
 
-  publishEvent(request: UserAndIdRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  publishEvent(
+    request: UserAndIdRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  publishPendingEvents(request: EmptyRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  publishPendingEvents(
+    request: EmptyRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  syncUserTopAttendee(request: EmptyRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  syncUserTopAttendee(
+    request: EmptyRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   addEventToFeaturedSection(
     request: AddEventToFeaturedSectionRequest,
@@ -1227,7 +1296,10 @@ export interface EventsServiceController {
 
   getEventAttendeeCountByTicketType(
     request: GetAttendeeCountRequest,
-  ): Promise<GetAttendeeCountResponse> | Observable<GetAttendeeCountResponse> | GetAttendeeCountResponse;
+  ):
+    | Promise<GetAttendeeCountResponse>
+    | Observable<GetAttendeeCountResponse>
+    | GetAttendeeCountResponse;
 
   /** Collaborators */
 
@@ -1253,7 +1325,10 @@ export interface EventsServiceController {
 
   getCollaboratorRoles(
     request: EmptyRequest,
-  ): Promise<CollaboratorRolesResponse> | Observable<CollaboratorRolesResponse> | CollaboratorRolesResponse;
+  ):
+    | Promise<CollaboratorRolesResponse>
+    | Observable<CollaboratorRolesResponse>
+    | CollaboratorRolesResponse;
 
   /** Event location */
 
@@ -1269,7 +1344,9 @@ export interface EventsServiceController {
     request: RequestById,
   ): Promise<EventLocationResponse> | Observable<EventLocationResponse> | EventLocationResponse;
 
-  deleteEventLocation(request: RequestById): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteEventLocation(
+    request: RequestById,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   listEventLocations(
     request: QueryRequest,
@@ -1289,7 +1366,9 @@ export interface EventsServiceController {
     request: RequestById,
   ): Promise<EventAgeLimitResponse> | Observable<EventAgeLimitResponse> | EventAgeLimitResponse;
 
-  deleteEventAgeLimit(request: RequestById): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteEventAgeLimit(
+    request: RequestById,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   listEventAgeLimits(
     request: EmptyRequest,
@@ -1297,19 +1376,29 @@ export interface EventsServiceController {
 
   /** Guests */
 
-  addGuests(request: AddGuestsRequest): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
+  addGuests(
+    request: AddGuestsRequest,
+  ): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
 
-  withdrawInvites(request: GuestsRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  withdrawInvites(
+    request: GuestsRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  getGuests(request: GuestsQueryRequest): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
+  getGuests(
+    request: GuestsQueryRequest,
+  ): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
 
-  manageGuests(request: ManageGuestsRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  manageGuests(
+    request: ManageGuestsRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   updateGuests(
     request: UpdateGuestsRequest,
   ): Promise<GuestsDataResponse> | Observable<GuestsDataResponse> | GuestsDataResponse;
 
-  deleteGuests(request: GuestsRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteGuests(
+    request: GuestsRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   getGuestDetails(
     request: UserAndIdRequest,
@@ -1317,7 +1406,10 @@ export interface EventsServiceController {
 
   inviteNewUser(
     request: InviteGuestRequest,
-  ): Promise<GetUserRequestsResponse> | Observable<GetUserRequestsResponse> | GetUserRequestsResponse;
+  ):
+    | Promise<GetUserRequestsResponse>
+    | Observable<GetUserRequestsResponse>
+    | GetUserRequestsResponse;
 
   listGuestsOverview(
     request: GuestsQueryRequest,
@@ -1325,7 +1417,10 @@ export interface EventsServiceController {
 
   getGuestCountForGuestStatuses(
     request: UserAndIdRequest,
-  ): Promise<EventGuestCountResponse> | Observable<EventGuestCountResponse> | EventGuestCountResponse;
+  ):
+    | Promise<EventGuestCountResponse>
+    | Observable<EventGuestCountResponse>
+    | EventGuestCountResponse;
 
   /** Guests Profiles */
 
@@ -1335,7 +1430,10 @@ export interface EventsServiceController {
 
   getGuestProfile(
     request: UserAndIdRequest,
-  ): Promise<GetGuestProfileResponse> | Observable<GetGuestProfileResponse> | GetGuestProfileResponse;
+  ):
+    | Promise<GetGuestProfileResponse>
+    | Observable<GetGuestProfileResponse>
+    | GetGuestProfileResponse;
 
   inviteGuest(
     request: InviteGuestRequest,
@@ -1371,23 +1469,34 @@ export interface EventsServiceController {
 
   saveUserQuizAnswers(
     request: SaveUserQuizAnswersRequest,
-  ): Promise<SaveUserQuizAnswersResponse> | Observable<SaveUserQuizAnswersResponse> | SaveUserQuizAnswersResponse;
+  ):
+    | Promise<SaveUserQuizAnswersResponse>
+    | Observable<SaveUserQuizAnswersResponse>
+    | SaveUserQuizAnswersResponse;
 
   updateUserQuizAnswer(
     request: UpdateUserQuizAnswerRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  deleteUserQuizAnswer(request: RequestById): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteUserQuizAnswer(
+    request: RequestById,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   getUserQuizAnswers(
     request: GetUserQuizAnswersRequest,
-  ): Promise<GetUserQuizAnswersResponse> | Observable<GetUserQuizAnswersResponse> | GetUserQuizAnswersResponse;
+  ):
+    | Promise<GetUserQuizAnswersResponse>
+    | Observable<GetUserQuizAnswersResponse>
+    | GetUserQuizAnswersResponse;
 
   /** guestEvents */
 
   listEventGuests(
     request: ListEventGuestsRequest,
-  ): Promise<ListEventGuestsResponse> | Observable<ListEventGuestsResponse> | ListEventGuestsResponse;
+  ):
+    | Promise<ListEventGuestsResponse>
+    | Observable<ListEventGuestsResponse>
+    | ListEventGuestsResponse;
 
   getTopUsersAttendees(
     request: EmptyRequest,
@@ -1403,19 +1512,30 @@ export interface EventsServiceController {
     request: RequestBecomeGuestRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  listUserRequests(request: GuestsQueryRequest): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
+  listUserRequests(
+    request: GuestsQueryRequest,
+  ): Promise<GuestsResponse> | Observable<GuestsResponse> | GuestsResponse;
 
   getUserRequests(
     request: RequestByUserAndEventRequest,
-  ): Promise<GetUserRequestsResponse> | Observable<GetUserRequestsResponse> | GetUserRequestsResponse;
+  ):
+    | Promise<GetUserRequestsResponse>
+    | Observable<GetUserRequestsResponse>
+    | GetUserRequestsResponse;
 
   bulkUploadGuests(
     request: BulkUploadGuestsRequest,
-  ): Promise<BulkUploadGuestsResponse> | Observable<BulkUploadGuestsResponse> | BulkUploadGuestsResponse;
+  ):
+    | Promise<BulkUploadGuestsResponse>
+    | Observable<BulkUploadGuestsResponse>
+    | BulkUploadGuestsResponse;
 
   fetchBulkGuests(
     request: FetchBulkGuestsRequest,
-  ): Promise<FetchBulkGuestsResponse> | Observable<FetchBulkGuestsResponse> | FetchBulkGuestsResponse;
+  ):
+    | Promise<FetchBulkGuestsResponse>
+    | Observable<FetchBulkGuestsResponse>
+    | FetchBulkGuestsResponse;
 
   manageBulkGuests(
     request: ManageBulkGuestsRequest,
@@ -1435,7 +1555,9 @@ export interface EventsServiceController {
     request: AcceptEventInvitationRequest,
   ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
-  deleteInvitedGuest(request: RequestById): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  deleteInvitedGuest(
+    request: RequestById,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 
   /** default role config */
 
@@ -1471,9 +1593,14 @@ export interface EventsServiceController {
 
   listEventUsedTickets(
     request: RequestById,
-  ): Promise<ListEventUsedTicketsResponse> | Observable<ListEventUsedTicketsResponse> | ListEventUsedTicketsResponse;
+  ):
+    | Promise<ListEventUsedTicketsResponse>
+    | Observable<ListEventUsedTicketsResponse>
+    | ListEventUsedTicketsResponse;
 
-  updateTicket(request: UpdateTicketRequest): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
+  updateTicket(
+    request: UpdateTicketRequest,
+  ): Promise<GenericResponse> | Observable<GenericResponse> | GenericResponse;
 }
 
 // export function EventsServiceControllerMethods() {
@@ -1578,4 +1705,4 @@ export interface EventsServiceController {
 //   };
 // }
 
-export const EVENTS_SERVICE_NAME = "EventsService";
+export const EVENTS_SERVICE_NAME = 'EventsService';

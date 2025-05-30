@@ -1,5 +1,11 @@
 import { ParsedQs } from 'qs';
-import { TokenRequest, PaginatedRequest, UserAndIdRequest, IdRequest, RequestByUserAndEventRequest } from '../grpc/auth/shared.pb';
+import {
+  TokenRequest,
+  PaginatedRequest,
+  UserAndIdRequest,
+  IdRequest,
+  RequestByUserAndEventRequest,
+} from '../grpc/auth/shared.pb';
 import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
 import { UserStatus } from '../interfaces/shared.interface';
 
@@ -7,6 +13,14 @@ export class TokenRequestDto implements TokenRequest {
   @IsString()
   @IsNotEmpty()
   token: string;
+
+  @IsString()
+  @IsOptional()
+  deviceId?: string;
+
+  @IsString()
+  @IsOptional()
+  fcmToken?: string;
 }
 
 export class IdRequestDto implements IdRequest {
@@ -40,8 +54,8 @@ export class PaginatedRequestDto implements PaginatedRequest {
   @IsOptional()
   userId: string;
   @IsString()
-  @IsNotEmpty()
-  query: string;
+  @IsOptional()
+  query?: string;
 }
 
 export class ReportAndFeedbackRequestDto {

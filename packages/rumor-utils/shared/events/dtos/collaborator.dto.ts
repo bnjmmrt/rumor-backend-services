@@ -1,7 +1,24 @@
-import { IsArray, IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
-import { CreateCollaboratorRequest, GetDefaultRoleConfigByRoleRequest, UpdateCollaboratorRequest } from '../grpc/events/events.pb';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import {
+  CreateCollaboratorRequest,
+  GetDefaultRoleConfigByRoleRequest,
+  UpdateCollaboratorRequest,
+} from '../grpc/events/events.pb';
 import { RoleCollaboratorEnum } from '../grpc/events/general.pb';
 import { Type } from 'class-transformer';
+import { CollaboratorRoles } from '../interfaces/event.interface';
 
 export class CollaboratorTicketDto {
   @IsNotEmpty()
@@ -10,6 +27,7 @@ export class CollaboratorTicketDto {
 
   @IsNotEmpty()
   @IsNumber()
+  @Min(-1)
   limitInvitationsNumber: number;
 
   @IsUUID()
@@ -45,9 +63,9 @@ export class CreateCollaboratorDto implements CreateCollaboratorRequest {
   @IsBoolean()
   limitInvitations: boolean;
 
-  @IsEnum(RoleCollaboratorEnum)
+  @IsEnum(CollaboratorRoles)
   @IsNotEmpty()
-  role: RoleCollaboratorEnum;
+  role: CollaboratorRoles;
 
   @IsNotEmpty()
   @IsBoolean()
@@ -101,6 +119,9 @@ export class CreateCollaboratorDto implements CreateCollaboratorRequest {
   @IsNumber()
   limitInvitationsNumber?: number;
 
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CollaboratorTicketDto)
   @IsOptional()
   tickets: CollaboratorTicketDto[];
 }
@@ -110,29 +131,30 @@ export class UpdateCollaboratorDto implements UpdateCollaboratorRequest {
   @IsUUID()
   id: string;
 
+  // @IsString()
+  // @IsOptional()
+  // name?: string;
+
+  @IsNotEmpty()
   @IsString()
-  @IsOptional()
-  name?: string;
+  @IsEmail()
+  email: string;
 
   @IsString()
   @IsOptional()
-  email?: string;
-
-  @IsString()
-  @IsOptional()
-  displayName: string;
+  displayName?: string;
 
   @IsBoolean()
   @IsOptional()
   displayNameListEvent: boolean;
 
+  @IsNotEmpty()
   @IsBoolean()
-  @IsOptional()
   limitInvitations: boolean;
 
-  @IsEnum(RoleCollaboratorEnum)
-  @IsOptional()
-  role: RoleCollaboratorEnum;
+  @IsEnum(CollaboratorRoles)
+  @IsNotEmpty()
+  role: CollaboratorRoles;
 
   @IsOptional()
   @IsBoolean()
@@ -142,31 +164,31 @@ export class UpdateCollaboratorDto implements UpdateCollaboratorRequest {
   @IsUUID()
   eventId?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   editEventDetailsSettings: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   inviteGuestsToEvent: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   addGuestsToDrafts: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   chatWithAllGuests: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   chatWithGuestsByCollaborator: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   viewFullGuestList: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   manageInAppRsvpRequests: boolean;
 
@@ -174,19 +196,19 @@ export class UpdateCollaboratorDto implements UpdateCollaboratorRequest {
   @IsBoolean()
   manageDedicatedSignUpForm: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   postAnnouncementsToAllGuests: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   postAnnouncementsByCollaborator: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   checkInGuests: boolean;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsBoolean()
   generateEventReports: boolean;
 
@@ -226,4 +248,3 @@ export class TicketReassignToDto {
   @IsOptional()
   name: string;
 }
-

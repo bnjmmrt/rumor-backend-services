@@ -4,6 +4,7 @@ import type { CsvRecord } from '../shared/users/grpc/auth/auth.pb';
 import axios from 'axios';
 import * as parse from 'csv-parser';
 import { createObjectCsvWriter } from 'csv-writer';
+import { COUNTRY_CALLING_CODES } from '../shared/constants/country-code.constants';
 
 export async function parseCsv(file: string): Promise<CsvRecord[]> {
   const records: CsvRecord[] = [];
@@ -21,7 +22,7 @@ export async function parseCsv(file: string): Promise<CsvRecord[]> {
 
 export async function generateErrorCsv(failedRecords: CsvRecord[]): Promise<Buffer> {
   const fileName = `/tmp/failed_records_${Date.now()}.csv`;
-  const records = failedRecords.map((record) => ({
+  const records = failedRecords.map(record => ({
     firstName: record.firstName,
     lastName: record.lastName,
     email: record.email,
@@ -52,7 +53,27 @@ function toCamelCase<T extends Record<string, unknown>>(obj: T): Record<string, 
   return newObj;
 }
 
-export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
+export const isValidEmail = (email: string): boolean => {
+  const trimmedEmail = email.trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(trimmedEmail);
+};
+
+export const isValidPhoneNumber = (phoneNumber: string): boolean => {
+  const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
+  const matchedPrefix = COUNTRY_CALLING_CODES.find(prefix => cleaned.startsWith(prefix));
+  if (!matchedPrefix) {
+    return false;
+  }
+  const numberWithoutPrefix = cleaned.slice(matchedPrefix.length);
+  // Check if remaining is 10 digits and numeric
+  return /^\d{10}$/.test(numberWithoutPrefix);
+};
+
+export const processCsvFile = async (
+  fileUrl: string,
+  isUploadUser: boolean,
+): Promise<{ validData: CsvRecord[]; garbageData: CsvRecord[] }> => {
   try {
     // Step 1: Fetch the file from the S3 pre-signed URL
     const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
@@ -72,42 +93,46 @@ export const processCsvFile = async (fileUrl: string, isUploadUser: boolean): Pr
 
     // Step 4: Validate and separate records
     for (const record of records) {
-      if (!isUploadUser && record.firstName && record.lastName && record.email) {
-        validData.push(record);
-      } else if (!isUploadUser && (!record.firstName || !record.lastName || !record.email)) {
-        let reasons = [];
-        if (!record.firstName) {
-          reasons.push('First Name is required');
+      let reasons: string[] = [];
+
+      // Basic validation
+      if (!record.firstName) reasons.push('First Name is required');
+      if (!record.lastName) reasons.push('Last Name is required');
+
+      const rawPhone = record.phoneNumber?.toString().trim() || '';
+      const rawEmail = record.email?.toString().trim() || '';
+
+      if (isUploadUser) {
+        // At least one of email or phone number must be present
+        if (!rawEmail && !rawPhone) {
+          reasons.push('Either Email or Phone Number is required');
         }
-        if (!record.lastName) {
-          reasons.push('Last Name is required');
+
+        if (rawEmail && !isValidEmail(rawEmail)) {
+          reasons.push('Invalid Email format');
         }
-        if (!record.email) {
+
+        if (rawPhone && !isValidPhoneNumber(rawPhone)) {
+          reasons.push('Invalid Phone Number format');
+        }
+      } else {
+        // Email is mandatory
+        if (!rawEmail) {
           reasons.push('Email is required');
-        }
-        if (reasons.length > 0) {
-          record.reason = reasons.join(', ');
-          garbageData.push(record);
+        } else if (!isValidEmail(rawEmail)) {
+          reasons.push('Invalid Email format');
         }
       }
 
-      if (isUploadUser && record.firstName && record.lastName && record.email && record.phoneNumber) {
+      if (reasons.length > 0) {
+        record.reason = reasons.join(', ');
+        garbageData.push(record);
+      } else {
+        record.firstName = record.firstName?.toString().trim();
+        record.lastName = record.lastName?.toString().trim();
+        record.phoneNumber = rawPhone.replace(/[\s\-()]/g, '');
+        record.email = rawEmail.trim().toLowerCase();
         validData.push(record);
-      } else if (isUploadUser && (!record.firstName || !record.lastName || !record.email || !record.phoneNumber)) {
-        let reasons = [];
-        if (!record.firstName) {
-          reasons.push('First Name is required');
-        }
-        if (!record.lastName) {
-          reasons.push('Last Name is required');
-        }
-        if (!record.email && !record.phoneNumber) {
-          reasons.push('Either Email or Phone Number are required');
-        }
-        if (reasons.length > 0) {
-          record.reason = reasons.join(', ');
-          garbageData.push(record);
-        }
       }
     }
 

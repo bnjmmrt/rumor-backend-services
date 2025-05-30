@@ -1,6 +1,6 @@
-import { EventStatusEnum } from "../../interfaces/event.interface";
+import { EventStatusEnum } from '../../interfaces/event.interface';
 
-export const protobufPackage = "events";
+export const protobufPackage = 'events';
 
 export enum UserStatus {
   NEW_APPLICANT = 0,
@@ -9,6 +9,7 @@ export enum UserStatus {
   DEACTIVATED = 3,
   REJECTED = 4,
   UNRECOGNIZED = -1,
+  NON_MEMBER = 5,
 }
 
 export enum UserSource {
@@ -19,6 +20,7 @@ export enum UserSource {
   REQUEST_IN_APP = 4,
   PLUS_1 = 5,
   UNRECOGNIZED = -1,
+  HOST_APPLICATION = 6,
 }
 
 export enum EventStatus {
@@ -135,7 +137,11 @@ export interface EventTypeData {
 export interface QueryRequest {
   query?: string | undefined;
 }
-
+export interface EventGuestRequest {
+  email?: string | undefined;
+  phoneNumber?: string | undefined;
+  id: string;
+}
 export interface QuizQuestion {
   id: string;
   question: string;
@@ -193,9 +199,13 @@ export interface EventData {
   userId?: string | undefined;
   featuredEventSection?: FeaturedEventSection | undefined;
   timeZone?: string | undefined;
+  createdAt?: string | undefined;
   invitationDeclinedBy?: string | undefined;
   isPublished?: boolean | undefined;
   totalCheckedInGuests?: number | undefined;
+  guestOptionalMessage?: string | undefined;
+  guestNote?: string | undefined;
+  invitationDate?: string | undefined;
 }
 
 export interface FeaturedEventSection {
@@ -302,11 +312,12 @@ export interface CollaboratorsEvent {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   tickets: CollaboratorTicket[];
   companyLogo?: string | undefined;
   companyName?: string | undefined;
   isFollowedByCurrentGuest?: boolean | undefined;
+  isApproved: boolean | undefined;
 }
 
 export interface Collaborator {
@@ -329,7 +340,7 @@ export interface Collaborator {
   postAnnouncementsByCollaborator: boolean;
   checkInGuests: boolean;
   generateEventReports: boolean;
-  limitInvitationsNumber?: number | undefined;
+  // limitInvitationsNumber?: number | undefined;
   ticketType?: TicketType | undefined;
 }
 
@@ -345,13 +356,12 @@ export interface EventAddress {
 }
 
 export interface EventLocation {
-  placeId?: string | undefined;
-  location?: string | undefined;
-  latitude?: number | undefined;
-  longitude?: number | undefined;
-  city?: string | undefined;
+  placeId?: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  city: string;
   regionCode?: string | undefined;
-  id?: string | undefined;
 }
 
 export interface EventAgeLimit {
@@ -392,6 +402,7 @@ export interface Guest {
   gender: Gender;
   age?: number | undefined;
   additionalGuests: AdditionalGuest[];
+  phoneNumber?: string;
 }
 
 export interface AdditionalGuest {
@@ -428,12 +439,12 @@ export interface GuestData {
   gender?: string | undefined;
   age?: number | undefined;
   address?: AddressGuest | undefined;
-  interest: InterestData[];
-  followsYou?: boolean | undefined;
-  favorite?: boolean | undefined;
+  interest: string[];
+  // followsYou?: boolean | undefined;
+  // favorite?: boolean | undefined;
   roles: UserRoleComplete[];
   addedBy?: string | undefined;
-  invitationSource: UserSource;
+  invitationSource: string;
   categories: string[];
   userId?: string | undefined;
   guestId?: string | undefined;
@@ -443,6 +454,12 @@ export interface GuestData {
   additionalGuests: AdditionalGuest[];
   checkIn?: boolean | undefined;
   addedById?: string | undefined;
+  declinedById?: string | undefined;
+  isSpammedByHost?: boolean | undefined;
+  rejectedReason?: string | undefined;
+  isFollow?: boolean | undefined;
+  isFavorite?: boolean | undefined;
+  hostUserMappingId?: string | undefined;
 }
 
 export interface GuestDataSimple {
@@ -527,7 +544,14 @@ export interface QuizAnswer {
   eventId: string;
   id?: string | undefined;
 }
-
+export interface SimpleGuestEventData {
+  id: string;
+  name: string;
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  imageFlyer: string | undefined;
+  imageCover: string | undefined;
+}
 export interface GuestEventData {
   id: string;
   name: string;
@@ -540,11 +564,12 @@ export interface GuestEventData {
   imageCover?: string | undefined;
   location?: EventLocation | undefined;
   eventType?: EventTypeEvent | undefined;
-  status?: EventStatus | undefined;
+  status?: EventStatusEnum | undefined;
   showLocation?: boolean | undefined;
   owner?: OwnerEvent | undefined;
   ageLimit?: EventAgeLimit | undefined;
   autoPublished?: boolean | undefined;
+  timeZone?: string | undefined;
   publishDate?: string | undefined;
   isPrivate?: boolean | undefined;
   guest?: GuestDataEvent | undefined;
@@ -621,10 +646,14 @@ export interface GuestDetail {
   guestId: string;
   userId: string;
   ticketType?: string | undefined;
+  ticketTypeId?: string | undefined;
   maxAdditionalGuests?: number | undefined;
   privateGuestNote?: string | undefined;
   guestStatus?: GuestStatus | undefined;
   inviteMessage?: string | undefined;
+  signupFormName?: string | undefined;
+  eventId?: string | undefined;
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface GuestDetails {
@@ -632,6 +661,7 @@ export interface GuestDetails {
   guestDetail: GuestDetail | undefined;
   quizDataList?: QuizDataList | undefined;
   vouches: VouchesData[];
+  additionalGuests?: AdditionalGuest[];
 }
 
 export interface QuizDataList {
@@ -640,10 +670,14 @@ export interface QuizDataList {
 
 export interface GenerateTicketForGuestData {
   guestId?: string | undefined;
-  ticketStatus?: TicketStatus | undefined;
+  ticketStatus?: string | undefined;
+  ticketTypeId?: string | undefined;
+  ticketType?: string | undefined;
+  guestNote?: string | undefined;
   jwtToken?: string | undefined;
   eventQr: boolean;
   checkInStatus?: boolean | undefined;
+  ticketDescription?: string | undefined;
 }
 
 export interface ToggleGuestCheckStatusData {
@@ -679,6 +713,8 @@ export interface SignupFormsResponse {
   userId: string;
   userName: string;
   userProfile: string;
+  companyName: string;
+  companyProfile: string;
   description: string;
   hasAccessForAdditionalGuests: boolean;
   startDate: string;
@@ -693,6 +729,7 @@ export interface SignupFormsResponse {
   eventStatus: EventStatusEnum;
   eventName: string;
   eventId: string;
+  limitOnePlus: number;
 }
 
 export interface ISignupFormQuestionsRequest {
@@ -703,6 +740,8 @@ export interface ISignupFormQuestionsRequest {
   answers?: string;
   ordering?: number;
   value?: string;
+  hasToggle?: boolean;
+  isToggled?: boolean;
 }
 
-export const EVENTS_PACKAGE_NAME = "events";
+export const EVENTS_PACKAGE_NAME = 'events';

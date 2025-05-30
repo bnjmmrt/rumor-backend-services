@@ -5,6 +5,6 @@ import * as dayjs from 'dayjs';
 export const toReferralCode = (code: ReferralCodeEntity): ReferralCodeData => {
   return {
     ...code,
-    expirationDate: dayjs(code.expirationDate).format('MM/DD/YYYY'),
+    expirationDate: code.expirationDate ? dayjs(code.expirationDate).format('MM/DD/YYYY') : null,
   };
 };

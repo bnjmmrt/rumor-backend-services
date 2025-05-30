@@ -27,6 +27,35 @@ export enum NotificationSource {
   UNRECOGNIZED = -1,
 }
 
+export enum NotificationType {
+  APPLICATION_APPOVED = 'applicationAppoved',
+  PROFILE_REFERRALS = 'profileReferrals',
+  EVENT_REMINDER = 'eventReminder',
+  EVENT_CANCELLED = 'eventCancelled',
+  EVENT_INVITATION = 'eventInvitation',
+  EVENT_INVITATION_NON_MEMBER = 'eventInvitationNonMember',
+  EVENT_POSTED = 'eventPosted',
+  EVENT_POSTED_CITY = 'eventPostedCity',
+  EVENT_REQUEST_APPROVED = 'eventRequestApproved',
+  EVENT_REQUEST_DENIED = 'eventRequestDenied',
+  EVENT_VOUCH = 'eventVouch',
+  EVENT_ANNOUNCEMENT = 'eventAnnouncement',
+  SIGNUP_FORM_APPROVED = 'signUpFormApproved',
+  SIGNUP_FORM_REJECTED = 'signUpFormRejected',
+  USER_APPLICATION = 'userApplication',
+  HOST_APPLICATION = 'hostApplication',
+  EVENT_SUBMITTED = 'eventSubmitted',
+  EVENT_EDITED = 'eventEdited',
+  HOST_REPORT = 'hostReport',
+  HOST_FEEDBACK = 'hostFeedback',
+  USER_REPORT = 'userReport',
+  USER_FEEDBACK = 'userFeedback',
+  EVENT_SUBMISSION_APPROVED = 'eventSubmissionApproved',
+  EVENT_APPROVED = 'eventApproved',
+  NEW_GUEST_REQUEST = 'newGuestRequest',
+  RSVP_SIGNUP_FORM_REQUEST = 'rsvpSignupFormRequest',
+}
+
 /** Generic Response */
 export interface GenericResponse {
   status: number;

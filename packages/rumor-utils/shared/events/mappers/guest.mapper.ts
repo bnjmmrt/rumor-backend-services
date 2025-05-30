@@ -1,4 +1,4 @@
-import { Guest as GuestEntity } from "../entities/guest.entity";
+import { Guest as GuestEntity } from '../entities/guest.entity';
 import {
   AdditionalGuest,
   Guest,
@@ -85,10 +85,12 @@ export const toGuest = (
   }
 
   const roles = guest?.user?.roles?.length > 0 ? guest.user.roles[0] : undefined;
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
+  const addedBy = guest.addedBy ? `${guest.addedBy?.additionalHostInformation?.companyName}` : '';
+  const addedByPicture = guest.addedBy ? guest.addedBy?.additionalHostInformation?.companyLogo : '';
   const invitationSourceNumber =
-    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined
+      ? guest.invitationSource
+      : UserSource.UNRECOGNIZED;
   return {
     userId: guest.user?.id,
     id: guest.id,
@@ -103,28 +105,29 @@ export const toGuest = (
     partySize: guest.maxAdditionalGuests + 1,
     numFollowers: formatToUnits(totalFollowerCount),
     baseCity: guest?.user?.address?.address || '',
-    category: focuses.length > 0 ? focuses.map((focus) => focus.name): [],
+    category: focuses.length > 0 ? focuses.map(focus => focus.name) : [],
     maxAdditionalGuests: guest.maxAdditionalGuests,
     source: roles ? UserSource[invitationSourceNumber] : null,
     checkIn: guest.checkIn,
     additionalRequestedGuests: guest?.additionalRequestedGuests || 0,
     profilePicture: guest?.user?.profilePicture || '',
     questions: answers?.length
-      ? answers.map((item) => {
+      ? answers.map(item => {
           return toQuizData(item);
         })
       : [],
     vouches: vouches?.length
-      ? vouches.map((item) => {
+      ? vouches.map(item => {
           return toVouchesData(item);
         })
       : [],
     email: guest?.user?.email,
     privateGuestNote: guest?.privateGuestNote,
     age: calculateAge(guest.user.dateOfBirth),
-    interest: interests ? interests.map((interest) => interest.name) : [],
+    interest: interests ? interests.map(interest => interest.name) : [],
     gender: entityToGender[guest.user.gender] ?? entityToGender.NOT_APPLICABLE,
     additionalGuests: [],
+    phoneNumber: guest?.user?.phoneNumber,
   };
 };
 
@@ -149,13 +152,38 @@ export const toVouchesData = (vouch: UserVouch): VouchesData => {
   };
 };
 
-export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: FocusProto[], followsYou: boolean, favorite: boolean, additionalGuestData): GuestData => {
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
-  const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
-  const declinedBy = guest.declinedBy ? `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}` : '';
-  const declinedByPicture = guest.declinedBy ? guest.declinedBy?.profilePicture : '';
+export const toGuestData = (
+  user: Partial<User>,
+  guest: GuestEntity,
+  focuses: FocusProto[],
+  interests: InterestData[] = [],
+  followsYou: boolean,
+  favorite: boolean,
+  additionalGuestData,
+  isSpammedByHost?: boolean,
+): GuestData => {
+  let addedBy, addedByPicture, declinedBy, declinedByPicture;
+  const invitationSourceNumber =
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined
+      ? guest.invitationSource
+      : UserSource.UNRECOGNIZED;
+  if (guest.event.owner.id === guest.addedBy?.id) {
+    addedBy = guest.addedBy?.additionalHostInformation?.companyName || '';
+    addedByPicture = guest.addedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
+    addedBy = `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`.trim();
+    addedByPicture = guest.addedBy?.profilePicture || '';
+  }
+
+  if (guest.event.owner.id === guest.declinedBy?.id) {
+    declinedBy = guest.declinedBy?.additionalHostInformation?.companyName || '';
+    declinedByPicture = guest.declinedBy?.additionalHostInformation?.companyLogo || '';
+  } else {
+    declinedBy = `${guest.declinedBy?.firstName || ''} ${guest.declinedBy?.lastName || ''}`.trim();
+    declinedByPicture = guest.declinedBy?.profilePicture || '';
+  }
   return {
-    roles: user.roles.map((item) => {
+    roles: user.roles.map(item => {
       return {
         roleId: item.role.id,
         roleName: item.role.name,
@@ -172,21 +200,24 @@ export const toGuestData = (user: Partial<User>, guest: GuestEntity, focuses: Fo
     gender: user.gender,
     age: calculateAge(user.dateOfBirth),
     address: user.address,
-    interest: user.interests || [],
-    followsYou,
-    favorite,
+    interest: interests ? interests.map(interest => interest.name) : [],
+    isFollow: followsYou,
+    isFavorite: favorite,
     addedBy,
     addedByPicture,
     declinedBy,
     declinedByPicture,
-    invitationSource: guest.invitationSource ? entityToUserSource[guest.invitationSource] : UserSource.UNRECOGNIZED,
+    rejectedReason: guest.rejectedReason,
+    invitationSource: UserSource[invitationSourceNumber],
     status: guest.status,
-    categories: focuses.map((focus) => focus.name),
+    categories: focuses.map(focus => focus.name),
     guestId: guest.id,
     userId: user.id,
     additionalGuests: additionalGuestData,
     checkIn: guest.checkIn,
     addedById: guest.addedBy?.id,
+    declinedById: guest.declinedBy?.id,
+    isSpammedByHost: isSpammedByHost,
   };
 };
 
@@ -198,11 +229,17 @@ export const toGuestDataSimple = (
   invitedGuests: GuestDataSimple[] = [],
 ): GuestDataSimple => {
   const user = guest.user;
-  const roleInfo = user.roles?.find((item) => item.role.name === 'member' || item.role.name === 'non_member');
-  const addedBy = guest.addedBy ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}` : '';
+  const roleInfo = user.roles?.find(
+    item => item.role?.name === 'member' || item.role?.name === 'non_member',
+  );
+  const addedBy = guest.addedBy
+    ? `${guest.addedBy?.firstName || ''} ${guest.addedBy?.lastName || ''}`
+    : '';
   const addedByPicture = guest.addedBy ? guest.addedBy?.profilePicture : '';
   const invitationSourceNumber =
-    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined ? guest.invitationSource : UserSource.UNRECOGNIZED;
+    typeof guest.invitationSource === 'number' && UserSource[guest.invitationSource] !== undefined
+      ? guest.invitationSource
+      : UserSource.UNRECOGNIZED;
 
   return {
     id: guest.id,
@@ -217,7 +254,7 @@ export const toGuestDataSimple = (
     username: user.username || '',
     ticketType: guest.ticketType?.name,
     numberAdditionalGuests: guest.maxAdditionalGuests,
-    category: focuses.map((focus) => focus.name),
+    category: focuses.map(focus => focus.name),
     checkIn: guest.checkIn,
     phoneNumber: user.phoneNumber,
     age: calculateAge(user.dateOfBirth),
@@ -239,7 +276,11 @@ export const toTicketData = (ticket: Ticket): ListEventUsedTicketsData => {
   };
 };
 
-export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocuses: FocusProto[], plusOnesInterests: InterestData[] = []): AdditionalGuest => {
+export const toAdditionalGuestData = (
+  additionalGuest: GuestEntity,
+  plusOnesFocuses: FocusProto[],
+  plusOnesInterests: InterestData[] = [],
+): AdditionalGuest => {
   let totalFollowerCount = 0;
 
   if (additionalGuest?.user?.socialStats) {
@@ -248,10 +289,13 @@ export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocu
     }, 0);
   }
 
-  const addedBy = additionalGuest.addedBy ? `${additionalGuest.addedBy?.firstName || ''} ${additionalGuest.addedBy?.lastName || ''}` : '';
+  const addedBy = additionalGuest.addedBy
+    ? `${additionalGuest.addedBy?.firstName || ''} ${additionalGuest.addedBy?.lastName || ''}`
+    : '';
   const addedByPicture = additionalGuest.addedBy ? additionalGuest.addedBy?.profilePicture : '';
   const invitationSourceNumber =
-    typeof additionalGuest.invitationSource === 'number' && UserSource[additionalGuest.invitationSource] !== undefined
+    typeof additionalGuest.invitationSource === 'number' &&
+    UserSource[additionalGuest.invitationSource] !== undefined
       ? additionalGuest.invitationSource
       : UserSource.UNRECOGNIZED;
 
@@ -260,8 +304,8 @@ export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocu
     firstName: additionalGuest.user?.firstName,
     lastName: additionalGuest.user?.lastName,
     guestId: additionalGuest.id,
-    interest: plusOnesInterests ? plusOnesInterests.map((interest) => interest.name) : [],
-    category: plusOnesFocuses ? plusOnesFocuses.map((focus) => focus.name) : [],
+    interest: plusOnesInterests ? plusOnesInterests.map(interest => interest.name) : [],
+    category: plusOnesFocuses ? plusOnesFocuses.map(focus => focus.name) : [],
     profilePicture: additionalGuest?.user?.profilePicture,
     ticketType: additionalGuest?.ticketType?.name,
     numFollowers: formatToUnits(totalFollowerCount),
@@ -273,7 +317,9 @@ export const toAdditionalGuestData = (additionalGuest: GuestEntity, plusOnesFocu
     isBanned: false,
     addedBy,
     addedByPicture,
-    declinedBy: additionalGuest.declinedBy ? `${additionalGuest.declinedBy?.firstName || ''} ${additionalGuest.declinedBy?.lastName || ''}` : '',
+    declinedBy: additionalGuest.declinedBy
+      ? `${additionalGuest.declinedBy?.firstName || ''} ${additionalGuest.declinedBy?.lastName || ''}`
+      : '',
     declinedByPicture: additionalGuest.declinedBy ? additionalGuest.declinedBy?.profilePicture : '',
   };
 };
