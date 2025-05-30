@@ -193,6 +193,7 @@ import {
   entityToUserStatus,
   newUserStatusTosUserStatus,
   userSourceToEntity,
+  userStatusToEntity,
 } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -497,7 +498,7 @@ export class AuthService {
     newUser = await this.dbConnection.getRepository(User).save(newUser);
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: 'non_member' },
-      UserSource.REQUEST_IN_APP,
+      UserSource.REQUEST_IN_APP, UserStatus.NEW_APPLICANT
     );
 
     await PlatformService.saveFocusesForUser({
@@ -3538,11 +3539,14 @@ export class AuthService {
       newUser.firstName = payload.firstName;
       newUser.lastName = payload.lastName;
       newUser.phoneNumber = payload.phoneNumber ?? '';
+
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
 
       const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
+      const status = payload.status !== undefined ? userStatusToEntity[payload.status] : null;
+
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source, status);
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;

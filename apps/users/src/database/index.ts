@@ -27,7 +27,7 @@ export class ConnectionManager {
           ...(['development', 'staging', 'production', 'uat'].includes(config.get('NODE_ENV')) && {
             ssl: { rejectUnauthorized: false },
           }),
-          synchronize: false,
+          synchronize: true,
           logging: false,
           migrationsTableName: 'users-migrations',
           migrations: ['src/database/migrations/*.ts'],
