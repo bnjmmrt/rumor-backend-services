@@ -1,10 +1,11 @@
-import { DefaultRoleSettings, Role } from 'rumor-utils/shared/entities/index';
+import { DefaultRoleSettings, Role, User } from 'rumor-utils/shared/entities/index';
 
 import database from '../database';
 import { Interest } from 'rumor-utils/shared/users/entities/interest.entity';
 import { Focus } from 'rumor-utils/shared/users/entities/focus.entity';
 import { CollaboratorRoles } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { RoleService } from '../services/role.service';
+import { SocialService } from '../services/social.service';
 
 export class Seeders {
   public static dbConnection = database;
@@ -210,6 +211,22 @@ export class Seeders {
         focus = this.dbConnection.getRepository(Focus).create(focusData);
         await this.dbConnection.getRepository(Focus).save(focus);
       }
+    }
+  }
+
+  public static async seedInstagramFollowers() {
+    const pendingInstagramUsers = await this.dbConnection
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .leftJoin('user.socialStats', 'socialStats')
+      .select(['user.id', 'user.instagramUserName'])
+      .where('user.instagramUserName IS NOT NULL')
+      .andWhere('user.instagramUserName != :empty', { empty: '' })
+      .andWhere('socialStats.id IS NULL')
+      .getMany();
+
+    for (const user of pendingInstagramUsers) {
+      await SocialService.scrapeInstagramFollowers(user.instagramUserName, user.id);
     }
   }
 }
