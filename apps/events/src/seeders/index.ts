@@ -211,79 +211,147 @@ export class Seeders {
   }
 
   public static async seedEventBranchLinks() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const maxAttempts = isProduction ? 50 : 1;
+
     try {
-      console.log('Starting branch links seeder...');
+      console.log(`Starting ${isProduction ? 'continuous' : 'single-pass'} branch links seeder...`);
 
-      // Find all events that don't have a branch link
-      const eventsWithoutBranchLinks = await this.dbConnection
-        .getRepository(Event)
-        .createQueryBuilder('event')
-        .where("event.branchLink IS NULL OR event.branchLink = ''")
-        .andWhere('event.deletedAt IS NULL')
-        .getMany();
+      let totalAttempts = 0;
 
-      if (eventsWithoutBranchLinks.length === 0) {
-        console.log('No events found without branch links.');
-        return;
-      }
+      while (totalAttempts < maxAttempts) {
+        totalAttempts++;
 
-      console.log(
-        `Found ${eventsWithoutBranchLinks.length} events without branch links. Processing...`,
-      );
+        // Find all events that don't have a branch link
+        const eventsWithoutBranchLinks = await this.dbConnection
+          .getRepository(Event)
+          .createQueryBuilder('event')
+          .where("event.branchLink IS NULL OR event.branchLink = ''")
+          .andWhere('event.deletedAt IS NULL')
+          .getMany();
 
-      let successCount = 0;
-      let errorCount = 0;
+        if (eventsWithoutBranchLinks.length === 0) {
+          if (isProduction) {
+            console.log(
+              `🎉 All events now have branch links! Completed after ${totalAttempts} attempt(s).`,
+            );
+          } else {
+            console.log('No events found without branch links.');
+          }
+          break;
+        }
 
-      // Process events in batches to avoid overwhelming the Branch API
-      const batchSize = 10;
-      for (let i = 0; i < eventsWithoutBranchLinks.length; i += batchSize) {
-        const batch = eventsWithoutBranchLinks.slice(i, i + batchSize);
+        if (isProduction) {
+          console.log(
+            `Attempt ${totalAttempts}: Found ${eventsWithoutBranchLinks.length} events without branch links. Processing...`,
+          );
+        } else {
+          console.log(
+            `Found ${eventsWithoutBranchLinks.length} events without branch links. Processing...`,
+          );
+        }
 
-        await Promise.all(
-          batch.map(async event => {
-            try {
-              // Generate branch link for the event
-              const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
-              const deepLinkPath = `events/event-details?id=${event.id}`;
+        let successCount = 0;
+        let errorCount = 0;
 
-              const branchData = {
-                $web_only: false,
-                $fallback_url: webUrl,
-                $ios_url: `therumorapp://${deepLinkPath}`,
-                $android_url: `com.therumor://${deepLinkPath}`,
-                $desktop_url: webUrl,
-                $marketing_title: `Event: ${event.name}`,
-              };
+        // Process events in batches to avoid overwhelming the Branch API
+        const batchSize = 10;
+        for (let i = 0; i < eventsWithoutBranchLinks.length; i += batchSize) {
+          const batch = eventsWithoutBranchLinks.slice(i, i + batchSize);
 
-              const branchLink = await generateBranchLink({
-                path: deepLinkPath,
-                data: branchData,
-              });
+          const results = await Promise.allSettled(
+            batch.map(async event => {
+              try {
+                // Generate branch link for the event
+                const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
+                const deepLinkPath = `events/event-details?id=${event.id}`;
 
-              // Update the event with the generated branch link
-              await this.dbConnection.getRepository(Event).update({ id: event.id }, { branchLink });
+                const branchData = {
+                  $web_only: false,
+                  $fallback_url: webUrl,
+                  $ios_url: `therumorapp://${deepLinkPath}`,
+                  $android_url: `com.therumor://${deepLinkPath}`,
+                  $desktop_url: webUrl,
+                  $marketing_title: `Event: ${event.name}`,
+                };
 
-              console.log(`✅ Generated branch link for event: ${event.name} (ID: ${event.id})`);
+                const branchLink = await generateBranchLink({
+                  path: deepLinkPath,
+                  data: branchData,
+                });
+
+                // Update the event with the generated branch link
+                await this.dbConnection
+                  .getRepository(Event)
+                  .update({ id: event.id }, { branchLink });
+
+                console.log(`✅ Generated branch link for event: ${event.name} (ID: ${event.id})`);
+                return { success: true, event };
+              } catch (error) {
+                console.error(
+                  `❌ Failed to generate branch link for event: ${event.name} (ID: ${event.id})`,
+                  error,
+                );
+                return { success: false, event, error };
+              }
+            }),
+          );
+
+          // Count results
+          results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value.success) {
               successCount++;
-            } catch (error) {
-              console.error(
-                `❌ Failed to generate branch link for event: ${event.name} (ID: ${event.id})`,
-                error,
-              );
+            } else {
               errorCount++;
             }
-          }),
-        );
+          });
 
-        // Add a small delay between batches to be respectful to the Branch API
-        if (i + batchSize < eventsWithoutBranchLinks.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Add a small delay between batches to be respectful to the Branch API
+          if (i + batchSize < eventsWithoutBranchLinks.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        if (isProduction) {
+          console.log(`Attempt ${totalAttempts} completed:`);
+        } else {
+          console.log(`Branch links seeder completed:`);
+        }
+        console.log(`  ✅ Success: ${successCount} events`);
+        console.log(`  ❌ Errors: ${errorCount} events`);
+
+        // If not production, break after first attempt
+        if (!isProduction) {
+          return { successCount, errorCount, totalProcessed: eventsWithoutBranchLinks.length };
+        }
+
+        // If production and we had errors, wait a bit before the next attempt
+        if (errorCount > 0) {
+          console.log('Waiting 5 seconds before next attempt due to errors...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } else if (eventsWithoutBranchLinks.length > 0) {
+          // Small delay between successful runs in production
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
 
-      console.log(`Branch links seeder completed:`);
-      console.log(`  ✅ Success: ${successCount} events`);
-      console.log(`  ❌ Errors: ${errorCount} events`);
+      if (isProduction && totalAttempts >= maxAttempts) {
+        console.warn(
+          `⚠️ Reached maximum attempts (${maxAttempts}). Some events may still be missing branch links.`,
+        );
+
+        // Final check
+        const remainingEvents = await this.dbConnection
+          .getRepository(Event)
+          .createQueryBuilder('event')
+          .where("event.branchLink IS NULL OR event.branchLink = ''")
+          .andWhere('event.deletedAt IS NULL')
+          .getMany();
+
+        if (remainingEvents.length > 0) {
+          console.log(`${remainingEvents.length} events still don't have branch links.`);
+        }
+      }
     } catch (error) {
       console.error('Error in seedEventBranchLinks:', error);
       throw error;
