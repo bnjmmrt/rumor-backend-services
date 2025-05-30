@@ -226,7 +226,10 @@ export class Seeders {
       .getMany();
 
     for (const user of pendingInstagramUsers) {
-      await SocialService.scrapeInstagramFollowers(user.instagramUserName, user.id);
+      try {
+        await SocialService.scrapeInstagramFollowers(user.instagramUserName, user.id);
+      } catch (e) {
+      }
     }
   }
 }

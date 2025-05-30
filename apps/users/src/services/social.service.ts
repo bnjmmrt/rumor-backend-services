@@ -1988,6 +1988,11 @@ export class SocialService {
     const url = `${baseUrl}${username}`;
   
     const response = await axios.get(url);
+
+    if (response.status !== 200 || response.data?.errorStatus === 404) {
+      throw new Error(`Failed to fetch instagram data for username: ${username}`);
+    }
+
     const followersCount = Number(response.data?.data?.follower_count);
   
     const socialStatsRepo = this.dbConnection.getRepository(SocialStats);

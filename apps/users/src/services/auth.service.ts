@@ -448,7 +448,12 @@ export class AuthService {
       newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
     
-    if(payload.instagramUserName) await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
+    if (payload.instagramUserName) {
+      try {
+        await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
+      } catch (e) {}
+    }
+
     if (payload.instagramAccessToken) {
       await SocialService.getInstagramData(
         newUser.id,
