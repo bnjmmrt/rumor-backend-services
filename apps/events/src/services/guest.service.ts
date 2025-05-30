@@ -283,6 +283,7 @@ export class GuestService {
               privateGuestNote,
               guestStatus,
               sendInvite: sendNotification,
+              email: email
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
