@@ -425,12 +425,13 @@ export class AuthService {
         lastName: payload.lastName,
         dateOfBirth: payload.dateOfBirth,
         phoneNumber: payload.phoneNumber,
+        instagramUserName: payload.instagramUserName,
         address: address,
         additionalMemberInformation: {
           ...existingUser.additionalMemberInformation,
           ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
         },
-      };
+      } as Partial<User>;
 
       await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
 
@@ -445,6 +446,12 @@ export class AuthService {
         newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
       }
       newUser = await this.dbConnection.getRepository(User).save(newUser);
+    }
+    
+    if (payload.instagramUserName) {
+      try {
+        await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
+      } catch (e) {}
     }
 
     if (payload.instagramAccessToken) {
