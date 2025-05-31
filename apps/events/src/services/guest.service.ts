@@ -193,6 +193,9 @@ export class GuestService {
     if (action && !Object.keys(ManageGuestsAction).includes(action))
       throw new BadRequestError('Invalid action for managing guest status');
 
+    //Get email if it is there
+    const email = payload?.email
+
     // Extract relevant fields from payload
     const {
       hostId,
@@ -280,6 +283,7 @@ export class GuestService {
               privateGuestNote,
               guestStatus,
               sendInvite: sendNotification,
+              email: email
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
@@ -434,6 +438,7 @@ export class GuestService {
         hostId: payload.hostId,
         eventId: eventId,
       };
+
       const getGuests = await this.getGuests(fetchData);
       // Validate if guest data exists
       if (!getGuests.result || getGuests.totalCount === 0) {
@@ -839,6 +844,12 @@ export class GuestService {
               where: [{ id: guest.user.id }],
               relations: { roles: { role: true } },
             });
+
+            if (payload.email) {
+              guest.user.email = payload.email;
+              await this.dbConnection.getRepository(User).save(guest.user);
+            }
+
             let emailData = {
               eventId: guest.event.id,
               id: guest.user.id,
@@ -1071,6 +1082,7 @@ export class GuestService {
         confirmedGuestsEmailsWithoutRequest.length > 0 &&
         payload.sendInvite
       ) {
+
         const event = await this.dbConnection.getRepository(Event).findOne({
           where: { id: confirmedGuestsEmailsWithoutRequest[0].eventId },
           relations: { location: true, owner: true },

@@ -2621,12 +2621,6 @@ export class AuthService {
   public static async createNonMemberUser(
     payload: CreateNonMemberUserRequestDto,
   ): Promise<UserIdData> {
-    // const exists = await this.dbConnection
-    //   .getRepository(User)
-    //   .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-    // if (exists) {
-    //   throw new BadRequestError('user exists');
-    // }
     if (payload.email || payload.phoneNumber) {
       const exists = await this.dbConnection
         .getRepository(User)
@@ -2641,7 +2635,11 @@ export class AuthService {
     user.lastName = payload.lastName || 'NA';
     user.phoneNumber = payload.phoneNumber || '';
     user = await this.dbConnection.getRepository(User).save(user);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'non_member' });
+    await RoleService.assignRoleToUser(
+      { userId: user.id, roleName: 'non_member' },
+      UserSource.INVITED_BY_HOST,
+      UserStatus.NON_MEMBER
+    );
     return { userId: user.id };
   }
 
@@ -3851,6 +3849,7 @@ export class AuthService {
       .skip(skip)
       .take(take);
 
+    const [usersj, count] = await usersQuery.getManyAndCount();
     /**past event filter */
     if (pastEventsIds.length) {
       const confirmedStatus = GuestStatus.CONFIRMED;
@@ -3862,7 +3861,6 @@ export class AuthService {
           .from(Guest, 'g')
           .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
           .andWhere('g.status = :confirmedStatus', { confirmedStatus })
-          .andWhere('g.check_in = true')
           .getQuery();
         return 'user.id IN ' + subQuery;
       });
@@ -4072,7 +4070,9 @@ export class AuthService {
         return userData;
       }),
     );
-    return { result: users, totalCount };
+
+    return { result: users, totalCount: count };
+
   }
 
   // ADMIN Sevice Code
@@ -4827,7 +4827,7 @@ export class AuthService {
       if (followerCountFrom === undefined || followerCountTo === undefined) {
         return {
           error: true,
-          response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
+          response: `Please provide both 'Follower Count From' and 'Follower Count To' when selecting one or more social networks.`,
         };
       }
       if (followerCountFrom > followerCountTo) {

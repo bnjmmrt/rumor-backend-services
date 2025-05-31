@@ -89,6 +89,10 @@ export class ManageGuestsRequestDto implements ManageGuestsRequest {
   @IsBoolean()
   @IsOptional()
   sendNotification?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  email?: string;
 }
 export class AddGuestsRequestDto implements AddGuestsRequest {
   @IsUUID()
@@ -160,6 +164,10 @@ export class UpdateGuestsRequestDto implements UpdateGuestsRequest {
   @IsBoolean()
   @IsOptional()
   sendInvite?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  email?: string;
 }
 
 export class GuestsRequestDto implements GuestsRequest {
