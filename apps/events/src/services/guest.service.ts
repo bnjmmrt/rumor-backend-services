@@ -4000,6 +4000,7 @@ export class GuestService {
 
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
+    
     if (!host) throw new NotFoundError('Host not found');
 
     if (!payload.email && !payload.phoneNumber) {
@@ -4012,6 +4013,7 @@ export class GuestService {
           email: '',
           phoneNumber: phoneNumber || '',
           eventId: event.id,
+          hostId: host.id,
         }))(payload);
 
         if (event.status !== EventStatusEnum.APPROVED_STATUS) {

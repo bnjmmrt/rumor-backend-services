@@ -2642,11 +2642,21 @@ export class AuthService {
     user.lastName = payload.lastName || 'NA';
     user.phoneNumber = payload.phoneNumber || '';
     user = await this.dbConnection.getRepository(User).save(user);
+
+    //if a hostId is provided, create a hostUserMapping
+    if (payload.hostId) {
+      await this.dbConnection.getRepository(HostUserMapping).save({
+        host: { id: payload.hostId },
+        user: { id: user.id },
+      });
+    }
+
     await RoleService.assignRoleToUser(
       { userId: user.id, roleName: 'non_member' },
       UserSource.INVITED_BY_HOST,
       UserStatus.NON_MEMBER
     );
+
     return { userId: user.id };
   }
 
