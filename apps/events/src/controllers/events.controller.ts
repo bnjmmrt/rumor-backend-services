@@ -338,8 +338,9 @@ export class EventsController {
   //@GrpcMethod(EVENTS_SERVICE_NAME, 'UpdateEventAgeLimit')
   public static getPublicEvent = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const { id } = req.params;
-      const payload: RequestByIdDto = { id };
+      const { eventId } = req.params;
+      const payload: RequestByIdDto = { id: eventId };
+      console.log("payload", payload);
       const ageLimitResponse: EventData = await EventsService.getPublicEvent(payload);
       const successResponse = new GetResponse(ageLimitResponse);
       res.status(successResponse.statusCode).json(successResponse);
