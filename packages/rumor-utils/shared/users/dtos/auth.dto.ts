@@ -458,6 +458,9 @@ export class CreateNonMemberUserRequestDto implements CreateNonMemberUserRequest
   @IsString()
   @IsOptional()
   eventId?: string;
+  @IsString()
+  @IsOptional()
+  hostId?: string;
 }
 
 export class CreateHostCollaboratorRequestDto implements CreateHostCollaboratorRequest {
