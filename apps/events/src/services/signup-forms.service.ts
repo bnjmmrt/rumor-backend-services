@@ -1198,30 +1198,100 @@ export class SignupFormsServices {
   public static async exportCsv(id: string, hostId: string, query: any): Promise<string> {
     // Get the guest data
     const data = await this.listSubmissions(id, hostId, query);
-
-    // Define the titles and keys for the CSV
-    const titleMapping = [
+    
+    // Get the questions for this signup form
+    const questions = await this.getSignupFormQuestions(id);
+    
+    // Define the base titles and keys
+    const baseTitleMapping = [
       { id: 'firstName', title: 'First Name' },
       { id: 'lastName', title: 'Last Name' },
       { id: 'partySize', title: 'Party Size' },
-      { id: 'gender', title: 'Gender' },
       { id: 'email', title: 'Email' },
-      { id: 'phone', title: 'Phone Number' },
+      { id: 'phone', title: 'Phone' },
       { id: 'status', title: 'Guest Status' },
     ];
-    const lineItems = data.result.map((item: any) => {
+
+    // Check if Instagram question exists
+    const instagramQuestion = questions.find(q => 
+      ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(q.name)
+    );
+
+    // Add custom questions to the mapping, excluding "Request Access for Additional Guests"
+    const customQuestions = questions
+      .filter(q => q.name !== 'Request Access for Additional Guests')
+      .map(q => ({
+        id: q.id,
+        title: q.name
+      }));
+
+    // Create a Set of existing titles to prevent duplicates
+    const existingTitles = new Set(baseTitleMapping.map(item => item.title));
+
+    // Filter out any custom questions that would create duplicate columns
+    const uniqueCustomQuestions = customQuestions.filter(q => {
+      if (existingTitles.has(q.title)) {
+        return false;
+      }
+      existingTitles.add(q.title);
+      return true;
+    });
+
+    // If Instagram question exists, insert followers column right after it
+    if (instagramQuestion) {
+      const instagramIndex = uniqueCustomQuestions.findIndex(q => q.id === instagramQuestion.id);
+      if (instagramIndex !== -1) {
+        uniqueCustomQuestions.splice(instagramIndex + 1, 0, {
+          id: 'instagramFollowers',
+          title: 'Instagram Followers'
+        });
+      }
+    }
+
+    const lineItems = await Promise.all(data.result.map(async (item: any) => {
       const lineItem: any = {};
-      titleMapping.forEach(title => {
+      
+      // Add base fields
+      baseTitleMapping.forEach(title => {
         lineItem[title.title] = item[title.id];
       });
+
+      // Add custom question answers
+      if (item.answers) {
+        for (const answer of item.answers) {
+          const question = questions.find(q => q.id === answer.id);
+          if (question && question.name !== 'Request Access for Additional Guests') {
+            lineItem[question.name] = answer.answers;
+
+            // If this is an Instagram handle answer, fetch follower count
+            if (instagramQuestion && question.id === instagramQuestion.id) {
+              try {
+                const cleanUsername = answer.answers.replace('@', '').trim().toLowerCase();
+                const igProfile = await this.getOrFetchInstagramProfile(cleanUsername);
+                lineItem['Instagram Followers'] = igProfile.followerCount;
+              } catch (e) {
+                console.error(`Failed to fetch Instagram followers for ${answer.answers}:`, e);
+                lineItem['Instagram Followers'] = '';
+              }
+            }
+          }
+        }
+      }
+
       return lineItem;
-    });
+    }));
+
+    // Combine base and custom columns for the CSV
+    const allColumns = [
+      ...baseTitleMapping.map(item => item.title),
+      ...uniqueCustomQuestions.map(q => q.title)
+    ];
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
       stringify(
         lineItems,
-        { header: true, columns: titleMapping.map(item => item.title) },
+        { header: true, columns: allColumns },
         (err, output) => {
           if (err) {
             reject(err);
