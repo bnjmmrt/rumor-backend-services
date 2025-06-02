@@ -340,7 +340,6 @@ export class EventsController {
     async (req: Request, res: Response): Promise<void> => {
       const { eventId } = req.params;
       const payload: RequestByIdDto = { id: eventId };
-      console.log("payload", payload);
       const ageLimitResponse: EventData = await EventsService.getPublicEvent(payload);
       const successResponse = new GetResponse(ageLimitResponse);
       res.status(successResponse.statusCode).json(successResponse);
