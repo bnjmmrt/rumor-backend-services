@@ -488,6 +488,10 @@ export const sendGuestEventApproval = async (
       key: 'link_to_application',
       value: branchLink || 'https://app.therumor.com/app',
     },
+    {
+      key: 'email',
+      value: emailsData.email,
+    },
   ];
 
   try {

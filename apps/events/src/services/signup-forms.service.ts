@@ -45,6 +45,7 @@ import { stringify } from 'csv-stringify';
 export class SignupFormsServices {
   public static dbConnection = database;
   public static dataSource: DataSource;
+
   public static async getStaticQuestions() {
     const staticQuestions = await SignupFormStaticQuestions.find({
       where: {

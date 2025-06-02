@@ -292,7 +292,7 @@ export class GuestService {
             const baseRedirectUrl = event.branchLink || 'https://app.therumor.com/app';
 
             for (const guest of updateGuests) {
-              const { phoneNumber, invitationSource, userId } = guest;
+              const { phoneNumber, invitationSource, userId, email } = guest;
 
               if (!phoneNumber) continue;
 
@@ -308,8 +308,8 @@ export class GuestService {
               if (shouldSendDecline && invitationSource === UserSource.SIGN_UP_FORM) {
                 textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
               } else if (shouldSendApproval) {
-                if (invitationSource === UserSource.SIGN_UP_FORM) {                  
-                  textMessage = `Good news! Your request for ${event.name} was approved. Download the Rumor app and log in with this phone number: ${phoneNumber} to view your confirmation.\n\n${baseRedirectUrl}`;
+                if (invitationSource === UserSource.SIGN_UP_FORM) {
+                  textMessage = `Good news! Your request for ${event.name} was approved. Download the Rumor app and log in with this phone number: [${phoneNumber}] to view your confirmation.\n\n${baseRedirectUrl}`;
                 } else if (invitationSource === UserSource.REQUEST_IN_APP) {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
@@ -1064,7 +1064,11 @@ export class GuestService {
               imageFlyer: event.imageFlyer,
               location: event.location.location,
               city: event.location.city,
+
+              email: data.email,
+
               branchLink: event.branchLink,
+
               emailsData: {
                 eventId: data.eventId,
                 id: data.id,
