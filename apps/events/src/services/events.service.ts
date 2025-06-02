@@ -145,6 +145,8 @@ import {
   SchedulerJobType,
   SchedulerTriggerPayload,
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { generateBranchLink } from '../utils/branch.utils';
+import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
 
 const responses = {
   conflict: (message: string) => ({
@@ -329,6 +331,9 @@ export class EventsService {
       // Save event within the transaction
       const createdEvent = await queryRunner.manager.save(event);
 
+      // Generate and update Branch link now that the event has an ID
+      await this.generateAndUpdateBranchLink(createdEvent.id, createdEvent.name, queryRunner);
+
       // Save associated data (ticket types, talents, collaborators, quiz questions)
       await this.saveAssociatedData(payload, createdEvent.id, queryRunner);
 
@@ -416,7 +421,7 @@ export class EventsService {
         },
         {
           key: 'event_url',
-          value: config.get('RUMOR_WEBSITE_ADMIN') + `${redirectPath}`,
+          value: config.get('RUMOR_WEBSITE_ADMIN') + `/${redirectPath}`,
         },
       ],
       'Super Admin - New Event Submission',
@@ -517,6 +522,42 @@ export class EventsService {
       .getOne();
 
     return event;
+  }
+
+  /**
+   * Generates and updates the Branch link for an event after it has been saved and has an ID.
+   *
+   * @param eventId - The ID of the saved event.
+   * @param eventName - The name of the event for the marketing title.
+   * @param queryRunner - The query runner to handle the transaction.
+   * @returns The generated Branch link.
+   */
+  private static async generateAndUpdateBranchLink(
+    eventId: string,
+    eventName: string,
+    queryRunner: QueryRunner,
+  ): Promise<string> {
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${eventId}`;
+    const deepLinkPath = `events/event-details?id=${eventId}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${eventName}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    await queryRunner.manager.update(Event, { id: eventId }, { branchLink });
+
+    return branchLink;
   }
 
   /**
@@ -1391,6 +1432,24 @@ export class EventsService {
     if (isEventApprovedAndNotEnded) {
       throw new ConflictError('Cannot delete an approved event that has not ended');
     }
+
+    // Get associated sponsorship opportunities and their dependencies
+    const sponsorshipOpportunityRepo = this.dbConnection.getRepository(SponsorshipOpportunity);
+    const sponsorshipOpportunities = await sponsorshipOpportunityRepo.find({
+      where: { event: { id: event.id } },
+      relations: ['targetSponsors', 'inquiries'], // Include relations that have cascade soft-remove
+    });
+
+    // First set event_id to null for all sponsorship opportunities
+    await sponsorshipOpportunityRepo
+      .createQueryBuilder()
+      .update(SponsorshipOpportunity)
+      .set({ event: null })
+      .where('event.id = :eventId', { eventId: event.id })
+      .execute();
+
+    // Then perform the soft remove
+    await sponsorshipOpportunityRepo.softRemove(sponsorshipOpportunities);
 
     const csvUploads = await this.dbConnection.getRepository(CsvUploadRecords).find({
       where: { event: { id: event.id } },
@@ -2669,6 +2728,7 @@ export class EventsService {
             eventDate: event.startDate,
             location: event.location?.location,
             city: event.location?.city,
+            branchLink: event.branchLink,
           };
           return sendEventReminder(
             mailPayload,
@@ -2755,6 +2815,7 @@ export class EventsService {
           eventDate: event.startDate,
           location: event.location.location,
           city: event.location.city,
+          branchLink: event.branchLink,
         };
         sendEventUpdation(
           createMailPayload,
@@ -3056,14 +3117,15 @@ export class EventsService {
         imageFlyer: updatedEvent.imageFlyer,
         location: updatedEvent.location.location,
         city: updatedEvent.location.city,
+        branchLink: updatedEvent.branchLink,
       };
-      sendEventPublishedApproval(
-        createPayload,
-        updatedEvent.owner.email,
-        host.additionalHostInformation.companyName,
-        updatedEvent.id,
-        updatedEvent.timeZone,
-      );
+      sendEventPublishedApproval({
+        mailComponents: createPayload,
+        email: updatedEvent.owner.email,
+        companyName: host.additionalHostInformation.companyName,
+        eventId: updatedEvent.id,
+        timeZone: updatedEvent.timeZone,
+      });
     }
     return;
   }
@@ -3139,7 +3201,32 @@ export class EventsService {
     newEvent.ticketTypes = event.ticketTypes;
     newEvent.collaborators = event.collaborators;
     newEvent.quizQuestions = event.quizQuestions;
+
+    // Save the duplicated event first to get an ID
     const createdEvent = await this.dbConnection.getRepository(Event).save(newEvent);
+
+    // Generate a new Branch link for the duplicated event
+    const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${createdEvent.id}`;
+    const deepLinkPath = `events/event-details?id=${createdEvent.id}`;
+
+    const branchData = {
+      $web_only: false,
+      $fallback_url: webUrl,
+      $ios_url: `therumorapp://${deepLinkPath}`,
+      $android_url: `com.therumor://${deepLinkPath}`,
+      $desktop_url: webUrl,
+      $marketing_title: `Event: ${createdEvent.name}`,
+    };
+
+    const branchLink = await generateBranchLink({
+      path: deepLinkPath,
+      data: branchData,
+    });
+
+    // Update the event with the generated branch link
+    createdEvent.branchLink = branchLink;
+    await this.dbConnection.getRepository(Event).save(createdEvent);
+
     return responses.data(toEvent(createdEvent, null));
   }
 
@@ -3291,7 +3378,7 @@ export class EventsService {
     if (updatedEvent.status === EventStatus[EventStatus.APPROVED_STATUS]) {
       //send text notification
       if (updatedEvent?.owner?.phoneNumber) {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = updatedEvent.branchLink || 'https://app.therumor.com/app';
         let message = `Hi ${updatedEvent?.owner?.additionalHostInformation?.companyName || 'Host'}, ${updatedEvent.name} has been approved and is live on Rumor! Log in to send invites and manage your guest list now. ${link}`;
         //Micro-service call
         let number = updatedEvent?.owner?.phoneNumber;
@@ -3312,14 +3399,15 @@ export class EventsService {
           imageFlyer: updatedEvent.imageFlyer,
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
         };
-        sendEventPublishedApproval(
-          createPayload,
-          updatedEvent.owner.email,
-          host.additionalHostInformation.companyName,
-          updatedEvent.id,
-          updatedEvent.timeZone,
-        );
+        sendEventPublishedApproval({
+          mailComponents: createPayload,
+          email: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          timeZone: updatedEvent.timeZone,
+        });
         // Send Push Notification
         try {
           serviceMesh
@@ -3337,15 +3425,16 @@ export class EventsService {
           imageFlyer: updatedEvent.imageFlyer,
           location: updatedEvent.location.location,
           city: updatedEvent.location.city,
+          branchLink: updatedEvent.branchLink,
         };
-        sendEventPrePublishApproval(
+        sendEventPrePublishApproval({
           createPayload,
-          updatedEvent.owner.email,
-          host.additionalHostInformation.companyName,
-          updatedEvent.id,
-          updatedEvent.publishDate,
-          updatedEvent.timeZone,
-        );
+          ownerEmail: updatedEvent.owner.email,
+          companyName: host.additionalHostInformation.companyName,
+          eventId: updatedEvent.id,
+          publishDate: updatedEvent.publishDate,
+          timeZone: updatedEvent.timeZone,
+        });
         try {
           //Send Push Notifications
           serviceMesh
@@ -3738,6 +3827,7 @@ export class EventsService {
               city: event.location.city || ' ',
               hostName:
                 event.owner?.additionalHostInformation?.companyName || event.owner.email || '',
+              branchLink: event.branchLink,
             };
             let mailServiceResponse = sendEventCancellation(
               createPayload,

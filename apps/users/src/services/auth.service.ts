@@ -193,6 +193,7 @@ import {
   entityToUserStatus,
   newUserStatusTosUserStatus,
   userSourceToEntity,
+  userStatusToEntity,
 } from 'rumor-utils/shared/users/mappers/shared.mapper';
 import { RoleService } from './role.service';
 import { SocialProviderType } from 'rumor-utils/shared/users/interfaces/shared.interface';
@@ -424,12 +425,13 @@ export class AuthService {
         lastName: payload.lastName,
         dateOfBirth: payload.dateOfBirth,
         phoneNumber: payload.phoneNumber,
+        instagramUserName: payload.instagramUserName,
         address: address,
         additionalMemberInformation: {
           ...existingUser.additionalMemberInformation,
           ...(payload.socialUrl && { socialUrl: payload.socialUrl }),
         },
-      };
+      } as Partial<User>;
 
       await this.dbConnection.getRepository(User).update(existingUser.id, updateData);
 
@@ -444,6 +446,12 @@ export class AuthService {
         newUser.additionalMemberInformation = { socialUrl: payload.socialUrl };
       }
       newUser = await this.dbConnection.getRepository(User).save(newUser);
+    }
+    
+    if (payload.instagramUserName) {
+      try {
+        await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
+      } catch (e) {}
     }
 
     if (payload.instagramAccessToken) {
@@ -497,7 +505,7 @@ export class AuthService {
     newUser = await this.dbConnection.getRepository(User).save(newUser);
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: 'non_member' },
-      UserSource.REQUEST_IN_APP,
+      UserSource.REQUEST_IN_APP, UserStatus.NEW_APPLICANT
     );
 
     await PlatformService.saveFocusesForUser({
@@ -1264,7 +1272,7 @@ export class AuthService {
         (payload.referralCode
           ? `Enter code ${payload.referralCode} to expedite your application review.`
           : ``) +
-        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+        `\n https://app.therumor.com/app`;
 
       //Micro-service call
       try {
@@ -1286,7 +1294,7 @@ export class AuthService {
         },
         {
           key: 'link_to_application',
-          value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
+          value: 'https://app.therumor.com/app', //config.get('RUMOR_WEBSITE'),
         },
       ];
 
@@ -1353,7 +1361,7 @@ export class AuthService {
     if (payload?.phoneNumber) {
       let message =
         `Hi ${payload.name?.split(' ')[0] || 'User'}, we invite you to join our community on Rumor. Download the app today to start discovering events. ` +
-        `\n ${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+        `\n https://app.therumor.com/app`;
 
       //Micro-service call
       try {
@@ -2354,7 +2362,7 @@ export class AuthService {
         [
           {
             key: 'link_to_application',
-            value: config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+            value: 'https://app.therumor.com/app',
           },
           {
             key: 'first_name',
@@ -2383,7 +2391,7 @@ export class AuthService {
     let userPhoneNumber = user?.phoneNumber;
     if (userPhoneNumber) {
       try {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = 'https://app.therumor.com/app';
         let message = `Welcome to Rumor. Your application has been approved! Log in here to start discovering events. ${link}`;
         const validateNumber = isValidPhoneNumber(userPhoneNumber);
         if (validateNumber) {
@@ -2568,7 +2576,7 @@ export class AuthService {
 
       // Send email only to users who are now "ACTIVE" and got the "member" role
       try {
-        let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+        let link = 'https://app.therumor.com/app';
         if (update.newStatus === UserStatus.ACTIVE && update.newRole) {
           const user = users.find(u => u.id === update.userRole.user.id);
           console.log('🚀 ~ AuthService ~ updateUsersStatus ~ user:', user);
@@ -2620,12 +2628,6 @@ export class AuthService {
   public static async createNonMemberUser(
     payload: CreateNonMemberUserRequestDto,
   ): Promise<UserIdData> {
-    // const exists = await this.dbConnection
-    //   .getRepository(User)
-    //   .findOne({ where: [{ email: payload.email }, { phoneNumber: payload.phoneNumber }] });
-    // if (exists) {
-    //   throw new BadRequestError('user exists');
-    // }
     if (payload.email || payload.phoneNumber) {
       const exists = await this.dbConnection
         .getRepository(User)
@@ -2640,7 +2642,21 @@ export class AuthService {
     user.lastName = payload.lastName || 'NA';
     user.phoneNumber = payload.phoneNumber || '';
     user = await this.dbConnection.getRepository(User).save(user);
-    await RoleService.assignRoleToUser({ userId: user.id, roleName: 'non_member' });
+
+    //if a hostId is provided, create a hostUserMapping
+    if (payload.hostId) {
+      await this.dbConnection.getRepository(HostUserMapping).save({
+        host: { id: payload.hostId },
+        user: { id: user.id },
+      });
+    }
+
+    await RoleService.assignRoleToUser(
+      { userId: user.id, roleName: 'non_member' },
+      UserSource.INVITED_BY_HOST,
+      UserStatus.NON_MEMBER
+    );
+
     return { userId: user.id };
   }
 
@@ -3538,11 +3554,14 @@ export class AuthService {
       newUser.firstName = payload.firstName;
       newUser.lastName = payload.lastName;
       newUser.phoneNumber = payload.phoneNumber ?? '';
+
       this.dbConnection.getRepository(User).create(newUser);
       user = await this.dbConnection.getRepository(User).save(newUser);
 
       const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source);
+      const status = payload.status !== undefined ? userStatusToEntity[payload.status] : null;
+
+      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source, status);
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;
@@ -3847,6 +3866,7 @@ export class AuthService {
       .skip(skip)
       .take(take);
 
+    const [usersj, count] = await usersQuery.getManyAndCount();
     /**past event filter */
     if (pastEventsIds.length) {
       const confirmedStatus = GuestStatus.CONFIRMED;
@@ -3858,7 +3878,6 @@ export class AuthService {
           .from(Guest, 'g')
           .where('g.event_id IN (:...pastEventsIds)', { pastEventsIds })
           .andWhere('g.status = :confirmedStatus', { confirmedStatus })
-          .andWhere('g.check_in = true')
           .getQuery();
         return 'user.id IN ' + subQuery;
       });
@@ -4068,7 +4087,9 @@ export class AuthService {
         return userData;
       }),
     );
-    return { result: users, totalCount };
+
+    return { result: users, totalCount: count };
+
   }
 
   // ADMIN Sevice Code
@@ -4823,7 +4844,7 @@ export class AuthService {
       if (followerCountFrom === undefined || followerCountTo === undefined) {
         return {
           error: true,
-          response: `Please provide both ‘Follower Count From’ and ‘Follower Count To’ when selecting one or more social networks.`,
+          response: `Please provide both 'Follower Count From' and 'Follower Count To' when selecting one or more social networks.`,
         };
       }
       if (followerCountFrom > followerCountTo) {
@@ -4933,7 +4954,7 @@ export class AuthService {
           if (user?.phoneNumber) {
             //Micro-service call
             try {
-              let link = config.get('RUMOR_WEBSITE_HOST') + 'redirect';
+              let link = 'https://app.therumor.com/app';
               let message = `Hi ${user?.firstName}, great news! Your application to become a host on Rumor has been approved. Log in to start curating your first experience and connect with our influential community. ${link}`;
               smsToSend.push({ phoneNumber: user.phoneNumber, message: message });
             } catch (err) {

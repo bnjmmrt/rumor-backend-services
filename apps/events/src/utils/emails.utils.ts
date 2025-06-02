@@ -10,6 +10,7 @@ interface MailComponent {
   location?: string | undefined;
   city: string;
   hostName?: string | undefined;
+  branchLink?: string;
   emailsData?:
     | {
         eventId?: string | undefined;
@@ -24,7 +25,8 @@ export const sendEventInviteMember = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName, emailsData, branchLink } =
+    mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -67,7 +69,7 @@ export const sendEventInviteMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: branchLink || 'https://app.therumor.com/app',
     },
   );
   try {
@@ -89,7 +91,8 @@ export const sendEventInviteNonMember = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, hostName, emailsData, branchLink } =
+    mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
     {
@@ -136,7 +139,7 @@ export const sendEventInviteNonMember = async (
     { key: 'first_name', value: data.firstName },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: branchLink || 'https://app.therumor.com/app',
     },
   );
   try {
@@ -159,7 +162,8 @@ export const sendEventInviteToConfirmedGuest = async (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   try {
-    const { eventDate, eventName, imageFlyer, city, hostName, emailsData } = mailComponents;
+    const { eventDate, eventName, imageFlyer, city, hostName, emailsData, branchLink } =
+      mailComponents;
     const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
     const params = [
       {
@@ -206,7 +210,7 @@ export const sendEventInviteToConfirmedGuest = async (
       { key: 'first_name', value: data.firstName },
       {
         key: 'view_ticket',
-        value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+        value: branchLink || 'https://app.therumor.com/app',
       },
     );
     const emailData = await serviceMesh
@@ -305,7 +309,7 @@ export const sendEventUpdation = async (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = `users/${userId}/events/${eventId}`;
-  const { eventDate, eventName, imageFlyer, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, branchLink } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -343,7 +347,7 @@ export const sendEventUpdation = async (
     },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect',
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 
@@ -362,7 +366,7 @@ export const sendEventInvitePlusOnes = async (
   addOnData: any,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { email, userId, firstName, eventId, leadGuestName } = addOnData;
+  const { email, userId, firstName, eventId, leadGuestName, branchLink } = addOnData;
   const redirectPath = `users/${userId}/events/${eventId}`;
   const { eventDate, eventName, imageFlyer, city, hostName } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
@@ -417,7 +421,7 @@ export const sendEventInvitePlusOnes = async (
     },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 
@@ -440,7 +444,7 @@ export const sendGuestEventApproval = async (
   mailComponents: MailComponent,
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city, emailsData } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, emailsData, branchLink } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -482,7 +486,11 @@ export const sendGuestEventApproval = async (
     },
     {
       key: 'link_to_application',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE'),
+      value: branchLink || 'https://app.therumor.com/app',
+    },
+    {
+      key: 'email',
+      value: emailsData.email,
     },
   ];
 
@@ -507,9 +515,10 @@ export const sendEventAnnouncement = async (
   eventName: string,
   eventId: string,
   email: string,
+  branchLink?: string,
   copy?: string,
 ): Promise<AxiosResponse<any, any>> => {
-  const redirectPath = config.get('RUMOR_WEBSITE_HOST') + 'redirect'; //`event-announcement?id=${eventId}`;
+  const redirectPath = branchLink || 'https://app.therumor.com/app';
   const params = [
     { key: 'event', value: eventName },
     { key: 'host', value: hostName },
@@ -520,28 +529,32 @@ export const sendEventAnnouncement = async (
   try {
     const emailData = await serviceMesh
       .notificationService()
-
       .sendEmailFromTemplate(
         params,
         'Non-Member: New Event Announcement',
         [email.trim().toLowerCase()],
         null,
       );
-
     return emailData;
   } catch (error) {
     console.log(`Event Announcement failed at function sendEventInviteMember:: ${error}`);
   }
 };
 
-export const sendEventPublishedApproval = async (
-  mailComponents: MailComponent,
-  email: string,
-  companyName: string,
-  eventId: string,
-  timeZone: string,
-): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city } = mailComponents;
+export const sendEventPublishedApproval = async ({
+  mailComponents,
+  email,
+  companyName,
+  eventId,
+  timeZone,
+}: {
+  mailComponents: MailComponent;
+  email: string;
+  companyName: string;
+  eventId: string;
+  timeZone: string;
+}): Promise<AxiosResponse<any, any>> => {
+  const { eventDate, eventName, imageFlyer, city, branchLink } = mailComponents;
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
   const params = [
@@ -583,7 +596,7 @@ export const sendEventPublishedApproval = async (
     },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
     },
   ];
   try {
@@ -597,19 +610,27 @@ export const sendEventPublishedApproval = async (
       );
     return emailData;
   } catch (e) {
-    console.log(`Evant Published Approval failed at function sendEventPublishedApproval:: ${e}`);
+    console.log(`Event Published Approval failed at function sendEventPublishedApproval:: ${e}`);
   }
 };
 
-export const sendEventPrePublishApproval = async (
-  mailComponents: MailComponent,
-  email: string,
-  companyName: string,
-  eventId: string,
-  publishDate: Date,
-  timeZone: string,
-): Promise<AxiosResponse<any, any>> => {
-  const { eventDate, eventName, imageFlyer, city } = mailComponents;
+export const sendEventPrePublishApproval = async ({
+  createPayload,
+  ownerEmail,
+  companyName,
+  eventId,
+  publishDate,
+  timeZone,
+}: {
+  createPayload: MailComponent;
+  ownerEmail: string;
+  companyName: string;
+  eventId: string;
+  publishDate: Date;
+  timeZone: string;
+}): Promise<AxiosResponse<any, any>> => {
+  const { eventDate, eventName, imageFlyer, city, branchLink } = createPayload;
+
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const publishDateData = extractDate(publishDate, timeZone);
   const redirectPath = `events/event-details?id=${eventId}`;
@@ -660,7 +681,7 @@ export const sendEventPrePublishApproval = async (
     },
     {
       key: 'view_event',
-      value: config.get('RUMOR_WEBSITE_HOST') + `${redirectPath}`,
+      value: branchLink || config.get('RUMOR_WEBSITE_HOST') + `/${redirectPath}`,
     },
   ];
   try {
@@ -669,7 +690,7 @@ export const sendEventPrePublishApproval = async (
       .sendEmailFromTemplate(
         params,
         'Host Event Approved by Admin - Pre-Publish',
-        [email.trim().toLowerCase()],
+        [ownerEmail.trim().toLowerCase()],
         null,
       );
     return emailData;
@@ -716,7 +737,7 @@ export const sendEventReminder = async (
   timeZone: string,
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = `users/${userId}/events/${eventId}`; //TODO  : this should be view rsvp button url (need to update)
-  const { eventDate, eventName, imageFlyer, city } = mailComponents;
+  const { eventDate, eventName, imageFlyer, city, branchLink } = mailComponents;
 
   const { month, day, dayOfWeek, hour, minutes, period } = extractDate(eventDate, timeZone);
   const params = [
@@ -754,7 +775,7 @@ export const sendEventReminder = async (
     },
     {
       key: 'view_rsvp',
-      value: config.get('RUMOR_WEBSITE_HOST') + 'redirect', //config.get('RUMOR_WEBSITE') + `${redirectPath}`,
+      value: branchLink || 'https://app.therumor.com/app',
     },
   ];
 

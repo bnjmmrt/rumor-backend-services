@@ -13,6 +13,11 @@ import { CollaboratorController } from '../controllers/collaborator.controller';
 import { AdmissionTypeController } from '../controllers/admission-type.controller';
 import { FeaturedEventSectionsController } from '../controllers/featured-event-sections.controller';
 import { validateRequest } from '../server/middleware/validate-request';
+import { SponsorshipOpportunityController } from '../controllers/sponsorship-opportunity.controller';
+import { SponsorshipCategoryController } from '../controllers/sponsorship-category.controller';
+import { TargetSponsorController } from '../controllers/target-sponsor.controller';
+import { CulturalMomentController } from '../controllers/cultural-moment.controller';
+import { SponsorshipInquiryController } from '../controllers/sponsorship-inquiry.controller';
 
 const router: Router = express.Router();
 
@@ -481,5 +486,184 @@ router.get('/guest/event/:id/export', AuthMiddleware.fusionAuthRequired, GuestCo
 router.delete('/delete-host-events/:id', EventsController.deleteHostEvents);
 
 router.post('/event/reminders/send', EventsController.sendEventRemindersToAllGuests);
+
+
+//Sponsorships here
+router.post(
+  '/sponsorships/opportunities',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipOpportunity'),
+  SponsorshipOpportunityController.create,
+);
+
+router.get(
+  '/sponsorships/opportunities',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.findAll,
+);
+
+router.get(
+  '/sponsorships/opportunities/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.findOne,
+);
+
+router.get(
+  '/sponsorships/opportunities/host/current/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.findOneForHost,
+);
+
+router.get(
+  '/sponsorships/events',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.findEventsWithSponsorships,
+);
+
+router.get(
+  '/sponsorships/events/available',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.findAvailableEvents,
+);
+
+router.patch(
+  '/sponsorships/opportunities/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipOpportunity'),
+  SponsorshipOpportunityController.update,
+);
+
+router.delete(
+  '/sponsorships/opportunities/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipOpportunityController.remove,
+);
+
+router.post(
+  '/sponsorships/categories',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipCategory'),
+  SponsorshipCategoryController.create,
+);
+
+router.get(
+  '/sponsorships/categories',
+  AuthMiddleware.fusionAuthRequired, 
+  SponsorshipCategoryController.findAll);
+
+router.get(
+  '/sponsorships/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipCategoryController.findOne,
+);
+
+router.patch(
+  '/sponsorships/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipCategory'),
+  SponsorshipCategoryController.update,
+);
+
+router.delete(
+  '/sponsorships/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipCategoryController.remove,
+);
+
+router.post(
+  '/sponsorships/target-sponsors',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('targetSponsor'),
+  TargetSponsorController.create,
+);
+
+router.get(
+  '/sponsorships/target-sponsors',
+  AuthMiddleware.fusionAuthRequired,
+  TargetSponsorController.findAll,
+);
+
+router.get(
+  '/sponsorships/target-sponsors/:id',
+  AuthMiddleware.fusionAuthRequired,
+  TargetSponsorController.findOne,
+);
+
+router.patch(
+  '/sponsorships/target-sponsors/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('targetSponsor'),
+  TargetSponsorController.update,
+);
+
+router.delete(
+  '/sponsorships/target-sponsors/:id',
+  AuthMiddleware.fusionAuthRequired,
+  TargetSponsorController.remove,
+);
+
+router.post(
+  '/cultural-moments',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('culturalMoment'),
+  CulturalMomentController.create,
+);
+
+router.get(
+  '/cultural-moments',
+  AuthMiddleware.fusionAuthRequired,
+  CulturalMomentController.findAll,
+);
+
+router.get(
+  '/cultural-moments/:id',
+  AuthMiddleware.fusionAuthRequired,
+  CulturalMomentController.findOne,
+);
+
+router.patch(
+  '/cultural-moments/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('culturalMoment'),
+  CulturalMomentController.update,
+);
+
+router.delete(
+  '/cultural-moments/:id',
+  AuthMiddleware.fusionAuthRequired,
+  CulturalMomentController.remove,
+);
+
+router.post(
+  '/sponsorships/inquiries',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipInquiry'),
+  SponsorshipInquiryController.create,
+);
+
+router.get(
+  '/sponsorships/inquiries',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipInquiryController.findAll,
+);
+
+router.get(
+  '/sponsorships/inquiries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipInquiryController.findOne,
+);
+
+router.patch(
+  '/sponsorships/inquiries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('sponsorshipInquiry'),
+  SponsorshipInquiryController.update,
+);
+
+router.delete(
+  '/sponsorships/inquiries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  SponsorshipInquiryController.remove,
+);
 
 export default router;

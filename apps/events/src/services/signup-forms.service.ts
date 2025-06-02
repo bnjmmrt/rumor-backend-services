@@ -35,7 +35,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { isValidEmail, isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
 import { HostUserMapping } from 'rumor-utils/shared/users/entities/host-user-mapping.entity';
-import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
+import { UserSource as UserSourceEnum, UserStatus as UserStatusEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 import { HostFavorite } from 'rumor-utils/shared/users/entities/host-favorite.entity';
 import { HostFollowing } from 'rumor-utils/shared/users/entities/host-following.entity';
 import { HostCustomUsersLists } from 'rumor-utils/shared/users/entities/host-custom-users-lists.entity';
@@ -45,6 +45,7 @@ import { stringify } from 'csv-stringify';
 export class SignupFormsServices {
   public static dbConnection = database;
   public static dataSource: DataSource;
+
   public static async getStaticQuestions() {
     const staticQuestions = await SignupFormStaticQuestions.find({
       where: {
@@ -171,6 +172,8 @@ export class SignupFormsServices {
         relations: { owner: true },
       });
 
+      const maxAdditionalGuests = event?.limitOnePlus;
+
       console.log('body', body);
       if (!event) {
         throw new NotFoundError('Event');
@@ -203,6 +206,9 @@ export class SignupFormsServices {
         question.isRequired = q.isRequired;
         question.hasToggle = q.hasToggle || false;
         question.isToggled = q.isToggled || false;
+        if (q.name === 'Request Access for Additional Guests' && maxAdditionalGuests === 0) {
+          question.isToggled = false;
+        }
         question.ordering = index;
         question.signupForms = { id: signupForm.id } as EventSignupForms;
 
@@ -379,20 +385,24 @@ export class SignupFormsServices {
     });
   }
 
-  private static async registerUserAsNonMember(payload: User, queryRunner: QueryRunner) {
+  private static async registerUserAsNonMember(payload: User, queryRunner: QueryRunner): Promise<UserRole> {
     await queryRunner.manager.save(payload);
 
-    const nonMemberRole: Role[] = await this.dbConnection
+    const nonMemberRole: Role = await this.dbConnection
       .getRepository(Role)
-      .find({ where: { name: 'non_member' } });
+      .findOne({ where: { name: 'non_member' } });
 
     const userRole = UserRole.create({
-      role: { id: nonMemberRole[0].id },
+      role: { id: nonMemberRole.id },
       source: UserSourceEnum.SIGN_UP_FORM,
+      status: UserStatusEnum.NON_MEMBER,
       user: { id: payload.id },
     });
 
-    await queryRunner.manager.save(userRole);
+    const newUserRole = await queryRunner.manager.save(userRole);
+    newUserRole.role = nonMemberRole; // Ensure role is populated
+
+    return newUserRole;
   }
 
   private static async assignRoleToUser(payload: User, queryRunner: QueryRunner) {
@@ -403,6 +413,7 @@ export class SignupFormsServices {
     const userRole = UserRole.create({
       role: { id: nonMemberRole[0].id },
       source: UserSourceEnum.SIGN_UP_FORM,
+      status: UserStatusEnum.NON_MEMBER,
       user: { id: payload.id },
     });
 
@@ -437,7 +448,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== user.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== user.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -479,7 +491,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithEmail.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithEmail.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -501,7 +514,8 @@ export class SignupFormsServices {
       });
 
       if (guest) {
-        const declinedByHost = guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithPhone.id;
+        const declinedByHost =
+          guest.status === GuestStatus.DECLINED && guest.declinedBy?.id !== userFoundWithPhone.id;
 
         if (guest.status === GuestStatus.DECLINED) {
           if (declinedByHost) {
@@ -515,7 +529,6 @@ export class SignupFormsServices {
           );
         }
       }
-
     }
     return '';
   }
@@ -553,7 +566,8 @@ export class SignupFormsServices {
       await queryRunner.startTransaction();
 
       if (!userPayload.id) {
-        await this.registerUserAsNonMember(userPayload, queryRunner);
+        const userRole = await this.registerUserAsNonMember(userPayload, queryRunner);
+        userPayload.roles = [userRole];
       }
 
       const isMemberOrNonMember = userPayload?.roles?.some(userRole =>
@@ -621,7 +635,7 @@ export class SignupFormsServices {
           const validateNumber = isValidPhoneNumber(userPayload.phoneNumber);
           if (validateNumber) {
             const cleanedNumber = userPayload.phoneNumber.replace(/[\s\-()]/g, '').trim();
-            const link = `${config.get('RUMOR_WEBSITE_HOST') + 'redirect'}`;
+            const link = 'https://app.therumor.com/app';
             let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }
@@ -1184,30 +1198,100 @@ export class SignupFormsServices {
   public static async exportCsv(id: string, hostId: string, query: any): Promise<string> {
     // Get the guest data
     const data = await this.listSubmissions(id, hostId, query);
-
-    // Define the titles and keys for the CSV
-    const titleMapping = [
+    
+    // Get the questions for this signup form
+    const questions = await this.getSignupFormQuestions(id);
+    
+    // Define the base titles and keys
+    const baseTitleMapping = [
       { id: 'firstName', title: 'First Name' },
       { id: 'lastName', title: 'Last Name' },
       { id: 'partySize', title: 'Party Size' },
-      { id: 'gender', title: 'Gender' },
       { id: 'email', title: 'Email' },
-      { id: 'phone', title: 'Phone Number' },
+      { id: 'phone', title: 'Phone' },
       { id: 'status', title: 'Guest Status' },
     ];
-    const lineItems = data.result.map((item: any) => {
+
+    // Check if Instagram question exists
+    const instagramQuestion = questions.find(q => 
+      ['Instagram', 'Instagram Handle', 'What is your Instagram handle?'].includes(q.name)
+    );
+
+    // Add custom questions to the mapping, excluding "Request Access for Additional Guests"
+    const customQuestions = questions
+      .filter(q => q.name !== 'Request Access for Additional Guests')
+      .map(q => ({
+        id: q.id,
+        title: q.name
+      }));
+
+    // Create a Set of existing titles to prevent duplicates
+    const existingTitles = new Set(baseTitleMapping.map(item => item.title));
+
+    // Filter out any custom questions that would create duplicate columns
+    const uniqueCustomQuestions = customQuestions.filter(q => {
+      if (existingTitles.has(q.title)) {
+        return false;
+      }
+      existingTitles.add(q.title);
+      return true;
+    });
+
+    // If Instagram question exists, insert followers column right after it
+    if (instagramQuestion) {
+      const instagramIndex = uniqueCustomQuestions.findIndex(q => q.id === instagramQuestion.id);
+      if (instagramIndex !== -1) {
+        uniqueCustomQuestions.splice(instagramIndex + 1, 0, {
+          id: 'instagramFollowers',
+          title: 'Instagram Followers'
+        });
+      }
+    }
+
+    const lineItems = await Promise.all(data.result.map(async (item: any) => {
       const lineItem: any = {};
-      titleMapping.forEach(title => {
+      
+      // Add base fields
+      baseTitleMapping.forEach(title => {
         lineItem[title.title] = item[title.id];
       });
+
+      // Add custom question answers
+      if (item.answers) {
+        for (const answer of item.answers) {
+          const question = questions.find(q => q.id === answer.id);
+          if (question && question.name !== 'Request Access for Additional Guests') {
+            lineItem[question.name] = answer.answers;
+
+            // If this is an Instagram handle answer, fetch follower count
+            if (instagramQuestion && question.id === instagramQuestion.id) {
+              try {
+                const cleanUsername = answer.answers.replace('@', '').trim().toLowerCase();
+                const igProfile = await this.getOrFetchInstagramProfile(cleanUsername);
+                lineItem['Instagram Followers'] = igProfile.followerCount;
+              } catch (e) {
+                console.error(`Failed to fetch Instagram followers for ${answer.answers}:`, e);
+                lineItem['Instagram Followers'] = '';
+              }
+            }
+          }
+        }
+      }
+
       return lineItem;
-    });
+    }));
+
+    // Combine base and custom columns for the CSV
+    const allColumns = [
+      ...baseTitleMapping.map(item => item.title),
+      ...uniqueCustomQuestions.map(q => q.title)
+    ];
 
     // Return the CSV as a string
     return new Promise<string>((resolve, reject) => {
       stringify(
         lineItems,
-        { header: true, columns: titleMapping.map(item => item.title) },
+        { header: true, columns: allColumns },
         (err, output) => {
           if (err) {
             reject(err);

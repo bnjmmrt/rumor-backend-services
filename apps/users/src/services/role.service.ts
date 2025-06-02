@@ -31,7 +31,7 @@ export class RoleService {
     return responses.data([]);
   }
 
-  static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource): Promise<UserRole> {
+  static async assignRoleToUser(payload: RoleRequestDto, source?: UserSource, status?: UserStatus): Promise<UserRole> {
     const user = await this.dbConnection
       .getRepository(User)
       .findOne({ where: { id: payload.userId }, relations: { roles: { role: true } } });
@@ -60,6 +60,12 @@ export class RoleService {
       } else {
         console.log(`User already has the role: ${role.name} with same source`);
       }
+      // Update status if it's different
+      if (status && existingUserRole.status !== status) {
+        existingUserRole.status = status;
+        await this.dbConnection.getRepository(UserRole).save(existingUserRole);
+        console.log(`Updated status for user to: ${status}`);
+      }
       return existingUserRole;
     }
 
@@ -67,6 +73,10 @@ export class RoleService {
     userRole.source = source;
     userRole.user = user;
     userRole.role = role;
+
+    if (status){
+      userRole.status = status;
+    }
 
     const newRole = await this.dbConnection.getRepository(UserRole).save(userRole);
     return newRole;

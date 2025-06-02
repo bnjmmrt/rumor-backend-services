@@ -33,6 +33,8 @@ export const createNonMemberUser = (payload: CreateNonMemberUserRequestDto) =>
     phoneNumber: payload.phoneNumber,
     firstName: payload.firstName,
     lastName: payload.lastName,
+    hostId: payload.hostId,
+    eventId: payload.eventId,
   });
 
 export const assignRoleToUser = (userId: string, roleName?: string, roleId?: string) =>
@@ -49,6 +51,7 @@ export const registerInvitesAsNonMember = (payload: InvitedGuestRequestDto) =>
     email: payload.email,
     id: payload.userId,
     source: payload.source,
+    status: payload.status,
   });
 
 export const getCurrentUser = () => apiService.getApi().get(`/auth/current-user`);

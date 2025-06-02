@@ -60,10 +60,10 @@ import {
   CreateHostCollaboratorRequest,
 } from '../grpc/auth/auth.pb';
 import { Type } from 'class-transformer';
-import { NewUserStatus, PaginatedRequest, ProviderType, UserSource } from '../grpc/auth/shared.pb';
+import { NewUserStatus, PaginatedRequest, ProviderType, UserSource, UserStatus } from '../grpc/auth/shared.pb';
 import { IsPasswordMatch, IsStrongPassword } from '../../../decorators';
 import { Tag } from '../interfaces/auth.interface';
-import { UserStatus } from '../interfaces/shared.interface';
+import { UserStatus as UserStatusI } from '../interfaces/shared.interface';
 
 export class AdminSignUpRequestDto implements AdminSignUpRequest {
   @IsString()
@@ -458,6 +458,9 @@ export class CreateNonMemberUserRequestDto implements CreateNonMemberUserRequest
   @IsString()
   @IsOptional()
   eventId?: string;
+  @IsString()
+  @IsOptional()
+  hostId?: string;
 }
 
 export class CreateHostCollaboratorRequestDto implements CreateHostCollaboratorRequest {
@@ -675,6 +678,10 @@ export class NonMemberSignUpRequestDto implements CreateNonMemberUserRequest {
   @IsEnum(UserSource)
   @IsOptional()
   source?: UserSource;
+
+  @IsEnum(UserStatus)
+  @IsOptional()
+  status?: UserStatus;
 }
 
 export class VerifyCodeRequestDto {
@@ -861,7 +868,7 @@ export class UpdateUsersStatusDto {
   ids: string[];
 
   @IsNotEmpty()
-  status: UserStatus;
+  status: UserStatusI;
 }
 
 export class SwitchProfileDto {

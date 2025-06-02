@@ -27,7 +27,7 @@ import {
   ManageGuestsRequest,
 } from '../grpc/events/events.pb';
 import { Type } from 'class-transformer';
-import { AnswersData, GuestStatus, UserSource } from '../grpc/events/general.pb';
+import { AnswersData, GuestStatus, UserSource, UserStatus } from '../grpc/events/general.pb';
 
 export class ManageGuestsRequestDto implements ManageGuestsRequest {
   @IsUUID()
@@ -89,6 +89,10 @@ export class ManageGuestsRequestDto implements ManageGuestsRequest {
   @IsBoolean()
   @IsOptional()
   sendNotification?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  email?: string;
 }
 export class AddGuestsRequestDto implements AddGuestsRequest {
   @IsUUID()
@@ -160,6 +164,10 @@ export class UpdateGuestsRequestDto implements UpdateGuestsRequest {
   @IsBoolean()
   @IsOptional()
   sendInvite?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  email?: string;
 }
 
 export class GuestsRequestDto implements GuestsRequest {
@@ -319,6 +327,10 @@ export class InvitedGuestRequestDto implements InviteGuestRequest {
   @IsEnum(UserSource)
   @IsOptional()
   source?: UserSource;
+
+  @IsEnum(UserStatus)
+  @IsOptional()
+  status?: UserStatus;
 }
 
 export class InvitedGuestsRequestDto {

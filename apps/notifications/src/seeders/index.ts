@@ -7,6 +7,48 @@ export class SeedDatabase {
   public static async seed() {
     const data = [
       {
+        templateName: 'Sponsorship Inquiry',
+        templateSendgridId: 'd-52c3b499516b42018db55ff7f9ead32c',
+        params: [
+          {
+            key: 'eventName',
+            mandatory: true
+          },
+          {
+            key: 'eventStartDate',
+            mandatory: true
+          },
+          {
+            key: 'eventCity',
+            mandatory: true
+          },
+          {
+            key: 'inquirerFirstName',
+            mandatory: true
+          },
+          {
+            key: 'inquirerLastName',
+            mandatory: true
+          },
+          {
+            key: 'inquirerEmail',
+            mandatory: true
+          },
+          {
+            key: 'inquirerCompanyName',
+            mandatory: true
+          },
+          {
+            key: 'inquirerTargetSponsors',
+            mandatory: true
+          },
+          {
+            key: 'message',
+            mandatory: true
+          }
+        ],
+      },
+      {
         templateName: 'Host Invited by Rumor Admin',
         templateSendgridId: 'd-4bcff8c979d646eb8a8cdad0d40ef144',
         params: [
@@ -437,6 +479,10 @@ export class SeedDatabase {
           },
           {
             key: 'link_to_application',
+            mandatory: true,
+          },
+          {
+            key: 'email',
             mandatory: true,
           },
         ],

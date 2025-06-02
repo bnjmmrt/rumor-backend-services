@@ -13,6 +13,7 @@ const start = async () => {
     await Seeders.seedInterests();
     await Seeders.seedFocuses();
     await Seeders.seedDefaultRoleSettings();
+    await Seeders.seedInstagramFollowers();
 
     await server.start();
     console.info('[APP] - Application started. 🚀');

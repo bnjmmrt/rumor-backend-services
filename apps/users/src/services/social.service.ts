@@ -39,6 +39,7 @@ import {
   SocialMediaStatsResponse,
   TiktokAuthCallbackResponse,
   XAuthCallbackResponse,
+  ScrapeInstagramFollowersResponse
 } from 'rumor-utils/shared/users/grpc/auth/social.pb';
 
 import {
@@ -1981,4 +1982,41 @@ export class SocialService {
       return responses.badRequest('An error happens when tries to sync social stats');
     }
   }
+
+  public static async scrapeInstagramFollowers(username : string, userId: string): Promise<ScrapeInstagramFollowersResponse> {
+    const baseUrl = config.get("INSTAGRAM_USER_PROFILE_SCRAPER_URL");
+    const url = `${baseUrl}${username}`;
+  
+    const response = await axios.get(url);
+
+    if (response.status !== 200 || response.data?.errorStatus === 404) {
+      throw new Error(`Failed to fetch instagram data for username: ${username}`);
+    }
+
+    const followersCount = Number(response.data?.data?.follower_count);
+  
+    const socialStatsRepo = this.dbConnection.getRepository(SocialStats);
+    // Check if a record already exists for the user
+    let socialStats = await socialStatsRepo.findOne({ where: { user: { id: userId } } });
+  
+    if (!socialStats) {
+      // Create a new row if not found
+      socialStats = socialStatsRepo.create({
+        user: { id: userId }, // Associate with user
+        instagramFollowersCount: followersCount,
+      });
+    } else {
+      // Update the existing row
+      socialStats.instagramFollowersCount = followersCount;
+    }
+  
+    // Save (insert or update) the record
+    await socialStatsRepo.save(socialStats);
+  
+    return {
+      username,
+      followers: followersCount,
+    };
+  }
+  
 }

@@ -11,10 +11,10 @@ export const buildSignupFormsResponse = (
   submissions: number = 0,
 ): SignupFormsResponse => {
   const companyName: string = (event.owner?.additionalHostInformation?.companyName || '')
-    .split(' ')
-    .join('');
+
   const eventName: string = event.name.split(' ').join('');
   const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators);
+
 
   const result: SignupFormsResponse = {
     id: esf.id,

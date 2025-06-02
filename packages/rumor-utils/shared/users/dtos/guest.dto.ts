@@ -92,6 +92,10 @@ export class UpdateGuestsRequestDto implements UpdateGuestsRequest {
   @IsBoolean()
   @IsOptional()
   sendInvite?: boolean;
+
+  @IsString()
+  @IsOptional()
+  email?: string;
 }
 
 export class GuestsRequestDto implements GuestsRequest {
