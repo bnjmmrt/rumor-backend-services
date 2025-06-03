@@ -426,6 +426,8 @@ export class AuthService {
         dateOfBirth: payload.dateOfBirth,
         phoneNumber: payload.phoneNumber,
         instagramUserName: payload.instagramUserName,
+        gender: payload.gender,
+        profilePicture: payload.profilePicture,
         address: address,
         additionalMemberInformation: {
           ...existingUser.additionalMemberInformation,
@@ -490,13 +492,13 @@ export class AuthService {
         },
       };
 
-      fusionAuthUser = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .register(newUser.id, registrationRequest);
-      if (fusionAuthUser.statusCode !== 200) {
-        throw new ConflictError(
-          `There was an issue creating your user: ${fusionAuthUser.exception.name}`,
-        );
+      try {
+        fusionAuthUser = await fusionAuthClientHandler
+          .fusionAuthClient()
+          .register(newUser.id, registrationRequest);
+      } catch (e) {
+        console.error('Error during FusionAuth registration:', JSON.stringify(e.exception));
+        throw new ConflictError(`There was an issue creating your user.`);
       }
       newUser.id = fusionAuthUser.response?.user?.id;
       fusionAuthToken = fusionAuthUser.response.token;
