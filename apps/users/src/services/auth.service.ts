@@ -1625,6 +1625,7 @@ export class AuthService {
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
     // Handle secondary verification
+    if (payload.isSecondary) {
       const verificationResult = isEmailLogin
         ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
         : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
