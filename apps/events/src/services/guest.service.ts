@@ -3185,6 +3185,7 @@ export class GuestService {
         event: { id: payload.eventId },
         addedBy: { id: payload.userId },
       },
+      relations: ['user'],
     });
 
     for (const plusOne of plusOnes) {
@@ -3206,7 +3207,41 @@ export class GuestService {
 
     // Save all updated guests
     await this.dbConnection.getRepository(Guest).save([guest, ...plusOnes]);
+
+    const leadUser = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.userId }
+    })
+
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: payload.eventId }
+    })
+
+    // Fire and forget notification to plus ones
+    this.messageDeclinedPlusOne(event.name, `${leadUser.firstName} ${leadUser.lastName}`, plusOnes).catch(error => {
+      console.error('Error sending notifications to plus ones:', error);
+    });
+
     return '';
+  }
+
+  private static async messageDeclinedPlusOne(eventName:string, leadGuestName:string, plusOnes: Guest[]): Promise<void> {
+    for(const plusOne of plusOnes) {
+      const firstName = plusOne.user?.firstName ?? 'Rumor Guest'
+      const phoneNumber = plusOne.user?.phoneNumber ?? null
+
+      if (phoneNumber) {              
+        const message = `Hi ${firstName},\n\n${leadGuestName} canceled their RSVP - your access to ${eventName} has been canceled.`;
+        try {
+          const validateNumber = isValidPhoneNumber(phoneNumber);
+          if (validateNumber) {
+            const cleanedNumber = phoneNumber.replace(/[\s\-()]/g, '');
+            serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
+          }
+        } catch (err) {
+          console.log(`❌ Error while processing SMS for ${phoneNumber}:`, err);
+        }
+      }    
+    }  
   }
 
   /**
