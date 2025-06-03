@@ -104,6 +104,7 @@ router.get('/auth/login-sso', AuthController.loginSSO);
 router.get('/auth/oauth-redirect', AuthController.oAuthRedirect);
 router.post('/auth/check-phone-number', AuthController.checkPhoneNumber);
 router.post('/auth/check-email', AuthController.checkEmail);
+router.post('/auth/check-user-contact', AuthController.checkUserContact);
 router.post('/auth/check-age', AuthController.checkAge);
 router.post('/auth/check-member-login', AuthController.checkMemberLogin);
 router.post('/auth/member-login', AuthController.memberLogin);
