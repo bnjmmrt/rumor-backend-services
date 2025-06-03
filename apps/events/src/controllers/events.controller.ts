@@ -491,7 +491,8 @@ export class EventsController {
 
   public static getGuestCountsByStatus = asyncWrapper(
     async (req: Request, res: Response): Promise<void> => {
-      const id = (req as any).user;
+      const { ownerId } = req.query;
+      const id = ownerId || (req as any).user;
       const payload: UserAndIdRequestDto = {
         userId: id,
         id: req.params.eventId,
