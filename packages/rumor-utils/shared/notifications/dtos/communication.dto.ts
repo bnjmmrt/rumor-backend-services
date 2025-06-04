@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNotEmpty, IsArray, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsArray, IsUUID, ValidateNested } from 'class-validator';
 import {
   DeleteEmailTemplateRequest,
   EmptyRequest,
@@ -10,9 +10,11 @@ import {
   SendVerificationCodeRequest,
   SendPushNotificationRequest,
   VerifyCodeRequest,
+  EmailAttachment
 } from '../grpc/communication/communication.pb';
 import { EmailTemplate } from '@fusionauth/typescript-client';
 import { ParamsEmailTemplatePayloadInterface } from '../interfaces/email-templates.interface';
+import { Type } from 'class-transformer';
 
 export class SendEmailRequestDto implements SendEmailRequest {
   @IsOptional()
@@ -85,6 +87,25 @@ export class SendEmailFromTemplateRequestDto implements SendEmailFromTemplateReq
   @IsString()
   @IsNotEmpty()
   template: string;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EmailAttachmentDto)
+  attachments?: EmailAttachment[];
+}
+
+export class EmailAttachmentDto implements EmailAttachment {
+  @IsString()
+  @IsNotEmpty()
+  mediaType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  media: string;
+
+  @IsString()
+  @IsNotEmpty()
+  mediaName: string;
 }
 
 export class EmailTemplateDto implements EmailTemplate {

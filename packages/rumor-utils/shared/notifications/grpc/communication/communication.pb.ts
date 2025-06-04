@@ -96,6 +96,13 @@ export interface SendEmailFromTemplateRequest {
   to: string[];
   dynamicData: Params[];
   template: string;
+  attachments?: EmailAttachment[];
+}
+
+export interface EmailAttachment {
+  mediaType: string;
+  media: string;
+  mediaName: string;
 }
 
 export interface EmailTemplate {

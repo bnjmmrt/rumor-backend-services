@@ -1,4 +1,5 @@
 import apiService from './apiService';
+import { EventAnnouncementAttachment } from 'rumor-utils/shared/events/interfaces/event.interface';
 
 export const sendVerificationCode = (phoneNumber: string) =>
   apiService.getApi().post(`/communication/send-verification-code`, { phoneNumber });
@@ -14,10 +15,16 @@ export const sendInvitationMessages = (phoneNumbers: string[], senderName: strin
 export const sendTextMessage = (phoneNumber: string, message: string) =>
   apiService.getApi().post(`/communication/send-text-message`, { phoneNumber, message });
 
-export const sendEmailFromTemplate = (dynamicData, template: string, to: string[], from?: string) =>
+export const sendEmailFromTemplate = (dynamicData, template: string, to: string[], from?: string, attachments?: EventAnnouncementAttachment[]) =>
   apiService
     .getApi()
-    .post(`/communication/template-email/send`, { dynamicData, template, to, from });
+    .post(`/communication/template-email/send`, { 
+      dynamicData, 
+      template, 
+      to, 
+      from,
+      ...(attachments && { attachments })
+    });
 
 export const getTemplateById = (id: string) => apiService.getApi().get(`/auth/validate`);
 
