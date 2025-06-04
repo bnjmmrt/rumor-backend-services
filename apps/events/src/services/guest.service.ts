@@ -1316,6 +1316,8 @@ export class GuestService {
         queryBuilder.andWhere('guest.status IN (:...statuses)', {
           statuses: [GuestStatus.DECLINED, GuestStatus.REFUSED],
         });
+      } else if (guestStatus === 'REQUESTS') {
+        queryBuilder.andWhere({ status: GuestStatus.APPLIED });
       } else {
         queryBuilder.andWhere({ status: GuestStatus[guestStatus] });
       }
