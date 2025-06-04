@@ -2,6 +2,7 @@ import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { extractDate } from './event.utils';
 import config from '../config';
 import { AxiosResponse } from 'axios';
+import { EventAnnouncementAttachment } from 'rumor-utils/shared/events/interfaces/event.interface';
 
 interface MailComponent {
   eventDate: Date;
@@ -517,6 +518,7 @@ export const sendEventAnnouncement = async (
   email: string,
   branchLink?: string,
   copy?: string,
+  attachments?: EventAnnouncementAttachment[],
 ): Promise<AxiosResponse<any, any>> => {
   const redirectPath = branchLink || 'https://app.therumor.com/app';
   const params = [
@@ -534,6 +536,7 @@ export const sendEventAnnouncement = async (
         'Non-Member: New Event Announcement',
         [email.trim().toLowerCase()],
         null,
+        attachments || undefined
       );
     return emailData;
   } catch (error) {

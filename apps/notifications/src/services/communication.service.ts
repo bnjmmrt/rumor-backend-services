@@ -40,7 +40,7 @@ export class CommunicationService {
           throw new BadRequestError(`Parameter [${item.key}] not set`);
         }
       }
-      await SendGrid.sendMail(payload, template, dynamicData);
+      await SendGrid.sendMail(payload, template, dynamicData, payload.attachments);
     } catch (error) {
       const err = {
         name: 'Send Email Failed',

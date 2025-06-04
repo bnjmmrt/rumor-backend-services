@@ -209,6 +209,7 @@ export class EventAnnouncementService {
               data.user.email,
               event.branchLink,
               announcement,
+              attachments || undefined
             );
           }
           if (data?.user?.phoneNumber) {

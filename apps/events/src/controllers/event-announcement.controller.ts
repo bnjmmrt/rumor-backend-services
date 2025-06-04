@@ -18,7 +18,7 @@ export class EventAnnouncementController {
     res.status(successResponse.statusCode).json(successResponse);
   });
 
-  public static postAnnouncement = asyncWrapper(async (req: Request, res: Response) => {
+  public static postAnnouncement = asyncWrapper(async (req: Request, res: Response) => {    
     const payload: any = {
       eventId: req.params.eventId,
       ticketType: req.body.ticketType,

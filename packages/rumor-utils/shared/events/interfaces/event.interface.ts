@@ -64,3 +64,9 @@ export enum QuestionValueType {
   STRING,
   NUMBER,
 }
+
+export interface EventAnnouncementAttachment {
+  mediaType: string;
+  media: string;
+  mediaName: string;
+}
