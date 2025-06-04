@@ -309,7 +309,7 @@ export class GuestService {
                 textMessage = `Sorry, your request for ${event.name} has been declined. Download Rumor to apply to join our community and discover other experiences ${baseRedirectUrl}.`;
               } else if (shouldSendApproval) {
                 if (invitationSource === UserSource.SIGN_UP_FORM) {
-                  textMessage = `Good news! Your request for ${event.name} was approved. Download the Rumor app and log in with this phone number: [${phoneNumber}] to view your confirmation.\n\n${baseRedirectUrl}`;
+                  textMessage = `Good news! Your request for ${event.name} was approved.\n\nDownload the Rumor app and log in with this phone number: [${phoneNumber}] to view your confirmation.\n\n${baseRedirectUrl}`;
                 } else if (invitationSource === UserSource.REQUEST_IN_APP) {
                   textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
                 }
