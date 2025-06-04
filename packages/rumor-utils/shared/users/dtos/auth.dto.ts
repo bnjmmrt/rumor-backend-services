@@ -381,6 +381,13 @@ export class MemberLoginRequestDto implements MemberLoginRequest {
 
   @IsOptional()
   isDeactivated: boolean;
+
+  @IsOptional()
+  isSecondary: boolean;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }
 
 export class UpdateUserProfilePictureRequestDto implements UpdateUserProfilePictureRequest {
@@ -886,4 +893,14 @@ export class Send2FACodeDto {
   @IsNotEmpty()
   @IsEmail()
   email: string;
+}
+
+export class CheckUserContactRequestDto {
+  @IsBoolean()
+  @IsNotEmpty()
+  isEmail: boolean;
+
+  @IsString()
+  @IsNotEmpty()
+  value: string;
 }

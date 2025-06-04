@@ -55,6 +55,7 @@ import {
   UpdateHostsStatusRequestDto,
   AddUserNoteRequestDto,
   ManageMulipleUsersRequestDto,
+  CheckUserContactRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 
 import {
@@ -246,6 +247,16 @@ import {
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
 dayjs.extend(tz);
+
+interface ContactCheckResponse {
+  isValid: boolean;
+  message: string;
+  data?: {
+    needsPhone?: boolean;
+    needsEmail?: boolean;
+    hasAllInfo?: boolean;
+  };
+}
 
 export class AuthService {
   public static googleAuthClient = new GoogleAuthJWT();
@@ -1611,8 +1622,54 @@ export class AuthService {
     if (payload.email) {
       payload.email = payload.email.trim().toLowerCase();
     }
+
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
+
+    // Handle secondary verification
+    if (payload.isSecondary) {
+      const verificationResult = isEmailLogin
+        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+
+      const isVerified: boolean =
+        ('verified' in verificationResult && verificationResult.verified === true) ||
+        ('data' in verificationResult && verificationResult.data?.verified === true);
+
+      if (!isVerified) {
+        throw new NotFoundError('Invalid or expired verification code, please try again.');
+      }
+
+      // Get the current user from the database
+      const user = await this.dbConnection.getRepository(User).findOne({
+        where: { id: payload.userId },
+        relations: ['roles', 'roles.role'],
+      });
+
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Add the new email/phone to the user's account
+      if (isEmailLogin) {
+        user.email = payload.email;
+      } else {
+        user.phoneNumber = payload.phoneNumber;
+      }
+
+      await this.dbConnection.getRepository(User).save(user);
+
+      return {
+        id: user.id,
+        token: '',
+        roles: user.roles.map(item => ({
+          roleName: item.role.name,
+          roleId: item.role.id,
+        })),
+        user: user,
+        isGuest: false,
+      };
+    }
 
     // Search for user by email or phone number
     let user: User | null = null;
@@ -7064,4 +7121,54 @@ export class AuthService {
       );
     });
   }
+
+
+  public static async checkUserContact(payload: CheckUserContactRequestDto): Promise<ContactCheckResponse> {
+    const { isEmail, value } = payload;
+    
+    try {
+      const user = isEmail 
+        ? await this.getUserWithRolesByEmail({ email: value })
+        : await this.getUserWithRolesByPhone({ phoneNumber: value });
+
+      if (!user) {
+        return {
+          isValid: false,
+          message: 'User not found'
+        };
+      }
+
+      const hasEmail = !!user.email;
+      const hasPhone = !!user.phoneNumber;  
+
+      if (isEmail && !hasPhone) {
+        return {
+          isValid: true,
+          message: 'User needs to add phone number',
+          data: { needsPhone: true }
+        };
+      }
+
+      if (!isEmail && !hasEmail) {
+        return {
+          isValid: true,
+          message: 'User needs to add email',
+          data: { needsEmail: true }
+        };
+      }
+
+      return {
+        isValid: true,
+        message: 'User has all required contact information',
+        data: { hasAllInfo: true }
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        message: error.message || 'Error checking user contact information'
+      };
+    }
+  }
+
 }
+
