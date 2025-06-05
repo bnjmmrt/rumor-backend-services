@@ -1,5 +1,5 @@
 import apiService from './apiService';
-import { EventAnnouncementAttachment } from 'rumor-utils/shared/events/interfaces/event.interface';
+import { EventAnnouncementAttachment } from '../shared/events/interfaces/event.interface';
 
 export const sendVerificationCode = (phoneNumber: string) =>
   apiService.getApi().post(`/communication/send-verification-code`, { phoneNumber });
