@@ -277,4 +277,68 @@ export class AdminController {
       res.status(500).send('Error generating CSV');
     }
   });
+
+  public static getMembersCount = asyncWrapper(async (req, res): Promise<void> => {
+    const userId = (req as any).user;
+    const query = { ...req.query };
+    delete query.take;
+    delete query.skip;
+
+    const payload: PaginatedRequestDto = { userId, query: query as string };
+
+    try {
+      const response: GetMembersResponse = await AuthService.getMembers(payload);
+      const members = response.data;
+
+      const filterButtons = [
+        { label: 'Non-Member', value: 'NON_MEMBER' },
+        { label: 'New Applicant', value: 'NEW_APPLICANT' },
+        { label: 'Active', value: 'ACTIVE' },
+        { label: 'Waitlisted', value: 'WAITLISTED' },
+        { label: 'Deactivated', value: 'DEACTIVATED' },
+        { label: 'Banned', value: 'BANNED' },
+      ];
+
+      const counts = filterButtons.map(objBttn => {
+        let filtered = members.filter(row => row.status === objBttn.value);
+
+        if (objBttn.value === 'ACTIVE') {
+          filtered = members.filter(
+            row => row.status === 'ACTIVE' && row.sources.includes('REQUEST_IN_APP'),
+          );
+        }
+
+        if (objBttn.value === 'DEACTIVATED') {
+          filtered = members.filter(row => row.status === 'DEACTIVATED');
+        }
+
+        if (objBttn.value === 'WAITLISTED') {
+          filtered = members.filter(row => row.status === 'WAITLISTED');
+        }
+
+        if (objBttn.value === 'NON_MEMBER') {
+          filtered = members.filter(
+            row =>
+              ['DEACTIVATED', 'WAITLISTED'].every(status => status !== row.status) &&
+              ((row.role === 'non_member' &&
+                ['DEACTIVATED', 'NEW_APPLICANT'].every(status => status !== row.status)) ||
+                row.sources.some(source =>
+                  ['PLUS_1', 'INVITED_BY_HOST', 'SIGN_UP_FORM'].includes(source),
+                )),
+          );
+        }
+
+        return {
+          label: objBttn.label,
+          count: filtered.length,
+          value: objBttn.value,
+        };
+      });
+
+      const getResponse = new GetResponse(counts);
+      res.status(getResponse.statusCode).json(getResponse);
+    } catch (error) {
+      res.status(500).json({ error: 'Error getting member counts' });
+    }
+  });
 }
