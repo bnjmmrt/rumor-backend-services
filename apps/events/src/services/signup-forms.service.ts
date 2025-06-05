@@ -431,11 +431,13 @@ export class SignupFormsServices {
     if (userPayload.email) {
       user = await User.findOne({
         where: { email: userPayload.email },
+        relations: { roles: { role: true } },
       });
     }
     if (userPayload.phoneNumber && !user) {
       user = await User.findOne({
         where: { phoneNumber: userPayload.phoneNumber },
+        relations: { roles: { role: true } },
       });
     }
     if (!user) {
