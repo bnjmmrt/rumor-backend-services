@@ -83,7 +83,11 @@ export class EventAnnouncementService {
 
     return {
       totalCount,
-      result: guests,
+      result: guests.filter(
+        (guest: any) =>
+          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(guest.user.email) ||
+          /^[+]?\d{10,15}$/.test(guest.user.phoneNumber),
+      ),
     };
   }
 
