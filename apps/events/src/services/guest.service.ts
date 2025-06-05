@@ -294,6 +294,18 @@ export class GuestService {
             for (const guest of updateGuests) {
               const { phoneNumber, invitationSource, userId, email } = guest;
 
+              // If the guest was previously declined as a plus one and is now being invited,
+              // update their role_added_by and added_by_id
+              if (currentStatus === GuestStatus.DECLINED && 
+                  (guestStatus === GuestStatus.INVITED || guestStatus === GuestStatus.CONFIRMED)) {
+                    const guestToUpdate = await this.dbConnection.getRepository(Guest).findOne({ where: { id: guest.id } });
+                    if (guestToUpdate) {
+                      guestToUpdate.invitationSource = UserSource.INVITED_BY_HOST;
+                      guestToUpdate.addedBy = { id: hostId } as User;
+                      await this.dbConnection.getRepository(Guest).save(guestToUpdate);
+                }
+              }
+
               if (!phoneNumber) continue;
 
               const shouldSendApproval =
