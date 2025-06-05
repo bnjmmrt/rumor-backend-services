@@ -139,9 +139,7 @@ export class EventAnnouncementService {
      *
      */
     try {
-      const link = event.branchLink || 'https://app.therumor.com/app';
-
-      let textMessage = `${event?.owner?.additionalHostInformation?.companyName || 'Host'} just sent an announcement for ${event?.name || 'Event'}.\n\n${announcement}\n\nClick here to view it in the Rumor app:\n\n${link}.`;
+      const link = event.branchLink || 'https://app.therumor.com/app';      
 
       let recipientsData: Guest[] = [];
 
@@ -213,7 +211,7 @@ export class EventAnnouncementService {
             );
           }
           if (data?.user?.phoneNumber) {
-            textMessage = `Hi ${data.user.firstName},\n\n` + textMessage;
+            const textMessage = `Hi ${data.user.firstName},\n\n${event?.owner?.additionalHostInformation?.companyName || 'Host'} just sent an announcement for ${event?.name || 'Event'}.\n\n${announcement}\n\nClick here to view it in the Rumor app:\n\n${link}.`;
             sendSmsNotification({ phoneNumber: data.user.phoneNumber, textMessage });
           }
         });
