@@ -311,7 +311,7 @@ export class GuestService {
                 if (invitationSource === UserSource.SIGN_UP_FORM) {
                   textMessage = `Good news! Your request for ${event.name} was approved.\n\nDownload the Rumor app and log in with this phone number: [${phoneNumber}] to view your confirmation.\n\n${baseRedirectUrl}`;
                 } else if (invitationSource === UserSource.REQUEST_IN_APP) {
-                  textMessage = `You're in! Your request for ${event.name} was approved. Keep an eye on the event details page for more updates. ${baseRedirectUrl}`;
+                  textMessage = `You're in! Your request for ${event.name} was approved.\n\nKeep an eye on the event details page for more updates.\n\n${baseRedirectUrl}`;
                 }
               }
 
