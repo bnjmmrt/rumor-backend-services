@@ -341,4 +341,73 @@ export class AdminController {
       res.status(500).json({ error: 'Error getting member counts' });
     }
   });
+
+  public static getMembersType = asyncWrapper(async (req, res): Promise<void> => {
+    const userId = (req as any).user;
+    const query = { ...req.query };
+    const types = req.params.type.split(','); // Split types by comma
+    delete query.take;
+    delete query.skip;
+
+    const payload: PaginatedRequestDto = { userId, query: query as string };
+
+    try {
+      const response: GetMembersResponse = await AuthService.getMembers(payload);
+      const members = response.data;
+      let filteredMembers = new Set(); // Use Set to avoid duplicates
+
+      // Filter for each type and add to Set
+      types.forEach(type => {
+        let typeFilteredMembers = [];
+
+        if (type === 'ACTIVE') {
+          typeFilteredMembers = members.filter(
+            row => row.status === 'ACTIVE' && row.sources.includes('REQUEST_IN_APP'),
+          );
+        } else if (type === 'DEACTIVATED') {
+          typeFilteredMembers = members.filter(row => row.status === 'DEACTIVATED');
+        } else if (type === 'WAITLISTED') {
+          typeFilteredMembers = members.filter(row => row.status === 'WAITLISTED');
+        } else if (type === 'NON_MEMBER') {
+          typeFilteredMembers = members.filter(
+            row =>
+              ['DEACTIVATED', 'WAITLISTED'].every(status => status !== row.status) &&
+              ((row.role === 'non_member' &&
+                ['DEACTIVATED', 'NEW_APPLICANT'].every(status => status !== row.status)) ||
+                row.sources.some(source =>
+                  ['PLUS_1', 'INVITED_BY_HOST', 'SIGN_UP_FORM'].includes(source),
+                )),
+          );
+        } else {
+          // For NEW_APPLICANT and BANNED, just filter by status
+          typeFilteredMembers = members.filter(row => row.status === type);
+        }
+
+        // Add filtered members to Set
+        typeFilteredMembers.forEach(member => filteredMembers.add(member));
+      });
+
+      // Convert Set back to array
+      const finalFilteredMembers = Array.from(filteredMembers);
+
+      // Apply search filter if searchValue exists
+      const searchValue = query.searchValue as string;
+      const searchResults = searchValue
+        ? finalFilteredMembers.filter((member: any) => {
+            const searchLower = searchValue.toLowerCase();
+            return (
+              member.name?.toLowerCase().includes(searchLower) ||
+              member.email?.toLowerCase().includes(searchLower) ||
+              member.phoneNumber?.includes(searchValue) ||
+              member.instagramUsername?.toLowerCase().includes(searchLower)
+            );
+          })
+        : finalFilteredMembers;
+
+      const getResponse = new GetResponse(searchResults);
+      res.status(getResponse.statusCode).json(getResponse);
+    } catch (error) {
+      res.status(500).json({ error: 'Error getting members by type' });
+    }
+  });
 }
