@@ -2703,11 +2703,13 @@ export class AuthService {
     user = await this.dbConnection.getRepository(User).save(user);
 
     //if a hostId is provided, create a hostUserMapping
-    if (payload.hostId) {
-      await this.dbConnection.getRepository(HostUserMapping).save({
-        host: { id: payload.hostId },
-        user: { id: user.id },
-      });
+    if (payload.email || payload.phoneNumber) {
+      if (payload.hostId) {
+        await this.dbConnection.getRepository(HostUserMapping).save({
+          host: { id: payload.hostId },
+          user: { id: user.id },
+        });
+      }
     }
 
     await RoleService.assignRoleToUser(
