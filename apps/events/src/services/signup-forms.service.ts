@@ -638,7 +638,14 @@ export class SignupFormsServices {
           if (validateNumber) {
             const cleanedNumber = userPayload.phoneNumber.replace(/[\s\-()]/g, '').trim();
             const link = 'https://app.therumor.com/app';
-            let message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}. Download Rumor to apply to join our community and discover other experiences. ${link}.`;
+      
+            let message;
+            if(userPayload?.roles?.some(userRole => userRole.role.name === 'member')) {            
+              message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}.\n\nCheck back in the app for updates from ${signupForm.event?.owner?.firstName || 'Host'}.\n\n${signupForm.event?.branchLink || link}`              
+            } else {
+              message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}.\n\nDownload Rumor to apply to join our community and discover other experiences.\n\n${link}`
+            }
+            
             await serviceMesh.notificationService().sendTextMessage(cleanedNumber, message);
           }
         } catch (err) {
