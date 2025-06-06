@@ -125,7 +125,7 @@ import * as dayjs from 'dayjs';
 import { Role, UserRole } from 'rumor-utils/shared/entities';
 import { UserSource as UserSourceEnum } from 'rumor-utils/shared/users/interfaces/shared.interface';
 
-const APP_LINK ='https://app.therumor.com/app'
+const APP_LINK = 'https://app.therumor.com/app';
 
 export class GuestService {
   public static dbConnection = database;
@@ -140,6 +140,25 @@ export class GuestService {
     return locations.filter(location => {
       const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);
       return distance <= maxDistance;
+    });
+  }
+  public static filterMultipleLocationsByDistance(
+    locations: EventLocationInterface[],
+    queryLocations: {
+      lat: number;
+      long: number;
+    }[],
+  ): EventLocationInterface[] {
+    const maxDistance = 50; //50 miles
+
+    return locations.filter(location => {
+      const isInQueryLocations = queryLocations.find(
+        queryLocation =>
+          haversineDistance(queryLocation.lat, queryLocation.long, location.lat, location.long) <=
+          maxDistance,
+      );
+
+      return !!isInQueryLocations;
     });
   }
 
@@ -194,7 +213,7 @@ export class GuestService {
       throw new BadRequestError('Invalid action for managing guest status');
 
     //Get email if it is there
-    const email = payload?.email
+    const email = payload?.email;
 
     // Extract relevant fields from payload
     const {
@@ -283,7 +302,7 @@ export class GuestService {
               privateGuestNote,
               guestStatus,
               sendInvite: sendNotification,
-              email: email
+              email: email,
             };
             // Call the function to update guests
             const updateGuests = await this.updateGuests(payloadUpdateGuest);
@@ -688,7 +707,7 @@ export class GuestService {
             }
 
             sendEventInviteMember(createMailPayload, event.timeZone);
-            if (data.phoneNumber) {              
+            if (data.phoneNumber) {
               const message = `Hi ${data.firstName},\n\n${event.owner?.additionalHostInformation?.companyName ?? 'Host'} has invited you to attend ${event.name}.\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP.\n\n${event.branchLink || APP_LINK}`;
               // Send SMS notification
               try {
@@ -730,7 +749,7 @@ export class GuestService {
 
             sendEventInviteNonMember(createMailPayload, event.timeZone);
 
-            if (data.phoneNumber) {              
+            if (data.phoneNumber) {
               const message = `Hi ${data.firstName}, ${event.owner?.additionalHostInformation?.companyName ?? 'Host'} has invited you to ${event.name}!\n\nDownload the Rumor app and log in with this phone number: ${data.phoneNumber} to RSVP and confirm your spot.\n\n${event.branchLink || APP_LINK}`;
               // Send SMS notification
               try {
@@ -1098,7 +1117,6 @@ export class GuestService {
         confirmedGuestsEmailsWithoutRequest.length > 0 &&
         payload.sendInvite
       ) {
-
         const event = await this.dbConnection.getRepository(Event).findOne({
           where: { id: confirmedGuestsEmailsWithoutRequest[0].eventId },
           relations: { location: true, owner: true },
@@ -2320,8 +2338,18 @@ export class GuestService {
       }
     };
 
-    const addLocationCondition = async (longitude: number, latitude: number) => {
+    const addLocationCondition = async (
+      longitude?: number,
+      latitude?: number,
+      queryLocations?: { lat: number; long: number }[],
+    ) => {
+      queryLocations = queryLocations ?? [];
+
       if (longitude && latitude) {
+        queryLocations.push({ lat: latitude, long: longitude });
+      }
+
+      if (queryLocations.length > 0) {
         const eventsNear = await this.dbConnection.getRepository(Event).find({
           where: {
             deletedAt: null,
@@ -2339,7 +2367,7 @@ export class GuestService {
           };
         });
 
-        const locations = this.filterLocationsByDistance(latitude, longitude, locationsToFind);
+        const locations = this.filterMultipleLocationsByDistance(locationsToFind, queryLocations);
         const locationsWhere = locations.map(item => item.id_event);
 
         // if (locationsWhere.length > 0) {
@@ -2349,9 +2377,17 @@ export class GuestService {
       return null;
     };
 
+    const parsedLocations = ((parsedQuery.location ?? []) as { lat: string; long: string }[]).map(
+      val => ({
+        lat: Number(val.lat),
+        long: Number(val.long),
+      }),
+    );
+
     const locationCondition = await addLocationCondition(
       Number(parsedQuery.longitude),
       Number(parsedQuery.latitude),
+      parsedLocations,
     );
     addCondition(locationCondition, 'AND');
 
@@ -3474,7 +3510,7 @@ export class GuestService {
       };
       sendEventInvitePlusOnes(createMailPayload, addOnMailPayload, event.timeZone);
     }
-    if (payload.phoneNumber) {      
+    if (payload.phoneNumber) {
       const message = `Hi ${guestFirstName}, ${event.owner?.additionalHostInformation?.companyName ?? 'Host'} has invited you to ${event.name}!\n\nDownload the Rumor app and log in with this phone number: ${payload.phoneNumber} to RSVP and confirm your spot.\n\n${event.branchLink || APP_LINK}`;
       try {
         const validateNumber = isValidPhoneNumber(payload.phoneNumber);
@@ -4053,7 +4089,7 @@ export class GuestService {
 
     // Step 2: Verify the existence of the host
     const host = (await serviceMesh.userService(token).getBasicHostProfile(payload.userId)).data;
-    
+
     if (!host) throw new NotFoundError('Host not found');
 
     if (!payload.email && !payload.phoneNumber) {
