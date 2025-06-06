@@ -134,22 +134,12 @@ export class GuestService {
     currentLat: number,
     currentLng: number,
     locations: EventLocationInterface[],
-    queryLocations?: {
-      lat: number;
-      long: number;
-    }[],
   ): EventLocationInterface[] {
     const maxDistance = 50; //50 miles
 
     return locations.filter(location => {
       const distance = haversineDistance(currentLat, currentLng, location.lat, location.long);
-      const isInQueryLocations = queryLocations.find(
-        queryLocation =>
-          haversineDistance(queryLocation.lat, queryLocation.long, location.lat, location.long) <=
-          maxDistance,
-      );
-
-      return distance <= maxDistance || isInQueryLocations;
+      return distance <= maxDistance;
     });
   }
   public static filterMultipleLocationsByDistance(
