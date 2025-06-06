@@ -158,7 +158,7 @@ export class GuestService {
           maxDistance,
       );
 
-      return isInQueryLocations;
+      return !!isInQueryLocations;
     });
   }
 
