@@ -3221,6 +3221,12 @@ export class GuestService {
         user: { id: payload.userId },
       },
     });
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: { id: payload.eventId },
+      relations: { owner: true },
+    });
+
+
     if (!guest) throw new NotFoundError('Guest not found');
     if (guest.status === GuestStatus.DECLINED)
       throw new BadRequestError('Guest is already declined');
@@ -3238,13 +3244,20 @@ export class GuestService {
       relations: ['user'],
     });
 
-    for (const plusOne of plusOnes) {
+    
+    if (guest.invitationSource === UserSource.UNRECOGNIZED) {
+      guest.invitationSource = UserSource.INVITED_BY_HOST;
+      guest.declinedBy = null;
+      
+      guest.addedBy = { id: event.owner.id } as User;
+    }
+
+      for (const plusOne of plusOnes) {
       plusOne.status = GuestStatus.DECLINED;
       plusOne.rejectedReason = 'Lead guest declined the invitation';
       plusOne.declinedBy = { id: payload.userId } as User;
       plusOne.checkIn = false;
     }
-
     // Collect all guest IDs (lead + plus ones)
     const guestIdsToRemoveTickets = [guest.id, ...plusOnes.map(g => g.id)];
 
@@ -3262,9 +3275,7 @@ export class GuestService {
       where: { id: payload.userId }
     })
 
-    const event = await this.dbConnection.getRepository(Event).findOne({
-      where: { id: payload.eventId }
-    })
+  
 
     // Fire and forget notification to plus ones
     this.messageDeclinedPlusOne(event.name, `${leadUser.firstName} ${leadUser.lastName}`, plusOnes).catch(error => {
@@ -4115,7 +4126,7 @@ export class GuestService {
 
         guest = this.dbConnection.getRepository(Guest).create({
           id: uuidv4(),
-          status: GuestStatus.CONFIRMED,
+          status: payload.guestStatus === 'DRAFT' ? GuestStatus.DRAFT : GuestStatus.CONFIRMED,
           event,
           maxAdditionalGuests: payload.maxAdditionalGuests || 0,
           user: { id: user.data.userId } as User,
@@ -4978,3 +4989,4 @@ export class GuestService {
     });
   }
 }
+
