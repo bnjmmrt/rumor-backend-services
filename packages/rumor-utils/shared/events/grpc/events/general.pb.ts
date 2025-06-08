@@ -730,6 +730,7 @@ export interface SignupFormsResponse {
   eventName: string;
   eventId: string;
   limitOnePlus: number;
+  socialMedia?: Record<string, any>;
 }
 
 export interface ISignupFormQuestionsRequest {
