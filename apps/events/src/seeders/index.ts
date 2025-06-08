@@ -6,7 +6,7 @@ import {
 } from 'rumor-utils/shared/entities/index';
 import database from '../database';
 import { QuestionValueType } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { generateBranchLink } from '../utils/branch.utils';
+import { BranchData, generateBranchLink } from '../utils/branch.utils';
 import config from '../config';
 import { SponsorshipCategory } from 'rumor-utils/shared/sponsorships/entities/sponsorship-category.entity';
 
@@ -211,7 +211,7 @@ export class Seeders {
   }
 
   public static async seedEventBranchLinks() {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = true;
     const maxAttempts = isProduction ? 50 : 1;
 
     try {
@@ -263,16 +263,49 @@ export class Seeders {
             batch.map(async event => {
               try {
                 // Generate branch link for the event
-                const webUrl = `${config.get('RUMOR_WEBSITE_HOST')}/events/event-details?id=${event.id}`;
+                const webUrl = `https://devhost.therumor.com/events/event-details?id=${event.id}`;
                 const deepLinkPath = `events/event-details?id=${event.id}`;
 
-                const branchData = {
+                const branchData: BranchData = {
+                  // Web and App Behavior
                   $web_only: false,
-                  $fallback_url: webUrl,
-                  $ios_url: `therumorapp://${deepLinkPath}`,
-                  $android_url: `com.therumor://${deepLinkPath}`,
+                  // $fallback_url: webUrl, // don't set this ever
+                  // $ios_url: `therumorapp://${deepLinkPath}`,
+                  // $android_url: `com.therumor://${deepLinkPath}`,
                   $desktop_url: webUrl,
-                  $marketing_title: `Event: ${event.name}`,
+                  $mobile_web_only: false,
+
+                  // Deep Link Configuration
+                  $deeplink_path: deepLinkPath,
+                  // $canonical_url: webUrl,
+                  $always_deeplink: true,
+                  // $uri_redirect_mode: 2, // Force open app if available
+
+                  // Content Classification
+                  $content_type: 'event',
+                  $canonical_identifier: `event_${event.id}`,
+                  $publicly_indexable: true,
+
+                  // Marketing
+                  // $marketing_title: `Event: ${event.name}`,
+
+                  // Open Graph Parameters
+                  $og_title: event.name,
+                  $og_description: event.description,
+                  $og_image_url: event.imageFlyer,
+                  $og_image_width: 400,
+                  $og_image_height: 585,
+                  // $og_url: webUrl,
+                  $og_type: 'website',
+                  $og_site_name: 'Rumor',
+                  $og_locale: 'en_US',
+
+                  // Twitter Card Parameters
+                  $twitter_card: 'summary_large_image',
+
+                  // App Timeout Settings (in milliseconds)
+                  $ios_redirect_timeout: 3000,
+                  $android_redirect_timeout: 3000,
                 };
 
                 const branchLink = await generateBranchLink({
