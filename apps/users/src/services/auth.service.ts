@@ -5355,6 +5355,15 @@ export class AuthService {
       });
 
     const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
+    const mappedGuestEvents = guestEvents.map(event => ({
+      id: event.id,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      name: event.name,
+      imageCover: event.imageCover,
+      imageFlyer: event.imageFlyer,
+      eventCover: event.imageCover
+    }));
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -5403,13 +5412,31 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         referredUser?.referralCode,
-        guestEvents?.totalEvents,
-        guestEvents?.upcoming,
-        guestEvents?.past,
-        guestEvents?.invited,
-        guestEvents?.requested,
-        referredByMembers,
-        references,
+        eventCount,
+        mappedGuestEvents.filter(e => e.startDate > new Date().toISOString()), // upcomingEvents
+        mappedGuestEvents.filter(e => e.endDate < new Date().toISOString()), // pastEvents
+        [], // invitedEvents
+        [], // requestedEvents
+        undefined, // referredBy
+        undefined, // references
+        surveys.map(survey => ({
+          id: survey.id,
+          response: survey.response,
+          user: {
+            ...survey.user,
+            roles: survey.user.roles.map(role => ({
+              roleId: role.role.id,
+              roleName: role.role.name,
+              status: entityToUserStatus[role.status],
+              source: role.source ? entityToUserSource[role.source] : undefined,
+            })),
+          },
+          survey: {
+            ...survey.survey,
+            message: survey.survey.message || '',
+          },
+          respondedAt: survey.respondedAt.toISOString(),
+        }))
       ),
     );
   }
@@ -6010,16 +6037,32 @@ export class AuthService {
     const eventCount = await this.dbConnection
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
+    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
+    const mappedGuestEvents = guestEvents.map(event => ({
+      id: event.id,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      name: event.name,
+      imageCover: event.imageCover,
+      imageFlyer: event.imageFlyer,
+      eventCover: event.imageCover
+    }));
+
     const userData = toMemberProfile(
       user,
       focuses,
       interests,
       userRole,
       formattedLists,
-      undefined,
-      undefined,
+      undefined, // instagramUsername
+      '', // referralCode
       eventCount,
-      '',
+      mappedGuestEvents.filter(e => e.startDate > new Date().toISOString()), // upcomingEvents
+      mappedGuestEvents.filter(e => e.endDate < new Date().toISOString()), // pastEvents
+      [], // invitedEvents
+      [], // requestedEvents
+      undefined, // referredBy
+      undefined, // references
       surveys.map(survey => ({
         id: survey.id,
         response: survey.response,
@@ -6037,7 +6080,7 @@ export class AuthService {
           message: survey.survey.message || '',
         },
         respondedAt: survey.respondedAt.toISOString(),
-      })),
+      }))
     );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
