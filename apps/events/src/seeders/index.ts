@@ -263,7 +263,6 @@ export class Seeders {
             batch.map(async event => {
               try {
                 // Generate branch link for the event
-                const webUrl = `https://devhost.therumor.com/events/event-details?id=${event.id}`;
                 const deepLinkPath = `events/event-details?id=${event.id}`;
 
                 const branchData: BranchData = {
@@ -272,7 +271,7 @@ export class Seeders {
                   // $fallback_url: webUrl, // don't set this ever
                   // $ios_url: `therumorapp://${deepLinkPath}`,
                   // $android_url: `com.therumor://${deepLinkPath}`,
-                  $desktop_url: webUrl,
+                  // $desktop_url: webUrl,
                   $mobile_web_only: false,
 
                   // Deep Link Configuration
