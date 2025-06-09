@@ -272,7 +272,7 @@ export class Seeders {
                   // $fallback_url: webUrl, // don't set this ever
                   // $ios_url: `therumorapp://${deepLinkPath}`,
                   // $android_url: `com.therumor://${deepLinkPath}`,
-                  $desktop_url: webUrl,
+                  // $desktop_url: webUrl,
                   $mobile_web_only: false,
 
                   // Deep Link Configuration
