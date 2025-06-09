@@ -105,7 +105,7 @@ export const formatToUnits = (num: number) => {
   const abbrev = ['', 'K', 'M'];
   const unrangifiedOrder = Math.floor(Math.log10(Math.abs(num)) / 3);
   const order = Math.max(0, Math.min(unrangifiedOrder, abbrev.length - 1));
-  return num / Math.pow(10, order * 3) + abbrev[order];
+  return num < 1000 ? num.toString() : (num / Math.pow(10, order * 3)).toFixed(1) + abbrev[order];
 };
 
 // Generates a code verifier
