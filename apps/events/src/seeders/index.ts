@@ -263,7 +263,6 @@ export class Seeders {
             batch.map(async event => {
               try {
                 // Generate branch link for the event
-                const webUrl = `https://devhost.therumor.com/events/event-details?id=${event.id}`;
                 const deepLinkPath = `events/event-details?id=${event.id}`;
 
                 const branchData: BranchData = {
