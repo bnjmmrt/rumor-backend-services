@@ -5413,31 +5413,13 @@ export class AuthService {
         undefined,
         socialProvider?.username,
         referredUser?.referralCode,
-        eventCount,
-        mappedGuestEvents.filter(e => e.startDate > new Date().toISOString()), // upcomingEvents
-        mappedGuestEvents.filter(e => e.endDate < new Date().toISOString()), // pastEvents
-        [], // invitedEvents
-        [], // requestedEvents
-        undefined, // referredBy
-        undefined, // references
-        surveys.map(survey => ({
-          id: survey.id,
-          response: survey.response,
-          user: {
-            ...survey.user,
-            roles: survey.user.roles.map(role => ({
-              roleId: role.role.id,
-              roleName: role.role.name,
-              status: entityToUserStatus[role.status],
-              source: role.source ? entityToUserSource[role.source] : undefined,
-            })),
-          },
-          survey: {
-            ...survey.survey,
-            message: survey.survey.message || '',
-          },
-          respondedAt: survey.respondedAt.toISOString(),
-        }))
+        guestEvents?.totalEvents,
+        guestEvents?.upcoming,
+        guestEvents?.past,
+        guestEvents?.invited,
+        guestEvents?.requested,
+        referredByMembers,
+        references,
       ),
     );
   }
