@@ -4189,26 +4189,28 @@ export class AuthService {
       );
     }
     const usersQuery = this.dbConnection
-      .getRepository(User)
-      .createQueryBuilder('user')
-      .innerJoinAndSelect('user.roles', 'userRole')
-      .innerJoinAndSelect('userRole.role', 'role')
-      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-      .leftJoinAndSelect('user.socialStats', 'socialStats')
-      .leftJoinAndSelect('user.address', 'address')
-      //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-      .where('user.deletedAt IS NULL')
-      // .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
-      .groupBy('user.id')
-      .addGroupBy('userRole.id')
-      .addGroupBy('role.id')
-      .addGroupBy('socialProvider.id')
-      .addGroupBy('socialStats.id')
-      .addGroupBy('address.id')
-      .addGroupBy('userRole.role.id')
-      .offset(skip)
-      .limit(take)
-      .orderBy('user.createdAt', 'DESC');
+    .getRepository(User)
+    .createQueryBuilder('user')
+    .innerJoinAndSelect('user.roles', 'userRole')
+    .innerJoinAndSelect('userRole.role', 'role')
+    .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+    .leftJoinAndSelect('user.socialStats', 'socialStats')
+    .leftJoinAndSelect('user.address', 'address')
+    //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+    .where('user.deletedAt IS NULL')
+    // Updated condition to ensure users have either email OR phone number
+    .andWhere('((user.email IS NOT NULL AND user.email != :emptyEmail) OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != :emptyPhone))', { emptyEmail: '', emptyPhone: '' })
+    // .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
+    .groupBy('user.id')
+    .addGroupBy('userRole.id')
+    .addGroupBy('role.id')
+    .addGroupBy('socialProvider.id')
+    .addGroupBy('socialStats.id')
+    .addGroupBy('address.id')
+    .addGroupBy('userRole.role.id')
+    .offset(skip)
+    .limit(take)
+    .orderBy('user.createdAt', 'DESC');
 
     if (searchValue) {
       usersQuery.andWhere(
