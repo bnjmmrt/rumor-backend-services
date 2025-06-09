@@ -33,6 +33,11 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   AdminController.getMembersCount,
 );
+router.get(
+  '/auth/admin/members-type/:type',
+  AuthMiddleware.fusionAuthRequired,
+  AdminController.getMembersType,
+);
 router.get('/auth/admin/hosts', AuthMiddleware.fusionAuthRequired, AdminController.getHosts);
 router.post('/auth/admin/2fa-send-code', AdminController.send2FACode);
 router.post('/auth/admin/login', AdminController.adminLogin);

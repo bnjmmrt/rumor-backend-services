@@ -34,8 +34,7 @@ export class CreateSponsorshipOpportunityDto implements CreateSponsorshipOpportu
   eventId: string;
 
   @IsString()
-  @IsUrl()
-  @IsNotEmpty()
+  @IsOptional()
   promoLink: string;
 
   @IsEnum(OpportunityType)
@@ -87,7 +86,6 @@ export class UpdateSponsorshipOpportunityDto implements UpdateSponsorshipOpportu
   eventId?: string;
 
   @IsString()
-  @IsUrl()
   @IsOptional()
   promoLink?: string;
 
@@ -182,6 +180,7 @@ export class SponsorshipOpportunityResponseDto implements SponsorshipOpportunity
   event: EventResponseDto;
 
   @IsString()
+  @IsOptional()
   promoLink: string;
 
   @IsEnum(OpportunityType)
