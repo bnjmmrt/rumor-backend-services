@@ -640,8 +640,8 @@ export class SignupFormsServices {
             const link = 'https://app.therumor.com/app';
       
             let message;
-            if(userPayload?.roles?.some(userRole => userRole.role.name === 'member')) {            
-              message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}.\n\nCheck back in the app for updates from ${signupForm.event?.owner?.firstName || 'Host'}.\n\n${signupForm.event?.branchLink || link}`              
+            if(userPayload?.roles?.some(userRole => userRole.role.name === 'member')) {
+              message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}.\n\nCheck back in the app for updates from ${signupForm.event?.owner?.additionalHostInformation?.companyName || 'Host'}.\n\n${signupForm.event?.branchLink || link}`              
             } else {
               message = `Thanks for your request for ${signupForm?.event?.name || 'Event'}.\n\nDownload Rumor to apply to join our community and discover other experiences.\n\n${link}`
             }
