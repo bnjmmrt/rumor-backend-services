@@ -22,7 +22,7 @@ import {
   UserSource,
   UserStatus,
 } from './shared.pb';
-import { IReferenceCode } from 'shared/users/mappers/auth.mapper';
+import { IReferenceCode } from '../../../users/mappers/auth.mapper';
 
 export const protobufPackage = 'auth';
 
