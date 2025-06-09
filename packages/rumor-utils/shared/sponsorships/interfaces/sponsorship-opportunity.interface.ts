@@ -13,7 +13,7 @@ export interface CreateSponsorshipOpportunityRequest {
   description: string;
   eventId: string;
   culturalMomentId?: string;
-  promoLink: string;
+  promoLink?: string;
   opportunityType: OpportunityType;
   targetSponsors?: TargetSponsorAssociation[];  
   paidSponsorshipMinimum?: number;
@@ -61,7 +61,7 @@ export interface SponsorshipOpportunityResponse {
   id: string;
   description: string;
   event: EventResponseDto;
-  promoLink: string;
+  promoLink?: string;
   opportunityType: OpportunityType;
   paidSponsorshipMinimum: number | null;
   paidSponsorshipMaximum: number | null;
