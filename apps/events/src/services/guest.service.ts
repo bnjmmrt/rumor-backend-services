@@ -3220,6 +3220,7 @@ export class GuestService {
         event: { id: payload.eventId },
         user: { id: payload.userId },
       },
+      relations: { user: true },
     });
     const event = await this.dbConnection.getRepository(Event).findOne({
       where: { id: payload.eventId },
@@ -3230,6 +3231,7 @@ export class GuestService {
     if (!guest) throw new NotFoundError('Guest not found');
     if (guest.status === GuestStatus.DECLINED)
       throw new BadRequestError('Guest is already declined');
+
     guest.status = GuestStatus.DECLINED;
     guest.rejectedReason = payload.reason;
     guest.declinedBy = { id: payload.userId } as User;
@@ -3247,8 +3249,7 @@ export class GuestService {
     
     if (guest.invitationSource === UserSource.UNRECOGNIZED) {
       guest.invitationSource = UserSource.INVITED_BY_HOST;
-      guest.declinedBy = null;
-      
+      guest.declinedBy = { id: guest.user.id } as User;
       guest.addedBy = { id: event.owner.id } as User;
     }
 

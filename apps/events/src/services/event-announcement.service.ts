@@ -339,6 +339,7 @@ export class EventAnnouncementService {
       Object.assign(announcement, { recipientCount });
     }
 
+
     return {
       totalCount,
       result: announcements,
