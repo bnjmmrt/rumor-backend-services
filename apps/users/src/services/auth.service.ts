@@ -91,6 +91,8 @@ import {
   UserIdWithRolesAndToken,
   AddUserNote,
   CheckEmaiLRequest,
+  ReportDetails,
+  EnhancedReportAndFeedbackRequestDto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import { TemporaryLoginCode } from 'rumor-utils/shared/users/entities/temporary-login-code.entity';
@@ -7175,5 +7177,288 @@ export class AuthService {
     }
   }
 
+  public static async getAllReports(payload: ReportAndFeedbackRequestDto): Promise<ReportDetails[]> {
+    const parsedQuery = parse(payload.query);
+    const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+
+    const query = this.dbConnection
+      .getRepository(Report)
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedBy', 'reportedBy')
+      .leftJoinAndSelect('report.reportedTo', 'reportedTo')
+      .leftJoinAndSelect('report.reportedByRole', 'reportedByRole')
+      .leftJoinAndSelect('report.reportedToRole', 'reportedToRole')
+      .take(take)
+      .skip(skip);
+
+    if (searchValue) {
+      query.andWhere(
+        '(reportedBy.firstName ILIKE :search OR reportedBy.lastName ILIKE :search OR reportedTo.firstName ILIKE :search OR reportedTo.lastName ILIKE :search OR report.reportMessage ILIKE :search)',
+        { search: `%${searchValue}%` }
+      );
+    }
+
+    const reports = await query.getMany();
+
+    return reports.map(report => ({
+      id: report.id,
+      reportMessage: report.reportMessage,
+      reportedBy: report.reportedBy ? {
+        id: report.reportedBy.id,
+        firstName: report.reportedBy.firstName,
+        lastName: report.reportedBy.lastName,
+        email: report.reportedBy.email,
+        username: report.reportedBy.username,
+        phoneNumber: report.reportedBy.phoneNumber,
+        gender: report.reportedBy.gender,
+        profilePicture: report.reportedBy.profilePicture,
+        instagramUserName: report.reportedBy.instagramUserName,
+      } : undefined,
+      reportedTo: report.reportedTo ? {
+        id: report.reportedTo.id,
+        firstName: report.reportedTo.firstName,
+        lastName: report.reportedTo.lastName,
+        email: report.reportedTo.email,
+        username: report.reportedTo.username,
+        phoneNumber: report.reportedTo.phoneNumber,
+        gender: report.reportedTo.gender,
+        profilePicture: report.reportedTo.profilePicture,
+        instagramUserName: report.reportedTo.instagramUserName,
+      } : undefined,
+      reportedByRole: report.reportedByRole?.name,
+      reportedToRole: report.reportedToRole?.name,
+    }));
+  }
+
+  public static async exportReports(): Promise<string> {
+    const reports = await this.dbConnection
+      .getRepository(Report)
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedBy', 'reportedBy')
+      .leftJoinAndSelect('report.reportedTo', 'reportedTo')
+      .leftJoinAndSelect('report.reportedByRole', 'reportedByRole')
+      .leftJoinAndSelect('report.reportedToRole', 'reportedToRole')
+      .getMany();
+
+    const csvRows = [
+      [
+        'Report ID',
+        'Report Date',
+        'Reporter Name',
+        'Reporter Email',
+        'Reported Against Name',
+        'Reported Against Email',
+        'Report Message',
+        'Reporter Role',
+        'Reported Against Role'
+      ].join(',')
+    ];
+
+    for (const report of reports) {
+      const row = [
+        report.id,
+        report.createdAt,
+        `${report.reportedBy?.firstName || ''} ${report.reportedBy?.lastName || ''}`.trim(),
+        report.reportedBy?.email || '',
+        `${report.reportedTo?.firstName || ''} ${report.reportedTo?.lastName || ''}`.trim(),
+        report.reportedTo?.email || '',
+        `"${(report.reportMessage || '').replace(/"/g, '""')}"`,
+        report.reportedByRole?.name || '',
+        report.reportedToRole?.name || ''
+      ].join(',');
+      csvRows.push(row);
+    }
+
+    return csvRows.join('\n');
+  }
+
+  public static async getEnhancedFeedbacks(payload: EnhancedReportAndFeedbackRequestDto): Promise<Feedback[]> {
+    const parsedQuery = parse(payload.query);
+    const take = payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+
+    const query = this.dbConnection
+      .getRepository(HostFeedback)
+      .createQueryBuilder('feedback')
+      .leftJoinAndSelect('feedback.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .take(take)
+      .skip(skip);
+
+    if (searchValue) {
+      query.andWhere(
+        '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR feedback.description ILIKE :search)',
+        { search: `%${searchValue}%` }
+      );
+    }
+
+    const feedbacks = await query.getMany();
+
+    return feedbacks.map(feedback => ({
+      id: feedback.id,
+      tag: feedback.tag,
+      description: feedback.description,
+      user: feedback.user ? {
+        id: feedback.user.id,
+        type: !!feedback.user.additionalHostInformation ? 'Host' : 'Member',
+        firstName: feedback.user.firstName,
+        lastName: feedback.user.lastName,
+        email: feedback.user.email,
+        username: feedback.user.username,
+        phoneNumber: feedback.user.phoneNumber,
+        gender: feedback.user.gender,
+        profilePicture: feedback.user.profilePicture,
+        instagramUserName: feedback.user.instagramUserName,
+        roles: feedback.user.roles?.map(r => r.role.name) || [],
+        additionalHostInformation: feedback.user.additionalHostInformation,
+      } : undefined,
+      createdAt: feedback.createdAt,
+    }));
+  }
+
+  public static async getEnhancedReports(payload: EnhancedReportAndFeedbackRequestDto): Promise<ReportDetails[]> {
+    const parsedQuery = parse(payload.query);
+    const take = payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip = payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue = payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+
+    const query = this.dbConnection
+      .getRepository(Report)
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedBy', 'reportedBy')
+      .leftJoinAndSelect('report.reportedTo', 'reportedTo')
+      .leftJoinAndSelect('report.reportedByRole', 'reportedByRole')
+      .leftJoinAndSelect('report.reportedToRole', 'reportedToRole')
+      .leftJoinAndSelect('reportedBy.roles', 'reporterRoles')
+      .leftJoinAndSelect('reportedTo.roles', 'reportedRoles')
+      .leftJoinAndSelect('reporterRoles.role', 'reporterRole')
+      .leftJoinAndSelect('reportedRoles.role', 'reportedRole')
+      .take(take)
+      .skip(skip);
+
+    if (searchValue) {
+      query.andWhere(
+        '(reportedBy.firstName ILIKE :search OR reportedBy.lastName ILIKE :search OR reportedTo.firstName ILIKE :search OR reportedTo.lastName ILIKE :search OR report.reportMessage ILIKE :search)',
+        { search: `%${searchValue}%` }
+      );
+    }
+
+    const reports = await query.getMany();
+
+    return reports.map(report => ({
+      id: report.id,
+      reportMessage: report.reportMessage,
+      reportedBy: report.reportedBy ? {
+        id: report.reportedBy.id,
+        firstName: report.reportedBy.firstName,
+        lastName: report.reportedBy.lastName,
+        email: report.reportedBy.email,
+        username: report.reportedBy.username,
+        phoneNumber: report.reportedBy.phoneNumber,
+        gender: report.reportedBy.gender,
+        profilePicture: report.reportedBy.profilePicture,
+        instagramUserName: report.reportedBy.instagramUserName,
+        roles: report.reportedBy.roles?.map(r => r.role.name) || [],
+      } : undefined,
+      reportedTo: report.reportedTo ? {
+        id: report.reportedTo.id,
+        firstName: report.reportedTo.firstName,
+        lastName: report.reportedTo.lastName,
+        email: report.reportedTo.email,
+        username: report.reportedTo.username,
+        phoneNumber: report.reportedTo.phoneNumber,
+        gender: report.reportedTo.gender,
+        profilePicture: report.reportedTo.profilePicture,
+        instagramUserName: report.reportedTo.instagramUserName,
+        roles: report.reportedTo.roles?.map(r => r.role.name) || [],
+      } : undefined,
+      reportedByRole: report.reportedByRole?.name,
+      reportedToRole: report.reportedToRole?.name,
+      createdAt: report.createdAt,
+    }));
+  }
+
+  public static async exportEnhancedReports(): Promise<string> {
+    const reports = await this.dbConnection
+      .getRepository(Report)
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedBy', 'reportedBy')
+      .leftJoinAndSelect('report.reportedTo', 'reportedTo')
+      .leftJoinAndSelect('report.reportedByRole', 'reportedByRole')
+      .leftJoinAndSelect('report.reportedToRole', 'reportedToRole')
+      .getMany();
+
+    const csvRows = [
+      [
+        'Report ID',
+        'Report Date',
+        'Reporter Name',
+        'Reporter Email',
+        'Reporter Role',
+        'Reported Against Name',
+        'Reported Against Email',
+        'Reported Against Role',
+        'Report Message'
+      ].join(',')
+    ];
+
+    for (const report of reports) {
+      const row = [
+        report.id,
+        report.createdAt,
+        `"${(report.reportedBy?.firstName || '')} ${(report.reportedBy?.lastName || '')}".trim()`,
+        report.reportedBy?.email || '',
+        report.reportedByRole?.name || '',
+        `"${(report.reportedTo?.firstName || '')} ${(report.reportedTo?.lastName || '')}".trim()`,
+        report.reportedTo?.email || '',
+        report.reportedToRole?.name || '',
+        `"${(report.reportMessage || '').replace(/"/g, '""')}"`
+      ].join(',');
+      csvRows.push(row);
+    }
+
+    return csvRows.join('\n');
+  }
+
+  public static async exportEnhancedFeedbacks(): Promise<string> {
+    const feedbacks = await this.dbConnection
+      .getRepository(HostFeedback)
+      .createQueryBuilder('feedback')
+      .leftJoinAndSelect('feedback.user', 'user')
+      .leftJoinAndSelect('user.roles', 'roles')
+      .leftJoinAndSelect('roles.role', 'role')
+      .getMany();
+
+    const csvRows = [
+      [
+        'Feedback ID',
+        'Feedback Date',
+        'User Name',
+        'User Email',
+        'User Role',
+        'Tag',
+        'Description'
+      ].join(',')
+    ];
+
+    for (const feedback of feedbacks) {
+      const row = [
+        feedback.id,
+        feedback.createdAt,
+        `"${(feedback.user?.firstName || '')} ${(feedback.user?.lastName || '')}".trim()`,
+        feedback.user?.email || '',
+        feedback.user?.roles?.map(r => r.role.name).join(', ') || '',
+        feedback.tag || '',
+        `"${(feedback.description || '').replace(/"/g, '""')}"`
+      ].join(',');
+      csvRows.push(row);
+    }
+
+    return csvRows.join('\n');
+  }
 }
 

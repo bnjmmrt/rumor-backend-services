@@ -29,6 +29,8 @@ import {
   UserWithRoles,
   UserIdWithRolesAndToken,
   AddUserNote,
+  ReportDetails,
+  EnhancedReportAndFeedbackRequestDto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -77,6 +79,7 @@ import {
   GetUserWithRolesByPhoneRequestDto,
   AddUserNoteRequestDto,
   ManageMulipleUsersRequestDto,
+  CheckUserContactRequestDto,
 } from 'rumor-utils/shared/users/dtos/auth.dto';
 import { GenericResponse, UserIdData } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import { ListUsersInviteesDto } from 'rumor-utils/shared/events/dtos/guest.dto';
@@ -90,6 +93,16 @@ import {
 } from 'rumor-utils/shared/users/dtos/shared.dto';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, DeleteResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
+
+interface ContactCheckResponse {
+  isValid: boolean;
+  message: string;
+  data?: {
+    needsPhone?: boolean;
+    needsEmail?: boolean;
+    hasAllInfo?: boolean;
+  };
+}
 
 export class AuthController {
   //@GrpcMethod(AUTH_SERVICE_NAME, 'ForgotPassword')
@@ -707,7 +720,7 @@ export class AuthController {
 
   public static getAllReports = asyncWrapper(async (req, res): Promise<void> => {
     const payload: ReportAndFeedbackRequestDto = req.body;
-    const response: Feedback[] = await AuthService.getAllFeedbacks(payload);
+    const response: ReportDetails[] = await AuthService.getAllReports(payload);
     const createResponse = new CreateResponse(response, 'All reports retrieved successfully');
     res.status(createResponse.statusCode).json(createResponse);
   });
@@ -784,5 +797,50 @@ export class AuthController {
       'Instagram validation status updated successfully',
     );
     res.status(updateResponse.statusCode).json(updateResponse);
+  });
+
+  public static checkUserContact = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: CheckUserContactRequestDto = req.body;
+    const response: ContactCheckResponse = await AuthService.checkUserContact(payload);
+    const createResponse = new CreateResponse(response, 'User contact check completed.');
+    res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static getEnhancedFeedbacks = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: EnhancedReportAndFeedbackRequestDto = {
+      query: req.query as string,
+      searchValue: req.query.searchValue as string,
+      take: req.query.take ? parseInt(req.query.take as string) : undefined,
+      skip: req.query.skip ? parseInt(req.query.skip as string) : undefined,
+    };
+    const response: Feedback[] = await AuthService.getEnhancedFeedbacks(payload);
+    const successResponse = new GetResponse(response, 'Feedbacks retrieved successfully');
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static getEnhancedReports = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: EnhancedReportAndFeedbackRequestDto = {
+      query: req.query as string,
+      searchValue: req.query.searchValue as string,
+      take: req.query.take ? parseInt(req.query.take as string) : undefined,
+      skip: req.query.skip ? parseInt(req.query.skip as string) : undefined,
+    };
+    const response: ReportDetails[] = await AuthService.getEnhancedReports(payload);
+    const successResponse = new GetResponse(response, 'Reports retrieved successfully');
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static exportEnhancedReports = asyncWrapper(async (req, res): Promise<void> => {
+    const response: string = await AuthService.exportEnhancedReports();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=reports.csv');
+    res.send(response);
+  });
+
+  public static exportEnhancedFeedbacks = asyncWrapper(async (req, res): Promise<void> => {
+    const response: string = await AuthService.exportEnhancedFeedbacks();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=feedbacks.csv');
+    res.send(response);
   });
 }

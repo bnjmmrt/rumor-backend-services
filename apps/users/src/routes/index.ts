@@ -494,4 +494,9 @@ router.get('/redirect', (req, res) => {
   //   `);
 });
 
+router.get('/auth/admin/enhanced-feedbacks', AuthController.getEnhancedFeedbacks);
+router.get('/auth/admin/enhanced-reports', AuthController.getEnhancedReports);
+router.get('/auth/admin/export-enhanced-reports', AuthController.exportEnhancedReports);
+router.get('/auth/admin/export-enhanced-feedbacks', AuthController.exportEnhancedFeedbacks);
+
 export default router;
