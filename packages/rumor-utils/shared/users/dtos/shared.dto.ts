@@ -6,7 +6,7 @@ import {
   IdRequest,
   RequestByUserAndEventRequest,
 } from '../grpc/auth/shared.pb';
-import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, IsUUID, isString, IsNumber } from 'class-validator';
 import { UserStatus } from '../interfaces/shared.interface';
 
 export class TokenRequestDto implements TokenRequest {
@@ -61,6 +61,23 @@ export class PaginatedRequestDto implements PaginatedRequest {
 export class ReportAndFeedbackRequestDto {
   @IsString()
   query: string;
+}
+
+export class EnhancedReportAndFeedbackRequestDto {
+  @IsString()
+  query: string;
+
+  @IsOptional()
+  @IsString()
+  searchValue?: string;
+
+  @IsOptional()
+  @IsNumber()
+  take?: number;
+
+  @IsOptional()
+  @IsNumber()
+  skip?: number;
 }
 
 export type PaginationQuery = {

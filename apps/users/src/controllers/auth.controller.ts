@@ -29,6 +29,8 @@ import {
   UserWithRoles,
   UserIdWithRolesAndToken,
   AddUserNote,
+  ReportDetails,
+  EnhancedReportAndFeedbackRequestDto
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
@@ -718,7 +720,7 @@ export class AuthController {
 
   public static getAllReports = asyncWrapper(async (req, res): Promise<void> => {
     const payload: ReportAndFeedbackRequestDto = req.body;
-    const response: Feedback[] = await AuthService.getAllFeedbacks(payload);
+    const response: ReportDetails[] = await AuthService.getAllReports(payload);
     const createResponse = new CreateResponse(response, 'All reports retrieved successfully');
     res.status(createResponse.statusCode).json(createResponse);
   });
@@ -802,5 +804,43 @@ export class AuthController {
     const response: ContactCheckResponse = await AuthService.checkUserContact(payload);
     const createResponse = new CreateResponse(response, 'User contact check completed.');
     res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static getEnhancedFeedbacks = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: EnhancedReportAndFeedbackRequestDto = {
+      query: req.query as string,
+      searchValue: req.query.searchValue as string,
+      take: req.query.take ? parseInt(req.query.take as string) : undefined,
+      skip: req.query.skip ? parseInt(req.query.skip as string) : undefined,
+    };
+    const response: Feedback[] = await AuthService.getEnhancedFeedbacks(payload);
+    const successResponse = new GetResponse(response, 'Feedbacks retrieved successfully');
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static getEnhancedReports = asyncWrapper(async (req, res): Promise<void> => {
+    const payload: EnhancedReportAndFeedbackRequestDto = {
+      query: req.query as string,
+      searchValue: req.query.searchValue as string,
+      take: req.query.take ? parseInt(req.query.take as string) : undefined,
+      skip: req.query.skip ? parseInt(req.query.skip as string) : undefined,
+    };
+    const response: ReportDetails[] = await AuthService.getEnhancedReports(payload);
+    const successResponse = new GetResponse(response, 'Reports retrieved successfully');
+    res.status(successResponse.statusCode).json(successResponse);
+  });
+
+  public static exportEnhancedReports = asyncWrapper(async (req, res): Promise<void> => {
+    const response: string = await AuthService.exportEnhancedReports();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=reports.csv');
+    res.send(response);
+  });
+
+  public static exportEnhancedFeedbacks = asyncWrapper(async (req, res): Promise<void> => {
+    const response: string = await AuthService.exportEnhancedFeedbacks();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=feedbacks.csv');
+    res.send(response);
   });
 }

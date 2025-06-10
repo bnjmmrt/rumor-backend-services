@@ -1989,4 +1989,11 @@ export interface AuthServiceController {
 //   };
 // }
 
+export interface EnhancedReportAndFeedbackRequestDto {
+  query: string;
+  take: number;
+  skip: number;
+  searchValue: string;
+}
+
 export const AUTH_SERVICE_NAME = 'AuthService';
