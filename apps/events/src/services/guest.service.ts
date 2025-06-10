@@ -3815,7 +3815,7 @@ export class GuestService {
                 lastName: guest.user.lastName,
                 email: guest.user.email,
                 phoneNumber: guest.user.phoneNumber,
-                reason: `User already exists in the event with status ${guest.status}`,
+                reason: `User already exists in the event with status ${guest.status === GuestStatus.APPLIED ? 'REQUESTED' : guest.status}`,
               };
               garbageData.push(user);
               userMap.delete(guest.user.email);
