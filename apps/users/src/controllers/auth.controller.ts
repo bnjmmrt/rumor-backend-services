@@ -30,7 +30,7 @@ import {
   UserIdWithRolesAndToken,
   AddUserNote,
   ReportDetails,
-  EnhancedReportAndFeedbackRequestDto
+  EnhancedReportAndFeedbackRequestDto,
 } from 'rumor-utils/shared/users/grpc/auth/auth.pb';
 
 import {
