@@ -1626,52 +1626,53 @@ export class AuthService {
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
-    // Handle secondary verification
-    if (payload.isSecondary) {
-      const verificationResult = isEmailLogin
-        ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-        : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
+    // // Handle secondary verification
+    // if (payload.isSecondary) {
+    //   const verificationResult = isEmailLogin
+    //     ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
+    //     : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
 
-      const isVerified: boolean =
-        ('verified' in verificationResult && verificationResult.verified === true) ||
-        ('data' in verificationResult && verificationResult.data?.verified === true);
+    //   const isVerified: boolean =
+    //     ('verified' in verificationResult && verificationResult.verified === true) ||
+    //     ('data' in verificationResult && verificationResult.data?.verified === true);
 
-      if (!isVerified) {
-        throw new NotFoundError('Invalid or expired verification code, please try again.');
-      }
+    //   if (!isVerified) {
+    //     throw new NotFoundError('Invalid or expired verification code, please try again.');
+    //   }
 
-      // Get the current user from the database
-      const user = await this.dbConnection.getRepository(User).findOne({
-        where: { id: payload.userId },
-        relations: ['roles', 'roles.role'],
-      });
+    //   // Get the current user from the database
+    //   const user = await this.dbConnection.getRepository(User).findOne({
+    //     where: { id: payload.userId },
+    //     relations: ['roles', 'roles.role'],
+    //   });
 
-      if (!user) {
-        throw new NotFoundError('User not found');
-      }
+    //   if (!user) {
+    //     throw new NotFoundError('User not found');
+    //   }
 
-      // Add the new email/phone to the user's account
-      if (isEmailLogin) {
-        user.email = payload.email;
-      } else {
-        user.phoneNumber = payload.phoneNumber;
-      }
+    //   // Add the new email/phone to the user's account
+    //   if (isEmailLogin) {
+    //     user.email = payload.email;
+    //   } else {
+    //     user.phoneNumber = payload.phoneNumber;
+    //   }
 
-      await this.dbConnection.getRepository(User).save(user);
+    //   await this.dbConnection.getRepository(User).save(user);
 
-      return {
-        id: user.id,
-        token: '',
-        roles: user.roles.map(item => ({
-          roleName: item.role.name,
-          roleId: item.role.id,
-        })),
-        user: user,
-        isGuest: false,
-      };
-    }
+    //   return {
+    //     id: user.id,
+    //     token: '',
+    //     roles: user.roles.map(item => ({
+    //       roleName: item.role.name,
+    //       roleId: item.role.id,
+    //     })),
+    //     user: user,
+    //     isGuest: false,
+    //   };
+    // }
 
     // Search for user by email or phone number
+    
     let user: User | null = null;
     if (isEmailLogin) {
       user = await this.dbConnection.getRepository(User).findOne({
