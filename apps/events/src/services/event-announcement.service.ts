@@ -69,6 +69,7 @@ export class EventAnnouncementService {
       .where('guest.event = :eventId', { eventId })
       .andWhere('guest.deletedAt IS NULL')
       .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+      .andWhere('(user.email IS NOT NULL OR user.phoneNumber IS NOT NULL)')
       .andWhere(
         new Brackets(qb => {
           qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
@@ -321,7 +322,9 @@ export class EventAnnouncementService {
         const countQuery = database
           .getRepository(Guest)
           .createQueryBuilder('guest')
+          .leftJoinAndSelect('guest.user', 'user')
           .where('guest.event.id = :eventId', { eventId })
+          .andWhere('(user.email IS NOT NULL OR user.phoneNumber IS NOT NULL)')
           .andWhere('guest.deletedAt IS NULL')
           .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
           .andWhere(
