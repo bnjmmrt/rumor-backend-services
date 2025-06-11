@@ -34,9 +34,13 @@ export class EventAnnouncementService {
       .getRepository(Guest)
       .createQueryBuilder('pg')
       .select('pg.user.id', 'userId')
+      .leftJoin('pg.user', 'pu')
       .where('pg.event = :eventId', { eventId })
       .andWhere('pg.deletedAt IS NULL')
-      .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+      .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED })
+      .andWhere(
+        "((pu.email IS NOT NULL AND pu.email != '') OR (pu.phoneNumber IS NOT NULL AND pu.phoneNumber != ''))",
+      );
 
     if (ticketType) {
       ticketType = Array.isArray(ticketType) ? ticketType : [ticketType];
@@ -68,7 +72,9 @@ export class EventAnnouncementService {
       .where('guest.event = :eventId', { eventId })
       .andWhere('guest.deletedAt IS NULL')
       .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
-      .andWhere('(user.email IS NOT NULL OR user.phoneNumber IS NOT NULL)')
+      .andWhere(
+        "((user.email IS NOT NULL AND user.email != '') OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != ''))",
+      )
       .andWhere(
         new Brackets(qb => {
           qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
@@ -148,9 +154,13 @@ export class EventAnnouncementService {
           .getRepository(Guest)
           .createQueryBuilder('pg')
           .select('pg.user.id', 'userId')
+          .leftJoin('pg.user', 'pu')
           .where('pg.event = :eventId', { eventId })
           .andWhere('pg.deletedAt IS NULL')
-          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED })
+          .andWhere(
+            "((pu.email IS NOT NULL AND pu.email != '') OR (pu.phoneNumber IS NOT NULL AND pu.phoneNumber != ''))",
+          );
 
         if (ticketType?.length) {
           subQuery.andWhere('pg.ticketType.id IN (:...ticketType)', { ticketType });
@@ -167,6 +177,9 @@ export class EventAnnouncementService {
           .where('guest.event = :eventId', { eventId })
           .andWhere('guest.deletedAt IS NULL')
           .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+          .andWhere(
+            "((user.email IS NOT NULL AND user.email != '') OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != ''))",
+          )
           .andWhere(
             new Brackets(qb => {
               qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
@@ -189,6 +202,14 @@ export class EventAnnouncementService {
             user: true,
           },
         });
+
+        // Filter out guests without valid contact info
+        recipientsData = recipientsData.filter(
+          guest =>
+            guest.user &&
+            ((guest.user.email && guest.user.email !== '') ||
+              (guest.user.phoneNumber && guest.user.phoneNumber !== '')),
+        );
       }
 
       if (recipientsData.length > 0) {
@@ -291,7 +312,14 @@ export class EventAnnouncementService {
       const recipientsExist = announcement.recipients?.length > 0;
 
       if (recipientsExist) {
-        recipientCount = announcement.recipients.length;
+        // Count only recipients with valid contact info
+        recipientCount = announcement.recipients.filter(recipient => {
+          return (
+            recipient.user &&
+            ((recipient.user.email && recipient.user.email !== '') ||
+              (recipient.user.phoneNumber && recipient.user.phoneNumber !== ''))
+          );
+        }).length;
       } else {
         const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
         const addedByIds = announcement.addedBy?.map(a => a.id) || [];
@@ -301,9 +329,13 @@ export class EventAnnouncementService {
           .getRepository(Guest)
           .createQueryBuilder('pg')
           .select('pg.user.id')
+          .leftJoin('pg.user', 'pu')
           .where('pg.event.id = :eventId', { eventId })
           .andWhere('pg.deletedAt IS NULL')
-          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+          .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED })
+          .andWhere(
+            "((pu.email IS NOT NULL AND pu.email != '') OR (pu.phoneNumber IS NOT NULL AND pu.phoneNumber != ''))",
+          );
 
         if (ticketTypeIds.length > 0) {
           subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
@@ -319,7 +351,9 @@ export class EventAnnouncementService {
           .createQueryBuilder('guest')
           .leftJoinAndSelect('guest.user', 'user')
           .where('guest.event.id = :eventId', { eventId })
-          .andWhere('(user.email IS NOT NULL OR user.phoneNumber IS NOT NULL)')
+          .andWhere(
+            "((user.email IS NOT NULL AND user.email != '') OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != ''))",
+          )
           .andWhere('guest.deletedAt IS NULL')
           .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
           .andWhere(
@@ -400,16 +434,29 @@ export class EventAnnouncementService {
     const ticketTypeIds = announcement.ticketType?.map(t => t.id) || [];
     const addedByIds = announcement.addedBy?.map(a => a.id) || [];
 
-    let recipientCount = recipientsExist ? announcement.recipients.length : 0;
+    let recipientCount = 0;
 
-    if (!recipientsExist) {
+    if (recipientsExist) {
+      // Count only recipients with valid contact info
+      recipientCount = announcement.recipients.filter(recipient => {
+        return (
+          recipient.user &&
+          ((recipient.user.email && recipient.user.email !== '') ||
+            (recipient.user.phoneNumber && recipient.user.phoneNumber !== ''))
+        );
+      }).length;
+    } else {
       const subQuery = database
         .getRepository(Guest)
         .createQueryBuilder('pg')
         .select('pg.user.id')
+        .leftJoin('pg.user', 'pu')
         .where('pg.event = :eventId', { eventId })
         .andWhere('pg.deletedAt IS NULL')
-        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          "((pu.email IS NOT NULL AND pu.email != '') OR (pu.phoneNumber IS NOT NULL AND pu.phoneNumber != ''))",
+        );
 
       if (ticketTypeIds.length > 0) {
         subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
@@ -422,9 +469,13 @@ export class EventAnnouncementService {
       recipientCount = await database
         .getRepository(Guest)
         .createQueryBuilder('guest')
+        .leftJoin('guest.user', 'user')
         .where('guest.event = :eventId', { eventId })
         .andWhere('guest.deletedAt IS NULL')
         .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          "((user.email IS NOT NULL AND user.email != '') OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != ''))",
+        )
         .andWhere(
           new Brackets(qb => {
             qb.where(`guest.user.id IN (${subQuery.getQuery()})`).orWhere(
@@ -503,7 +554,10 @@ export class EventAnnouncementService {
       .leftJoinAndSelect('guest.addedBy', 'addedBy')
       .where('guest.event.id = :eventId', { eventId })
       .andWhere('guest.deletedAt IS NULL')
-      .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED });
+      .andWhere('guest.status = :status', { status: GuestStatus.CONFIRMED })
+      .andWhere(
+        "((user.email IS NOT NULL AND user.email != '') OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != ''))",
+      );
 
     if (findByName) {
       const searchTerm = `%${findByName.toLowerCase()}%`;
@@ -520,9 +574,13 @@ export class EventAnnouncementService {
       const subQuery = guestRepo
         .createQueryBuilder('pg')
         .select('pg.user.id')
+        .leftJoin('pg.user', 'pu')
         .where('pg.event = :eventId', { eventId })
         .andWhere('pg.deletedAt IS NULL')
-        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED });
+        .andWhere('pg.status = :status', { status: GuestStatus.CONFIRMED })
+        .andWhere(
+          "((pu.email IS NOT NULL AND pu.email != '') OR (pu.phoneNumber IS NOT NULL AND pu.phoneNumber != ''))",
+        );
 
       if (ticketTypeIds.length > 0) {
         subQuery.andWhere('pg.ticketType.id IN (:...ticketTypeIds)', { ticketTypeIds });
