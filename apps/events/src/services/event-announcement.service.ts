@@ -8,7 +8,6 @@ import { NotificationType } from 'rumor-utils/shared/notifications/grpc/notifica
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { sendEventAnnouncement } from '../utils/emails.utils';
 import { sendSmsNotification } from '../utils/sms.utils';
-import config from '../config';
 
 export class EventAnnouncementService {
   public static dbConnection = database;
@@ -84,11 +83,7 @@ export class EventAnnouncementService {
 
     return {
       totalCount,
-      result: guests.filter(
-        (guest: any) =>
-          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(guest.user.email) ||
-          /^[+]?\d{10,15}$/.test(guest.user.phoneNumber),
-      ),
+      result: guests,
     };
   }
 
@@ -144,7 +139,7 @@ export class EventAnnouncementService {
      *
      */
     try {
-      const link = event.branchLink || 'https://app.therumor.com/app';      
+      const link = event.branchLink || 'https://app.therumor.com/app';
 
       let recipientsData: Guest[] = [];
 
@@ -212,7 +207,7 @@ export class EventAnnouncementService {
               data.user.email,
               event.branchLink,
               announcement,
-              attachments || undefined
+              attachments || undefined,
             );
           }
           if (data?.user?.phoneNumber) {
@@ -341,7 +336,6 @@ export class EventAnnouncementService {
 
       Object.assign(announcement, { recipientCount });
     }
-
 
     return {
       totalCount,
