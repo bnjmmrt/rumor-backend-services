@@ -6,7 +6,7 @@ import { UserSource, UserStatus } from '../../interfaces/shared.interface';
 
 @Entity()
 export class UserRole extends RumorBaseEntity {
-  @Column({ type: 'enum', enum: UserStatus, default: UserStatus.NEW_APPLICANT, name: 'status' })
+  @Column({ type: 'enum', enum: UserStatus, default: UserStatus.NON_MEMBER, name: 'status' })
   status: UserStatus;
 
   @Column({
