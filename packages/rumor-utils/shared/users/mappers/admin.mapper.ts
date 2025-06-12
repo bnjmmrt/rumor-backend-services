@@ -7,7 +7,6 @@ import {
   MemberProfile,
   customListData,
   SurveyResponse,
-  SurveyResponse,
 } from '../grpc/auth/auth.pb';
 import * as dayjs from 'dayjs';
 import { formatEventStatus } from '../../events/mappers/events.mapper';

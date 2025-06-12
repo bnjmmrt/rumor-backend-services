@@ -231,7 +231,6 @@ import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfac
 import { PlatformService } from './platform.service';
 import {
   RestrictedInvites, Survey, SurveyResponses,
-  RestrictedInvites, Survey, SurveyResponses,
   SignupFormSubmissions,
   Ticket,
 } from 'rumor-utils/shared/events/entities';

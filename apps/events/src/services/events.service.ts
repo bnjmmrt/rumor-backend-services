@@ -156,7 +156,6 @@ import { generateBranchLink } from '../utils/branch.utils';
 import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
 import { SurveyResponses } from '../../packages/rumor-utils/shared/events/entities'
 import { SurveyResponseDto } from 'packages/rumor-utils/shared/events/dtos/survey-response.dto';
-import { SurveyResponseDto } from 'packages/rumor-utils/shared/events/dtos/survey-response.dto';
 
 const responses = {
   conflict: (message: string) => ({
@@ -4444,11 +4443,6 @@ export class EventsService {
       }
       return responses.ok;
     } catch (error) {
-      if (eventIds.length > 0) {
-        await this.dbConnection.getRepository(Event).delete({ id: In(eventIds) }); // Bulk delete using TypeORM
-      }
-      return responses.ok;
-    } catch (error) {
       throw new BadRequestError('Error deleting host events');
     }
   }
@@ -4519,10 +4513,6 @@ export class EventsService {
     return survey;
   }
 
-  public static async getSurveyResponders(id: string): Promise<Survey> {
-    const survey = await this.dbConnection.getRepository(Survey).findOne({ where: { id } });
-    return survey;
-  }
 
   public static async updateSurveyById(
     id: string,

@@ -50,8 +50,6 @@ import { Focus } from './focus.entity';
 import { Report } from './report.entity';
 import { Survey } from '../../events/entities/survey.entity';
 import { SurveyResponses } from '../../events/entities/survey-response.entity';
-import { Survey } from '../../events/entities/survey.entity';
-import { SurveyResponses } from '../../events/entities/survey-response.entity';
 
 @Entity()
 export class User extends RumorBaseEntity {
