@@ -4165,11 +4165,29 @@ export class GuestService {
           .andWhere({ user: { id: guest.user.id } })
           .limit(1);
 
-      const checkGuest = await queryBuilder.getOne();
-      const focuses = (await serviceMesh.userService().getUserFocuses(savedGuest.user.id)).data;
-      const guestData = toGuestDataSimple(checkGuest, focuses);
+        const checkGuest = await queryBuilder.getOne();
+        const focuses = (await serviceMesh.userService().getUserFocuses(guest.user.id)).data;
+        const guestData = toGuestDataSimple(checkGuest, focuses);
 
-      return guestData;
+        return guestData;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    if (payload.email && payload.email.trim().toLowerCase() === host.email.trim().toLowerCase()) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (
+      payload.phoneNumber &&
+      payload.phoneNumber.replace(/[\s\-()]/g, '') === host.phoneNumber.replace(/[\s\-()]/g, '')
+    ) {
+      throw new ValidationError('You cannot add yourself to an event');
+    }
+
+    if (!payload.email && !payload.phoneNumber) {
+      throw new ValidationError('Atleast phoneNumber or email should be there');
     }
 
     // Step 3: Validate the ticket type if provided
