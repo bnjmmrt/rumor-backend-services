@@ -6009,10 +6009,6 @@ export class AuthService {
     const formattedLists = await this.getUserCustomLists(payload.id, user.id);
     const userRole = user.roles.find(r => ['member', 'non_member'].includes(r.role.name));
 
-    const surveys = await this.dbConnection.getRepository(SurveyResponses).find({
-      where: { user: { id: user.id } },
-    });
-
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
@@ -6020,74 +6016,25 @@ export class AuthService {
     const eventCount = await this.dbConnection
       .getRepository(Guest)
       .count({ where: { user: { id: user.id } } });
-    const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
-    const mappedGuestEvents = guestEvents.map(event => ({
-      id: event.id,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      name: event.name,
-      imageCover: event.imageCover,
-      imageFlyer: event.imageFlyer,
-      eventCover: event.imageCover
-    }));
-
     const userData = toMemberProfile(
       user,
       focuses,
       interests,
       userRole,
       formattedLists,
-      undefined, // instagramUsername
-      '', // referralCode
+      undefined,
+      undefined,
       eventCount,
-      mappedGuestEvents.filter(e => e.startDate > new Date().toISOString()), // upcomingEvents
-      mappedGuestEvents.filter(e => e.endDate < new Date().toISOString()), // pastEvents
-      [], // invitedEvents
-      [], // requestedEvents
-      undefined, // referredBy
-      undefined, // references
-      surveys.map(survey => ({
-        id: survey.id,
-        response: survey.response,
-        user: {
-          ...survey.user,
-          roles: survey.user.roles.map(role => ({
-            roleId: role.role.id,
-            roleName: role.role.name,
-            status: entityToUserStatus[role.status],
-            source: role.source ? entityToUserSource[role.source] : undefined,
-          })),
-        },
-        survey: {
-          ...survey.survey,
-          message: survey.survey.message || '',
-        },
-        respondedAt: survey.respondedAt.toISOString(),
-      }))
     );
     userData.isFavourite = isFavorite;
     userData.isFollow = isFollow;
     userData.isSpam = isSpam;
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
-    userData.surveyResponses = surveys.map(survey => ({
-      id: survey.id,
-      response: survey.response,
-      user: {
-        ...survey.user,
-        roles: survey.user.roles.map(role => ({
-          roleId: role.role.id,
-          roleName: role.role.name,
-          status: entityToUserStatus[role.status],
-          source: role.source ? entityToUserSource[role.source] : undefined,
-        })),
-      },
-      survey: survey.survey,
-      respondedAt: survey.respondedAt.toISOString(),
-    }));
-
+    userData.isHost = isHost;
     return userData;
   }
+
 
   public static async getUserCustomLists(
     hostId: string,
