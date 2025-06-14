@@ -4461,13 +4461,25 @@ export class AuthService {
    * - AdminController.getMembersType() - via getMembers for filtered results
    */
   public static buildMemberTypeCondition(type: string): { query: string; params: any } {
+    // Common exclusion condition for problematic source values
+    // Use text casting and JSON operations to handle array comparisons with enum fields
+    const sourceExclusionCondition = `
+      AND userRole.source IS NOT NULL 
+      AND CAST(userRole.source AS TEXT) != :nullArrayString 
+      AND CAST(userRole.source AS TEXT) != :emptyStringArrayString
+    `;
+
+    const sourceExclusionParams = {
+      nullArrayString: '{NULL}',
+      emptyStringArrayString: '{""}',
+    };
+
     switch (type) {
       case 'ACTIVE':
         // ACTIVE: Must have ACTIVE status, REQUEST_IN_APP source, AND member role
         // Explicitly filter out non-allowed statuses to handle multiple roles properly
         return {
-          query:
-            '(userRole.status = :activeStatus AND userRole.source = :activeSource AND role.name = :activeRole AND userRole.isRoleDeactivated = :activeIsRoleDeactivated AND userRole.status NOT IN (:...excludedActiveStatuses))',
+          query: `(userRole.status = :activeStatus AND userRole.source = :activeSource AND role.name = :activeRole AND userRole.isRoleDeactivated = :activeIsRoleDeactivated AND userRole.status NOT IN (:...excludedActiveStatuses)${sourceExclusionCondition})`,
           params: {
             activeStatus: 'ACTIVE',
             activeSource: 'REQUEST_IN_APP',
@@ -4481,6 +4493,7 @@ export class AuthService {
               'UNRECOGNIZED',
               'NON_MEMBER',
             ],
+            ...sourceExclusionParams,
           },
         };
 
@@ -4488,8 +4501,7 @@ export class AuthService {
         // NEW_APPLICANT: Must have NEW_APPLICANT status, REQUEST_IN_APP source, AND non_member role
         // Explicitly filter out non-allowed statuses to handle multiple roles properly
         return {
-          query:
-            '(userRole.status = :newStatus AND userRole.source = :newSource AND role.name = :newRole AND userRole.isRoleDeactivated = :newIsRoleDeactivated AND userRole.status NOT IN (:...excludedNewStatuses))',
+          query: `(userRole.status = :newStatus AND userRole.source = :newSource AND role.name = :newRole AND userRole.isRoleDeactivated = :newIsRoleDeactivated AND userRole.status NOT IN (:...excludedNewStatuses)${sourceExclusionCondition})`,
           params: {
             newStatus: 'NEW_APPLICANT',
             newSource: 'REQUEST_IN_APP',
@@ -4503,46 +4515,56 @@ export class AuthService {
               'UNRECOGNIZED',
               'NON_MEMBER',
             ],
+            ...sourceExclusionParams,
           },
         };
 
       case 'DEACTIVATED':
         return {
-          query: '(userRole.status = :deactivatedStatus)',
-          params: { deactivatedStatus: 'DEACTIVATED' },
+          query: `(userRole.status = :deactivatedStatus${sourceExclusionCondition})`,
+          params: {
+            deactivatedStatus: 'DEACTIVATED',
+            ...sourceExclusionParams,
+          },
         };
 
       case 'WAITLISTED':
         return {
-          query: '(userRole.status = :waitlistedStatus)',
-          params: { waitlistedStatus: 'WAITLISTED' },
+          query: `(userRole.status = :waitlistedStatus${sourceExclusionCondition})`,
+          params: {
+            waitlistedStatus: 'WAITLISTED',
+            ...sourceExclusionParams,
+          },
         };
 
       case 'REJECTED':
         return {
-          query: '(userRole.status = :rejectedStatus)',
-          params: { rejectedStatus: 'REJECTED' },
+          query: `(userRole.status = :rejectedStatus${sourceExclusionCondition})`,
+          params: {
+            rejectedStatus: 'REJECTED',
+            ...sourceExclusionParams,
+          },
         };
 
       case 'NON_MEMBER':
         // NON_MEMBER: All users except those with status ACTIVE, DEACTIVATED, WAITLISTED, or UNRECOGNIZED
         return {
-          query:
-            '(userRole.status NOT IN (:...nonMemberExcluded) AND userRole.isRoleDeactivated = :nonMemberIsRoleDeactivated)',
+          query: `(userRole.status NOT IN (:...nonMemberExcluded) AND userRole.isRoleDeactivated = :nonMemberIsRoleDeactivated${sourceExclusionCondition})`,
           params: {
             nonMemberExcluded: ['ACTIVE', 'DEACTIVATED', 'WAITLISTED', 'UNRECOGNIZED'],
             nonMemberIsRoleDeactivated: false,
+            ...sourceExclusionParams,
           },
         };
 
       default:
         // For any other status, just filter by status
         return {
-          query:
-            '(userRole.status = :defaultStatus AND userRole.isRoleDeactivated = :defaultIsRoleDeactivated)',
+          query: `(userRole.status = :defaultStatus AND userRole.isRoleDeactivated = :defaultIsRoleDeactivated${sourceExclusionCondition})`,
           params: {
             defaultStatus: type,
             defaultIsRoleDeactivated: false,
+            ...sourceExclusionParams,
           },
         };
     }
