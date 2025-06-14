@@ -2836,14 +2836,10 @@ export class AuthService {
             relations: ['user'],
           });
 
-        return toMember(
-          user,
-          focuses,
-          interests,
-          user.roles[0],
-          undefined,
-          socialProvider?.username,
-        );
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
+        return toMember(user, focuses, interests, primaryRole, undefined, socialProvider?.username);
       }),
     );
     return members;
@@ -3137,7 +3133,10 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        const userData = toUser(user, focuses, interests, user.roles[0], {
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
+        const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
         });
         userData.isFavourite = favoriteUserIds.includes(user.id);
@@ -3429,7 +3428,10 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        const userData = toUser(user, focuses, interests, user.roles[0], {
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
+        const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
         });
         userData.isFavourite = true;
@@ -4148,7 +4150,10 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        const userData = toUser(user, focuses, interests, user.roles[0], {
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
+        const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
         });
         userData.isFavourite = favoriteUserIds.includes(user.id);
@@ -4163,6 +4168,78 @@ export class AuthService {
   }
 
   // ADMIN Sevice Code
+
+  /**
+   * Determines the primary role for a user based on role priority hierarchy
+   * Priority order (highest to lowest):
+   * 1. ACTIVE member with REQUEST_IN_APP source
+   * 2. NEW_APPLICANT with non_member role
+   * 3. WAITLISTED with any role
+   * 4. DEACTIVATED with any role
+   * 5. REJECTED with any role
+   * 6. Any other ACTIVE status
+   * 7. NON_MEMBER status
+   * 8. Any other status (fallback)
+   */
+  private static getPrimaryRole(roles: UserRole[]): UserRole {
+    if (!roles || roles.length === 0) {
+      throw new Error('User must have at least one role');
+    }
+
+    // If only one role, return it
+    if (roles.length === 1) {
+      return roles[0];
+    }
+
+    // Define priority order (lower number = higher priority)
+    const getPriority = (role: UserRole): number => {
+      // Highest priority: ACTIVE member with REQUEST_IN_APP source
+      if (
+        role.status === UserStatus.ACTIVE &&
+        role.source === UserSource.REQUEST_IN_APP &&
+        role.role?.name === 'member'
+      ) {
+        return 1;
+      }
+
+      // Second priority: NEW_APPLICANT (typically non_member role)
+      if (role.status === UserStatus.NEW_APPLICANT) {
+        return 2;
+      }
+
+      // Third priority: WAITLISTED
+      if (role.status === UserStatus.WAITLISTED) {
+        return 3;
+      }
+
+      // Fourth priority: DEACTIVATED
+      if (role.status === UserStatus.DEACTIVATED || role.isRoleDeactivated) {
+        return 4;
+      }
+
+      // Fifth priority: REJECTED
+      if (role.status === UserStatus.REJECTED) {
+        return 5;
+      }
+
+      // Sixth priority: Any other ACTIVE status (but not REQUEST_IN_APP + member)
+      if (role.status === UserStatus.ACTIVE) {
+        return 6;
+      }
+
+      // Seventh priority: NON_MEMBER
+      if (role.status === UserStatus.NON_MEMBER) {
+        return 7;
+      }
+
+      // Lowest priority: Any other status
+      return 8;
+    };
+
+    // Sort roles by priority and return the highest priority role
+    const sortedRoles = roles.sort((a, b) => getPriority(a) - getPriority(b));
+    return sortedRoles[0];
+  }
 
   public static async getMembers(payload: PaginatedRequestDto): Promise<GetMembersResponse> {
     //GetMembersResponse
@@ -4354,11 +4431,14 @@ export class AuthService {
           email: referenceCode?.inviteeUser?.email || '---',
         };
 
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
         const member = toMember(
           user,
           focuses,
           interests,
-          user.roles[0],
+          primaryRole,
           socialNetworkObject,
           socialProvider?.username,
           sources,
@@ -6159,7 +6239,10 @@ export class AuthService {
 
         const socialProviderUsername = socialProvider?.username || null;
 
-        const userData = toUser(user, focuses, interests, user.roles[0], {
+        // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
+        const primaryRole = this.getPrimaryRole(user.roles);
+
+        const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
         });
         userData.isFavourite = favoriteUserIds.includes(user.id);

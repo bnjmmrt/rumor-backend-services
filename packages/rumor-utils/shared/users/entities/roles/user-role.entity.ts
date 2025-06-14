@@ -14,7 +14,7 @@ export class UserRole extends RumorBaseEntity {
     enum: UserSource,
     nullable: true,
     name: 'source',
-    default: UserSource.REQUEST_IN_APP,
+    default: UserSource.UNRECOGNIZED,
   })
   source?: UserSource;
 
