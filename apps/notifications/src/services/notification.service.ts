@@ -153,7 +153,7 @@ class NotificationService {
             pushNotifications.push({
               tokens,
               body: pushMessage,
-              title: 'The Rumor',
+              title: 'Rumor',
               image: notificationImage
                 ? notificationImage
                 : 'https://host.therumor.com/images/app/rumor_icon.svg',

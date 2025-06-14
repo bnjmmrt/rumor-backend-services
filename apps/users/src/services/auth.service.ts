@@ -462,7 +462,7 @@ export class AuthService {
       }
       newUser = await this.dbConnection.getRepository(User).save(newUser);
     }
-    
+
     if (payload.instagramUserName) {
       try {
         await SocialService.scrapeInstagramFollowers(payload.instagramUserName, newUser.id);
@@ -520,7 +520,8 @@ export class AuthService {
     newUser = await this.dbConnection.getRepository(User).save(newUser);
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: 'non_member' },
-      UserSource.REQUEST_IN_APP, UserStatus.NEW_APPLICANT
+      UserSource.REQUEST_IN_APP,
+      UserStatus.NEW_APPLICANT,
     );
 
     await PlatformService.saveFocusesForUser({
@@ -1674,7 +1675,7 @@ export class AuthService {
     // }
 
     // Search for user by email or phone number
-    
+
     let user: User | null = null;
     if (isEmailLogin) {
       user = await this.dbConnection.getRepository(User).findOne({
@@ -2718,7 +2719,7 @@ export class AuthService {
     await RoleService.assignRoleToUser(
       { userId: user.id, roleName: 'non_member' },
       UserSource.INVITED_BY_HOST,
-      UserStatus.NON_MEMBER
+      UserStatus.NON_MEMBER,
     );
 
     return { userId: user.id };
@@ -2812,8 +2813,10 @@ export class AuthService {
     });
     users = users.filter(
       user =>
-        user.roles.find(role => role.role.name === 'member' && role.status === 'ACTIVE') ||
-        user.roles.find(role => role.role.name === 'non_member'),
+        user.roles.find(
+          role =>
+            role.role.name === 'member' && role.status === 'ACTIVE' && !role.isRoleDeactivated,
+        ) || user.roles.find(role => role.role.name === 'non_member' && !role.isRoleDeactivated),
     );
     const members = await Promise.all(
       users.map(async user => {
@@ -3625,7 +3628,11 @@ export class AuthService {
       const source = payload.source !== undefined ? userSourceToEntity[payload.source] : null;
       const status = payload.status !== undefined ? userStatusToEntity[payload.status] : null;
 
-      await RoleService.assignRoleToUser({ userId: user.id, roleName: RoleType.NonMember }, source, status);
+      await RoleService.assignRoleToUser(
+        { userId: user.id, roleName: RoleType.NonMember },
+        source,
+        status,
+      );
 
       const newMapping = new HostUserMapping();
       newMapping.user = user;
@@ -4153,7 +4160,6 @@ export class AuthService {
     );
 
     return { result: users, totalCount: count };
-
   }
 
   // ADMIN Sevice Code
@@ -4173,6 +4179,9 @@ export class AuthService {
       ? parseInt(parsedQuery.followerCountTo as string)
       : undefined;
     const searchValue = parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const memberTypes = parsedQuery?.memberTypes
+      ? parsedQuery.memberTypes.toString().split(',')
+      : undefined;
     const { error: validationError, response: validation } = this.validateFilters(payload.query);
 
     if (validationError) {
@@ -4192,28 +4201,48 @@ export class AuthService {
       );
     }
     const usersQuery = this.dbConnection
-    .getRepository(User)
-    .createQueryBuilder('user')
-    .innerJoinAndSelect('user.roles', 'userRole')
-    .innerJoinAndSelect('userRole.role', 'role')
-    .leftJoinAndSelect('user.socialProviders', 'socialProvider')
-    .leftJoinAndSelect('user.socialStats', 'socialStats')
-    .leftJoinAndSelect('user.address', 'address')
-    //.where('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
-    .where('user.deletedAt IS NULL')
-    // Updated condition to ensure users have either email OR phone number
-    .andWhere('((user.email IS NOT NULL AND user.email != :emptyEmail) OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != :emptyPhone))', { emptyEmail: '', emptyPhone: '' })
-    // .andWhere('user.isDeactivated = :isDeactivated', { isDeactivated: false })
-    .groupBy('user.id')
-    .addGroupBy('userRole.id')
-    .addGroupBy('role.id')
-    .addGroupBy('socialProvider.id')
-    .addGroupBy('socialStats.id')
-    .addGroupBy('address.id')
-    .addGroupBy('userRole.role.id')
-    .offset(skip)
-    .limit(take)
-    .orderBy('user.createdAt', 'DESC');
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.roles', 'userRole')
+      .innerJoinAndSelect('userRole.role', 'role')
+      .leftJoinAndSelect('user.socialProviders', 'socialProvider')
+      .leftJoinAndSelect('user.socialStats', 'socialStats')
+      .leftJoinAndSelect('user.address', 'address')
+      .where('user.deletedAt IS NULL')
+      .andWhere('userRole.deletedAt IS NULL')
+      .andWhere('userRole.isRoleDeactivated = :isRoleDeactivated', { isRoleDeactivated: false })
+      .andWhere('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+      // Updated condition to ensure users have either email OR phone number
+      .andWhere(
+        '((user.email IS NOT NULL AND user.email != :emptyEmail) OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != :emptyPhone))',
+        { emptyEmail: '', emptyPhone: '' },
+      )
+      .groupBy('user.id')
+      .addGroupBy('userRole.id')
+      .addGroupBy('role.id')
+      .addGroupBy('socialProvider.id')
+      .addGroupBy('socialStats.id')
+      .addGroupBy('address.id')
+      .addGroupBy('userRole.role.id')
+      .offset(skip)
+      .limit(take)
+      .orderBy('user.createdAt', 'DESC');
+
+    // Apply member type filtering at database level for performance
+    if (memberTypes && memberTypes.length > 0) {
+      usersQuery.andWhere(
+        new Brackets(qb => {
+          memberTypes.forEach((type, index) => {
+            const condition = this.buildMemberTypeCondition(type);
+            if (index === 0) {
+              qb.where(condition.query, condition.params);
+            } else {
+              qb.orWhere(condition.query, condition.params);
+            }
+          });
+        }),
+      );
+    }
 
     if (searchValue) {
       usersQuery.andWhere(
@@ -4252,14 +4281,6 @@ export class AuthService {
     }
 
     let users = await usersQuery.getMany();
-    users = users.filter(item => {
-      const rolesList = item?.roles?.map(item => item.role.name);
-
-      if (rolesList.includes(RoleType.Member) || rolesList.includes(RoleType.NonMember)) {
-        //filter users with desired roles
-        return item;
-      }
-    });
 
     const members = await Promise.all(
       users.map(async user => {
@@ -4324,6 +4345,103 @@ export class AuthService {
       }),
     );
     return responses.data(members);
+  }
+
+  /**
+   * Shared helper method to build database conditions for different member types
+   * This ensures consistency between getMembers, getMembersType, and getMembersCount
+   *
+   * Used by:
+   * - AuthService.getMembers() - for filtering members
+   * - AdminController.getMembersCount() - for counting members
+   * - AdminController.getMembersType() - via getMembers for filtered results
+   */
+  public static buildMemberTypeCondition(type: string): { query: string; params: any } {
+    switch (type) {
+      case 'ACTIVE':
+        // ACTIVE: Must have ACTIVE status, REQUEST_IN_APP source, AND member role
+        // Explicitly filter out non-allowed statuses to handle multiple roles properly
+        return {
+          query:
+            '(userRole.status = :activeStatus AND userRole.source = :activeSource AND role.name = :activeRole AND userRole.isRoleDeactivated = :activeIsRoleDeactivated AND userRole.status NOT IN (:...excludedActiveStatuses))',
+          params: {
+            activeStatus: 'ACTIVE',
+            activeSource: 'REQUEST_IN_APP',
+            activeRole: 'member',
+            activeIsRoleDeactivated: false,
+            excludedActiveStatuses: [
+              'NEW_APPLICANT',
+              'WAITLISTED',
+              'DEACTIVATED',
+              'REJECTED',
+              'UNRECOGNIZED',
+              'NON_MEMBER',
+            ],
+          },
+        };
+
+      case 'NEW_APPLICANT':
+        // NEW_APPLICANT: Must have NEW_APPLICANT status, REQUEST_IN_APP source, AND non_member role
+        // Explicitly filter out non-allowed statuses to handle multiple roles properly
+        return {
+          query:
+            '(userRole.status = :newStatus AND userRole.source = :newSource AND role.name = :newRole AND userRole.isRoleDeactivated = :newIsRoleDeactivated AND userRole.status NOT IN (:...excludedNewStatuses))',
+          params: {
+            newStatus: 'NEW_APPLICANT',
+            newSource: 'REQUEST_IN_APP',
+            newRole: 'non_member',
+            newIsRoleDeactivated: false,
+            excludedNewStatuses: [
+              'ACTIVE',
+              'WAITLISTED',
+              'DEACTIVATED',
+              'REJECTED',
+              'UNRECOGNIZED',
+              'NON_MEMBER',
+            ],
+          },
+        };
+
+      case 'DEACTIVATED':
+        return {
+          query: '(userRole.status = :deactivatedStatus)',
+          params: { deactivatedStatus: 'DEACTIVATED' },
+        };
+
+      case 'WAITLISTED':
+        return {
+          query: '(userRole.status = :waitlistedStatus)',
+          params: { waitlistedStatus: 'WAITLISTED' },
+        };
+
+      case 'REJECTED':
+        return {
+          query: '(userRole.status = :rejectedStatus)',
+          params: { rejectedStatus: 'REJECTED' },
+        };
+
+      case 'NON_MEMBER':
+        // NON_MEMBER: All users except those with status ACTIVE, DEACTIVATED, WAITLISTED, or UNRECOGNIZED
+        return {
+          query:
+            '(userRole.status NOT IN (:...nonMemberExcluded) AND userRole.isRoleDeactivated = :nonMemberIsRoleDeactivated)',
+          params: {
+            nonMemberExcluded: ['ACTIVE', 'DEACTIVATED', 'WAITLISTED', 'UNRECOGNIZED'],
+            nonMemberIsRoleDeactivated: false,
+          },
+        };
+
+      default:
+        // For any other status, just filter by status
+        return {
+          query:
+            '(userRole.status = :defaultStatus AND userRole.isRoleDeactivated = :defaultIsRoleDeactivated)',
+          params: {
+            defaultStatus: type,
+            defaultIsRoleDeactivated: false,
+          },
+        };
+    }
   }
 
   public static async getHosts(payload: PaginatedRequestDto): Promise<GetHostsResponse> {
@@ -7129,30 +7247,31 @@ export class AuthService {
     });
   }
 
-
-  public static async checkUserContact(payload: CheckUserContactRequestDto): Promise<ContactCheckResponse> {
+  public static async checkUserContact(
+    payload: CheckUserContactRequestDto,
+  ): Promise<ContactCheckResponse> {
     const { isEmail, value } = payload;
-    
+
     try {
-      const user = isEmail 
+      const user = isEmail
         ? await this.getUserWithRolesByEmail({ email: value })
         : await this.getUserWithRolesByPhone({ phoneNumber: value });
 
       if (!user) {
         return {
           isValid: false,
-          message: 'User not found'
+          message: 'User not found',
         };
       }
 
       const hasEmail = !!user.email;
-      const hasPhone = !!user.phoneNumber;  
+      const hasPhone = !!user.phoneNumber;
 
       if (isEmail && !hasPhone) {
         return {
           isValid: true,
           message: 'User needs to add phone number',
-          data: { needsPhone: true }
+          data: { needsPhone: true },
         };
       }
 
@@ -7160,24 +7279,26 @@ export class AuthService {
         return {
           isValid: true,
           message: 'User needs to add email',
-          data: { needsEmail: true }
+          data: { needsEmail: true },
         };
       }
 
       return {
         isValid: true,
         message: 'User has all required contact information',
-        data: { hasAllInfo: true }
+        data: { hasAllInfo: true },
       };
     } catch (error) {
       return {
         isValid: false,
-        message: error.message || 'Error checking user contact information'
+        message: error.message || 'Error checking user contact information',
       };
     }
   }
 
-  public static async getAllReports(payload: ReportAndFeedbackRequestDto): Promise<ReportDetails[]> {
+  public static async getAllReports(
+    payload: ReportAndFeedbackRequestDto,
+  ): Promise<ReportDetails[]> {
     const parsedQuery = parse(payload.query);
     const take = parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
     const skip = parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
@@ -7196,7 +7317,7 @@ export class AuthService {
     if (searchValue) {
       query.andWhere(
         '(reportedBy.firstName ILIKE :search OR reportedBy.lastName ILIKE :search OR reportedTo.firstName ILIKE :search OR reportedTo.lastName ILIKE :search OR report.reportMessage ILIKE :search)',
-        { search: `%${searchValue}%` }
+        { search: `%${searchValue}%` },
       );
     }
 
@@ -7205,28 +7326,32 @@ export class AuthService {
     return reports.map(report => ({
       id: report.id,
       reportMessage: report.reportMessage,
-      reportedBy: report.reportedBy ? {
-        id: report.reportedBy.id,
-        firstName: report.reportedBy.firstName,
-        lastName: report.reportedBy.lastName,
-        email: report.reportedBy.email,
-        username: report.reportedBy.username,
-        phoneNumber: report.reportedBy.phoneNumber,
-        gender: report.reportedBy.gender,
-        profilePicture: report.reportedBy.profilePicture,
-        instagramUserName: report.reportedBy.instagramUserName,
-      } : undefined,
-      reportedTo: report.reportedTo ? {
-        id: report.reportedTo.id,
-        firstName: report.reportedTo.firstName,
-        lastName: report.reportedTo.lastName,
-        email: report.reportedTo.email,
-        username: report.reportedTo.username,
-        phoneNumber: report.reportedTo.phoneNumber,
-        gender: report.reportedTo.gender,
-        profilePicture: report.reportedTo.profilePicture,
-        instagramUserName: report.reportedTo.instagramUserName,
-      } : undefined,
+      reportedBy: report.reportedBy
+        ? {
+            id: report.reportedBy.id,
+            firstName: report.reportedBy.firstName,
+            lastName: report.reportedBy.lastName,
+            email: report.reportedBy.email,
+            username: report.reportedBy.username,
+            phoneNumber: report.reportedBy.phoneNumber,
+            gender: report.reportedBy.gender,
+            profilePicture: report.reportedBy.profilePicture,
+            instagramUserName: report.reportedBy.instagramUserName,
+          }
+        : undefined,
+      reportedTo: report.reportedTo
+        ? {
+            id: report.reportedTo.id,
+            firstName: report.reportedTo.firstName,
+            lastName: report.reportedTo.lastName,
+            email: report.reportedTo.email,
+            username: report.reportedTo.username,
+            phoneNumber: report.reportedTo.phoneNumber,
+            gender: report.reportedTo.gender,
+            profilePicture: report.reportedTo.profilePicture,
+            instagramUserName: report.reportedTo.instagramUserName,
+          }
+        : undefined,
       reportedByRole: report.reportedByRole?.name,
       reportedToRole: report.reportedToRole?.name,
     }));
@@ -7252,8 +7377,8 @@ export class AuthService {
         'Reported Against Email',
         'Report Message',
         'Reporter Role',
-        'Reported Against Role'
-      ].join(',')
+        'Reported Against Role',
+      ].join(','),
     ];
 
     for (const report of reports) {
@@ -7266,7 +7391,7 @@ export class AuthService {
         report.reportedTo?.email || '',
         `"${(report.reportMessage || '').replace(/"/g, '""')}"`,
         report.reportedByRole?.name || '',
-        report.reportedToRole?.name || ''
+        report.reportedToRole?.name || '',
       ].join(',');
       csvRows.push(row);
     }
@@ -7274,11 +7399,16 @@ export class AuthService {
     return csvRows.join('\n');
   }
 
-  public static async getEnhancedFeedbacks(payload: EnhancedReportAndFeedbackRequestDto): Promise<Feedback[]> {
+  public static async getEnhancedFeedbacks(
+    payload: EnhancedReportAndFeedbackRequestDto,
+  ): Promise<Feedback[]> {
     const parsedQuery = parse(payload.query);
-    const take = payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const searchValue = payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const take =
+      payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip =
+      payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue =
+      payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const query = this.dbConnection
       .getRepository(HostFeedback)
@@ -7292,7 +7422,7 @@ export class AuthService {
     if (searchValue) {
       query.andWhere(
         '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR feedback.description ILIKE :search)',
-        { search: `%${searchValue}%` }
+        { search: `%${searchValue}%` },
       );
     }
 
@@ -7302,29 +7432,36 @@ export class AuthService {
       id: feedback.id,
       tag: feedback.tag,
       description: feedback.description,
-      user: feedback.user ? {
-        id: feedback.user.id,
-        type: !!feedback.user.additionalHostInformation ? 'Host' : 'Member',
-        firstName: feedback.user.firstName,
-        lastName: feedback.user.lastName,
-        email: feedback.user.email,
-        username: feedback.user.username,
-        phoneNumber: feedback.user.phoneNumber,
-        gender: feedback.user.gender,
-        profilePicture: feedback.user.profilePicture,
-        instagramUserName: feedback.user.instagramUserName,
-        roles: feedback.user.roles?.map(r => r.role.name) || [],
-        additionalHostInformation: feedback.user.additionalHostInformation,
-      } : undefined,
+      user: feedback.user
+        ? {
+            id: feedback.user.id,
+            type: !!feedback.user.additionalHostInformation ? 'Host' : 'Member',
+            firstName: feedback.user.firstName,
+            lastName: feedback.user.lastName,
+            email: feedback.user.email,
+            username: feedback.user.username,
+            phoneNumber: feedback.user.phoneNumber,
+            gender: feedback.user.gender,
+            profilePicture: feedback.user.profilePicture,
+            instagramUserName: feedback.user.instagramUserName,
+            roles: feedback.user.roles?.map(r => r.role.name) || [],
+            additionalHostInformation: feedback.user.additionalHostInformation,
+          }
+        : undefined,
       createdAt: feedback.createdAt,
     }));
   }
 
-  public static async getEnhancedReports(payload: EnhancedReportAndFeedbackRequestDto): Promise<ReportDetails[]> {
+  public static async getEnhancedReports(
+    payload: EnhancedReportAndFeedbackRequestDto,
+  ): Promise<ReportDetails[]> {
     const parsedQuery = parse(payload.query);
-    const take = payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
-    const skip = payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
-    const searchValue = payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
+    const take =
+      payload.take || parsedQuery?.take ? parseInt(parsedQuery.take as string) : undefined;
+    const skip =
+      payload.skip || parsedQuery?.skip ? parseInt(parsedQuery.skip as string) : undefined;
+    const searchValue =
+      payload.searchValue || parsedQuery?.searchValue ? parsedQuery.searchValue : undefined;
 
     const query = this.dbConnection
       .getRepository(Report)
@@ -7343,7 +7480,7 @@ export class AuthService {
     if (searchValue) {
       query.andWhere(
         '(reportedBy.firstName ILIKE :search OR reportedBy.lastName ILIKE :search OR reportedTo.firstName ILIKE :search OR reportedTo.lastName ILIKE :search OR report.reportMessage ILIKE :search)',
-        { search: `%${searchValue}%` }
+        { search: `%${searchValue}%` },
       );
     }
 
@@ -7352,30 +7489,34 @@ export class AuthService {
     return reports.map(report => ({
       id: report.id,
       reportMessage: report.reportMessage,
-      reportedBy: report.reportedBy ? {
-        id: report.reportedBy.id,
-        firstName: report.reportedBy.firstName,
-        lastName: report.reportedBy.lastName,
-        email: report.reportedBy.email,
-        username: report.reportedBy.username,
-        phoneNumber: report.reportedBy.phoneNumber,
-        gender: report.reportedBy.gender,
-        profilePicture: report.reportedBy.profilePicture,
-        instagramUserName: report.reportedBy.instagramUserName,
-        roles: report.reportedBy.roles?.map(r => r.role.name) || [],
-      } : undefined,
-      reportedTo: report.reportedTo ? {
-        id: report.reportedTo.id,
-        firstName: report.reportedTo.firstName,
-        lastName: report.reportedTo.lastName,
-        email: report.reportedTo.email,
-        username: report.reportedTo.username,
-        phoneNumber: report.reportedTo.phoneNumber,
-        gender: report.reportedTo.gender,
-        profilePicture: report.reportedTo.profilePicture,
-        instagramUserName: report.reportedTo.instagramUserName,
-        roles: report.reportedTo.roles?.map(r => r.role.name) || [],
-      } : undefined,
+      reportedBy: report.reportedBy
+        ? {
+            id: report.reportedBy.id,
+            firstName: report.reportedBy.firstName,
+            lastName: report.reportedBy.lastName,
+            email: report.reportedBy.email,
+            username: report.reportedBy.username,
+            phoneNumber: report.reportedBy.phoneNumber,
+            gender: report.reportedBy.gender,
+            profilePicture: report.reportedBy.profilePicture,
+            instagramUserName: report.reportedBy.instagramUserName,
+            roles: report.reportedBy.roles?.map(r => r.role.name) || [],
+          }
+        : undefined,
+      reportedTo: report.reportedTo
+        ? {
+            id: report.reportedTo.id,
+            firstName: report.reportedTo.firstName,
+            lastName: report.reportedTo.lastName,
+            email: report.reportedTo.email,
+            username: report.reportedTo.username,
+            phoneNumber: report.reportedTo.phoneNumber,
+            gender: report.reportedTo.gender,
+            profilePicture: report.reportedTo.profilePicture,
+            instagramUserName: report.reportedTo.instagramUserName,
+            roles: report.reportedTo.roles?.map(r => r.role.name) || [],
+          }
+        : undefined,
       reportedByRole: report.reportedByRole?.name,
       reportedToRole: report.reportedToRole?.name,
       createdAt: report.createdAt,
@@ -7402,21 +7543,21 @@ export class AuthService {
         'Reported Against Name',
         'Reported Against Email',
         'Reported Against Role',
-        'Report Message'
-      ].join(',')
+        'Report Message',
+      ].join(','),
     ];
 
     for (const report of reports) {
       const row = [
         report.id,
         report.createdAt,
-        `"${(report.reportedBy?.firstName || '')} ${(report.reportedBy?.lastName || '')}".trim()`,
+        `"${report.reportedBy?.firstName || ''} ${report.reportedBy?.lastName || ''}".trim()`,
         report.reportedBy?.email || '',
         report.reportedByRole?.name || '',
-        `"${(report.reportedTo?.firstName || '')} ${(report.reportedTo?.lastName || '')}".trim()`,
+        `"${report.reportedTo?.firstName || ''} ${report.reportedTo?.lastName || ''}".trim()`,
         report.reportedTo?.email || '',
         report.reportedToRole?.name || '',
-        `"${(report.reportMessage || '').replace(/"/g, '""')}"`
+        `"${(report.reportMessage || '').replace(/"/g, '""')}"`,
       ].join(',');
       csvRows.push(row);
     }
@@ -7441,19 +7582,19 @@ export class AuthService {
         'User Email',
         'User Role',
         'Tag',
-        'Description'
-      ].join(',')
+        'Description',
+      ].join(','),
     ];
 
     for (const feedback of feedbacks) {
       const row = [
         feedback.id,
         feedback.createdAt,
-        `"${(feedback.user?.firstName || '')} ${(feedback.user?.lastName || '')}".trim()`,
+        `"${feedback.user?.firstName || ''} ${feedback.user?.lastName || ''}".trim()`,
         feedback.user?.email || '',
         feedback.user?.roles?.map(r => r.role.name).join(', ') || '',
         feedback.tag || '',
-        `"${(feedback.description || '').replace(/"/g, '""')}"`
+        `"${(feedback.description || '').replace(/"/g, '""')}"`,
       ].join(',');
       csvRows.push(row);
     }
@@ -7461,4 +7602,3 @@ export class AuthService {
     return csvRows.join('\n');
   }
 }
-

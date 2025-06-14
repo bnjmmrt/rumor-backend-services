@@ -26,6 +26,7 @@ import { GenericResponse } from 'rumor-utils/shared/users/grpc/auth/shared.pb';
 import asyncWrapper from '../server/helpers/asyncWrapper';
 import { CreateResponse, GetResponse, UpdateResponse } from 'rumor-utils/success';
 import type { BasicHostProfile } from 'rumor-utils/shared/users/grpc/auth/auth.pb.d.ts';
+import { UserRole } from 'rumor-utils/shared/users/entities/roles/user-role.entity';
 
 export class AdminController {
   public static getMembers = asyncWrapper(async (req, res): Promise<void> => {
@@ -279,121 +280,142 @@ export class AdminController {
   });
 
   public static getMembersCount = asyncWrapper(async (req, res): Promise<void> => {
+    /*
+     * SQL Query to get all user roles and populate the role.name:
+     *
+     * SELECT
+     *     ur.id,
+     *     ur.status,
+     *     ur.source,
+     *     ur.is_blacklisted,
+     *     ur.profile_setup_completed,
+     *     ur.is_role_deactivated,
+     *     ur.created_at,
+     *     ur.updated_at,
+     *     u.id as user_id,
+     *     u.email as user_email,
+     *     u.first_name,
+     *     u.last_name,
+     *     r.id as role_id,
+     *     r.name as role_name,
+     *     CASE
+     *         WHEN ur.status = 'NEW_APPLICANT' AND ur.source = 'REQUEST_IN_APP' AND r.name = 'non_member' THEN 'Users who have applied to join but haven''t been approved yet (REQUEST_IN_APP + non_member)'
+     *         WHEN ur.status = 'ACTIVE' AND ur.source = 'REQUEST_IN_APP' AND r.name = 'member' THEN 'Users who are currently active members (applied through app + member role)'
+     *         WHEN ur.status = 'ACTIVE' THEN 'Active users from other sources'
+     *         WHEN ur.status = 'WAITLISTED' THEN 'Users who applied but are on the waiting list'
+     *         WHEN ur.status = 'DEACTIVATED' THEN 'Users who were once active but have been deactivated'
+     *         WHEN ur.status = 'REJECTED' THEN 'Users whose applications were rejected'
+     *         WHEN ur.status NOT IN ('ACTIVE', 'DEACTIVATED', 'WAITLISTED', 'UNRECOGNIZED') THEN 'Non-members (all users except ACTIVE, DEACTIVATED, WAITLISTED, UNRECOGNIZED)'
+     *         ELSE 'Unknown status'
+     *     END as status_description
+     * FROM user_role ur
+     * INNER JOIN role r ON ur.role_id = r.id
+     * INNER JOIN "user" u ON ur.user_id = u.id
+     * WHERE r.is_active = true
+     *   AND u.deleted_at IS NULL
+     *   AND ((u.email IS NOT NULL AND u.email != '') OR (u.phone_number IS NOT NULL AND u.phone_number != ''))
+     *   AND r.name IN ('member', 'non_member')
+     * ORDER BY ur.created_at DESC;
+     */
+
     const userId = (req as any).user;
     const query = { ...req.query };
     delete query.take;
     delete query.skip;
 
-    const payload: PaginatedRequestDto = { userId, query: query as string };
-
     try {
-      const response: GetMembersResponse = await AuthService.getMembers(payload);
-      const members = response.data;
-
+      // Define filter buttons with detailed comments about what each status represents
       const filterButtons = [
+        // NON_MEMBER: All users except those with status ACTIVE, DEACTIVATED, WAITLISTED, or UNRECOGNIZED
         { label: 'Non-Member', value: 'NON_MEMBER' },
+
+        // NEW_APPLICANT: Users who have applied to join but haven't been approved yet
+        // - Must have REQUEST_IN_APP source and non_member role
         { label: 'New Applicant', value: 'NEW_APPLICANT' },
+
+        // ACTIVE: Users who are currently active members
+        // - Must have ACTIVE status, REQUEST_IN_APP source, and member role
         { label: 'Active', value: 'ACTIVE' },
+
+        // WAITLISTED: Users who applied but are on the waiting list
         { label: 'Waitlisted', value: 'WAITLISTED' },
+
+        // DEACTIVATED: Users who were once active but have been deactivated
         { label: 'Deactivated', value: 'DEACTIVATED' },
-        { label: 'Banned', value: 'BANNED' },
+
+        // REJECTED: Users whose applications were rejected
+        { label: 'Rejected', value: 'REJECTED' },
       ];
 
-      const counts = filterButtons.map(objBttn => {
-        let filtered = members.filter(row => row.status === objBttn.value);
+      // Get counts efficiently using shared filtering logic with getMembers
+      const counts = await Promise.all(
+        filterButtons.map(async button => {
+          let count = 0;
 
-        if (objBttn.value === 'ACTIVE') {
-          filtered = members.filter(
-            row => row.status === 'ACTIVE' && row.sources.includes('REQUEST_IN_APP'),
-          );
-        }
+          // Base query for all status types - gets users with member or non_member roles
+          const baseQuery = AuthService.dbConnection
+            .getRepository(UserRole)
+            .createQueryBuilder('userRole')
+            .innerJoin('userRole.user', 'user')
+            .innerJoin('userRole.role', 'role')
+            .where('user.deletedAt IS NULL')
+            .andWhere('userRole.deletedAt IS NULL')
+            .andWhere('userRole.isRoleDeactivated = :isRoleDeactivated', {
+              isRoleDeactivated: false,
+            })
+            .andWhere('role.name IN (:...roleNames)', { roleNames: ['member', 'non_member'] })
+            .andWhere(
+              '((user.email IS NOT NULL AND user.email != :emptyEmail) OR (user.phoneNumber IS NOT NULL AND user.phoneNumber != :emptyPhone))',
+              {
+                emptyEmail: '',
+                emptyPhone: '',
+              },
+            );
 
-        if (objBttn.value === 'DEACTIVATED') {
-          filtered = members.filter(row => row.status === 'DEACTIVATED');
-        }
+          // Use shared filtering logic from AuthService for consistency
+          const condition = AuthService.buildMemberTypeCondition(button.value);
+          count = await baseQuery.andWhere(condition.query, condition.params).getCount();
 
-        if (objBttn.value === 'WAITLISTED') {
-          filtered = members.filter(row => row.status === 'WAITLISTED');
-        }
-
-        if (objBttn.value === 'NON_MEMBER') {
-          filtered = members.filter(
-            row =>
-              ['DEACTIVATED', 'WAITLISTED'].every(status => status !== row.status) &&
-              ((row.role === 'non_member' &&
-                ['DEACTIVATED', 'NEW_APPLICANT'].every(status => status !== row.status)) ||
-                row.sources.some(source =>
-                  ['PLUS_1', 'INVITED_BY_HOST', 'SIGN_UP_FORM'].includes(source),
-                )),
-          );
-        }
-
-        return {
-          label: objBttn.label,
-          count: filtered.length,
-          value: objBttn.value,
-        };
-      });
+          return {
+            label: button.label,
+            count: count,
+            value: button.value,
+          };
+        }),
+      );
 
       const getResponse = new GetResponse(counts);
       res.status(getResponse.statusCode).json(getResponse);
     } catch (error) {
+      console.error('Error getting member counts:', error);
       res.status(500).json({ error: 'Error getting member counts' });
     }
   });
 
   public static getMembersType = asyncWrapper(async (req, res): Promise<void> => {
-    const userId = (req as any).user;
-    const query = { ...req.query };
-    const types = req.params.type.split(','); // Split types by comma
-    delete query.take;
-    delete query.skip;
-
-    const payload: PaginatedRequestDto = { userId, query: query as string };
-
     try {
+      // Extract and validate request parameters
+      const userId = (req as any).user;
+      const memberTypes = req.params.type.split(',').map(type => type.trim()); // Split and clean types
+      const query = { ...req.query };
+
+      // Add member types for filtering (keep pagination params - take and skip)
+      query.memberTypes = memberTypes.join(','); // Pass types to service for database filtering
+
+      // Build payload for AuthService
+      const payload: PaginatedRequestDto = {
+        userId,
+        query: query as string,
+      };
+
+      // Get filtered members directly from database (no more inefficient JavaScript filtering!)
       const response: GetMembersResponse = await AuthService.getMembers(payload);
       const members = response.data;
-      let filteredMembers = new Set(); // Use Set to avoid duplicates
 
-      // Filter for each type and add to Set
-      types.forEach(type => {
-        let typeFilteredMembers = [];
-
-        if (type === 'ACTIVE') {
-          typeFilteredMembers = members.filter(
-            row => row.status === 'ACTIVE' && row.sources.includes('REQUEST_IN_APP'),
-          );
-        } else if (type === 'DEACTIVATED') {
-          typeFilteredMembers = members.filter(row => row.status === 'DEACTIVATED');
-        } else if (type === 'WAITLISTED') {
-          typeFilteredMembers = members.filter(row => row.status === 'WAITLISTED');
-        } else if (type === 'NON_MEMBER') {
-          typeFilteredMembers = members.filter(
-            row =>
-              ['DEACTIVATED', 'WAITLISTED'].every(status => status !== row.status) &&
-              ((row.role === 'non_member' &&
-                ['DEACTIVATED', 'NEW_APPLICANT'].every(status => status !== row.status)) ||
-                row.sources.some(source =>
-                  ['PLUS_1', 'INVITED_BY_HOST', 'SIGN_UP_FORM'].includes(source),
-                )),
-          );
-        } else {
-          // For NEW_APPLICANT and BANNED, just filter by status
-          typeFilteredMembers = members.filter(row => row.status === type);
-        }
-
-        // Add filtered members to Set
-        typeFilteredMembers.forEach(member => filteredMembers.add(member));
-      });
-
-      // Convert Set back to array
-      const finalFilteredMembers = Array.from(filteredMembers);
-
-      // Apply search filter if searchValue exists
+      // Apply additional search filtering if needed (this is still efficient as it's on already filtered data)
       const searchValue = query.searchValue as string;
       const searchResults = searchValue
-        ? finalFilteredMembers.filter((member: any) => {
+        ? members.filter((member: any) => {
             const searchLower = searchValue.toLowerCase();
             return (
               member.name?.toLowerCase().includes(searchLower) ||
@@ -402,11 +424,12 @@ export class AdminController {
               member.instagramUsername?.toLowerCase().includes(searchLower)
             );
           })
-        : finalFilteredMembers;
+        : members;
 
       const getResponse = new GetResponse(searchResults);
       res.status(getResponse.statusCode).json(getResponse);
     } catch (error) {
+      console.error('Error getting members by type:', error);
       res.status(500).json({ error: 'Error getting members by type' });
     }
   });
