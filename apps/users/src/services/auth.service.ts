@@ -2837,7 +2837,7 @@ export class AuthService {
           });
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         return toMember(user, focuses, interests, primaryRole, undefined, socialProvider?.username);
       }),
@@ -3134,7 +3134,7 @@ export class AuthService {
         const socialProviderUsername = socialProvider?.username || null;
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
@@ -3429,7 +3429,7 @@ export class AuthService {
         const socialProviderUsername = socialProvider?.username || null;
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
@@ -4151,7 +4151,7 @@ export class AuthService {
         const socialProviderUsername = socialProvider?.username || null;
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
@@ -4181,14 +4181,20 @@ export class AuthService {
    * 7. NON_MEMBER status
    * 8. Any other status (fallback)
    */
-  private static getPrimaryRole(roles: UserRole[]): UserRole {
+  private static getPrimaryRole(user: User): UserRole {
+    const roles = user.roles;
     if (!roles || roles.length === 0) {
       throw new Error('User must have at least one role');
     }
 
-    // Pre-process all roles: Convert NEW_APPLICANT to NON_MEMBER if source is not REQUEST_IN_APP
+    // Pre-process all roles: Convert NEW_APPLICANT to NON_MEMBER if:
+    // 1. Source is not REQUEST_IN_APP, OR
+    // 2. User doesn't have a valid age (dateOfBirth is null or empty)
     roles.forEach(role => {
-      if (role.status === UserStatus.NEW_APPLICANT && role.source !== UserSource.REQUEST_IN_APP) {
+      if (
+        role.status === UserStatus.NEW_APPLICANT &&
+        (role.source !== UserSource.REQUEST_IN_APP || !user.dateOfBirth || user.dateOfBirth === '')
+      ) {
         role.status = UserStatus.NON_MEMBER;
       }
     });
@@ -4439,7 +4445,7 @@ export class AuthService {
         };
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         const member = toMember(
           user,
@@ -4506,9 +4512,10 @@ export class AuthService {
 
       case 'NEW_APPLICANT':
         // NEW_APPLICANT: Must have NEW_APPLICANT status, REQUEST_IN_APP source, AND non_member role
+        // Also filter out users with null or empty date_of_birth (age)
         // Explicitly filter out non-allowed statuses to handle multiple roles properly
         return {
-          query: `(userRole.status = :newStatus AND userRole.source = :newSource AND role.name = :newRole AND userRole.isRoleDeactivated = :newIsRoleDeactivated AND userRole.status NOT IN (:...excludedNewStatuses)${sourceExclusionCondition})`,
+          query: `(userRole.status = :newStatus AND userRole.source = :newSource AND role.name = :newRole AND userRole.isRoleDeactivated = :newIsRoleDeactivated AND userRole.status NOT IN (:...excludedNewStatuses) AND user.dateOfBirth IS NOT NULL AND user.dateOfBirth != ''${sourceExclusionCondition})`,
           params: {
             newStatus: 'NEW_APPLICANT',
             newSource: 'REQUEST_IN_APP',
@@ -4555,11 +4562,15 @@ export class AuthService {
 
       case 'NON_MEMBER':
         // NON_MEMBER: All users except those with status ACTIVE, DEACTIVATED, WAITLISTED, or UNRECOGNIZED
+        // ALSO include NEW_APPLICANT users who don't have a valid age (null or empty date_of_birth)
         return {
-          query: `(userRole.status NOT IN (:...nonMemberExcluded) AND userRole.isRoleDeactivated = :nonMemberIsRoleDeactivated${sourceExclusionCondition})`,
+          query: `((userRole.status NOT IN (:...nonMemberExcluded) AND userRole.isRoleDeactivated = :nonMemberIsRoleDeactivated) OR (userRole.status = :newApplicantStatus AND userRole.source = :newApplicantSource AND role.name = :newApplicantRole AND (user.dateOfBirth IS NULL OR user.dateOfBirth = ''))${sourceExclusionCondition})`,
           params: {
             nonMemberExcluded: ['ACTIVE', 'DEACTIVATED', 'WAITLISTED', 'UNRECOGNIZED'],
             nonMemberIsRoleDeactivated: false,
+            newApplicantStatus: 'NEW_APPLICANT',
+            newApplicantSource: 'REQUEST_IN_APP',
+            newApplicantRole: 'non_member',
             ...sourceExclusionParams,
           },
         };
@@ -6269,7 +6280,7 @@ export class AuthService {
         const socialProviderUsername = socialProvider?.username || null;
 
         // 🚀 FIXED: Use primary role based on priority hierarchy instead of just first role
-        const primaryRole = this.getPrimaryRole(user.roles);
+        const primaryRole = this.getPrimaryRole(user);
 
         const userData = toUser(user, focuses, interests, primaryRole, {
           INSTAGRAM: socialProviderUsername,
