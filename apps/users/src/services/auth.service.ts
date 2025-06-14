@@ -4242,6 +4242,30 @@ export class AuthService {
           });
         }),
       );
+    } else {
+      // When no specific member types are requested, apply default filtering to ensure
+      // only valid members are returned (users who meet our established criteria)
+      // This includes all valid member types: ACTIVE, NEW_APPLICANT, WAITLISTED, DEACTIVATED, REJECTED, NON_MEMBER
+      const defaultMemberTypes = [
+        'ACTIVE',
+        'NEW_APPLICANT',
+        'WAITLISTED',
+        'DEACTIVATED',
+        'REJECTED',
+        'NON_MEMBER',
+      ];
+      usersQuery.andWhere(
+        new Brackets(qb => {
+          defaultMemberTypes.forEach((type, index) => {
+            const condition = this.buildMemberTypeCondition(type);
+            if (index === 0) {
+              qb.where(condition.query, condition.params);
+            } else {
+              qb.orWhere(condition.query, condition.params);
+            }
+          });
+        }),
+      );
     }
 
     if (searchValue) {
