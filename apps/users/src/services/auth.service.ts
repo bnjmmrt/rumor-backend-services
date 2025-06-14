@@ -7563,6 +7563,7 @@ export class AuthService {
       .leftJoinAndSelect('feedback.user', 'user')
       .leftJoinAndSelect('user.roles', 'roles')
       .leftJoinAndSelect('roles.role', 'role')
+      .orderBy('feedback.createdAt', 'DESC')
       .take(take)
       .skip(skip);
 
@@ -7621,6 +7622,7 @@ export class AuthService {
       .leftJoinAndSelect('reportedTo.roles', 'reportedRoles')
       .leftJoinAndSelect('reporterRoles.role', 'reporterRole')
       .leftJoinAndSelect('reportedRoles.role', 'reportedRole')
+      .orderBy('report.createdAt', 'DESC')
       .take(take)
       .skip(skip);
 
