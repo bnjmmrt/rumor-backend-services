@@ -10,11 +10,10 @@ export const buildSignupFormsResponse = (
   baseUrl: string,
   submissions: number = 0,
 ): SignupFormsResponse => {
-  const companyName: string = (event.owner?.additionalHostInformation?.companyName || '')
+  const companyName: string = event.owner?.additionalHostInformation?.companyName || '';
 
   const eventName: string = event.name.split(' ').join('');
   const collaborators: CollaboratorsEvent[] = groupCollaborators(event?.collaborators);
-
 
   const result: SignupFormsResponse = {
     id: esf.id,
@@ -38,7 +37,7 @@ export const buildSignupFormsResponse = (
     isActive: esf.isActive,
     isPublished: esf.isPublished,
     description: esf.description,
-    url: `${baseUrl}/${companyName}/${eventName}/${esf.urlCode}`,
+    url: encodeURI(`${baseUrl}/${companyName}/${eventName}/${esf.urlCode}`),
     questions: (esf.questions && esf.questions.map(q => buildQuestion(q))) || [],
     hasAccessForAdditionalGuests: esf.hasAccessForAdditionalGuests,
     eventStatus: event.status,
