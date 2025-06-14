@@ -412,21 +412,9 @@ export class AdminController {
       const response: GetMembersResponse = await AuthService.getMembers(payload);
       const members = response.data;
 
-      // Apply additional search filtering if needed (this is still efficient as it's on already filtered data)
-      const searchValue = query.searchValue as string;
-      const searchResults = searchValue
-        ? members.filter((member: any) => {
-            const searchLower = searchValue.toLowerCase();
-            return (
-              member.name?.toLowerCase().includes(searchLower) ||
-              member.email?.toLowerCase().includes(searchLower) ||
-              member.phoneNumber?.includes(searchValue) ||
-              member.instagramUsername?.toLowerCase().includes(searchLower)
-            );
-          })
-        : members;
-
-      const getResponse = new GetResponse(searchResults);
+      // No need for additional client-side search filtering since AuthService.getMembers()
+      // already handles search at the database level more comprehensively and efficiently
+      const getResponse = new GetResponse(members);
       res.status(getResponse.statusCode).json(getResponse);
     } catch (error) {
       console.error('Error getting members by type:', error);
