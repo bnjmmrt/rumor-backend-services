@@ -4186,6 +4186,13 @@ export class AuthService {
       throw new Error('User must have at least one role');
     }
 
+    // Pre-process all roles: Convert NEW_APPLICANT to NON_MEMBER if source is not REQUEST_IN_APP
+    roles.forEach(role => {
+      if (role.status === UserStatus.NEW_APPLICANT && role.source !== UserSource.REQUEST_IN_APP) {
+        role.status = UserStatus.NON_MEMBER;
+      }
+    });
+
     // If only one role, return it
     if (roles.length === 1) {
       return roles[0];
