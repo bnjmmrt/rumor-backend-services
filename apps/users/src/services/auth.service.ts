@@ -1539,6 +1539,7 @@ export class AuthService {
     try {
       await fusionAuthClientHandler.fusionAuthClient().retrieveUserByEmail(user.email);
     } catch (error) {
+      console.log('error login', error);
       const guest = await this.dbConnection.getRepository(Guest).findOne({
         where: { user: { id: user.id } },
       });
@@ -1585,6 +1586,7 @@ export class AuthService {
     try {
       if (isEmailLogin) {
         //TODO: change and proper format
+        console.log('send verification code', code.response.code);
 
         // Micro-service call
         await serviceMesh.notificationService().sendEmailFromTemplate(
@@ -1629,54 +1631,8 @@ export class AuthService {
     const isEmailLogin = !!payload.email;
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
-    // // Handle secondary verification
-    // if (payload.isSecondary) {
-    //   const verificationResult = isEmailLogin
-    //     ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-    //     : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
-
-    //   const isVerified: boolean =
-    //     ('verified' in verificationResult && verificationResult.verified === true) ||
-    //     ('data' in verificationResult && verificationResult.data?.verified === true);
-
-    //   if (!isVerified) {
-    //     throw new NotFoundError('Invalid or expired verification code, please try again.');
-    //   }
-
-    //   // Get the current user from the database
-    //   const user = await this.dbConnection.getRepository(User).findOne({
-    //     where: { id: payload.userId },
-    //     relations: ['roles', 'roles.role'],
-    //   });
-
-    //   if (!user) {
-    //     throw new NotFoundError('User not found');
-    //   }
-
-    //   // Add the new email/phone to the user's account
-    //   if (isEmailLogin) {
-    //     user.email = payload.email;
-    //   } else {
-    //     user.phoneNumber = payload.phoneNumber;
-    //   }
-
-    //   await this.dbConnection.getRepository(User).save(user);
-
-    //   return {
-    //     id: user.id,
-    //     token: '',
-    //     roles: user.roles.map(item => ({
-    //       roleName: item.role.name,
-    //       roleId: item.role.id,
-    //     })),
-    //     user: user,
-    //     isGuest: false,
-    //   };
-    // }
-
-    // Search for user by email or phone number
-
     let user: User | null = null;
+    console.log('login with email', payload.email, isEmailLogin, loginIdentifier);
     if (isEmailLogin) {
       user = await this.dbConnection.getRepository(User).findOne({
         where: [{ email: payload.email, deletedAt: IsNull() }],
@@ -1690,12 +1646,6 @@ export class AuthService {
     }
 
     if (user && user.roles.length) {
-      const isUnapprovedHost =
-        user.roles.length === 1 &&
-        user.roles[0].role?.name === 'host' &&
-        user.roles[0].status === UserStatus.NEW_APPLICANT;
-
-      // Filter out 'host' roles with status 'new_applicant'
       user.roles = user.roles.filter(
         userRole =>
           !(userRole.role?.name === 'host' && userRole.status === UserStatus.NEW_APPLICANT),
@@ -1703,6 +1653,7 @@ export class AuthService {
     }
 
     if (user?.isDeactivated) {
+      console.log('reactivate user reachd');
       this.reactivateUserAccount({ email: user.email });
     }
 
@@ -1717,7 +1668,7 @@ export class AuthService {
         ('data' in verificationResult && verificationResult.data?.verified === true);
 
       if (!isVerified) {
-        throw new NotFoundError('Invalid or expired verification code, please try again.');
+        throw new NotFoundError('Invalid or expired verification code, please try again. 1');
       }
 
       // Check for invitation and set flags
@@ -1757,7 +1708,7 @@ export class AuthService {
         ('data' in verificationResult && verificationResult.data?.verified === true);
 
       if (!isVerified) {
-        throw new NotFoundError('Invalid or expired verification code, please try again.');
+        throw new NotFoundError('Invalid or expired verification code, please try again. 2');
       }
 
       // Check for invitation and set flags
@@ -1787,181 +1738,42 @@ export class AuthService {
       };
     }
 
-    // Handle bypass verification logic for testing or review environment
-    if (config.get('BYPASS_VERIFICATION_CODE')) {
-      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
-        where: {
-          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
-          // code: payload.code,
-        },
-      });
-
-      if (!temporaryCode) {
-        if (!isEmailLogin) {
-          const verificationResult = await serviceMesh
-            .notificationService()
-            .verifyCode(payload.phoneNumber, payload.code);
-          const isVerified = verificationResult?.data?.verified === true;
-
-          if (!isVerified) {
-            throw new NotFoundError('Invalid or expired verification code, please try again.');
-          }
-
-          let rolesToReturn = user.roles;
-
-          // If no roles exist, assign non_member temporarily
-          if (!user.roles || user.roles.length === 0) {
-            const nonMemberRole = await this.dbConnection
-              .getRepository(Role)
-              .findOne({ where: { name: RoleType.NonMember } });
-
-            if (nonMemberRole) {
-              rolesToReturn = [
-                {
-                  role: nonMemberRole,
-                  status: UserStatus.NEW_APPLICANT,
-                } as UserRole,
-              ];
-            }
-          }
-
-          return {
-            id: user.id,
-            token: '',
-            roles: rolesToReturn.map(item => ({
-              roleName: item.role.name,
-              roleId: item.role.id,
-            })),
-            user: user,
-            isGuest: false,
-          };
-        } else {
-          throw new NotFoundError('Invalid or expired verification code, please try again.');
-        }
-      }
-
-      // Setting up Payload.code to bypass verification for below email and phone number
-      if (payload.email === 'mahad+test@therumor.com' || payload.phoneNumber === '+447719855602') {
-        payload.code = temporaryCode.code;
-      } else if (payload.code !== temporaryCode.code) {
-        throw new BadRequestError('Invalid or expired verification code, please try again.');
-      }
-
-      let completedLogin;
-      try {
-        completedLogin = await fusionAuthClientHandler
-          .fusionAuthClient()
-          .passwordlessLogin({ code: payload.code });
-      } catch (error) {
-        try {
-          const verificationResult = isEmailLogin
-            ? await this.verifyCodeByEmail({ email: payload.email, verificationCode: payload.code })
-            : await serviceMesh.notificationService().verifyCode(payload.phoneNumber, payload.code);
-
-          const isVerified: boolean =
-            ('verified' in verificationResult && verificationResult.verified === true) ||
-            ('data' in verificationResult && verificationResult.data?.verified === true);
-
-          if (!isVerified) {
-            throw new NotFoundError('Invalid or expired verification code, please try again.');
-          }
-
-          let rolesToReturn = user.roles;
-
-          // If no roles exist, assign non_member temporarily
-          if (!user.roles || user.roles.length === 0) {
-            const nonMemberRole = await this.dbConnection
-              .getRepository(Role)
-              .findOne({ where: { name: RoleType.NonMember } });
-
-            if (nonMemberRole) {
-              rolesToReturn = [
-                {
-                  role: nonMemberRole,
-                  status: UserStatus.ACTIVE,
-                } as UserRole,
-              ];
-            }
-          }
-
-          return {
-            id: user.id,
-            token: '',
-            roles: rolesToReturn.map(item => ({
-              roleName: item.role.name,
-              roleId: item.role.id,
-            })),
-            user: user,
-            isGuest: false,
-          };
-        } catch (error) {
-          console.error(error);
-        }
-      }
-
-      // if (completedLogin.statusCode > 299) {
-      //   throw new NotFoundError(`Unable to login. ${completedLogin.exception.message}`);
-      // }
-
-      await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
-
-      if (user?.id) {
-        // Save FCM Token for the User
-        SettingsService.savePushNotificationToken({
-          userId: user.id,
-          token: payload.fcmToken,
-          deviceId: payload.deviceId,
-        });
-      }
-
-      return {
-        id: user.id,
-        token: completedLogin?.response?.token,
-        roles: user.roles.map(item => ({
-          roleName: item.role.name,
-          roleId: item.role.id,
-        })),
-        user: user,
-        isGuest: false,
-      };
-    } else {
-      const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
-        where: {
-          [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
-          code: payload.code,
-        },
-      });
-      if (!temporaryCode) {
-        throw new NotFoundError('Unable to login.');
-      }
-
-      const completedLogin = await fusionAuthClientHandler
-        .fusionAuthClient()
-        .passwordlessLogin({ code: payload.code });
-      if (completedLogin.statusCode > 299) {
-        throw new BadRequestError('Unable to login.');
-      }
-
-      await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
-
-      // Save FCM Token for the User
-      SettingsService.savePushNotificationToken({
-        userId: user.id,
-        token: payload.fcmToken,
-        deviceId: payload.deviceId,
-      });
-
-      return {
-        token: completedLogin.response?.token,
-        roles: user.roles.map(item => ({
-          roleName: item.role.name,
-          roleId: item.role.id,
-        })),
-        id: user.id,
-        user: user,
-        isGuest: false,
-      };
+    const temporaryCode = await this.dbConnection.getRepository(TemporaryLoginCode).findOne({
+      where: {
+        [isEmailLogin ? 'email' : 'phoneNumber']: loginIdentifier,
+        code: payload.code,
+      },
+    });
+    if (!temporaryCode) {
+      throw new NotFoundError('Unable to login. 1');
     }
+
+    const completedLogin = await fusionAuthClientHandler
+      .fusionAuthClient()
+      .passwordlessLogin({ code: payload.code });
+    if (completedLogin.statusCode > 299) {
+      throw new BadRequestError('Unable to login. 2');
+    }
+
+    await this.dbConnection.getRepository(TemporaryLoginCode).delete(temporaryCode.id);
+
+    // Save FCM Token for the User
+    SettingsService.savePushNotificationToken({
+      userId: user.id,
+      token: payload.fcmToken,
+      deviceId: payload.deviceId,
+    });
+
+    return {
+      token: completedLogin.response?.token,
+      roles: user.roles.map(item => ({
+        roleName: item.role.name,
+        roleId: item.role.id,
+      })),
+      id: user.id,
+      user: user,
+      isGuest: false,
+    };
   }
 
   public static async hostLogin(payload: LoginRequestDto): Promise<TokenResponseAndRoles> {
