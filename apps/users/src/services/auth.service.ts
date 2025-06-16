@@ -1585,7 +1585,6 @@ export class AuthService {
 
     try {
       if (isEmailLogin) {
-        //TODO: change and proper format
         console.log('send verification code', code.response.code);
 
         // Micro-service call
@@ -1632,7 +1631,6 @@ export class AuthService {
     const loginIdentifier = isEmailLogin ? payload.email : payload.phoneNumber;
 
     let user: User | null = null;
-    console.log('login with email', payload.email, isEmailLogin, loginIdentifier);
     if (isEmailLogin) {
       user = await this.dbConnection.getRepository(User).findOne({
         where: [{ email: payload.email, deletedAt: IsNull() }],
@@ -1653,7 +1651,6 @@ export class AuthService {
     }
 
     if (user?.isDeactivated) {
-      console.log('reactivate user reachd');
       this.reactivateUserAccount({ email: user.email });
     }
 
@@ -3581,6 +3578,8 @@ export class AuthService {
     }
 
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+    console.log('***** code is:', verificationCode);
 
     if (existingLoginAttempts.length) {
       await Promise.all(
