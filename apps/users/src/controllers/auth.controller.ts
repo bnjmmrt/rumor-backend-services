@@ -598,11 +598,33 @@ export class AuthController {
   });
 
   public static setLoginStatus = asyncWrapper(async (req, res): Promise<void> => {
-    const id = req.params;
+    const { id } = req.params;
     const payload: IdRequestDto = { id };
     const response: string = await AuthService.setLoginStatus(payload);
     const updateResponse = new UpdateResponse(response, 'Login status reset successfully');
     res.status(updateResponse.statusCode).json(updateResponse);
+  });
+
+  public static agreeToCommunityGuidelines = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const payload: IdRequestDto = { id };
+    const response: string = await AuthService.agreeToCommunityGuidelines(payload);
+    const updateResponse = new UpdateResponse(
+      response,
+      'Community guidelines agreement recorded successfully',
+    );
+    res.status(updateResponse.statusCode).json(updateResponse);
+  });
+
+  public static checkCommunityGuidelinesStatus = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const payload: IdRequestDto = { id };
+    const response = await AuthService.checkCommunityGuidelinesStatus(payload);
+    const getResponse = new GetResponse(
+      response,
+      'Community guidelines status retrieved successfully',
+    );
+    res.status(getResponse.statusCode).json(getResponse);
   });
 
   public static duplicateCustomList = asyncWrapper(async (req, res): Promise<void> => {

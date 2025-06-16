@@ -95,6 +95,12 @@ export class User extends RumorBaseEntity {
   @Column({ type: 'boolean', name: 'instagram_validated', default: false, nullable: true })
   instagramValidated: boolean;
 
+  @Column({ type: 'boolean', name: 'community_guidelines_agreed', default: false })
+  communityGuidelinesAgreed: boolean;
+
+  @Column({ type: 'timestamp', name: 'community_guidelines_agreed_at', nullable: true })
+  communityGuidelinesAgreedAt: Date | null;
+
   @Column({ type: 'varchar', name: '2fa_code', nullable: true })
   twoFactorCode: string | null;
 
