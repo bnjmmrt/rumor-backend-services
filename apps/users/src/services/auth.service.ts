@@ -686,6 +686,7 @@ export class AuthService {
     await RoleService.assignRoleToUser(
       { userId: newUser.id, roleName: 'host' },
       UserSource.HOST_APPLICATION,
+      UserStatus.NEW_APPLICANT,
     );
 
     // Micro-service call
@@ -3676,8 +3677,45 @@ export class AuthService {
     user.isFirstTimeLoggedIn = true;
     await this.dbConnection.getRepository(User).save(user);
 
-    await user.save();
     return '';
+  }
+
+  public static async agreeToCommunityGuidelines(payload: IdRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+    });
+
+    if (!user) {
+      throw new NotFoundError('user');
+    }
+
+    if (user.communityGuidelinesAgreed) {
+      throw new BadRequestError('User has already agreed to community guidelines');
+    }
+
+    user.communityGuidelinesAgreed = true;
+    user.communityGuidelinesAgreedAt = new Date();
+    await this.dbConnection.getRepository(User).save(user);
+
+    return '';
+  }
+
+  public static async checkCommunityGuidelinesStatus(
+    payload: IdRequestDto,
+  ): Promise<{ agreed: boolean; agreedAt: Date | null }> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      select: ['communityGuidelinesAgreed', 'communityGuidelinesAgreedAt'],
+    });
+
+    if (!user) {
+      throw new NotFoundError('user');
+    }
+
+    return {
+      agreed: user.communityGuidelinesAgreed,
+      agreedAt: user.communityGuidelinesAgreedAt,
+    };
   }
 
   public static async getAllusers(payload: ListUsersInviteesDto): Promise<UsersData> {
