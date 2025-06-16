@@ -1260,6 +1260,7 @@ export class GuestService {
     const isFromAdmin = parsedQuery?.isFromAdmin ? true : false;
     const spam = parsedQuery?.spammed;
     const customListName = parsedQuery.list;
+    const userId = parsedQuery?.userId
     const systemDefaultLists = ['myFavourites-systemDefault', 'myFollowers-systemDefault'];
     let pastEventsIds: string[] =
       (parsedQuery.pastEvents as string)
@@ -1360,6 +1361,10 @@ export class GuestService {
         .addOrderBy('user.lastName', sortDirection);
     } else {
       queryBuilder.orderBy('guest.createdAt', 'DESC');
+    }
+
+    if (userId) {
+      queryBuilder.andWhere('guest.user.id = :userId', { userId });
     }
 
     await this.applyUserFilters(
