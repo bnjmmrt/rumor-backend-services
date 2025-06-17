@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as express from 'express';
 import { CommunicationController } from '../controllers/communication.controller';
 import { NotificationController } from '../controllers/notification.controller';
+import { AdminNotificationController } from '../controllers/admin-notification.controller';
 import AuthMiddleware from '../server/middleware/auth';
 
 const router: Router = express.Router();
@@ -80,6 +81,27 @@ router.delete(
   '/notifications/bulk-delete',
   AuthMiddleware.fusionAuthRequired,
   NotificationController.deleteMultipleNotifications,
+);
+//Called from Admin Panel
+router.post(
+  '/admin-notifications',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.createAdminNotification,
+);
+router.get(
+  '/admin-notifications',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.getAllAdminNotifications,
+);
+router.get(
+  '/admin-notifications/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.getAdminNotification,
+);
+//Interservice call
+router.post(
+  '/admin-notifications/:notificationId/send',
+  AdminNotificationController.sendAdminNotification,
 );
 
 export default router;

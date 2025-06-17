@@ -17,6 +17,10 @@ import {
   RequestById,
   NotificationData,
   SendPushNotificationRequest,
+  AdminNotificationRecipients,
+  NotificationDeliveryChannel,
+  CreateAdminNotificationRequest,
+  NotificationDeliveryType,
 } from '../grpc/notification/notification.pb';
 
 export class RequestByIdDto implements RequestById {
@@ -29,6 +33,32 @@ export class ListNotificationsRequestDto implements ListNotificationsRequest {
   @IsOptional()
   @IsString()
   query?: string;
+}
+
+export class CreateAdminNotificationRequestDto implements CreateAdminNotificationRequest {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  message: string;
+
+  @IsString()
+  @IsOptional()
+  scheduledDate?: string;
+
+  @IsNotEmpty()
+  @IsEnum(AdminNotificationRecipients, { each: true })
+  recipients: AdminNotificationRecipients[];
+
+  @IsNotEmpty()
+  @IsEnum(NotificationDeliveryChannel, { each: true })
+  channels: NotificationDeliveryChannel[];
+
+  @IsNotEmpty()
+  @IsEnum(NotificationDeliveryType)
+  deliveryType: NotificationDeliveryType;
 }
 
 export class CreateNotificationRequestDto implements CreateNotificationRequest {
