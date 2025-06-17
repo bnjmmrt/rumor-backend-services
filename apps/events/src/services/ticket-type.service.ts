@@ -10,9 +10,22 @@ import {
 import { TicketType } from 'rumor-utils/shared/events/entities/ticket-type.entity';
 import { IsNull } from 'typeorm';
 import { responses } from '../common/responses';
-import { Event } from 'rumor-utils/shared/events/entities';
+import { normalizeCatalogName } from '../common/helpers';
+import { Event, Guest } from 'rumor-utils/shared/events/entities';
 import database from '../database';
 import { BadRequestError, NotFoundError } from 'rumor-utils/errors';
+import { GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
+
+interface TicketTypeBreakdown {
+  id: string;
+  name: string;
+  description: string;
+  capacity: number;
+  enabled: boolean;
+  attendeeCount: number;
+  confirmedCount: number;
+  pendingCount: number;
+}
 
 export class TicketTypeService {
   public static dbConnection = database;
@@ -139,5 +152,68 @@ export class TicketTypeService {
     } catch (err) {
       return responses.badRequest('Error updating ticket type');
     }
+  }
+
+  public static async getTicketBreakdown(payload: RequestByIdDto): Promise<TicketTypeBreakdown[]> {
+    //For a given event, get the ticket types and the number of guests that have RSVPed for each ticket type
+    //Get the ticket types
+    const event = await this.dbConnection.getRepository(Event).findOne({
+      where: {
+        id: payload.id,
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
+    if (!event) {
+      throw new NotFoundError('Event not found');
+    }
+
+    //Get the ticket types
+    const ticketTypes = await this.dbConnection.getRepository(TicketType).find({
+      where: {
+        event: {
+          id: event.id,
+        },
+      },
+    });
+
+    // Get attendee count for each ticket type
+    const ticketTypesWithCounts = await Promise.all(
+      ticketTypes.map(async ticketType => {
+        const [confirmedCount, pendingCount] = await Promise.all([
+          this.dbConnection.getRepository(Guest).count({
+            where: {
+              event: { id: event.id },
+              ticketType: { id: ticketType.id },
+              status: GuestStatus.CONFIRMED,
+              deletedAt: IsNull(),
+            },
+          }),
+          this.dbConnection.getRepository(Guest).count({
+            where: {
+              event: { id: event.id },
+              ticketType: { id: ticketType.id },
+              status: GuestStatus.INVITED,
+              deletedAt: IsNull(),
+            },
+          }),
+        ]);
+
+        return {
+          id: ticketType.id,
+          name: ticketType.name,
+          description: ticketType.description,
+          capacity: ticketType.capacity,
+          enabled: ticketType.enabled,
+          attendeeCount: confirmedCount + pendingCount,
+          confirmedCount,
+          pendingCount,
+        };
+      }),
+    );
+
+    return ticketTypesWithCounts;
   }
 }

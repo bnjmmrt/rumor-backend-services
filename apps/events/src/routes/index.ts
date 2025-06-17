@@ -185,7 +185,10 @@ router.put('/ticket-type/:id', TicketTypeController.updateTicketType);
 router.delete('/ticket-type/:id', TicketTypeController.deleteTicketType);
 router.get('/ticket-type/:id', TicketTypeController.getTicketType); /**TestStatus: working */
 router.get('/ticket-types/:id', TicketTypeController.getTicketTypes); /**TestStatus: working */
-
+router.get(
+  '/ticket-types/:id/ticket-breakdown',
+  TicketTypeController.getTicketBreakdown,
+); /**TestStatus: working */
 // Collaborators
 router.get(
   '/collaborators/roles',

@@ -745,4 +745,26 @@ export interface ISignupFormQuestionsRequest {
   isToggled?: boolean;
 }
 
+export interface TicketBreakdown {
+  ticketType: string;
+  price: number;
+  quantity: number;
+  confirmed: number;
+  pending: number;
+  collaborator: Collaborator;
+}
+
+export interface TicketBreakdownResponse {
+  ticketBreakdown: TicketBreakdown[];
+}
+
+export interface TicketBreakdown {
+  ticketType: string;
+  price: number;
+  quantity: number;
+  confirmed: number;
+  pending: number;
+  collaborator: Collaborator;
+}
+
 export const EVENTS_PACKAGE_NAME = 'events';
