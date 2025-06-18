@@ -98,6 +98,11 @@ router.get(
   AuthMiddleware.fusionAuthRequired,
   AdminNotificationController.getAdminNotification,
 );
+router.delete(
+  '/admin-notifications/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.deleteNotificationById,
+);
 //Interservice call
 router.post(
   '/admin-notifications/:notificationId/send',

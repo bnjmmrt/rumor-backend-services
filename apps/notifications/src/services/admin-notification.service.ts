@@ -18,6 +18,7 @@ import {
 import { PushNotificationPayload } from '../utils/firebase-notifications/firebase-notifications.interface';
 import TwilioService from '../utils/twilio/sms';
 import { isValidPhoneNumber } from 'rumor-utils/utils/file-utils';
+import { NotFoundError } from 'rumor-utils/errors';
 
 export class AdminNotificationService {
   private dbConnection = database;
@@ -178,6 +179,16 @@ export class AdminNotificationService {
     });
 
     return toAdminNotification(notification);
+  }
+
+  async deleteAdminNotification(notificationId: string): Promise<{ message: string }> {
+    const result = await this.dbConnection.getRepository(AdminNotification).delete(notificationId);
+
+    if (result.affected === 0) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    return { message: 'Notification deleted successfully' };
   }
 }
 

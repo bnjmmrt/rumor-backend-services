@@ -78,9 +78,11 @@ export class SchedulerService {
 
   public static async scheduleAdminNotification(payload: any): Promise<void> {
     try {
+      if(!payload.id || !payload.scheduledDate )
+        return;
+
       const jobKey = `${SchedulerJobType.ADMIN_NOTIFICATION}_${payload.id}`;
-      const nextMinute = dayjs().add(1, 'minute').toDate();
-      const scheduledDate = payload.scheduledDate || nextMinute;
+      const scheduledDate = payload.scheduledDate;
 
       this.cancelScheduledJob(jobKey);
 
@@ -103,7 +105,7 @@ export class SchedulerService {
       });
       this.storeScheduledJob(jobKey, job);
     } catch (err) {
-      console.log(`Error in scheduling admin notification ::`, err);
+      console.log(`Error scheduling admin notification ::`, err);
     }
   }
 
