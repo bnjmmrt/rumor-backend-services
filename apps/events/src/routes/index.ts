@@ -5,6 +5,7 @@ import { SignupFormsController } from '../controllers/signup-forms.controller';
 import { GuestController } from '../controllers/guest.controller';
 import AuthMiddleware from '../server/middleware/auth';
 import { EventsController } from '../controllers/events.controller';
+import { SurveysController } from 'src/controllers/surveys.controller';
 import { VouchRequestController } from '../controllers/vouch-request.controller';
 import { QuizQuestionController } from '../controllers/quiz-question.controller';
 import { TalentController } from '../controllers/talent.controller';
@@ -190,34 +191,34 @@ router.get(
   TicketTypeController.getTicketBreakdown,
 ); /**TestStatus: working */
 //Surveys
-router.post('/surveys', AuthMiddleware.fusionAuthRequired, EventsController.createSurvey);
-router.get('/surveys', AuthMiddleware.fusionAuthRequired, EventsController.listSurveys);
-router.get('/surveys/page', AuthMiddleware.fusionAuthRequired, EventsController.getSurveyPage);
-router.get('/surveys/page', AuthMiddleware.fusionAuthRequired, EventsController.getSurveyPage);
+router.post('/surveys', AuthMiddleware.fusionAuthRequired, SurveysController.createSurvey);
+router.get('/surveys', AuthMiddleware.fusionAuthRequired, SurveysController.listSurveys);
+router.get('/surveys/page', AuthMiddleware.fusionAuthRequired, SurveysController.getSurveyPage);
+router.get('/surveys/page', AuthMiddleware.fusionAuthRequired, SurveysController.getSurveyPage);
 
-router.get('/surveys/:id', AuthMiddleware.fusionAuthRequired, EventsController.getSurveyById);
+router.get('/surveys/:id', AuthMiddleware.fusionAuthRequired, SurveysController.getSurveyById);
 
-router.put('/surveys/:id', AuthMiddleware.fusionAuthRequired, EventsController.updateSurveyById);
+router.put('/surveys/:id', AuthMiddleware.fusionAuthRequired, SurveysController.updateSurveyById);
 
 router.get(
   '/surveys/:id/responders',
   AuthMiddleware.fusionAuthRequired,
-  EventsController.getSurveyResponders,
+  SurveysController.getSurveyResponders,
 );
 router.get(
   '/surveys/mostRecent/:userId',
   AuthMiddleware.fusionAuthRequired,
-  EventsController.getMostRecentSurvey,
+  SurveysController.getMostRecentSurvey,
 );
 router.post(
   '/surveys/:id/respond',
   AuthMiddleware.fusionAuthRequired,
-  EventsController.respondToSurvey,
+  SurveysController.respondToSurvey,
 );
 router.put(
   '/surveys/:id/updateResponse',
   AuthMiddleware.fusionAuthRequired,
-  EventsController.updateSurveyResponse,
+  SurveysController.updateSurveyResponse,
 );
 
 // Collaborators
