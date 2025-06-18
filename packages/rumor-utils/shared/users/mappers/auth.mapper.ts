@@ -353,5 +353,12 @@ export const toMemberProfile = (
       : [],
     referralCode,
     references,
+    company: user.additionalHostInformation
+      ? {
+          name: user.additionalHostInformation.companyName || '',
+          logo: user.additionalHostInformation.companyLogo || '',
+          website: user.additionalHostInformation.website || '',
+        }
+      : undefined,
   };
 };
