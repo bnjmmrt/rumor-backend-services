@@ -587,6 +587,11 @@ export interface MemberProfile {
   sources?: string[] | undefined;
   isHost?: boolean | undefined;
   references?: IReferenceCode;
+  company?: {
+    name: string;
+    logo: string;
+    website: string;
+  };
 }
 
 export interface FocusProto {
