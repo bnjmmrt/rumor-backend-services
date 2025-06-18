@@ -5,7 +5,7 @@ import { SignupFormsController } from '../controllers/signup-forms.controller';
 import { GuestController } from '../controllers/guest.controller';
 import AuthMiddleware from '../server/middleware/auth';
 import { EventsController } from '../controllers/events.controller';
-import { SurveysController } from 'src/controllers/surveys.controller';
+import { SurveysController } from '../controllers/surveys.controller';
 import { VouchRequestController } from '../controllers/vouch-request.controller';
 import { QuizQuestionController } from '../controllers/quiz-question.controller';
 import { TalentController } from '../controllers/talent.controller';
