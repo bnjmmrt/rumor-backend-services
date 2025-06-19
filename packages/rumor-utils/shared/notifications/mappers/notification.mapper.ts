@@ -69,7 +69,6 @@ function toAdminNotification(notification: Partial<AdminNotification>): AdminNot
       ? dayjs(notification.scheduledDate).tz('America/New_York').format('MM/DD/YYYY hh:mm A')
       : null,
     status: notification.status,
-    deliveryType: notification.deliveryType,
     sentDate:
       notification.status === NotificationStatus.SENT
         ? dayjs(notification.scheduledDate || notification.updatedAt)

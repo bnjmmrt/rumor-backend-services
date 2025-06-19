@@ -4,7 +4,6 @@ import { NotificationStatus } from '../interfaces/notification.interface';
 import {
   AdminNotificationRecipients,
   NotificationDeliveryChannel,
-  NotificationDeliveryType,
 } from '../grpc/notification/notification.pb';
 
 @Entity()
@@ -26,7 +25,4 @@ export class AdminNotification extends RumorBaseEntity {
 
   @Column({ type: 'enum', enum: NotificationStatus, name: 'status' })
   status: NotificationStatus;
-
-  @Column({ type: 'enum', enum: NotificationDeliveryType, name: 'delivery_type' })
-  deliveryType: NotificationDeliveryType;
 }

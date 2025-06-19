@@ -1,8 +1,3 @@
-export enum NotificationDeliveryType {
-  IMMEDIATE = 'IMMEDIATE',
-  SCHEDULED = 'SCHEDULED',
-}
-
 export enum NotificationDeliveryChannel {
   SMS = 'SMS',
   PUSH = 'PUSH',
@@ -93,7 +88,6 @@ export interface CreateAdminNotificationRequest {
   scheduledDate?: string;
   recipients: AdminNotificationRecipients[];
   channels: NotificationDeliveryChannel[];
-  deliveryType: NotificationDeliveryType;
 }
 
 export interface CreateNotificationRequest {
