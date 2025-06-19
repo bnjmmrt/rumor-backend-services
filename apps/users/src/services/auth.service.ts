@@ -5355,15 +5355,6 @@ export class AuthService {
       });
 
     const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
-    const mappedGuestEvents = guestEvents.map(event => ({
-      id: event.id,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      name: event.name,
-      imageCover: event.imageCover,
-      imageFlyer: event.imageFlyer,
-      eventCover: event.imageCover
-    }));
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
