@@ -67,6 +67,12 @@ import {
   QuizQuestion,
   UserRole,
 } from '../../packages/rumor-utils/shared/entities';
+import { Survey } from '../../packages/rumor-utils/shared/events/entities';
+import {
+  CreateSurveyResponse,
+  SurveyListResponse,
+  UpdateSurveyRequestDto,
+} from '../interfaces/survey.interface';
 import { GoogleAddressClient } from '../utils/google';
 import { formatEventStatus, toEvent } from 'rumor-utils/shared/events/mappers/events.mapper';
 import {
@@ -115,6 +121,7 @@ import {
   CreateQuizQuestionRequestDto,
   UpdateQuizQuestionRequestDto,
 } from '../../packages/rumor-utils/shared/events/dtos/quiz-question.dto';
+import { CreateSurveyRequestDto } from '../interfaces/survey.interface';
 import { RoleData } from '../../packages/rumor-utils/shared/users/grpc/auth/role.pb';
 import { createCollaboratorEntity } from '../utils/collaborator.utils';
 import { GuestService } from './guest.service';
@@ -147,6 +154,8 @@ import {
 } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { generateBranchLink } from '../utils/branch.utils';
 import { SponsorshipOpportunity } from 'rumor-utils/shared/sponsorships/entities/sponsorship-opportunity.entity';
+import { SurveyResponses } from '../../packages/rumor-utils/shared/events/entities'
+import { SurveyResponseDto } from 'packages/rumor-utils/shared/events/dtos/survey-response.dto';
 
 const responses = {
   conflict: (message: string) => ({
@@ -4434,7 +4443,9 @@ export class EventsService {
       }
       return responses.ok;
     } catch (error) {
-      console.log(error);
+      throw new BadRequestError('Error deleting host events');
     }
   }
+
+  
 }

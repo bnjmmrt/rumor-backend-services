@@ -230,7 +230,7 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import {
-  RestrictedInvites,
+  RestrictedInvites, Survey, SurveyResponses,
   SignupFormSubmissions,
   Ticket,
 } from 'rumor-utils/shared/events/entities';
@@ -4629,7 +4629,7 @@ export class AuthService {
 
     if (!user) {
       throw new ForbiddenError(
-        'The email address you provided does not match any account in our system. Please check for any typos or try a different email.',
+        "The email address you provided doesn't match any account in our system. Please check for any typos or try a different email.",
       );
     }
 
@@ -4643,7 +4643,7 @@ export class AuthService {
     );
     if (isAllowed === undefined) {
       throw new ForbiddenError(
-        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        "We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.",
       );
     }
 
@@ -4673,7 +4673,7 @@ export class AuthService {
 
     if (loginResponse.statusCode > 299 || loginResponse.statusCode < 200) {
       throw new ForbiddenError(
-        'We could not sign you in. Either your email or password is incorrect. Please try again or reset your password.',
+        "We couldn't sign you in. Either your email or password is incorrect. Please try again or reset your password.",
       );
     }
 
@@ -4923,6 +4923,8 @@ export class AuthService {
     const host: User = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: IsNull() },
     });
+
+    console.log('🚀 ~ AuthService ~ host:', host);
 
     if (!host) {
       throw new NotFoundError('host');
@@ -5353,6 +5355,15 @@ export class AuthService {
       });
 
     const guestEvents = (await serviceMesh.eventService().getSimpleGuestEvents(user.id)).data;
+    const mappedGuestEvents = guestEvents.map(event => ({
+      id: event.id,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      name: event.name,
+      imageCover: event.imageCover,
+      imageFlyer: event.imageFlyer,
+      eventCover: event.imageCover
+    }));
 
     const referredUser = await this.dbConnection
       .getRepository(ReferredUser)
@@ -5412,6 +5423,7 @@ export class AuthService {
     );
   }
 
+   
   public static async applyUserFilters(
     queryBuilder,
     parsedQuery,
@@ -5551,6 +5563,7 @@ export class AuthService {
       'userSource',
       'declinedBy',
       'vouch',
+      'whosInTown',
     ];
     const focuses = await PlatformService.getFocuses();
 
@@ -5757,6 +5770,13 @@ export class AuthService {
       type: FilterTypeValues.followers,
     };
 
+    const surveysObj = {
+      id: 'whosInTown',
+      label: "Who's In Town",
+      options: [serviceMesh.eventService().listSurveys()],
+      type: FilterTypeValues.whosInTown,
+    };
+
     const objectsMap = {
       baseCity: baseCityObj,
       gender: genderObj,
@@ -5775,6 +5795,7 @@ export class AuthService {
       declinedBy: declinedByObj,
       vouch: vouchObj,
       followersObj,
+      whosInTown: surveysObj,
     };
     // Arrange objects in the desired sequence
     const orderedObjects = filterOptionsSequence.map(id => objectsMap[id]).filter(node => node);
@@ -6013,6 +6034,7 @@ export class AuthService {
     userData.isHost = isHost;
     return userData;
   }
+
 
   public static async getUserCustomLists(
     hostId: string,

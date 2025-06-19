@@ -25,3 +25,6 @@ export const listHostEvents = (query: string) => apiService.getApi().get(`/hosts
 
 export const sendEventRemindersToAllGuests = (eventId: string) =>
   apiService.getApi().post(`event/reminders/send`, { eventId });
+
+export const listSurveys = () =>
+  apiService.getApi().get('/surveys');
