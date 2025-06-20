@@ -188,7 +188,6 @@ class TwilioService {
           toBinding: phoneNumbers,
           body: message,
         });
-      console.log('SMS notification sent:', r);
     } catch (error) {
       throw new InternalServerError(error);
     }
