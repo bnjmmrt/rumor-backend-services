@@ -88,6 +88,11 @@ router.post(
   AuthMiddleware.fusionAuthRequired,
   AdminNotificationController.createAdminNotification,
 );
+router.put(
+  '/admin-notifications/:notificationId',
+  AuthMiddleware.fusionAuthRequired,
+  AdminNotificationController.updateAdminNotification,
+);
 router.get(
   '/admin-notifications',
   AuthMiddleware.fusionAuthRequired,

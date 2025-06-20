@@ -2,7 +2,6 @@ import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.inte
 import { Event, User, AdminNotification } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
-import * as dayjs from 'dayjs';
 import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
 import { NotificationStatus } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
@@ -78,8 +77,7 @@ export class SchedulerService {
 
   public static async scheduleAdminNotification(payload: any): Promise<void> {
     try {
-      if(!payload.id || !payload.scheduledDate )
-        return;
+      if (!payload.id || !payload.scheduledDate) return;
 
       const jobKey = `${SchedulerJobType.ADMIN_NOTIFICATION}_${payload.id}`;
       const scheduledDate = payload.scheduledDate;
@@ -95,15 +93,18 @@ export class SchedulerService {
           if (!adminNotification) return; // Stop execution if the notification was deleted
 
           serviceMesh.notificationService().sendAdminNotification(adminNotification.id);
-
-          if(payload.scheduledDate) {
-            adminNotification.status = NotificationStatus.SCHEDULED
-            await adminNotification.save();
-          }
         }
         this.removeScheduledJob(jobKey);
       });
+
       this.storeScheduledJob(jobKey, job);
+
+      //Change the status to SCHEDULED
+      const adminNotification = await AdminNotification.findOne({
+        where: { id: payload.id },
+      });
+      adminNotification.status = NotificationStatus.SCHEDULED
+      await adminNotification.save();
     } catch (err) {
       console.log(`Error scheduling admin notification ::`, err);
     }

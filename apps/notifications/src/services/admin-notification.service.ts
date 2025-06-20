@@ -10,7 +10,7 @@ import {
   AdminNotificationResponse,
   NotificationStatus,
 } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
-import { CreateAdminNotificationRequestDto } from 'rumor-utils/shared/notifications/dtos/notification.dto';
+import { CreateAdminNotificationRequestDto, UpdateAdminNotificationRequestDto } from 'rumor-utils/shared/notifications/dtos/notification.dto';
 import {
   SchedulerJobType,
   SchedulerTriggerPayload,
@@ -27,15 +27,31 @@ export class AdminNotificationService {
     payload: CreateAdminNotificationRequestDto,
   ): Promise<AdminNotificationResponse> {
     const adminNotification = new AdminNotification();
+
+    return await this.saveAndSchedule(adminNotification, payload);
+  }
+
+  public async updateAdminNotification(
+    payload: UpdateAdminNotificationRequestDto,
+  ): Promise<AdminNotificationResponse> {
+    const adminNotification = await this.dbConnection.getRepository(AdminNotification).findOne({
+      where: { id: payload.id },
+    });
+
+    if (!adminNotification) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    return await this.saveAndSchedule(adminNotification, payload);
+  }  
+
+  private async saveAndSchedule(adminNotification: AdminNotification, payload: UpdateAdminNotificationRequestDto | CreateAdminNotificationRequestDto): Promise<AdminNotificationResponse> {
     adminNotification.title = payload.title;
     adminNotification.message = payload.message;
     adminNotification.recipients = payload.recipients;
     adminNotification.channels = payload.channels;
-
-    if (payload.scheduledDate) {
-      adminNotification.scheduledDate = new Date(payload.scheduledDate);
-      adminNotification.status = NotificationStatus.SCHEDULED;
-    } else {
+    adminNotification.scheduledDate = new Date(payload.scheduledDate);
+    if(!adminNotification.id){
       adminNotification.status = NotificationStatus.CREATED;
     }
 

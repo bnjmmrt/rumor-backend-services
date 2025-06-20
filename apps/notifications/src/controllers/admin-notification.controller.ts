@@ -1,5 +1,4 @@
-import { CreateAdminNotificationRequest } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
-//import { AdminNotificationResponse } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
+import { CreateAdminNotificationRequest, UpdateAdminNotificationRequest } from 'rumor-utils/shared/notifications/grpc/notification/notification.pb';
 import { AdminNotificationResponse } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
 import { CreateResponse, GetResponse, DeleteResponse } from 'rumor-utils/success';
 import adminNotificationService from '../services/admin-notification.service';
@@ -11,6 +10,15 @@ export class AdminNotificationController {
     const response: AdminNotificationResponse =
       await adminNotificationService.createAdminNotification(payload);
     const createResponse = new CreateResponse(response, 'Notification created successfully!');
+    res.status(createResponse.statusCode).json(createResponse);
+  });
+
+  public static updateAdminNotification = asyncWrapper(async (req, res): Promise<void> => {
+    const { notificationId } = req.params;
+    const payload: UpdateAdminNotificationRequest = { ...req.body, id: notificationId };
+    const response: AdminNotificationResponse =
+      await adminNotificationService.updateAdminNotification(payload);
+    const createResponse = new CreateResponse(response, 'Notification updated successfully!');
     res.status(createResponse.statusCode).json(createResponse);
   });
 

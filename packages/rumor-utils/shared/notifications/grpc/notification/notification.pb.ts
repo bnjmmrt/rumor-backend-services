@@ -90,6 +90,10 @@ export interface CreateAdminNotificationRequest {
   channels: NotificationDeliveryChannel[];
 }
 
+export interface UpdateAdminNotificationRequest extends CreateAdminNotificationRequest {
+  id: string;
+}
+
 export interface CreateNotificationRequest {
   title: string;
   message: string;
