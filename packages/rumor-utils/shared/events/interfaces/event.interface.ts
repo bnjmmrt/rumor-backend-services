@@ -19,6 +19,13 @@ export enum EventStatusEnum {
   REJECTED_STATUS = 'REJECTED_STATUS',
 }
 
+export enum CollaboratorStatusEnum {
+  ACCEPTED = 'ACCEPTED',
+  PENDING = 'PENDING',
+  DECLINED = 'REJECTED',
+  REMOVED = 'REMOVED',
+}
+
 export enum UploadType {
   EVENT_UPLOAD = 'EVENT_UPLOAD', // CSV uploaded for an event
   USER_UPLOAD = 'USER_UPLOAD', // CSV uploaded to add users to the system
