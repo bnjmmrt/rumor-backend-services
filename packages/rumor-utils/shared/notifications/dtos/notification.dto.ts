@@ -56,6 +56,12 @@ export class CreateAdminNotificationRequestDto implements CreateAdminNotificatio
   channels: NotificationDeliveryChannel[];
 }
 
+export class UpdateAdminNotificationRequestDto extends CreateAdminNotificationRequestDto {
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+}
+
 export class CreateNotificationRequestDto implements CreateNotificationRequest {
   @IsString()
   @IsNotEmpty()
