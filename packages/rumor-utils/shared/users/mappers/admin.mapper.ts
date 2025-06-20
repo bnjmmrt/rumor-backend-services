@@ -6,6 +6,7 @@ import {
   Focus as FocusProto,
   MemberProfile,
   customListData,
+  SurveyResponse,
 } from '../grpc/auth/auth.pb';
 import * as dayjs from 'dayjs';
 import { formatEventStatus } from '../../events/mappers/events.mapper';
@@ -124,3 +125,67 @@ export const toBasicHostProfile = (user: User, status: any, source: any): BasicH
     bio: user.additionalHostInformation?.bio || '',
   };
 };
+
+/*
+TODO: remove
+export const toMemberProfile = (
+  user: User,
+  focuses: FocusProto[],
+  role: UserRole,
+  instagramUsername?: string,
+  eventCount?: number,
+  surveyResponses?: SurveyResponse[],
+): MemberProfile => {
+  return {
+    id: user.id,
+    userId: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    category: focuses.map(focus => focus.name).join(', '),
+    city: user.address?.city ?? user.address?.address ?? 'N/A',
+    placeId: user.address?.googlePlaceId,
+    dateOfBirth: user.dateOfBirth,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    gender: entityToGender[user.gender],
+    referralCode: '',
+    socialStats: {
+      instagramFollowersCount: user.socialStats?.instagramFollowersCount || 0,
+      facebookFollowersCount: user.socialStats?.facebookFollowersCount || 0,
+      youtubeFollowersCount: user.socialStats?.youtubeFollowersCount || 0,
+      tiktokFollowersCount: user.socialStats?.tiktokFollowersCount || 0,
+      linkedinFollowersCount: user.socialStats?.linkedinFollowersCount || 0,
+      xFollowersCount: user.socialStats?.xFollowersCount || 0,
+      snapchatFollowersCount: user.socialStats?.snapchatFollowersCount || 0,
+    },
+    referredBy: [],
+    upcomingEvents: [],
+    pastEvents: [],
+    invitedEvents: [],
+    requestedEvents: [],
+    status: entityToUserStatus[role.status],
+    instagramUsername: instagramUsername,
+    customLists: [],
+    focuses: focuses.map(focus => ({ id: focus.id, name: focus.name })),
+    eventCount,
+    surveyResponses:
+      user.surveyResponses?.map(response => ({
+        id: response.id,
+        response: response.response,
+        user: {
+          ...response.user,
+          roles: response.user.roles.map(role => ({
+            roleId: role.role.id,
+            roleName: role.role.name,
+            status: entityToUserStatus[role.status],
+            source: role.source ? entityToUserSource[role.source] : undefined,
+          })),
+        },
+        survey: {
+          ...response.survey,
+          message: response.survey.message || '',
+        },
+        respondedAt: response.respondedAt.toISOString(),
+      })) || [],
+  };
+}; */

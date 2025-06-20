@@ -55,6 +55,12 @@ import { EventAgeLimit, Event } from 'packages/rumor-utils/shared/entities';
 import { IdRequestDto } from 'packages/rumor-utils/shared/users/dtos/shared.dto';
 import { DeleteEventInterface } from '../interfaces/delete-event.interface';
 import { CancelEventInterface } from '../interfaces/cancel-event.interface';
+import {
+  CreateSurveyRequestDto,
+  GetSurveyPageRequestDto,
+  UpdateSurveyRequestDto,
+} from 'src/interfaces/survey.interface';
+import { SurveyResponseDto } from 'packages/rumor-utils/shared/events/dtos/survey-response.dto';
 
 export class EventsController {
   public static listEventStatus = asyncWrapper(
@@ -520,4 +526,5 @@ export class EventsController {
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
+
 }

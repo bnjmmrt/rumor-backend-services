@@ -86,6 +86,7 @@ export enum FilterTypes {
   userSource = 'userSource',
   vouch = 'vouch',
   followers = 'followers',
+  whosInTown = 'whosInTown',
 }
 
 export const FilterTypeValues: Record<FilterTypes, string> = {
@@ -108,4 +109,5 @@ export const FilterTypeValues: Record<FilterTypes, string> = {
   [FilterTypes.vouch]: 'checkbox',
   [FilterTypes.followers]: 'followers',
   [FilterTypes.userHostRelationship]: 'checkbox',
+  [FilterTypes.whosInTown]: 'whosInTown',
 };

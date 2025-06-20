@@ -48,6 +48,8 @@ import { HostUserSettings } from './host-user-settings.entity';
 import { RestrictedInvites } from '../../events/entities';
 import { Focus } from './focus.entity';
 import { Report } from './report.entity';
+import { Survey } from '../../events/entities/survey.entity';
+import { SurveyResponses } from '../../events/entities/survey-response.entity';
 
 @Entity()
 export class User extends RumorBaseEntity {
@@ -239,6 +241,9 @@ export class User extends RumorBaseEntity {
 
   @OneToMany(() => Report, report => report.reportedTo)
   reportsReceived: Relation<Report[]>;
+
+  @OneToMany(() => SurveyResponses, response => response.user)
+  surveyResponses: Relation<SurveyResponses[]>;
 
   @OneToMany(() => CsvUploadRecords, csvUploads => csvUploads.host)
   csvUploads: CsvUploadRecords[];

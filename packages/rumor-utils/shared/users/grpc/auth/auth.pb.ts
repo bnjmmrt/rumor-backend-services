@@ -22,7 +22,7 @@ import {
   UserSource,
   UserStatus,
 } from './shared.pb';
-import { IReferenceCode } from '../../mappers/auth.mapper';
+import { IReferenceCode } from '../../../users/mappers/auth.mapper';
 
 export const protobufPackage = 'auth';
 
@@ -550,6 +550,25 @@ export interface InvitedUsers {
   lastName: string;
 }
 
+export interface Survey {
+  title: string;
+  message?: string;
+  imageUrl: string;
+  eventStartDate: Date;
+  eventEndDate: Date;
+  surveyStartDate: Date;
+  surveyEndDate: Date;
+  status: string;
+}
+
+export interface SurveyResponse {
+  id: string;
+  response: string;
+  user: User;
+  survey: Survey;
+  respondedAt: string;
+}
+
 export interface MemberProfile {
   id: string;
   userId?: string | undefined;
@@ -587,6 +606,12 @@ export interface MemberProfile {
   sources?: string[] | undefined;
   isHost?: boolean | undefined;
   references?: IReferenceCode;
+  surveyResponses: SurveyResponse[];
+  company?: {
+    name: string;
+    logo: string;
+    website: string;
+  };
 }
 
 export interface FocusProto {

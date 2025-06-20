@@ -23,3 +23,5 @@ export { SignupFormStaticQuestions } from './signup-form-static-questions.entity
 export { SignupFormSubmissions } from './signup-form-submissions.entity';
 export { CsvUploadRecords } from './csv-upload-records.entity';
 export { RestrictedInvites } from './restricted-invites.entity';
+export { Survey } from './survey.entity';
+export { SurveyResponses } from './survey-response.entity';

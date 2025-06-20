@@ -18,6 +18,15 @@ import {
 import { Request, Response } from 'express';
 import { TicketType } from 'packages/rumor-utils/shared/entities';
 
+interface TicketTypeBreakdown {
+  id: string;
+  name: string;
+  description: string;
+  capacity: number;
+  enabled: boolean;
+  attendeeCount: number;
+}
+
 export class TicketTypeController {
   constructor(private readonly ticketTypeService: TicketTypeService) {}
 
@@ -67,6 +76,17 @@ export class TicketTypeController {
       const ticketTypeResponse: TicketTypeResponse =
         await TicketTypeService.deleteTicketType(payload);
       const successResponse = new DeleteResponse(ticketTypeResponse);
+      res.status(successResponse.statusCode).json(successResponse);
+    },
+  );
+
+  public static getTicketBreakdown = asyncWrapper(
+    async (req: Request, res: Response): Promise<void> => {
+      const { id } = req.params;
+      const payload: RequestByIdDto = { id };
+      const ticketTypeResponse: TicketTypeBreakdown[] =
+        await TicketTypeService.getTicketBreakdown(payload);
+      const successResponse = new GetResponse(ticketTypeResponse);
       res.status(successResponse.statusCode).json(successResponse);
     },
   );
