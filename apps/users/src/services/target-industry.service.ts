@@ -87,13 +87,7 @@ export class TargetIndustryService {
     const connection = await this.connectionManager.initializeDbConnection();
     const repository = connection.getRepository(TargetIndustry);
 
-    // Load the relations we need for cascading
-    const targetIndustryWithRelations = await repository.findOne({
-      where: { id },
-      relations: ['industryOpportunities', 'industryInquiries']
-    });
-
-    await repository.softRemove(targetIndustryWithRelations);
+    await repository.softDelete({ id, deletedAt: IsNull() });
   }
 }
 

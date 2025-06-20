@@ -60,7 +60,7 @@ export class IndustryCategoryService {
     // Load the relations we need for cascading
     const categoryWithRelations = await repository.findOne({
       where: { id },
-      relations: ['targetIndustries', 'targetIndustries.industryOpportunities', 'targetIndustries.industryInquiries']
+      relations: ['targetIndustries']
     });
 
     if (!categoryWithRelations) {
