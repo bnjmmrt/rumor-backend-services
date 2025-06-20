@@ -10,6 +10,9 @@ import { PlatformController } from '../controllers/platform.controller';
 import { ReferralRequestController } from '../controllers/referral-request.controller';
 import { ReferralCodeController } from '../controllers/referral-code.controller';
 import FilesController from '../controllers/files.controller';
+import { validateRequest } from '../server/middleware/validate-request';
+import { IndustryCategoryController } from '../controllers/industry-category.controller';
+import { TargetIndustryController } from '../controllers/target-industry.controller';
 const multer = require('multer');
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -354,6 +357,70 @@ router.delete('/auth/interest/:id', PlatformController.deleteInterest);
 router.get('/auth/user-interests/:id', PlatformController.getUserInterests);
 router.post('/auth/user-interests/:id', PlatformController.saveInterestsForUser);
 router.post('/auth/user/:userId/add-focus', PlatformController.saveFocusesForUser);
+
+router.post(
+  '/industries/categories',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('industryCategory'),
+  IndustryCategoryController.create,
+);
+
+router.get(
+  '/industries/categories',
+  AuthMiddleware.fusionAuthRequired,
+  IndustryCategoryController.findAll,
+);
+
+router.get(
+  '/industries/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  IndustryCategoryController.findOne,
+);
+
+router.patch(
+  '/industries/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('industryCategory'),
+  IndustryCategoryController.update,
+);
+
+router.delete(
+  '/industries/categories/:id',
+  AuthMiddleware.fusionAuthRequired,
+  IndustryCategoryController.remove,
+);
+
+router.post(
+  '/industries/target-industries',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('targetIndustry'),
+  TargetIndustryController.create,
+);
+
+router.get(
+  '/industries/target-industries',
+  AuthMiddleware.fusionAuthRequired,
+  TargetIndustryController.findAll,
+);
+
+router.get(
+  '/industries/target-industries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  TargetIndustryController.findOne,
+);
+
+router.patch(
+  '/industries/target-industries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  validateRequest('targetIndustry'),
+  TargetIndustryController.update,
+);
+
+router.delete(
+  '/industries/target-industries/:id',
+  AuthMiddleware.fusionAuthRequired,
+  TargetIndustryController.remove,
+);
 
 //Referral Requests
 router.post(
