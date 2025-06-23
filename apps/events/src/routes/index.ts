@@ -324,7 +324,7 @@ router.get(
 
 // router.get("/event/:id", AuthMiddleware.fusionAuthRequired, EventsController.getEvent) /**TestStatus: working */
 router.get(
-  '/event/:id',
+  '/event/:id',  
   AuthMiddleware.fusionAuthRequired,
   EventsController.getEvent,
 ); /**TestStatus: working */

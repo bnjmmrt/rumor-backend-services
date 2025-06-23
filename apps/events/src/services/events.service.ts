@@ -83,6 +83,7 @@ import {
   extractDate,
 } from '../utils/event.utils';
 import {
+  CollaboratorStatusEnum,
   EventLocationInterface,
   EventStatusEnum,
   GuestStatus,
@@ -1361,10 +1362,12 @@ export class EventsService {
     const eventId = payload.id;
     const event: Event = await this.getEventWithAllRelations(eventId);
     if (!event) throw new NotFoundError('Item Event  not found');
+
     const userRoles = await this.dbConnection.getRepository(UserRole).find({
       where: { user: { id: payload.userId } },
       relations: { role: true },
     });
+
     const isAdmin = userRoles.some(userRole => userRole.role.name === 'admin');
     if (!isAdmin && event.owner.id !== payload.userId) {
       throw new ForbiddenError('Permission denied: You can only access events you host.');
@@ -1416,7 +1419,10 @@ export class EventsService {
       });
     } else {
       event = await this.dbConnection.getRepository(Event).findOne({
-        where: { id: payload.id, owner: { id: payload.userId } },
+        where: {
+          id: payload.id,
+          owner: { id: payload.userId },
+        },
         relations: [
           'quizQuestions',
           'collaborators',

@@ -4,6 +4,7 @@ import { Event } from './event.entity';
 import { Role } from '../../users/entities/roles/role.entity';
 import { User } from '../../users/entities/user.entity';
 import { TicketType } from './ticket-type.entity';
+import { CollaboratorStatusEnum } from '../interfaces/event.interface';
 
 @Entity('collaborator')
 export class Collaborator extends RumorBaseEntity {
@@ -86,4 +87,12 @@ export class Collaborator extends RumorBaseEntity {
   })
   @JoinColumn({ name: 'ticket_type_id' })
   ticketType: Partial<TicketType>;
+
+  @Column({
+    type: 'enum',
+    enumName: 'collaborator_status',
+    default: CollaboratorStatusEnum.PENDING,
+    enum: CollaboratorStatusEnum,
+  })
+  status: CollaboratorStatusEnum;
 }
