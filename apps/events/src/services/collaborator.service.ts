@@ -307,7 +307,7 @@ export class CollaboratorService {
     }
     const roles = response
       .map(setting => setting.role)
-      .filter(role => !!role)
+      .filter(role => !!role && role.name !== 'promoter')
       .map(role => ({
         id: role.id,
         name: role.name,

@@ -24,3 +24,5 @@ export { SignupFormStaticQuestions } from '../events/entities/signup-form-static
 export { SignupFormSubmissions } from '../events/entities/signup-form-submissions.entity';
 export { EventSignupForms } from '../events/entities/event-signup-forms.entity';
 export { AdminNotification } from '../notifications/entities/admin-notification.entity';
+export { IndustryCategory } from '../industries/entities/industry-category.entity';
+export { TargetIndustry } from '../industries/entities/target-industry.entity';
