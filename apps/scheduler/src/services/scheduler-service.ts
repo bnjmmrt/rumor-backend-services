@@ -1,9 +1,10 @@
 import { EventStatusEnum } from 'rumor-utils/shared/events/interfaces/event.interface';
-import { Event, User } from 'rumor-utils/shared/entities';
+import { Event, User, AdminNotification } from 'rumor-utils/shared/entities';
 import { convertToEpoch } from 'rumor-utils/shared/events/utils/event.utils';
 import * as schedule from 'node-schedule';
 import { BadRequestError } from 'rumor-utils/errors';
 import { SchedulerJobType } from 'rumor-utils/shared/schedulers/interfaces/scheduler.interface';
+import { NotificationStatus } from 'rumor-utils/shared/notifications/interfaces/notification.interface';
 import serviceMesh from '../server/helpers/serviceMeshHandler';
 import { IsNull, Not } from 'typeorm';
 
@@ -65,10 +66,48 @@ export class SchedulerService {
       case SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB:
         await this.cancelAndRemoveScheduledJob(data.jobKey);
         break;
+      case SchedulerJobType.ADMIN_NOTIFICATION:
+        await this.scheduleAdminNotification(data);
+        break;
       default:
         throw new BadRequestError(`Invalid scheduler type: ${type}`);
     }
     return '';
+  }
+
+  public static async scheduleAdminNotification(payload: any): Promise<void> {
+    try {
+      if (!payload.id || !payload.scheduledDate) return;
+
+      const jobKey = `${SchedulerJobType.ADMIN_NOTIFICATION}_${payload.id}`;
+      const scheduledDate = payload.scheduledDate;
+
+      this.cancelScheduledJob(jobKey);
+
+      const job = schedule.scheduleJob(scheduledDate, async () => {
+        if (payload.id) {
+          const adminNotification = await AdminNotification.findOne({
+            where: { id: payload.id },
+          });
+
+          if (!adminNotification) return; // Stop execution if the notification was deleted
+
+          serviceMesh.notificationService().sendAdminNotification(adminNotification.id);
+        }
+        this.removeScheduledJob(jobKey);
+      });
+
+      this.storeScheduledJob(jobKey, job);
+
+      //Change the status to SCHEDULED
+      const adminNotification = await AdminNotification.findOne({
+        where: { id: payload.id },
+      });
+      adminNotification.status = NotificationStatus.SCHEDULED
+      await adminNotification.save();
+    } catch (err) {
+      console.log(`Error scheduling admin notification ::`, err);
+    }
   }
 
   /**

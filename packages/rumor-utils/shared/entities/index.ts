@@ -23,6 +23,6 @@ export { SignupFormQuestions } from '../events/entities/signup-form-questions.en
 export { SignupFormStaticQuestions } from '../events/entities/signup-form-static-questions.entity';
 export { SignupFormSubmissions } from '../events/entities/signup-form-submissions.entity';
 export { EventSignupForms } from '../events/entities/event-signup-forms.entity';
-
+export { AdminNotification } from '../notifications/entities/admin-notification.entity';
 export { IndustryCategory } from '../industries/entities/industry-category.entity';
 export { TargetIndustry } from '../industries/entities/target-industry.entity';

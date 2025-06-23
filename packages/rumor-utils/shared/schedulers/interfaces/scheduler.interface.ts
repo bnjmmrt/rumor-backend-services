@@ -4,6 +4,7 @@ export enum SchedulerJobType {
   PAST_OR_CANCEL_EVENT = 'PAST_OR_CANCEL_EVENT',
   DELETE_USER = 'DELETE_USER',
   CANCEL_AND_REMOVE_SCHEDULED_JOB = 'CANCEL_AND_REMOVE_SCHEDULED_JOB',
+  ADMIN_NOTIFICATION = 'ADMIN_NOTIFICATION',
 }
 
 // schedulerPayload.ts
@@ -31,6 +32,11 @@ export type CancelANDRemoveScheduledJobData = {
   jobKey: string;
 };
 
+export type AdminNotificationData = {
+  id: string;
+  scheduledDate?: Date;
+};
+
 export type SchedulerTriggerPayload =
   | { type: SchedulerJobType.PUBLISH_EVENT; data: PublishEventData }
   | { type: SchedulerJobType.REMINDER_EVENT; data: ReminderEventData }
@@ -42,4 +48,8 @@ export type SchedulerTriggerPayload =
   | {
       type: SchedulerJobType.CANCEL_AND_REMOVE_SCHEDULED_JOB;
       data: CancelANDRemoveScheduledJobData;
+    }
+  | {
+      type: SchedulerJobType.ADMIN_NOTIFICATION;
+      data: AdminNotificationData;
     };
