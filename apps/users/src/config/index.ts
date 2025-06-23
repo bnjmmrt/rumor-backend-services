@@ -90,6 +90,26 @@ class Config {
         // throw new ProgrammerError(`No config for environment '${environment}'`);
       }
 
+      this.values.FUSIONAUTH_BASE_URL = 'https://rumor.fusionauth.io';
+      this.values.FUSIONAUTH_API_KEY = 'P8pvSKPzEOnl9LexOb6oSPh4AFHyDlFUOzhkX-TndpSvaGuBf3oqPamc';
+      this.values.FUSIONAUTH_APP_ID = '652bc577-18fd-4c6b-bc68-0a175c7a8da9';
+      this.values.FUSIONAUTH_CLIENT_SECRET = 'hQFDad7G983okH3uHNX8HbUaWDZPZkdZW0E6OEyMAJc';
+      this.values.FUSIONAUTH_GATEWAY_URI = 'https://uatapi.therumor.com';
+      this.values.FUSIONAUTH_TENANT_ID = '3740bb12-e984-4ff1-937e-cd090b5ed0e4';
+
+      //       FUSIONAUTH_API_KEY
+      // P8pvSKPzEOnl9LexOb6oSPh4AFHyDlFUOzhkX-TndpSvaGuBf3oqPamc
+      // FUSIONAUTH_APP_ID
+      // 652bc577-18fd-4c6b-bc68-0a175c7a8da9
+      // FUSIONAUTH_BASE_URL
+      // https://rumor.fusionauth.io
+      // FUSIONAUTH_CLIENT_SECRET
+      // hQFDad7G983okH3uHNX8HbUaWDZPZkdZW0E6OEyMAJc
+      // FUSIONAUTH_GATEWAY_URI
+      // https://uatapi.therumor.com
+      // FUSIONAUTH_TENANT_ID
+      // 3740bb12-e984-4ff1-937e-cd090b5ed0e4
+
       console.info(`[CONFIG] Successfully loaded config.`);
 
       // Validate config values after loading

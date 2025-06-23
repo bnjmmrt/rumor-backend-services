@@ -224,10 +224,18 @@ router.post('/auth/host-feedback', AuthMiddleware.fusionAuthRequired, AuthContro
 router.post('/auth/send-verification-code-by-email', AuthController.sendVerificationCodeByEmail);
 router.post('/auth/verify-code-by-email', AuthController.verifyCodeByEmail);
 router.post('/auth/user/:id/set-login-status', AuthController.setLoginStatus);
-router.post('/auth/user/:id/agree-community-guidelines', AuthController.agreeToCommunityGuidelines);
+router.put('/auth/user/:id/agree-community-guidelines', AuthController.agreeToCommunityGuidelines);
 router.get(
   '/auth/user/:id/community-guidelines-status',
   AuthController.checkCommunityGuidelinesStatus,
+);
+router.put(
+  '/auth/user/:id/agree-host-community-guidelines',
+  AuthController.agreeToHostCommunityGuidelines,
+);
+router.get(
+  '/auth/user/:id/host-community-guidelines-status',
+  AuthController.checkHostCommunityGuidelinesStatus,
 );
 router.post(
   '/auth/hosts/custom-lists/duplicate',
