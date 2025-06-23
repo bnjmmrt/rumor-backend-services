@@ -230,7 +230,9 @@ import { Guest } from 'rumor-utils/shared/entities';
 import { EventStatusEnum, GuestStatus } from 'rumor-utils/shared/events/interfaces/event.interface';
 import { PlatformService } from './platform.service';
 import {
-  RestrictedInvites, Survey, SurveyResponses,
+  RestrictedInvites,
+  Survey,
+  SurveyResponses,
   SignupFormSubmissions,
   Ticket,
 } from 'rumor-utils/shared/events/entities';
@@ -3680,13 +3682,19 @@ export class AuthService {
     return '';
   }
 
-  public static async agreeToCommunityGuidelines(payload: IdRequestDto): Promise<string> {
+  public static async agreeToMemberCommunityGuidelines(payload: IdRequestDto): Promise<string> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
+      relations: ['roles', 'roles.role'],
     });
 
     if (!user) {
       throw new NotFoundError('user');
+    }
+
+    const isMember = user.roles.some(role => role.role.name === 'member');
+    if (!isMember) {
+      throw new ForbiddenError('User is not a member');
     }
 
     if (user.communityGuidelinesAgreed) {
@@ -3700,12 +3708,54 @@ export class AuthService {
     return '';
   }
 
-  public static async checkCommunityGuidelinesStatus(
+  public static async checkMemberCommunityGuidelinesStatus(
     payload: IdRequestDto,
   ): Promise<{ agreed: boolean; agreedAt: Date | null }> {
     const user = await this.dbConnection.getRepository(User).findOne({
       where: { id: payload.id, deletedAt: null },
-      select: ['communityGuidelinesAgreed', 'communityGuidelinesAgreedAt'],
+    });
+
+    if (!user) {
+      throw new NotFoundError('user not found');
+    }
+
+    return {
+      agreed: user.communityGuidelinesAgreed,
+      agreedAt: user.communityGuidelinesAgreedAt,
+    };
+  }
+
+  public static async agreeToHostCommunityGuidelines(payload: IdRequestDto): Promise<string> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
+      relations: ['roles', 'roles.role'],
+    });
+
+    if (!user) {
+      throw new NotFoundError('user');
+    }
+
+    const isHost = user.roles.some(role => role.role.name === 'host');
+    if (!isHost) {
+      throw new ForbiddenError('User is not a host');
+    }
+
+    if (user.hostCommunityGuidelinesAgreed) {
+      throw new BadRequestError('Host has already agreed to community guidelines');
+    }
+
+    user.hostCommunityGuidelinesAgreed = true;
+    user.hostCommunityGuidelinesAgreedAt = new Date();
+    await this.dbConnection.getRepository(User).save(user);
+
+    return '';
+  }
+
+  public static async checkHostCommunityGuidelinesStatus(
+    payload: IdRequestDto,
+  ): Promise<{ agreed: boolean; agreedAt: Date | null }> {
+    const user = await this.dbConnection.getRepository(User).findOne({
+      where: { id: payload.id, deletedAt: null },
     });
 
     if (!user) {
@@ -3713,8 +3763,8 @@ export class AuthService {
     }
 
     return {
-      agreed: user.communityGuidelinesAgreed,
-      agreedAt: user.communityGuidelinesAgreedAt,
+      agreed: user.hostCommunityGuidelinesAgreed,
+      agreedAt: user.hostCommunityGuidelinesAgreedAt,
     };
   }
 
@@ -5414,7 +5464,6 @@ export class AuthService {
     );
   }
 
-   
   public static async applyUserFilters(
     queryBuilder,
     parsedQuery,
@@ -5820,7 +5869,6 @@ export class AuthService {
 
     const savedFeedback = await this.dbConnection.getRepository(HostFeedback).save(feedback);
 
-
     try {
       const adminUsers: User[] = await this.dbConnection.getRepository(User).find({
         where: {
@@ -6025,7 +6073,6 @@ export class AuthService {
     userData.isHost = isHost;
     return userData;
   }
-
 
   public static async getUserCustomLists(
     hostId: string,

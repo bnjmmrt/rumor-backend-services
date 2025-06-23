@@ -608,7 +608,7 @@ export class AuthController {
   public static agreeToCommunityGuidelines = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
     const payload: IdRequestDto = { id };
-    const response: string = await AuthService.agreeToCommunityGuidelines(payload);
+    const response: string = await AuthService.agreeToMemberCommunityGuidelines(payload);
     const updateResponse = new UpdateResponse(
       response,
       'Community guidelines agreement recorded successfully',
@@ -619,13 +619,37 @@ export class AuthController {
   public static checkCommunityGuidelinesStatus = asyncWrapper(async (req, res): Promise<void> => {
     const { id } = req.params;
     const payload: IdRequestDto = { id };
-    const response = await AuthService.checkCommunityGuidelinesStatus(payload);
+    const response = await AuthService.checkMemberCommunityGuidelinesStatus(payload);
     const getResponse = new GetResponse(
       response,
       'Community guidelines status retrieved successfully',
     );
     res.status(getResponse.statusCode).json(getResponse);
   });
+
+  public static agreeToHostCommunityGuidelines = asyncWrapper(async (req, res): Promise<void> => {
+    const { id } = req.params;
+    const payload: IdRequestDto = { id };
+    const response: string = await AuthService.agreeToHostCommunityGuidelines(payload);
+    const updateResponse = new UpdateResponse(
+      response,
+      'Host community guidelines agreement recorded successfully',
+    );
+    res.status(updateResponse.statusCode).json(updateResponse);
+  });
+
+  public static checkHostCommunityGuidelinesStatus = asyncWrapper(
+    async (req, res): Promise<void> => {
+      const { id } = req.params;
+      const payload: IdRequestDto = { id };
+      const response = await AuthService.checkHostCommunityGuidelinesStatus(payload);
+      const getResponse = new GetResponse(
+        response,
+        'Host community guidelines status retrieved successfully',
+      );
+      res.status(getResponse.statusCode).json(getResponse);
+    },
+  );
 
   public static duplicateCustomList = asyncWrapper(async (req, res): Promise<void> => {
     const hostId = (req as any).user;

@@ -103,6 +103,12 @@ export class User extends RumorBaseEntity {
   @Column({ type: 'timestamp', name: 'community_guidelines_agreed_at', nullable: true })
   communityGuidelinesAgreedAt: Date | null;
 
+  @Column({ type: 'boolean', name: 'host_community_guidelines_agreed', default: false })
+  hostCommunityGuidelinesAgreed: boolean;
+
+  @Column({ type: 'timestamp', name: 'host_community_guidelines_agreed_at', nullable: true })
+  hostCommunityGuidelinesAgreedAt: Date | null;
+
   @Column({ type: 'varchar', name: '2fa_code', nullable: true })
   twoFactorCode: string | null;
 
