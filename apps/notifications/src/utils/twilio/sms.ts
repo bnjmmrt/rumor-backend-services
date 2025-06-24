@@ -176,14 +176,18 @@ class TwilioService {
   async sendBulkTextMessage(message: string, phoneNumbers: string[]) {
     const client = this.getClient();
     const messagingServiceSid = config.get('TWILIO_MESSAGING_SERVICE_SID');
+    const notifyServiceSid = config.get('TWILIO_NOTIFY_SERVICE_SID');
 
     if (!messagingServiceSid) {
       throw new BadRequestError('TWILIO_MESSAGING_SERVICE_SID is missing or invalid');
     }
+    if (!notifyServiceSid) {
+      throw new BadRequestError('TWILIO_NOTIFY_SERVICE_SID is missing or invalid');
+    }
 
     try {
       const r = await client.notify.v1
-        .services('IS3c3104d01fea30539ce68ba74b3da48f') //TODO: move to env
+        .services(notifyServiceSid)
         .notifications.create({
           toBinding: phoneNumbers,
           body: message,
