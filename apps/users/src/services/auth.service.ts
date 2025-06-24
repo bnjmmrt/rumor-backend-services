@@ -6048,6 +6048,44 @@ export class AuthService {
     const formattedLists = await this.getUserCustomLists(payload.id, user.id);
     const userRole = user.roles.find(r => ['member', 'non_member'].includes(r.role.name));
 
+    // Extract company information from JSON fields
+    let company = {
+      name: 'N/A',
+      logo: '',
+      website: ''
+    };
+    
+    try {
+      // Check additionalHostInformation first
+      if (user.additionalHostInformation) {
+        const hostInfo = typeof user.additionalHostInformation === 'string' 
+          ? JSON.parse(user.additionalHostInformation) 
+          : user.additionalHostInformation;
+        
+        if (hostInfo && hostInfo.companyName) {
+          company.name = hostInfo.companyName;
+          company.logo = hostInfo.companyLogo || '';
+          company.website = hostInfo.website || '';
+        }
+      }
+      
+      // If not found in host info, check additionalMemberInformation
+      if (company.name === 'N/A' && user.additionalMemberInformation) {
+        const memberInfo = typeof user.additionalMemberInformation === 'string' 
+          ? JSON.parse(user.additionalMemberInformation) 
+          : user.additionalMemberInformation;
+        
+        if (memberInfo && memberInfo.companyName) {
+          company.name = memberInfo.companyName;
+          company.logo = memberInfo.companyLogo || '';
+          company.website = memberInfo.website || '';
+        }
+      }
+    } catch (error) {
+      // If JSON parsing fails, keep company with default values
+      console.error('Error parsing JSON fields for company information:', error);
+    }
+
     const isFollow = !!hostFollowing;
     const isFavorite = !!hostUserFavorite;
     const isSpam = hostUserSettings?.isSpam ?? false;
@@ -6071,6 +6109,7 @@ export class AuthService {
     userData.note = note;
     userData.hostUserMappingId = hostUserMapping?.id ?? '';
     userData.isHost = isHost;
+    userData.company = company;
     return userData;
   }
 
