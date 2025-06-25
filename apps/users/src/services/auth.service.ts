@@ -5590,6 +5590,7 @@ export class AuthService {
       'list',
       'pastEvents',
       'category',
+      'profession',
       'baseCity',
       'gender',
       'age',
@@ -5632,7 +5633,7 @@ export class AuthService {
     const customLists = user?.customLists?.map(list => ({
       name: list.listName,
       id: list.listName,
-    }));
+    })) || [];
     const hostDefaultList = [
       { id: 'myFavourites-systemDefault', name: 'My Favorites' },
       { id: 'myFollowers-systemDefault', name: 'My Followers' },
@@ -5817,6 +5818,24 @@ export class AuthService {
       type: FilterTypeValues.whosInTown,
     };
 
+    const profession = {
+      id: 'profession',
+      label: 'Profession',
+      options: [
+        { id: 'actor', name: 'Actor' },
+        { id: 'advertising', name: 'Advertising' },
+        { id: 'architect', name: 'Architect' },
+        { id: 'artDirector', name: 'Art Director' },
+        { id: 'artist', name: 'Artist' },
+        { id: 'chef', name: 'Chef' },
+        { id: 'coach', name: 'Coach' },
+        { id: 'comedian', name: 'Comedian' },
+        { id: 'contentCreator', name: 'Content Creator' },
+        { id: 'creativeDirector', name: 'Creative Director' },
+      ],
+      type: FilterTypeValues.profession,
+    };
+
     const objectsMap = {
       baseCity: baseCityObj,
       gender: genderObj,
@@ -5836,6 +5855,7 @@ export class AuthService {
       vouch: vouchObj,
       followersObj,
       whosInTown: surveysObj,
+      profession: profession,
     };
     // Arrange objects in the desired sequence
     const orderedObjects = filterOptionsSequence.map(id => objectsMap[id]).filter(node => node);
