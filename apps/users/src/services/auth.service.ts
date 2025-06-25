@@ -5821,6 +5821,7 @@ export class AuthService {
     const profession = {
       id: 'profession',
       label: 'Profession',
+      isSearchable: true,
       options: [
         { id: 'actor', name: 'Actor' },
         { id: 'advertising', name: 'Advertising' },
